@@ -1,0 +1,182 @@
+# Copyright (C) 2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+name: "profile.suite.ai.gen"
+description: "Gen AI suite profile"
+version: "1.0.0"
+params:
+  labels:
+    profile_display_name: "Gen AI"
+    type: "suite"
+  requirements:
+    # Hardware requirements
+    cpu_min_cores: 2
+    memory_min_gb: 5.0
+    storage_min_gb: 10.0
+    # Software requirements
+    os_type:
+      - "linux"
+    docker_required: true
+
+suites:
+  - name: "ai"
+    sub_suites:
+      - name: "gen"
+      
+        tests:
+          test_text_generation:
+            params:
+              - test_id: "T0069"
+                display_name: "Qwen/Qwen3-1.7B INT4 (CPU)"
+                model_id: "Qwen/Qwen3-1.7B"
+                devices: [cpu]
+                requirements:
+                  memory_min_gb: 4.0
+
+              - test_id: "T0070"
+                display_name: "Qwen/Qwen3-1.7B INT4 (iGPU)"
+                model_id: "Qwen/Qwen3-1.7B"
+                devices: [igpu]
+                requirements:
+                  igpu_required: true
+                  memory_min_gb: 4.0
+
+              - test_id: "T0071"
+                display_name: "Qwen/Qwen3-1.7B INT4 (dGPU)"
+                model_id: "Qwen/Qwen3-1.7B"
+                devices: [dgpu]
+                requirements:
+                  dgpu_required: true
+                  dgpu_min_vram_gb: 4.0
+
+              - test_id: "T0072"
+                display_name: "Qwen/Qwen3-1.7B INT4 (NPU)"
+                model_id: "Qwen/Qwen3-1.7B"
+                devices: [npu]
+                requirements:
+                  npu_required: true
+                  memory_min_gb: 4.0
+
+              - test_id: "T0073"
+                display_name: "microsoft/Phi-4-mini-instruct INT4 (CPU)"
+                model_id: "microsoft/Phi-4-mini-instruct"
+                devices: [cpu]
+                requirements:
+                  memory_min_gb: 6.0
+
+              - test_id: "T0074"
+                display_name: "microsoft/Phi-4-mini-instruct INT4 (iGPU)"
+                model_id: "microsoft/Phi-4-mini-instruct"
+                devices: [igpu]
+                requirements:
+                  igpu_required: true
+                  memory_min_gb: 6.0
+
+              - test_id: "T0075"
+                display_name: "microsoft/Phi-4-mini-instruct INT4 (dGPU)"
+                model_id: "microsoft/Phi-4-mini-instruct"
+                devices: [dgpu]
+                requirements:
+                  dgpu_required: true
+                  dgpu_min_vram_gb: 6.0
+
+              - test_id: "T0076"
+                display_name: "microsoft/Phi-4-mini-instruct INT4 (NPU)"
+                model_id: "microsoft/Phi-4-mini-instruct"
+                devices: [npu]
+                requirements:
+                  npu_required: true
+                  memory_min_gb: 6.0
+
+              - test_id: "T0077"
+                display_name: "deepseek-ai/DeepSeek-R1-Distill-Llama-8B INT4 (CPU)"
+                model_id: "deepseek-ai/DeepSeek-R1-Distill-Llama-8B"
+                devices: [cpu]
+                requirements:
+                  memory_min_gb: 8.0
+
+              - test_id: "T0078"
+                display_name: "deepseek-ai/DeepSeek-R1-Distill-Llama-8B INT4 (iGPU)"
+                model_id: "deepseek-ai/DeepSeek-R1-Distill-Llama-8B"
+                devices: [igpu]
+                requirements:
+                  igpu_required: true
+                  memory_min_gb: 8.0
+
+              - test_id: "T0079"
+                display_name: "deepseek-ai/DeepSeek-R1-Distill-Llama-8B INT4 (dGPU)"
+                model_id: "deepseek-ai/DeepSeek-R1-Distill-Llama-8B"
+                devices: [dgpu]
+                requirements:
+                  dgpu_required: true
+                  dgpu_min_vram_gb: 8.0
+
+              - test_id: "T0080"
+                display_name: "deepseek-ai/DeepSeek-R1-Distill-Llama-8B INT4 (NPU)"
+                model_id: "deepseek-ai/DeepSeek-R1-Distill-Llama-8B"
+                devices: [npu]
+                requirements:
+                  npu_required: true
+                  memory_min_gb: 8.0
+
+              - test_id: "T0081"
+                display_name: "Qwen/Qwen3-14B INT4 (CPU)"
+                model_id: "Qwen/Qwen3-14B"
+                devices: [cpu]
+                requirements:
+                  memory_min_gb: 14.0
+
+              - test_id: "T0082"
+                display_name: "Qwen/Qwen3-14B INT4 (iGPU)"
+                model_id: "Qwen/Qwen3-14B"
+                devices: [igpu]
+                requirements:
+                  igpu_required: true
+                  memory_min_gb: 14.0
+
+              - test_id: "T0083"
+                display_name: "Qwen/Qwen3-14B INT4 (dGPU)"
+                model_id: "Qwen/Qwen3-14B"
+                devices: [dgpu]
+                requirements:
+                  dgpu_required: true
+                  dgpu_min_vram_gb: 14.0
+
+              - test_id: "T0084"
+                display_name: "Qwen/Qwen3-14B INT4 (NPU)"
+                model_id: "Qwen/Qwen3-14B"
+                devices: [npu]
+                requirements:
+                  npu_required: true
+                  memory_min_gb: 14.0
+
+              - test_id: "T0085"
+                display_name: "Qwen/Qwen3-32B INT4 (CPU)"
+                model_id: "Qwen/Qwen3-32B"
+                devices: [cpu]
+                requirements:
+                  memory_min_gb: 16.0
+
+              - test_id: "T0086"
+                display_name: "Qwen/Qwen3-32B INT4 (iGPU)"
+                model_id: "Qwen/Qwen3-32B"
+                devices: [igpu]
+                requirements:
+                  igpu_required: true
+                  memory_min_gb: 16.0
+
+              - test_id: "T0087"
+                display_name: "Qwen/Qwen3-32B INT4 (dGPU)"
+                model_id: "Qwen/Qwen3-32B"
+                devices: [dgpu]
+                requirements:
+                  dgpu_required: true
+                  dgpu_min_vram_gb: 16.0
+
+              - test_id: "T0088"
+                display_name: "Qwen/Qwen3-32B INT4 (NPU)"
+                model_id: "Qwen/Qwen3-32B"
+                devices: [npu]
+                requirements:
+                  npu_required: true
+                  memory_min_gb: 16.0

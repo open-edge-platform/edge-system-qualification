@@ -1,0 +1,3727 @@
+diff --git a/.gitignore b/.gitignore
+index 64e67a73a..c7eb0fe38 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -51,4 +51,7 @@ build
+ .cursor/
+ .cursorrules
+ .cursorignore
+-.cursorindexingignore
+\ No newline at end of file
++.cursorindexingignore
++
++# ignore data folder
++data
+\ No newline at end of file
+diff --git a/allurerc.mjs b/allurerc.mjs
+index 31265892d..3f27bfafd 100644
+--- a/allurerc.mjs
++++ b/allurerc.mjs
+@@ -1,15 +1,19 @@
+ import { defineConfig } from "allure";
+ 
+ export default defineConfig({
+-  name: "Allure Report 3",
++  name: "Intel® Edge System Qualification",
+   output: "./out/allure-report",
+   plugins: {
+     awesome: {
+       options: {
+         singleFile: false,
++        allureVersion: "2025.1.0",
+         reportLanguage: "en",
+         reportName: "Allure 3 Report",
+         groupBy: ["module", "parentSuite", "suite", "subSuite"],
++        // sections: ["summary"],
++        // defaultSection: "report",
++        defaultSection: "summary",
+       },
+     },
+     log: {
+diff --git a/packages/core-api/src/model.ts b/packages/core-api/src/model.ts
+index b1df710b7..4c546ba65 100644
+--- a/packages/core-api/src/model.ts
++++ b/packages/core-api/src/model.ts
+@@ -124,6 +124,7 @@ export interface AttachmentLinkFile {
+   contentLength?: number;
+   originalFileName: string;
+   ext: string;
++  name?: string;
+   used: false;
+   missed: false;
+ }
+diff --git a/packages/core/src/api.ts b/packages/core/src/api.ts
+index c517d965d..f579a7a44 100644
+--- a/packages/core/src/api.ts
++++ b/packages/core/src/api.ts
+@@ -20,6 +20,7 @@ export interface FullConfig {
+   output: string;
+   historyPath: string;
+   knownIssuesPath: string;
++  allureVersion?: string;
+   qualityGate?: QualityGateConfig;
+   /**
+    * You can specify default labels for tests which don't have them at all
+diff --git a/packages/core/src/config.ts b/packages/core/src/config.ts
+index e29af589f..97815489f 100644
+--- a/packages/core/src/config.ts
++++ b/packages/core/src/config.ts
+@@ -117,6 +117,12 @@ export const resolveConfig = async (config: Config, override: ConfigOverride = {
+       : config.plugins!;
+   const pluginInstances = await resolvePlugins(plugins);
+ 
++  // Extract allureVersion from awesome plugin options if available
++  const awesomePlugin = Object.entries(plugins).find(([key, descriptor]) =>
++    key === "awesome" || key.includes("awesome") || (descriptor as PluginDescriptor).import?.includes("awesome"),
++  );
++  const allureVersion = (awesomePlugin?.[1] as PluginDescriptor)?.options?.allureVersion;
++
+   return {
+     name,
+     output,
+@@ -127,6 +133,7 @@ export const resolveConfig = async (config: Config, override: ConfigOverride = {
+     variables,
+     environments,
+     appendHistory,
++    allureVersion,
+     reportFiles: new FileSystemReportFiles(output),
+     plugins: pluginInstances,
+     qualityGate: config.qualityGate,
+diff --git a/packages/core/src/report.ts b/packages/core/src/report.ts
+index 2e7cf4805..2623b47ba 100644
+--- a/packages/core/src/report.ts
++++ b/packages/core/src/report.ts
+@@ -29,6 +29,7 @@ const initRequired = "report is not initialised. Call the start() method first."
+ export class AllureReport {
+   readonly #reportUuid: string;
+   readonly #reportName: string;
++  readonly #allureVersion: string;
+   readonly #store: DefaultAllureStore;
+   readonly #readers: readonly ResultsReader[];
+   readonly #plugins: readonly PluginInstance[];
+@@ -46,6 +47,7 @@ export class AllureReport {
+   constructor(opts: FullConfig) {
+     const {
+       name,
++      allureVersion,
+       readers = [allure1, allure2, cucumberjson, junitXml, attachments],
+       plugins = [],
+       history,
+@@ -62,6 +64,7 @@ export class AllureReport {
+     } = opts;
+     this.#reportUuid = randomUUID();
+     this.#reportName = name;
++    this.#allureVersion = allureVersion ?? version; // Use config version or fallback to package.json version
+     this.#eventEmitter = new EventEmitter<AllureStoreEvents>();
+     this.#events = new Events(this.#eventEmitter);
+     this.#realTime = realTime;
+@@ -267,7 +270,7 @@ export class AllureReport {
+ 
+       const pluginFiles = new PluginFiles(this.#reportFiles, id);
+       const pluginContext: PluginContext = {
+-        allureVersion: version,
++        allureVersion: this.#allureVersion,
+         reportUuid: this.#reportUuid,
+         reportName: this.#reportName,
+         state: pluginState,
+diff --git a/packages/plugin-awesome/src/generators.ts b/packages/plugin-awesome/src/generators.ts
+index 19b0c689d..3db189b07 100644
+--- a/packages/plugin-awesome/src/generators.ts
++++ b/packages/plugin-awesome/src/generators.ts
+@@ -45,7 +45,6 @@ const template = `<!DOCTYPE html>
+ <head>
+     <meta charset="utf-8">
+     <title> {{ reportName }} </title>
+-    <link rel="icon" href="favicon.ico">
+     {{{ headTags }}}
+ </head>
+ <body>
+@@ -317,6 +316,7 @@ export const generateStaticFiles = async (
+     layout = "base",
+     charts = [],
+     defaultSection = "",
++    sections: configuredSections = [],
+   } = payload;
+   const compile = Handlebars.compile(template);
+   const manifest = await readTemplateManifest(payload.singleFile);
+@@ -324,8 +324,15 @@ export const generateStaticFiles = async (
+   const bodyTags: string[] = [];
+   const sections: string[] = [];
+ 
+-  if (charts.length) {
+-    sections.push("charts");
++  // Use configured sections if provided, otherwise use default behavior
++  if (configuredSections.length > 0) {
++    sections.push(...configuredSections);
++  } else {
++    // Default behavior: add charts if available, and always add summary
++    if (charts.length) {
++      sections.push("charts");
++    }
++    sections.push("summary");
+   }
+ 
+   if (!payload.singleFile) {
+@@ -383,7 +390,7 @@ export const generateStaticFiles = async (
+     bodyTags: bodyTags.join("\n"),
+     reportFilesScript: createReportDataScript(reportDataFiles),
+     reportOptions: JSON.stringify(reportOptions),
+-    analyticsEnable: true,
++    analyticsEnable: false,
+     allureVersion,
+     reportUuid,
+     reportName,
+diff --git a/packages/web-awesome/src/components/Footer/FooterLogo.tsx b/packages/web-awesome/src/components/Footer/FooterLogo.tsx
+index 782b09f88..97c3ff1a4 100644
+--- a/packages/web-awesome/src/components/Footer/FooterLogo.tsx
++++ b/packages/web-awesome/src/components/Footer/FooterLogo.tsx
+@@ -1,15 +1,16 @@
+-import { ReportLogoFull, Text } from "@allurereport/web-components";
++import { getReportOptions } from "@allurereport/web-commons";
++import { Text } from "@allurereport/web-components";
++import type { AwesomeReportOptions } from "types";
+ import * as styles from "./styles.scss";
+ 
+ export const FooterLogo = () => {
++  const { reportName } = getReportOptions<AwesomeReportOptions>() ?? {};
++
+   return (
+     <div className={styles["footer-logo"]}>
+-      <a href="https://allurereport.org" target={"_blank"} rel="noreferrer">
+-        <Text type="paragraph" size="m" className={styles["footer-logo"]}>
+-          Powered by
+-        </Text>
+-        <ReportLogoFull className={styles.logo} />
+-      </a>
++      <Text type="paragraph" size="m" bold className={styles["footer-logo"]}>
++        {reportName || "Allure Report"}
++      </Text>
+     </div>
+   );
+ };
+diff --git a/packages/web-awesome/src/components/Footer/FooterVersion.tsx b/packages/web-awesome/src/components/Footer/FooterVersion.tsx
+index 4bd439530..83db1061c 100644
+--- a/packages/web-awesome/src/components/Footer/FooterVersion.tsx
++++ b/packages/web-awesome/src/components/Footer/FooterVersion.tsx
+@@ -31,7 +31,7 @@ export const FooterVersion = () => {
+   return (
+     <Text type="paragraph" size="m" className={styles.version}>
+       {formattedCreatedAt}
+-      {currentVersion && <span> Ver: {currentVersion}</span>}
++      {currentVersion && <span> Version: {currentVersion}</span>}
+     </Text>
+   );
+ };
+diff --git a/packages/web-awesome/src/components/SectionPicker/index.tsx b/packages/web-awesome/src/components/SectionPicker/index.tsx
+index 3efce1d01..8d04dd9ac 100644
+--- a/packages/web-awesome/src/components/SectionPicker/index.tsx
++++ b/packages/web-awesome/src/components/SectionPicker/index.tsx
+@@ -13,6 +13,7 @@ const defaultSection: SectionItem = { name: "report", logo: allureIcons.reportLo
+ const sectionMap: Record<string, SectionItem> = {
+   default: defaultSection,
+   charts: { name: "charts", logo: allureIcons.lineChartsBarChartSquare },
++  summary: { name: "summary", logo: allureIcons.lineChartsBarChartSquare },
+ };
+ 
+ export const SectionPicker = () => {
+diff --git a/packages/web-awesome/src/components/SectionSwitcher/index.tsx b/packages/web-awesome/src/components/SectionSwitcher/index.tsx
+index c8841a643..3cd80c9fb 100644
+--- a/packages/web-awesome/src/components/SectionSwitcher/index.tsx
++++ b/packages/web-awesome/src/components/SectionSwitcher/index.tsx
+@@ -1,6 +1,7 @@
+ import type { VNode } from "preact";
+ import { Charts } from "@/components/Charts";
+ import { Report } from "@/components/Report";
++import { Summary } from "@/components/Summary";
+ import { currentSection } from "@/stores/sections";
+ import * as styles from "./styles.scss";
+ 
+@@ -8,6 +9,7 @@ export const SectionSwitcher = () => {
+   const sectionMap: Record<string, VNode> = {
+     report: <Report />,
+     charts: <Charts />,
++    summary: <Summary />,
+   };
+ 
+   return <div className={styles.layout}>{sectionMap[currentSection.value] || sectionMap.report}</div>;
+diff --git a/packages/web-awesome/src/components/Summary/index.tsx b/packages/web-awesome/src/components/Summary/index.tsx
+new file mode 100644
+index 000000000..21b803731
+--- /dev/null
++++ b/packages/web-awesome/src/components/Summary/index.tsx
+@@ -0,0 +1,2569 @@
++import { useEffect, useState } from "preact/hooks";
++import { fetchAttachment } from "@allurereport/web-commons";
++import * as styles from "./styles.scss";
++import { availableSections } from "../../stores/sections";
++import { testResultNavStore, fetchTestResultNav, testResultStore, fetchTestResult } from "../../stores/testResults";
++
++// Summary table components
++interface SortableTableProps {
++  title: string;
++  data: (string | number)[][];
++  headers: string[];
++  onSort?: (columnIndex: number, direction: "asc" | "desc") => void;
++  onRowClick?: (rowIndex: number) => void;
++  expandedRows?: boolean[];
++  renderExpandedContent?: (rowIndex: number) => any;
++  getRowId?: (rowIndex: number) => string;
++}
++
++// System Information table component (for Hardware and Software info)
++interface SystemInfoTableProps {
++  title: string;
++  data: { component: string; details: string[]; packageData?: { [key: string]: string }; expandable?: boolean }[];
++  expandedPackageDetails?: Set<string>;
++  onTogglePackageDetails?: (packageType: string) => void;
++}
++
++// Metadata table component for test metrics
++interface MetadataTableProps {
++  metricsData: any;
++}
++
++// Attachment Image component for Summary
++interface AttachmentImageProps {
++  attachment: {
++    link: {
++      id: string;
++      contentType: string;
++      ext?: string;
++    };
++    name?: string;
++  };
++  onError?: () => void;
++}
++
++const AttachmentImage = ({ attachment, onError }: AttachmentImageProps) => {
++  const [imageData, setImageData] = useState<string | null>(null);
++  const [loading, setLoading] = useState(true);
++  const [error, setError] = useState(false);
++
++  useEffect(() => {
++    const loadAttachment = async () => {
++      try {
++        setLoading(true);
++        setError(false);
++
++        const attachmentId = attachment.link.id;
++        const contentType = attachment.link.contentType;
++
++        // Determine file extension from content type if not provided
++        let ext = attachment.link.ext || "";
++        if (!ext) {
++          ext = contentType === "image/png" ? ".png" :
++               contentType === "image/jpeg" ? ".jpg" :
++               contentType === "image/jpg" ? ".jpg" : "";
++        }
++
++        // Use the same pattern as web-components Attachment: fetchAttachment function
++        const result = await fetchAttachment(attachmentId, ext, contentType);
++
++        if (result?.img) {
++          setImageData(result.img);
++        } else {
++          throw new Error("Failed to load attachment - no image data returned");
++        }
++
++      } catch (err) {
++        console.error("Failed to load attachment:", err);
++        setError(true);
++        onError?.();
++      } finally {
++        setLoading(false);
++      }
++    };
++
++    loadAttachment();
++  }, [attachment.link.id, attachment.link.contentType, onError]);
++
++  if (loading) {
++    return (
++      <div style={{ 
++        display: 'flex', 
++        alignItems: 'center', 
++        justifyContent: 'center', 
++        height: '100%',
++        color: '#666',
++        fontSize: '12px'
++      }}>
++        Loading...
++      </div>
++    );
++  }
++
++  if (error || !imageData) {
++    return (
++      <div style={{ 
++        display: 'flex', 
++        alignItems: 'center', 
++        justifyContent: 'center', 
++        height: '100%',
++        color: '#999',
++        fontSize: '12px',
++        fontStyle: 'italic'
++      }}>
++        Failed to load image
++      </div>
++    );
++  }
++
++  return (
++    <img 
++      src={imageData}
++      alt={attachment.name || "Attachment"}
++      style={{ 
++        maxWidth: '100%', 
++        maxHeight: '100%', 
++        objectFit: 'contain',
++        cursor: 'pointer'
++      }}
++      onClick={() => window.open(imageData, '_blank')}
++      onError={() => {
++        setError(true);
++        onError?.();
++      }}
++    />
++  );
++};
++
++// Helper function to transform KPI data for display
++const transformKpisData = (kpis: Record<string, any>, metricsData?: any) => {
++  const operatorDisplayMap: Record<string, string> = {
++    "eq": "==",
++    "neq": "!=",
++    "gt": ">",
++    "gte": ">=",
++    "lt": "<",
++    "lte": "<=",
++    "between": "between",
++    "contains": "contains",
++    "not_contains": "not contains",
++    "matches": "matches",
++    "in": "in",
++    "not_in": "not in"
++  };
++
++  const transformedData: Array<{
++    name: string;
++    value: string;
++    reference: string;
++    status: string;
++    unit: string;
++    validationMode: string;
++  }> = [];
++
++  // Extract validation mode from the first KPI (should be consistent across all KPIs)
++  let validationMode = "all"; // default
++  const firstKpiData = Object.values(kpis)[0];
++  if (firstKpiData && typeof firstKpiData === 'object') {
++    validationMode = firstKpiData.mode || "all";
++  }
++
++  Object.entries(kpis).forEach(([key, kpiData]) => {
++    if (kpiData && typeof kpiData === 'object') {
++      const config = kpiData.config || {};
++      const validation = kpiData.validation || {};
++      
++      const operator = config.validation?.operator || validation.operator || "==";
++      const operatorSymbol = operatorDisplayMap[operator] || operator;
++      const referenceValue = config.validation?.reference || validation.expected_value || "N/A";
++      let actualValue = validation.actual_value !== undefined ? validation.actual_value : "N/A";
++      const unit = config.unit || validation.unit || "";
++      const passed = validation.passed !== undefined ? validation.passed : false;
++      const enabled = config.validation?.enabled !== false; // default to true if not specified
++      
++      // For skip mode with empty validation, try to get actual value from metrics data
++      if (validationMode === "skip" && Object.keys(validation).length === 0 && metricsData?.metrics) {
++        const matchingMetric = metricsData.metrics[key];
++        if (matchingMetric && typeof matchingMetric === 'object' && matchingMetric.value !== undefined) {
++          actualValue = matchingMetric.value;
++          // Use unit from metrics if not available in config
++          if (!unit && matchingMetric.unit) {
++            const metricUnit = matchingMetric.unit;
++            const name = config.name || validation.kpi_name || key;
++            // Extract reference from config if available, otherwise show "Reference Only"
++            const configReference = config.validation?.reference;
++            const reference = configReference !== undefined 
++              ? `${operatorSymbol} ${configReference}${metricUnit ? ` ${metricUnit}` : ""}`
++              : "Reference Only";
++            const actualDisplay = `${actualValue}${metricUnit ? ` ${metricUnit}` : ""}`;
++            
++            transformedData.push({
++              name,
++              value: actualDisplay,
++              reference,
++              status: "SKIPPED",
++              unit: metricUnit,
++              validationMode
++            });
++            return;
++          }
++        }
++      }
++      
++      const name = config.name || validation.kpi_name || key;
++      // For skip mode, extract reference from config if available
++      let reference;
++      if (validationMode === "skip") {
++        const configReference = config.validation?.reference;
++        reference = configReference !== undefined 
++          ? `${operatorSymbol} ${configReference}${unit ? ` ${unit}` : ""}`
++          : "Reference Only";
++      } else {
++        reference = `${operatorSymbol} ${referenceValue}${unit ? ` ${unit}` : ""}`;
++      }
++      const actualDisplay = `${actualValue}${unit ? ` ${unit}` : ""}`;
++      
++      // Determine status based on validation mode and enabled flag
++      let status = "FAILED";
++      if (validationMode === "skip") {
++        status = "SKIPPED";
++      } else if (!enabled) {
++        status = "SKIPPED";
++      } else if (passed) {
++        status = "PASSED";
++      }
++
++      transformedData.push({
++        name,
++        value: actualDisplay,
++        reference,
++        status,
++        unit,
++        validationMode
++      });
++    }
++  });
++
++  return { data: transformedData, validationMode };
++};
++
++// Helper function to render KPIs section with custom table structure
++const renderKpisSection = (transformResult: {
++  data: Array<{
++    name: string;
++    value: string;
++    reference: string;
++    status: string;
++    unit: string;
++    validationMode: string;
++  }>;
++  validationMode: string;
++}) => {
++  if (transformResult.data.length === 0) {
++    return null;
++  }
++
++  const { data: kpisData, validationMode } = transformResult;
++
++  // Helper function to get status badge color
++  const getStatusColor = (status: string) => {
++    switch (status) {
++      case 'PASSED':
++        return '#2e7d32'; // Green
++      case 'FAILED':
++        return '#d32f2f'; // Red
++      case 'SKIPPED':
++        return '#616161'; // Gray
++      default:
++        return '#424242'; // Dark gray
++    }
++  };
++
++  return (
++    <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: 'white', borderRadius: '4px', border: '1px solid #e0e0e0' }}>
++      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
++        <h4 style={{ margin: '0', fontSize: '14px', fontWeight: '600', color: '#333' }}>KPIs</h4>
++        <div style={{ 
++          fontSize: '11px', 
++          color: '#666', 
++          fontWeight: '500',
++          padding: '2px 6px',
++          backgroundColor: '#f0f0f0',
++          borderRadius: '3px',
++          textTransform: 'uppercase'
++        }}>
++          Validation Mode: {validationMode}
++        </div>
++      </div>
++      <div style={{ fontSize: '11px', color: '#888', marginBottom: '8px', fontStyle: 'italic' }}>
++        {validationMode === 'skip' 
++          ? 'All KPI validations are disabled and provided for reference purposes only' 
++          : validationMode === 'any' 
++            ? 'At least one KPI must pass for overall pass status' 
++            : 'All KPIs must pass for overall pass status'}
++      </div>
++      <table style={{ 
++        width: '100%', 
++        borderCollapse: 'collapse', 
++        fontSize: '12px',
++        border: '1px solid #e0e0e0'
++      }}>
++        <thead>
++          <tr>
++            <th style={{ 
++              backgroundColor: '#f8f9fa', 
++              color: '#333', 
++              textAlign: 'left', 
++              fontWeight: '500', 
++              padding: '8px 12px', 
++              border: '1px solid #e0e0e0',
++              width: '30%'
++            }}>
++              KPI Name
++            </th>
++            <th style={{ 
++              backgroundColor: '#f8f9fa', 
++              color: '#333', 
++              textAlign: 'left', 
++              fontWeight: '500', 
++              padding: '8px 12px', 
++              border: '1px solid #e0e0e0',
++              width: '30%'
++            }}>
++              Reference
++            </th>
++            <th style={{ 
++              backgroundColor: '#f8f9fa', 
++              color: '#333', 
++              textAlign: 'left', 
++              fontWeight: '500', 
++              padding: '8px 12px', 
++              border: '1px solid #e0e0e0',
++              width: '20%'
++            }}>
++              Value
++            </th>
++            <th style={{ 
++              backgroundColor: '#f8f9fa', 
++              color: '#333', 
++              textAlign: 'center', 
++              fontWeight: '500', 
++              padding: '8px 12px', 
++              border: '1px solid #e0e0e0',
++              width: '20%'
++            }}>
++              Status
++            </th>
++          </tr>
++        </thead>
++        <tbody>
++          {kpisData.map((kpi, idx) => (
++            <tr key={idx}>
++              <td style={{ 
++                padding: '8px 12px', 
++                border: '1px solid #e0e0e0', 
++                backgroundColor: 'white',
++                fontWeight: '500',
++                color: '#555',
++                verticalAlign: 'top'
++              }}>
++                {kpi.name}
++              </td>
++              <td style={{ 
++                padding: '8px 12px', 
++                border: '1px solid #e0e0e0', 
++                backgroundColor: 'white',
++                color: '#333',
++                verticalAlign: 'top'
++              }}>
++                {kpi.reference}
++              </td>
++              <td style={{ 
++                padding: '8px 12px', 
++                border: '1px solid #e0e0e0', 
++                backgroundColor: 'white',
++                color: '#333',
++                verticalAlign: 'top'
++              }}>
++                {kpi.value}
++              </td>
++              <td style={{ 
++                padding: '8px 12px', 
++                border: '1px solid #e0e0e0', 
++                backgroundColor: 'white',
++                textAlign: 'center',
++                verticalAlign: 'top'
++              }}>
++                <span style={{
++                  border: `1px solid ${getStatusColor(kpi.status)}`,
++                  color: getStatusColor(kpi.status),
++                  backgroundColor: 'transparent',
++                  padding: '2px 6px',
++                  borderRadius: '3px',
++                  fontSize: '11px',
++                  fontWeight: '500',
++                  textTransform: 'uppercase',
++                  display: 'inline-block',
++                  minWidth: '70px',
++                  textAlign: 'center'
++                }}>
++                  {kpi.status}
++                </span>
++              </td>
++            </tr>
++          ))}
++        </tbody>
++      </table>
++    </div>
++  );
++};
++
++const MetadataTable = ({ metricsData }: MetadataTableProps) => {
++  if (!metricsData) {
++    return null;
++  }
++
++  // Helper function to render value as string
++  const renderValue = (value: any): string => {
++    if (value === null || value === undefined) {
++      return 'N/A';
++    }
++    if (typeof value === 'object') {
++      if (Array.isArray(value)) {
++        return JSON.stringify(value);
++      }
++      return JSON.stringify(value, null, 2);
++    }
++    return String(value);
++  };
++
++  // Helper function to render an individual section
++  const renderIndividualSection = (title: string, data: Record<string, any>) => {
++    const entries = Object.entries(data);
++    if (entries.length === 0) {
++      return null;
++    }
++
++    return (
++      <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: 'white', borderRadius: '4px', border: '1px solid #e0e0e0' }}>
++        <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '600', color: '#333' }}>{title}</h4>
++        <table style={{ 
++          width: '100%', 
++          borderCollapse: 'collapse', 
++          fontSize: '12px',
++          border: '1px solid #e0e0e0'
++        }}>
++          <thead>
++            <tr>
++              <th style={{ 
++                backgroundColor: '#f8f9fa', 
++                color: '#333', 
++                textAlign: 'left', 
++                fontWeight: '500', 
++                padding: '8px 12px', 
++                border: '1px solid #e0e0e0',
++                width: '30%'
++              }}>
++                Property
++              </th>
++              <th style={{ 
++                backgroundColor: '#f8f9fa', 
++                color: '#333', 
++                textAlign: 'left', 
++                fontWeight: '500', 
++                padding: '8px 12px', 
++                border: '1px solid #e0e0e0'
++              }}>
++                Value
++              </th>
++            </tr>
++          </thead>
++          <tbody>
++            {entries.map(([key, value], idx) => (
++              <tr key={idx}>
++                <td style={{ 
++                  padding: '8px 12px', 
++                  border: '1px solid #e0e0e0', 
++                  backgroundColor: 'white',
++                  fontWeight: '500',
++                  color: '#555',
++                  verticalAlign: 'top'
++                }}>
++                  {key}
++                </td>
++                <td style={{ 
++                  padding: '8px 12px', 
++                  border: '1px solid #e0e0e0', 
++                  backgroundColor: 'white',
++                  color: '#333',
++                  verticalAlign: 'top'
++                }}>
++                  {renderValue(value).includes('\n') ? (
++                    <pre style={{ 
++                      margin: 0, 
++                      fontSize: '11px', 
++                      fontFamily: 'monospace', 
++                      whiteSpace: 'pre-wrap', 
++                      wordBreak: 'break-word',
++                      color: '#333',
++                      maxHeight: '200px',
++                      overflow: 'auto'
++                    }}>
++                      {renderValue(value)}
++                    </pre>
++                  ) : (
++                    <span style={{ wordBreak: 'break-word' }}>{renderValue(value)}</span>
++                  )}
++                </td>
++              </tr>
++            ))}
++          </tbody>
++        </table>
++      </div>
++    );
++  };
++
++  // Prepare individual sections
++  const sections = [];
++
++  // // Parameters section - excluded
++  // if (metricsData.parameters && Object.keys(metricsData.parameters).length > 0) {
++  //   sections.push(renderIndividualSection('Parameters', metricsData.parameters));
++  // }
++
++  // Metrics section
++  if (metricsData.metrics && Object.keys(metricsData.metrics).length > 0) {
++    // Transform metrics to display value and unit properly
++    const metricsForDisplay: Record<string, any> = {};
++    Object.entries(metricsData.metrics).forEach(([key, metricData]: [string, any]) => {
++      if (metricData && typeof metricData === 'object' && metricData.value !== undefined) {
++        metricsForDisplay[key] = metricData.unit 
++          ? `${metricData.value} ${metricData.unit}`
++          : metricData.value;
++      } else {
++        metricsForDisplay[key] = metricData;
++      }
++    });
++    sections.push(renderIndividualSection('Metrics', metricsForDisplay));
++  }
++
++  // Metadata section
++  if (metricsData.metadata && Object.keys(metricsData.metadata).length > 0) {
++    sections.push(renderIndividualSection('Metadata', metricsData.metadata));
++  }
++
++  // KPIs section - transform to display readable format
++  if (metricsData.kpis && Object.keys(metricsData.kpis).length > 0) {
++    const transformResult = transformKpisData(metricsData.kpis, metricsData);
++    sections.push(renderKpisSection(transformResult));
++  }
++
++  if (sections.length === 0) {
++    return null;
++  }
++
++  // Return all sections as individual components
++  return (
++    <>
++      {sections}
++    </>
++  );
++};
++
++const SystemInfoTable = ({ title, data, expandedPackageDetails, onTogglePackageDetails }: SystemInfoTableProps) => {
++  return (
++    <div className={styles["table-wrapper"]}>
++      <h3>{title}</h3>
++      <table className={styles["custom-table"]}>
++        <thead>
++          <tr>
++            <th className={styles["system-info-header"]}>Component</th>
++            <th className={styles["system-info-header"]}>Details</th>
++          </tr>
++        </thead>
++        <tbody>
++          {data.map((row, idx) => (
++            <tr key={idx}>
++              <td className={styles["system-info-component"]}>{row.component}</td>
++              <td className={styles["system-info-details"]}>
++                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
++                  {/* Expandable package button positioned on the left */}
++                  {row.expandable && row.packageData && onTogglePackageDetails && (
++                    <button
++                      className={styles["expansion-toggle-button"]}
++                      onClick={() => onTogglePackageDetails(row.component)}
++                      type="button"
++                      style={{ 
++                        // backgroundColor: 'var(--bg-base-secondary)',
++                        // color: 'var(--text-primary)',
++                        border: '0px solid var(--on-border-secondary)'
++                      }}
++                    >
++                      {expandedPackageDetails?.has(row.component) ? '−' : '+'}
++                    </button>
++                  )}
++                  
++                  {/* Details content */}
++                  <div style={{ flex: 1 }}>
++                    {row.details.map((detail, detailIdx) => (
++                      <div key={detailIdx} className={styles["system-info-detail-line"]}>
++                        {detail}
++                      </div>
++                    ))}
++                  </div>
++                </div>
++                
++                {/* Expanded package list */}
++                {row.expandable && row.packageData && expandedPackageDetails?.has(row.component) && (
++                  <div style={{ 
++                    marginTop: '12px', 
++                    backgroundColor: 'var(--bg-base-secondary)', 
++                    borderRadius: '6px',
++                    border: '1px solid var(--on-border-secondary)'
++                  }}>
++                    <table style={{
++                      width: '100%',
++                      borderCollapse: 'collapse',
++                      fontSize: '12px',
++                      fontFamily: 'monospace',
++                    }}>
++                      <tbody>
++                        {Object.entries(row.packageData)
++                          .sort(([a], [b]) => a.toLowerCase().localeCompare(b.toLowerCase()))
++                          .map(([name, version], index) => (
++                            <tr 
++                              key={name} 
++                              style={{
++                                backgroundColor: index % 2 === 0 ? 'var(--bg-base-primary)' : 'var(--bg-base-secondary)',
++                                opacity: index % 2 === 0 ? 1 : 0.7,
++                                borderBottom: index < Object.keys(row.packageData).length - 1 ? 
++                                  '1px solid var(--on-border-secondary)' : 'none',
++                                transition: 'background-color 0.2s ease',
++                                cursor: 'default'
++                              }}
++                              onMouseEnter={(e) => {
++                                (e.target as HTMLElement).style.backgroundColor = 'var(--bg-base-neutral)';
++                              }}
++                              onMouseLeave={(e) => {
++                                (e.target as HTMLElement).style.backgroundColor = index % 2 === 0 ? 'var(--bg-base-primary)' : 'var(--bg-base-secondary)';
++                              }}
++                            >
++                              <td style={{
++                                padding: '4px 12px',
++                                color: 'var(--text-primary)',
++                                fontWeight: '500',
++                                wordBreak: 'break-word',
++                                fontSize: '12px'
++                              }}>
++                                {name}
++                              </td>
++                              <td style={{
++                                padding: '4px 12px',
++                                color: 'var(--text-secondary)',
++                                fontSize: '11px',
++                                opacity: version ? 1 : 0.7,
++                                width: 'auto'
++                              }}>
++                                {version || 'unknown'}
++                              </td>
++                            </tr>
++                          ))}
++                      </tbody>
++                    </table>
++                  </div>
++                )}
++              </td>
++            </tr>
++          ))}
++        </tbody>
++      </table>
++    </div>
++  );
++};
++
++const SortableTable = ({ 
++  title, 
++  data, 
++  headers, 
++  onRowClick, 
++  expandedRows = [], 
++  renderExpandedContent,
++  getRowId
++}: SortableTableProps) => {
++  const [sortConfig, setSortConfig] = useState<{ column: number; direction: "asc" | "desc" } | null>(null);
++  const [sortedData, setSortedData] = useState(data);
++  const [originalToSortedMapping, setOriginalToSortedMapping] = useState<number[]>([]);
++
++  // Update sorted data when original data changes
++  useEffect(() => {
++    setSortedData(data);
++    setSortConfig(null);
++    // Initialize mapping to original order
++    setOriginalToSortedMapping(data.map((_, index) => index));
++  }, [data]);
++
++  // Helper function to extract numeric value from percentage strings
++  const parsePercentage = (value: string | number): number => {
++    if (typeof value === "number") return value;
++    const str = String(value);
++    if (str.endsWith("%")) {
++      return parseFloat(str.slice(0, -1));
++    }
++    return parseFloat(str) || 0;
++  };
++
++  // Helper function to extract seconds from duration strings
++  const parseDuration = (value: string | number): number => {
++    if (typeof value === "number") return value;
++    const str = String(value);
++    
++    // Handle formats like "2m 30.5s", "45.2s", "1h 30m 45.2s"
++    let totalSeconds = 0;
++    
++    // Extract hours (must be followed by 'h')
++    const hoursMatch = str.match(/(\d+(?:\.\d+)?)h/);
++    if (hoursMatch) {
++      totalSeconds += parseFloat(hoursMatch[1]) * 3600;
++    }
++    
++    // Extract minutes (must be followed by 'm' but not 'ms')
++    const minutesMatch = str.match(/(\d+(?:\.\d+)?)m(?!s)/);
++    if (minutesMatch) {
++      totalSeconds += parseFloat(minutesMatch[1]) * 60;
++    }
++    
++    // Extract seconds (must be followed by 's')
++    const secondsMatch = str.match(/(\d+(?:\.\d+)?)s/);
++    if (secondsMatch) {
++      totalSeconds += parseFloat(secondsMatch[1]);
++    }
++    
++    // If no time units found, try to parse as plain number (assume seconds)
++    if (totalSeconds === 0) {
++      const plainNumber = parseFloat(str);
++      if (!isNaN(plainNumber)) {
++        totalSeconds = plainNumber;
++      }
++    }
++    
++    return totalSeconds;
++  };
++
++  // Helper function to extract timestamp for date sorting
++  const parseTimestamp = (value: string | number): number => {
++    if (typeof value === "number") return value;
++    const str = String(value);
++    
++    // Remove "LATEST" suffix if present
++    const cleanStr = str.replace(" LATEST", "");
++    const date = new Date(cleanStr);
++    return date.getTime();
++  };
++
++  // Helper function to determine column type and get sortable value
++  const getSortableValue = (value: string | number, columnIndex: number): number => {
++    const header = headers[columnIndex].toLowerCase();
++    
++    // Handle percentage columns
++    if (header.includes("rate") || header.includes("percent")) {
++      return parsePercentage(value);
++    }
++    
++    // Handle duration columns
++    if (header.includes("duration") || header.includes("longest") || header.includes("current")) {
++      return parseDuration(value);
++    }
++    
++    // Handle timestamp columns
++    if (header.includes("generated") || header.includes("timestamp")) {
++      return parseTimestamp(value);
++    }
++    
++    // Handle numeric values
++    if (typeof value === "number") {
++      return value;
++    }
++    
++    // Try to parse as number, fallback to 0 for string comparison
++    const numValue = parseFloat(String(value));
++    return isNaN(numValue) ? 0 : numValue;
++  };
++
++  const handleSort = (columnIndex: number) => {
++    let direction: "asc" | "desc" = "asc";
++    
++    if (sortConfig && sortConfig.column === columnIndex && sortConfig.direction === "asc") {
++      direction = "desc";
++    }
++
++    // Create array of {row, originalIndex} objects for sorting
++    const rowsWithOriginalIndex = data.map((row, originalIndex) => ({
++      row,
++      originalIndex
++    }));
++
++    // Sort the array
++    const sorted = [...rowsWithOriginalIndex].sort((a, b) => {
++      const aVal = a.row[columnIndex];
++      const bVal = b.row[columnIndex];
++      
++      // Handle different data types
++      let comparison = 0;
++      
++      if (typeof aVal === "number" && typeof bVal === "number") {
++        comparison = aVal - bVal;
++      } else {
++        const header = headers[columnIndex].toLowerCase();
++        
++        // For columns that should be sorted numerically (percentages, durations, timestamps)
++        if (header.includes("rate") || header.includes("percent") || 
++            header.includes("duration") || header.includes("longest") || 
++            header.includes("current") || header.includes("generated") || 
++            header.includes("timestamp")) {
++          
++          const aSortValue = getSortableValue(aVal, columnIndex);
++          const bSortValue = getSortableValue(bVal, columnIndex);
++          comparison = aSortValue - bSortValue;
++        } else {
++          // Try numeric comparison first
++          const aNum = parseFloat(String(aVal));
++          const bNum = parseFloat(String(bVal));
++          
++          if (!isNaN(aNum) && !isNaN(bNum)) {
++            comparison = aNum - bNum;
++          } else {
++            // Fall back to string comparison
++            const aStr = String(aVal).toLowerCase();
++            const bStr = String(bVal).toLowerCase();
++            comparison = aStr.localeCompare(bStr);
++          }
++        }
++      }
++      
++      return direction === "asc" ? comparison : -comparison;
++    });
++
++    // Extract sorted data and mapping
++    const sortedDataOnly = sorted.map(item => item.row);
++    const newMapping = sorted.map(item => item.originalIndex);
++
++    setSortedData(sortedDataOnly);
++    setOriginalToSortedMapping(newMapping);
++    setSortConfig({ column: columnIndex, direction });
++  };
++
++  const getSortIcon = (columnIndex: number) => {
++    if (!sortConfig || sortConfig.column !== columnIndex) {
++      return " ⇅";
++    }
++    return sortConfig.direction === "asc" ? " ↑" : " ↓";
++  };
++
++  const getStatusClassName = (status: string) => {
++    const statusLower = String(status).toLowerCase();
++    switch (statusLower) {
++      case "passed":
++        return styles["status-passed"];
++      case "failed":
++        return styles["status-failed"];
++      case "broken":
++        return styles["status-broken"];
++      case "skipped":
++        return styles["status-skipped"];
++      default:
++        return styles["status-unknown"];
++    }
++  };
++
++  const getStatusCountClassName = (header: string) => {
++    const headerLower = header.toLowerCase();
++    switch (headerLower) {
++      case "passed":
++        return styles["status-passed"];
++      case "failed":
++        return styles["status-failed"];
++      case "broken":
++        return styles["status-broken"];
++      case "skipped":
++        return styles["status-skipped"];
++      case "unknown":
++        return styles["status-unknown"];
++      default:
++        return null;
++    }
++  };
++
++  const isStatusColumn = (header: string) => {
++    return header.toLowerCase() === "status";
++  };
++
++  const isStatusCountColumn = (header: string) => {
++    const headerLower = header.toLowerCase();
++    return ["passed", "failed", "broken", "skipped", "unknown"].includes(headerLower);
++  };
++
++  const isLatestColumn = (header: string) => {
++    return header.toLowerCase() === "latest";
++  };
++
++  const isGeneratedColumn = (header: string) => {
++    return header.toLowerCase() === "generated";
++  };
++
++  const renderGeneratedCell = (cell: string | number) => {
++    const cellStr = String(cell);
++    if (cellStr.includes(" LATEST")) {
++      const timestamp = cellStr.replace(" LATEST", "");
++      return (
++        <span>
++          {timestamp}{" "}
++          <span className={styles["status-latest"]}>LATEST</span>
++        </span>
++      );
++    }
++    return cellStr;
++  };
++
++  return (
++    <div className={styles["table-wrapper"]}>
++      <h3>{title}</h3>
++      <table className={styles["custom-table"]}>
++        <thead>
++          <tr>
++            {onRowClick && (
++              <th className={styles["expansion-header"]}>
++                {/* No label for the expansion column */}
++              </th>
++            )}
++            {headers.map((header, index) => (
++              <th
++                key={header}
++                className={styles["sortable-header"]}
++                onClick={() => handleSort(index)}
++                title={`Click to sort by ${header}`}
++              >
++                {header}{getSortIcon(index)}
++              </th>
++            ))}
++          </tr>
++        </thead>
++        <tbody>
++          {sortedData.flatMap((row, idx) => {
++            // Get the original index for this sorted row
++            const originalIdx = originalToSortedMapping[idx];
++
++            const mainRow = (
++              <tr 
++                key={`row-${originalIdx}`}
++                className={onRowClick ? styles["clickable-row"] : ""}
++                onClick={() => onRowClick?.(originalIdx)}
++                style={{ cursor: onRowClick ? "pointer" : "default" }}
++              >
++                {onRowClick && (
++                  <td className={styles["expansion-indicator"]}>
++                    <span className={styles["expansion-toggle-button"]}>
++                      {expandedRows?.[originalIdx] ? "−" : "+"}
++                    </span>
++                  </td>
++                )}
++                {row.map((cell, cidx) => (
++                  <td key={cidx}>
++                    {isStatusColumn(headers[cidx]) ? (
++                      <span className={getStatusClassName(String(cell))}>
++                        {String(cell)}
++                      </span>
++                    ) : isStatusCountColumn(headers[cidx]) ? (
++                      <span className={Number(cell) > 0 ? getStatusCountClassName(headers[cidx]) : styles["status-zero"]}>
++                        {typeof cell === "number" ? cell.toLocaleString() : cell}
++                      </span>
++                    ) : isGeneratedColumn(headers[cidx]) ? (
++                      renderGeneratedCell(cell)
++                    ) : isLatestColumn(headers[cidx]) && String(cell) === "LATEST" ? (
++                      <span className={styles["status-latest"]}>
++                        {String(cell)}
++                      </span>
++                    ) : (
++                      typeof cell === "number" ? cell.toLocaleString() : cell
++                    )}
++                  </td>
++                ))}
++              </tr>
++            );
++
++            const expandedRow = expandedRows?.[originalIdx] && renderExpandedContent ? (
++              <tr key={`expanded-${originalIdx}`} className={styles["details-row"]}>
++                <td colSpan={onRowClick ? headers.length + 1 : headers.length} className={styles["details-cell"]}>
++                  {renderExpandedContent(originalIdx)}
++                </td>
++              </tr>
++            ) : null;
++
++            return expandedRow ? [mainRow, expandedRow] : [mainRow];
++          })}
++        </tbody>
++      </table>
++    </div>
++  );
++};
++
++export const Summary = () => {
++  const [expandedProfiles, setExpandedProfiles] = useState<Set<string>>(new Set());
++  const [allExpanded, setAllExpanded] = useState(false);
++  const [searchTerm, setSearchTerm] = useState<string>("");
++  const [expandedSystemSections, setExpandedSystemSections] = useState<Set<string>>(new Set(["hardware", "software"])); // Expanded by default
++  const [expandedTestDetails, setExpandedTestDetails] = useState<Set<string>>(new Set()); // For individual test details
++  const [expandedPackageDetails, setExpandedPackageDetails] = useState<Set<string>>(new Set()); // For package lists
++  const [individualTestResults, setIndividualTestResults] = useState<Record<string, any>>({});
++  const [loadingTests, setLoadingTests] = useState(true);
++  const [testMetrics, setTestMetrics] = useState<Record<string, any>>({}); // Store metrics data from attachments
++  const [testFullMetrics, setTestFullMetrics] = useState<Record<string, any>>({}); // Store full metrics data for metadata tables
++  
++  // State for qualifications profiles
++  const [expandedQualificationProfiles, setExpandedQualificationProfiles] = useState<Set<string>>(new Set());
++  const [qualificationSearchTerm, setQualificationSearchTerm] = useState<string>("");
++
++  useEffect(() => {
++    // Fetch navigation data and individual test results
++    const fetchAllTestData = async () => {
++      try {
++        setLoadingTests(true);
++        
++        // First fetch the navigation data to get all test IDs
++        await fetchTestResultNav();
++        const navData = testResultNavStore.value.data;
++        
++        if (navData && Array.isArray(navData)) {
++          // Fetch each individual test result
++          const fetchPromises = navData.map(testId => fetchTestResult(testId));
++          await Promise.all(fetchPromises);
++          
++          // Now get all the fetched data from the store
++          const allFetchedResults = testResultStore.value.data || {};
++          setIndividualTestResults(allFetchedResults);
++        }
++      } catch (error) {
++        console.error("Error fetching test data:", error);
++      } finally {
++        setLoadingTests(false);
++      }
++    };
++    
++    fetchAllTestData();
++    
++    // Auto-add summary section to available sections when summary data exists
++    if (!availableSections.value.includes("summary")) {
++      availableSections.value = [...availableSections.value, "summary"];
++    }
++  }, []);
++
++  // Fetch metrics from test attachments when individual test results are loaded
++  useEffect(() => {
++    const fetchAllMetrics = async () => {
++      if (loadingTests || Object.keys(individualTestResults).length === 0) {
++        return;
++      }
++
++      const metricsData: Record<string, any> = {};
++      const fullMetricsData: Record<string, any> = {};
++      
++      // Fetch metrics for each test
++      for (const testResult of Object.values(individualTestResults)) {
++        const metrics = await getMetricsFromAttachment(testResult);
++        const fullMetrics = await getFullMetricsFromAttachment(testResult);
++        if ((testResult as any).id) {
++          metricsData[(testResult as any).id] = metrics;
++          fullMetricsData[(testResult as any).id] = fullMetrics;
++        }
++      }
++      
++      setTestMetrics(metricsData);
++      setTestFullMetrics(fullMetricsData);
++    };
++
++    fetchAllMetrics();
++  }, [loadingTests, individualTestResults]);
++
++  const toggleProfile = (profileName: string) => {
++    setExpandedProfiles((prev: Set<string>) => {
++      const newSet = new Set(prev);
++      if (newSet.has(profileName)) {
++        newSet.delete(profileName);
++      } else {
++        newSet.add(profileName);
++      }
++      return newSet;
++    });
++  };
++
++  const expandAllProfiles = () => {
++    // Get all profile names from the currently rendered profiles (filteredProfilesData)
++    const allProfileNames = filteredProfilesData.map(profile => profile.profileName);
++    setExpandedProfiles(new Set(allProfileNames));
++    setAllExpanded(true);
++  };
++
++  const collapseAllProfiles = () => {
++    setExpandedProfiles(new Set());
++    setAllExpanded(false);
++  };
++
++  // Qualification profile management functions
++  const toggleQualificationProfile = (profileName: string) => {
++    setExpandedQualificationProfiles((prev: Set<string>) => {
++      const newSet = new Set(prev);
++      if (newSet.has(profileName)) {
++        newSet.delete(profileName);
++      } else {
++        newSet.add(profileName);
++      }
++      return newSet;
++    });
++  };
++
++  const expandAllQualificationProfiles = () => {
++    // We need to reference filteredQualificationProfilesData but it's defined later
++    // So we'll get all qualification profile names from the base data
++    const allQualificationProfileNames = qualificationProfilesData.map((profile: any) => profile.profileName);
++    setExpandedQualificationProfiles(new Set(allQualificationProfileNames));
++  };
++
++  const collapseAllQualificationProfiles = () => {
++    setExpandedQualificationProfiles(new Set());
++  };
++
++  const clearQualificationSearch = () => {
++    setQualificationSearchTerm("");
++  };
++
++  const handleQualificationSearchChange = (event: Event) => {
++    const target = event.target as HTMLInputElement;
++    setQualificationSearchTerm(target.value);
++  };
++
++  const clearSearch = () => {
++    setSearchTerm("");
++  };
++
++  const handleSearchChange = (event: Event) => {
++    const target = event.target as HTMLInputElement;
++    setSearchTerm(target.value);
++  };
++
++  const toggleSystemSection = (sectionName: string) => {
++    setExpandedSystemSections((prev: Set<string>) => {
++      const newSet = new Set(prev);
++      if (newSet.has(sectionName)) {
++        newSet.delete(sectionName);
++      } else {
++        newSet.add(sectionName);
++      }
++      return newSet;
++    });
++  };
++
++  const expandAllSystemSections = () => {
++    setExpandedSystemSections(new Set(["hardware", "software"]));
++  };
++
++  const collapseAllSystemSections = () => {
++    setExpandedSystemSections(new Set());
++  };
++
++  const toggleTestDetails = (testId: string) => {
++    setExpandedTestDetails(prev => {
++      const newSet = new Set(prev);
++      if (newSet.has(testId)) {
++        newSet.delete(testId);
++      } else {
++        newSet.add(testId);
++      }
++      return newSet;
++    });
++  };
++
++  const togglePackageDetails = (packageType: string) => {
++    setExpandedPackageDetails(prev => {
++      const newSet = new Set(prev);
++      if (newSet.has(packageType)) {
++        newSet.delete(packageType);
++      } else {
++        newSet.add(packageType);
++      }
++      return newSet;
++    });
++  };
++
++  // Helper functions
++  const formatDuration = (seconds: number): string => {
++    if (seconds < 60) {
++      return `${seconds.toFixed(1)}s`;
++    }
++    const minutes = Math.floor(seconds / 60);
++    const remainingSeconds = seconds % 60;
++    return `${minutes}m ${remainingSeconds.toFixed(1)}s`;
++  };
++
++
++
++  // Helper function to get metrics from test attachment
++  const getMetricsFromAttachment = async (testResult: any) => {
++    if (!testResult?.attachments || !Array.isArray(testResult.attachments)) {
++      return { metric: "N/A", value: "N/A", unit: "N/A" };
++    }
++
++    // Find the "Core Metrics Test Results" JSON attachment
++    const metricsAttachment = testResult.attachments.find((attachment: any) =>
++      attachment.link?.name === "Core Metrics Test Results" &&
++      attachment.link?.contentType === "application/json"
++    );
++
++    if (!metricsAttachment) {
++      return { metric: "N/A", value: "N/A", unit: "N/A" };
++    }
++
++    try {
++      const result = await fetchAttachment(
++        metricsAttachment.link.id,
++        metricsAttachment.link.ext,
++        metricsAttachment.link.contentType
++      );
++
++      if (!result || !result.text) {
++        return { metric: "N/A", value: "N/A", unit: "N/A" };
++      }
++
++      const metricsData = JSON.parse(result.text);
++      
++      if (metricsData?.metrics && typeof metricsData.metrics === "object") {
++        const metrics = Object.entries(metricsData.metrics);
++        if (metrics.length > 0) {
++          // Look for a metric with is_key_metric: true first
++          let selectedMetric = null;
++          
++          // Find the key metric if it exists
++          for (const [metricKey, metricValue] of metrics) {
++            if (typeof metricValue === "object" && metricValue !== null && (metricValue as any).is_key_metric === true) {
++              selectedMetric = [metricKey, metricValue];
++              break;
++            }
++          }
++          
++          // If no key metric found, use the first metric
++          if (!selectedMetric) {
++            selectedMetric = metrics[0];
++          }
++          
++          const [metricKey, metricValue] = selectedMetric;
++          if (typeof metricValue === "object" && metricValue !== null && "value" in metricValue && "unit" in metricValue) {
++            return {
++              metric: metricKey,
++              value: String(metricValue.value),
++              unit: String(metricValue.unit)
++            };
++          }
++          return {
++            metric: metricKey,
++            value: String(metricValue),
++            unit: ""
++          };
++        }
++      }
++    } catch (error) {
++      console.error("Error fetching metrics attachment:", error);
++    }
++
++    return { metric: "N/A", value: "N/A", unit: "N/A" };
++  };
++
++  // Helper function to get full metrics data from test attachment for metadata table
++  const getFullMetricsFromAttachment = async (testResult: any) => {
++    if (!testResult?.attachments || !Array.isArray(testResult.attachments)) {
++      return null;
++    }
++
++    // Find the "Core Metrics Test Results" JSON attachment
++    const metricsAttachment = testResult.attachments.find((attachment: any) =>
++      attachment.link?.name === "Core Metrics Test Results" &&
++      attachment.link?.contentType === "application/json"
++    );
++
++    if (!metricsAttachment) {
++      return null;
++    }
++
++    try {
++      const result = await fetchAttachment(
++        metricsAttachment.link.id,
++        metricsAttachment.link.ext,
++        metricsAttachment.link.contentType
++      );
++
++      if (!result || !result.text) {
++        return null;
++      }
++
++      return JSON.parse(result.text);
++    } catch (error) {
++      console.error("Error fetching full metrics attachment:", error);
++    }
++
++    return null;
++  };
++
++  // Helper function to get first metric from test results (deprecated - kept for backward compatibility)
++  const getFirstMetric = (testName: string) => {
++    // This function is now deprecated but kept for backward compatibility
++    // The new approach uses getMetricsFromAttachment directly
++    return { metric: "N/A", value: "N/A", unit: "N/A" };
++  };
++
++  // Helper function to get image attachments from test results
++  const getImageAttachments = (testResult: any) => {
++    if (testResult?.attachments && Array.isArray(testResult.attachments)) {
++      // Filter for image attachments (PNG and JPEG only)
++      return testResult.attachments.filter((attachment: any) => 
++        attachment.link?.contentType === "image/png" || 
++        attachment.link?.contentType === "image/jpeg"
++      );
++    }
++    
++    return [];
++  };
++
++  // Create profile table data for test results (type: "suite")
++  const createTestResultProfilesFromTestResults = () => {
++    if (loadingTests || Object.keys(individualTestResults).length === 0) {
++      return [];
++    }
++
++    // Group tests by parentSuite for suite type only
++    const profileGroups: Record<string, any[]> = {};
++    
++    Object.values(individualTestResults).forEach((testResult: any) => {
++      const parentSuite = testResult.labels?.find((label: any) => label.name === "parentSuite")?.value;
++      const typeLabel = testResult.labels?.find((label: any) => label.name === "type")?.value;
++      
++      // Include only profiles that have "type" label with value "suite" and exclude "core" type
++      if (parentSuite && typeLabel === "suite") {
++        if (!profileGroups[parentSuite]) {
++          profileGroups[parentSuite] = [];
++        }
++        profileGroups[parentSuite].push(testResult);
++      }
++    });
++
++    // Create profile table data
++    return Object.entries(profileGroups).map(([profileName, tests]) => {
++      // Get profile_display_name from the first test in the group
++      const firstTest = tests[0];
++      const profileDisplayName = firstTest?.labels?.find((label: any) => label.name === "profile_display_name")?.value;
++      const displayStatus = firstTest?.labels?.find((label: any) => label.name === "display_status")?.value;
++      
++      // Find tier_display_name from any test in the group (not just the first one)
++      let tierDisplayName: string | undefined;
++      for (const test of tests) {
++        const tierLabel = test.labels?.find((label: any) => label.name === "tier_display_name")?.value;
++        if (tierLabel) {
++          tierDisplayName = tierLabel;
++          break;
++        }
++      }
++      
++      // Check if status column should be hidden
++      const hideStatusColumn = displayStatus === "False" || displayStatus === "false";
++
++      const testsData = tests.map((test: any) => {
++        // Get metrics from cached data
++        const cachedMetrics = testMetrics[test.id] || { metric: "N/A", value: "N/A", unit: "N/A" };
++        
++        // Calculate history and retries data
++        const historyCount = test.history?.length || 0;
++        const retriesCount = test.retries?.length || 0;
++        const totalDuration = test.duration || 0;
++
++        // Get test title from test_title label, fallback to test name
++        const testTitle = test.labels?.find((label: any) => label.name === "test_title")?.value;
++
++        return {
++          id: test.id.substring(0, 8), // Display ID (shortened)
++          fullId: test.id, // Full ID for accessing individual test results
++          testName: testTitle || test.name, // Use test_title label if available, otherwise use test name
++          metric: cachedMetrics.metric,
++          value: cachedMetrics.value,
++          unit: cachedMetrics.unit,
++          status: test.status,
++          // Additional data for expanded content
++          historyCount,
++          retriesCount,
++          duration: formatDuration(totalDuration / 1000), // Convert from ms to seconds
++          testResult: test // Store full test result for detailed view
++        };
++      });
++
++      // Get the type from the first test in the group to identify profile type
++      const firstTestForType = tests[0];
++      const profileType = firstTestForType?.labels?.find((label: any) => label.name === "type")?.value;
++
++      return {
++        profileName: profileDisplayName || profileName.replace(/^profile\.(suite|qualification)\./, ""), // Use profile_display_name or fallback to processed profileName
++        testsData,
++        hideStatusColumn, // Pass this flag to the table rendering
++        profileType, // Add profile type for conditional rendering
++        tierDisplayName // Add tier display name for badge rendering
++      };
++    });
++  };
++
++  // Create profile table data for qualifications (type: "qualification")
++  const createQualificationProfilesFromTestResults = () => {
++    if (loadingTests || Object.keys(individualTestResults).length === 0) {
++      return [];
++    }
++
++    // Group tests by parentSuite for qualification type only
++    const profileGroups: Record<string, any[]> = {};
++    
++    Object.values(individualTestResults).forEach((testResult: any) => {
++      const parentSuite = testResult.labels?.find((label: any) => label.name === "parentSuite")?.value;
++      const typeLabel = testResult.labels?.find((label: any) => label.name === "type")?.value;
++      
++      // Include only profiles that have "type" label with value "qualification"
++      if (parentSuite && ( typeLabel === "qualification" || typeLabel === "vertical") ) {
++        if (!profileGroups[parentSuite]) {
++          profileGroups[parentSuite] = [];
++        }
++        profileGroups[parentSuite].push(testResult);
++      }
++    });
++
++    // Create profile table data similar to test results but for qualifications
++    const profilesArray = Object.entries(profileGroups).map(([profileName, tests]) => {
++      // Get profile_display_name from the first test in the group
++      const firstTest = tests[0];
++      const profileDisplayName = firstTest?.labels?.find((label: any) => label.name === "profile_display_name")?.value;
++      const displayStatus = firstTest?.labels?.find((label: any) => label.name === "display_status")?.value;
++      
++      // Find tier_display_name from any test in the group (not just the first one)
++      let tierDisplayName: string | undefined;
++      for (const test of tests) {
++        const tierLabel = test.labels?.find((label: any) => label.name === "tier_display_name")?.value;
++        if (tierLabel) {
++          tierDisplayName = tierLabel;
++          break;
++        }
++      }
++      
++      // Check if status column should be hidden
++      const hideStatusColumn = displayStatus === "False" || displayStatus === "false";
++
++      // Calculate overall status and test count for the profile
++      const totalTests = tests.length;
++      const passedTests = tests.filter(test => test.status === "passed").length;
++      const failedTests = tests.filter(test => test.status === "failed").length;
++      const brokenTests = tests.filter(test => test.status === "broken").length;
++      const skippedTests = tests.filter(test => test.status === "skipped").length;
++      const unknownTests = tests.filter(test => test.status === "unknown").length;
++      
++      // Determine overall status - only passed/failed for qualifications
++      // Any non-passed test (failed, broken, skipped, unknown) results in "failed" status
++      let overallStatus = "passed";
++      if (failedTests > 0 || brokenTests > 0 || skippedTests > 0 || unknownTests > 0) {
++        overallStatus = "failed";
++      }
++
++      const testsData = tests.map((test: any) => {
++        // Get metrics from cached data
++        const cachedMetrics = testMetrics[test.id] || { metric: "N/A", value: "N/A", unit: "N/A" };
++        
++        // Calculate history and retries data
++        const historyCount = test.history?.length || 0;
++        const retriesCount = test.retries?.length || 0;
++        const totalDuration = test.duration || 0;
++
++        // Get test title from test_title label, fallback to test name
++        const testTitle = test.labels?.find((label: any) => label.name === "test_title")?.value;
++
++        return {
++          id: test.id.substring(0, 8), // Display ID (shortened)
++          fullId: test.id, // Full ID for accessing individual test results
++          testName: testTitle || test.name, // Use test_title label if available, otherwise use test name
++          metric: cachedMetrics.metric,
++          value: cachedMetrics.value,
++          unit: cachedMetrics.unit,
++          status: test.status,
++          // Additional data for expanded content
++          historyCount,
++          retriesCount,
++          duration: formatDuration(totalDuration / 1000), // Convert from ms to seconds
++          testResult: test // Store full test result for detailed view
++        };
++      });
++
++      // Get the type from the first test in the group to identify profile type
++      const firstTestForType = tests[0];
++      const profileType = firstTestForType?.labels?.find((label: any) => label.name === "type")?.value;
++
++      return {
++        profileName: profileDisplayName || profileName.replace(/^profile\.(suite|qualification)\./, ""), // Use profile_display_name or fallback to processed profileName
++        testsData,
++        hideStatusColumn, // Pass this flag to the table rendering
++        profileType, // Add profile type for conditional rendering
++        tierDisplayName, // Add tier display name for badge rendering
++        // Additional data for qualification profiles
++        totalTests,
++        passedTests,
++        failedTests,
++        brokenTests,
++        skippedTests,
++        unknownTests,
++        overallStatus
++      };
++    });
++
++    // Sort profiles: first by type (qualification type label), then by profile name alphabetically
++    return profilesArray.sort((a, b) => {
++      // Sort by type first (qualification < vertical, or other ordering if needed)
++      const typeComparison = (a.profileType || '').localeCompare(b.profileType || '');
++      if (typeComparison !== 0) {
++        return typeComparison;
++      }
++      
++      // Then sort by profile name alphabetically
++      return a.profileName.localeCompare(b.profileName);
++    });
++  };
++
++  const individualProfilesData = createTestResultProfilesFromTestResults();
++  const qualificationProfilesData = createQualificationProfilesFromTestResults();
++
++  // Filter profiles and their tests based on search term
++  const filteredProfilesData = individualProfilesData.map(profile => {
++    if (!searchTerm.trim()) {
++      return profile; // No search term, return all data
++    }
++
++    const searchLower = searchTerm.toLowerCase();
++    
++    // Filter tests within this profile
++    const filteredTests = profile.testsData.filter((test: any) => {
++      // Check if any field contains the search term
++      return [
++        test.id,
++        test.testName,
++        test.metric,
++        test.value,
++        test.unit,
++        test.status
++      ].some(field => String(field).toLowerCase().includes(searchLower));
++    });
++
++    // Only include profiles that have matching tests or whose name matches
++    const profileNameMatches = profile.profileName.toLowerCase().includes(searchLower);
++    
++    return {
++      profileName: profile.profileName,
++      testsData: filteredTests,
++      hideStatusColumn: profile.hideStatusColumn, // Preserve the hideStatusColumn flag
++      profileType: profile.profileType, // Preserve the profileType flag
++      tierDisplayName: profile.tierDisplayName, // Preserve the tierDisplayName flag
++      hasMatches: filteredTests.length > 0 || profileNameMatches
++    };
++  }).filter(profile => (profile as any).hasMatches || !searchTerm.trim());
++
++  // Filter qualification profiles and their tests based on search term
++  const filteredQualificationProfilesData = qualificationProfilesData.map(profile => {
++    if (!qualificationSearchTerm.trim()) {
++      return profile; // No search term, return all data
++    }
++
++    const searchLower = qualificationSearchTerm.toLowerCase();
++    
++    // Filter tests within this profile
++    const filteredTests = profile.testsData.filter((test: any) => {
++      // Check if any field contains the search term
++      return [
++        test.id,
++        test.testName,
++        test.metric,
++        test.value,
++        test.unit,
++        test.status
++      ].some(field => String(field).toLowerCase().includes(searchLower));
++    });
++
++    // Only include profiles that have matching tests or whose name matches
++    const profileNameMatches = profile.profileName.toLowerCase().includes(searchLower);
++    
++    return {
++      ...profile, // Include all original properties (totalTests, overallStatus, etc.)
++      testsData: filteredTests,
++      hasMatches: filteredTests.length > 0 || profileNameMatches
++    };
++  }).filter(profile => (profile as any).hasMatches || !qualificationSearchTerm.trim());
++
++  // Helper function to get system information from test attachments
++  const getSystemInfoFromAttachment = async () => {
++    if (loadingTests || Object.keys(individualTestResults).length === 0) {
++      return null;
++    }
++
++    // Find the test with suite="core" and package="test_system"
++    const systemTest = Object.values(individualTestResults).find((testResult: any) => {
++      const suiteLabel = testResult.labels?.find((label: any) => label.name === "suite")?.value;
++      const packageLabel = testResult.labels?.find((label: any) => label.name === "package")?.value;
++      return suiteLabel === "core" && packageLabel === "test_system";
++    });
++
++    if (!systemTest) {
++      return null;
++    }
++
++    // Find the "Core CLI System Information" JSON attachment
++    const systemAttachment = (systemTest as any)?.attachments?.find((attachment: any) =>
++      attachment.link?.name === "Core CLI System Information" &&
++      attachment.link?.contentType === "application/json"
++    );
++
++    if (!systemAttachment) {
++      return null;
++    }
++
++    try {
++      // Fetch the attachment data
++      const result = await fetchAttachment(
++        systemAttachment.link.id,
++        systemAttachment.link.ext || ".json",
++        systemAttachment.link.contentType
++      );
++      
++      if (result?.text) {
++        const systemInfo = JSON.parse(result.text);
++        return systemInfo.system_info || systemInfo;
++      }
++    } catch (error) {
++      console.error("Error fetching system information attachment:", error);
++    }
++
++    return null;
++  };
++
++  // State for system information
++  const [systemInfo, setSystemInfo] = useState<any>(null);
++
++  // Fetch system information on component mount
++  useEffect(() => {
++    const loadSystemInfo = async () => {
++      const info = await getSystemInfoFromAttachment();
++      setSystemInfo(info);
++    };
++
++    if (!loadingTests && Object.keys(individualTestResults).length > 0) {
++      loadSystemInfo();
++    }
++  }, [loadingTests, individualTestResults]);
++
++  // Helper function to convert bytes to GB (decimal, like physical disk labels)
++  const bytesToGB = (bytes: number): string => {
++    return (bytes / 1000000000).toFixed(2); // Convert to GB (decimal, not binary)
++  };
++
++  // Helper function to get tier display name from any test in a section
++  const getSectionTierDisplayName = (profilesData: any[]): string | undefined => {
++    for (const profile of profilesData) {
++      if (profile.tierDisplayName) {
++        return profile.tierDisplayName;
++      }
++    }
++    return undefined;
++  };
++
++  // Hardware Information data preparation from attachment
++  const hardwareInfoData: { component: string; details: string[]; packageData?: { [key: string]: string }; expandable?: boolean }[] = [];
++  
++  if (systemInfo?.hardware) {
++    const hardware = systemInfo.hardware;
++    
++    // Product information (DMI system, BIOS, board) - formatted for marketing-style presentation
++    if (hardware.dmi) {
++      const dmi = hardware.dmi;
++      const productDetails: string[] = [];
++      
++      if (dmi.system) {
++        productDetails.push(`${dmi.system.vendor} ${dmi.system.product_name}`);
++        if (dmi.motherboard) {
++          productDetails.push(`${dmi.motherboard.name} motherboard`);
++        }
++      }
++      
++      if (productDetails.length > 0) {
++        hardwareInfoData.push({ component: "Product", details: productDetails });
++      }
++    }
++    
++    // CPU information - simplified marketing format
++    if (hardware.cpu) {
++      const cpu = hardware.cpu;
++      const cpuDetails: string[] = [];
++      
++      cpuDetails.push(`${cpu.brand}`);
++      
++      // Combine core counts and frequency information in one line
++      let coreFreqLine = `${cpu.count} cores, ${cpu.logical_count} threads`;
++      if (cpu.frequency) {
++        coreFreqLine += ` • Current: ${cpu.frequency.current.toFixed(0)} MHz • Range: ${cpu.frequency.min}-${cpu.frequency.max} MHz`;
++      }
++      cpuDetails.push(coreFreqLine);
++      
++      hardwareInfoData.push({ component: "CPU", details: cpuDetails });
++    }
++    
++    // Graphics information with VRAM from openvino memory_bytes
++    if (hardware.gpu?.devices && hardware.gpu.devices.length > 0) {
++      const allGpuDetails: string[] = [];
++      
++      hardware.gpu.devices.forEach((gpu: any, index: number) => {
++        let gpuLine = '';
++        
++        // Use openvino full_device_name first, fallback to device_name
++        const deviceName = gpu.openvino?.full_device_name || gpu.device_name;
++        gpuLine += `${deviceName}`;
++        
++        // Add VRAM information from openvino if available
++        if (gpu.openvino?.memory_bytes) {
++          gpuLine += ` • ${bytesToGB(gpu.openvino.memory_bytes)} GB VRAM`;
++        }
++        
++        // Add execution units if available
++        if (gpu.openvino?.execution_units) {
++          gpuLine += ` • ${gpu.openvino.execution_units} EUs`;
++        }
++        
++        allGpuDetails.push(gpuLine);
++      });
++      
++      hardwareInfoData.push({ component: "Graphics", details: allGpuDetails });
++    }
++
++    // Storage information - show individual devices with model, interface, size and partition info
++    if (hardware.storage?.devices && hardware.storage.devices.length > 0) {
++      const allStorageDetails: string[] = [];
++      
++      hardware.storage.devices.forEach((device: any, index: number) => {
++        let storageLine = '';
++        
++        storageLine += `${device.model || 'Unknown Model'}`;
++        if (device.interface) {
++          storageLine += ` (${device.interface})`;
++        }
++        storageLine += ` • ${parseInt(bytesToGB(device.size))} GB capacity`;
++        
++        // Check if this device has partitions and show root partition info
++        if (device.partitions && device.partitions.length > 0) {
++          const rootPartition = device.partitions.find((p: any) => p.mountpoint === '/');
++          if (rootPartition) {
++            storageLine += ` • ${parseInt(bytesToGB(rootPartition.free))} GB available (${rootPartition.percent.toFixed(0)}% used)`;
++          }
++        }
++        
++        allStorageDetails.push(storageLine);
++      });
++      
++      hardwareInfoData.push({ component: "Storage", details: allStorageDetails });
++    }
++    
++    // Memory information - simplified presentation
++    if (hardware.memory) {
++      const memory = hardware.memory;
++      const memoryDetails: string[] = [];
++      
++      // Single line with total, available, and usage percentage
++      memoryDetails.push(`${bytesToGB(memory.total)} GB total • ${bytesToGB(memory.available)} GB available (${memory.percent.toFixed(0)}% used)`);
++      
++      hardwareInfoData.push({ component: "Memory", details: memoryDetails });
++    }
++  }
++
++  // Software Information data preparation from attachment
++  const softwareInfoData: { component: string; details: string[]; packageData?: { [key: string]: string }; expandable?: boolean }[] = [];
++  
++  if (systemInfo?.software) {
++    const software = systemInfo.software;
++    
++    // Operating System information - marketing-style presentation
++    if (software.os) {
++      const os = software.os;
++      const osDetails: string[] = [];
++      
++      if (os.distribution?.pretty_name) {
++        osDetails.push(`${os.distribution.pretty_name}`);
++      } else if (os.name) {
++        osDetails.push(`${os.name}`);
++      }
++      
++      if (os.kernel?.version) {
++        osDetails.push(`Kernel ${os.kernel.version}`);
++      } else if (os.release) {
++        osDetails.push(`Kernel ${os.release}`);
++      }
++      
++      if (os.uptime_seconds) {
++        const days = Math.floor(os.uptime_seconds / 86400);
++        const hours = Math.floor((os.uptime_seconds % 86400) / 3600);
++        osDetails.push(`System uptime: ${days} days, ${hours} hours`);
++      }
++      
++      if (osDetails.length > 0) {
++        softwareInfoData.push({ component: "Operating System", details: osDetails });
++      }
++    }
++    
++    // Python information
++    if (software.python) {
++      const python = software.python;
++      const pythonDetails: string[] = [];
++      
++      if (python.version) {
++        const versionMatch = python.version.match(/^(\d+\.\d+\.\d+)/);
++        const cleanVersion = versionMatch ? versionMatch[1] : python.version;
++        pythonDetails.push(`Python ${cleanVersion}`);
++      }
++      
++      if (python.in_virtualenv && python.virtualenv?.name) {
++        pythonDetails.push(`Virtual environment: ${python.virtualenv.name}`);
++      }
++      
++      if (pythonDetails.length > 0) {
++        softwareInfoData.push({ component: "Python Runtime", details: pythonDetails });
++      }
++    }
++    
++    // System packages information
++    if (software.system_packages) {
++      const systemPackages = software.system_packages;
++      const packageDetails: string[] = [];
++      
++      // Show single line summary
++      if (systemPackages.total_installed) {
++        packageDetails.push(`${Object.keys(systemPackages.packages || {}).length} tracked • ${systemPackages.total_installed} installed on system`);
++      }
++      
++      if (packageDetails.length > 0) {
++        softwareInfoData.push({ 
++          component: "System Packages", 
++          details: packageDetails,
++          packageData: systemPackages.packages || {},
++          expandable: true
++        });
++      }
++    }
++    
++    // Python packages information
++    if (software.python_packages) {
++      const pythonPackages = software.python_packages;
++      const packageDetails: string[] = [];
++      
++      // Show single line summary
++      if (pythonPackages.total_installed) {
++        packageDetails.push(`${Object.keys(pythonPackages.packages || {}).length} tracked • ${pythonPackages.total_installed} installed on system`);
++      }
++      
++      if (packageDetails.length > 0) {
++        softwareInfoData.push({ 
++          component: "Python Packages", 
++          details: packageDetails,
++          packageData: pythonPackages.packages || {},
++          expandable: true
++        });
++      }
++    }
++  }
++
++  return (
++    <div className={styles.overview}>
++      {/* System Information */}
++      {(hardwareInfoData.length > 0 || softwareInfoData.length > 0) && (
++        <div className={styles["overview-grid-item"]}>
++          <div className={styles["collapsible-section"]}>
++            <div className={styles["collapsible-header"]}>
++              <div className={styles["header-left"]}>
++                <h3 className={styles["section-title"]}>System Information</h3>
++              </div>
++              <div className={styles["expand-collapse-controls"]}>
++                <button 
++                  className={styles["secondary-button"]}
++                  onClick={expandAllSystemSections}
++                  type="button"
++                >
++                  Expand All
++                </button>
++                <button 
++                  className={styles["secondary-button"]}
++                  onClick={collapseAllSystemSections}
++                  type="button"
++                >
++                  Collapse All
++                </button>
++              </div>
++            </div>
++            
++            <div className={styles["profiles-container"]}>
++              {hardwareInfoData.length > 0 && (
++                <div className={styles["profile-section"]}>
++                  <div 
++                    className={styles["profile-header"]}
++                    onClick={() => toggleSystemSection("hardware")}
++                  >
++                    <button 
++                      className={styles["toggle-button"]}
++                      type="button"
++                      aria-expanded={expandedSystemSections.has("hardware")}
++                    >
++                      {expandedSystemSections.has("hardware") ? "−" : "+"}
++                    </button>
++                    <h4 className={styles["profile-title"]}>Hardware</h4>
++                  </div>
++                  
++                  {expandedSystemSections.has("hardware") && (
++                    <div className={styles["profile-content"]}>
++                      <SystemInfoTable
++                        title=""
++                        data={hardwareInfoData}
++                        expandedPackageDetails={expandedPackageDetails}
++                        onTogglePackageDetails={togglePackageDetails}
++                      />
++                    </div>
++                  )}
++                </div>
++              )}
++
++              {softwareInfoData.length > 0 && (
++                <div className={styles["profile-section"]}>
++                  <div 
++                    className={styles["profile-header"]}
++                    onClick={() => toggleSystemSection("software")}
++                  >
++                    <button 
++                      className={styles["toggle-button"]}
++                      type="button"
++                      aria-expanded={expandedSystemSections.has("software")}
++                    >
++                      {expandedSystemSections.has("software") ? "−" : "+"}
++                    </button>
++                    <h4 className={styles["profile-title"]}>Software</h4>
++                  </div>
++                  
++                  {expandedSystemSections.has("software") && (
++                    <div className={styles["profile-content"]}>
++                      <SystemInfoTable
++                        title=""
++                        data={softwareInfoData}
++                        expandedPackageDetails={expandedPackageDetails}
++                        onTogglePackageDetails={togglePackageDetails}
++                      />
++                    </div>
++                  )}
++                </div>
++              )}
++            </div>
++          </div>
++        </div>
++      )}
++
++      {/* Qualifications */}
++      {qualificationProfilesData.length > 0 && (
++        <div className={styles["overview-grid-item"]}>
++          <div className={styles["collapsible-section"]}>
++            <div className={styles["collapsible-header-enhanced"]}>
++              <div className={styles["header-left-enhanced"]}>
++                <h3 className={styles["section-title"]}>Qualifications</h3>
++                {(() => {
++                  const sectionTierDisplayName = getSectionTierDisplayName(filteredQualificationProfilesData);
++                  return sectionTierDisplayName ? (
++                    <span className={styles["test-tier-label"]}>
++                      {sectionTierDisplayName}
++                    </span>
++                  ) : null;
++                })()}
++              </div>
++              <div className={styles["header-right-enhanced"]}>
++                <div className={styles["search-container-inline"]}>
++                  <div className={styles["search-box"]}>
++                    <input
++                      type="text"
++                      className={styles["search-input"]}
++                      placeholder="Search"
++                      value={qualificationSearchTerm}
++                      onInput={handleQualificationSearchChange}
++                    />
++                    <button
++                      className={styles["clear-button"]}
++                      onClick={clearQualificationSearch}
++                      type="button"
++                      title="Clear search"
++                    >
++                      ×
++                    </button>
++                  </div>
++                </div>
++                <div className={styles["expand-collapse-controls"]}>
++                  <button 
++                    className={styles["secondary-button"]}
++                    onClick={expandAllQualificationProfiles}
++                    type="button"
++                  >
++                    Expand All
++                  </button>
++                  <button 
++                    className={styles["secondary-button"]}
++                    onClick={collapseAllQualificationProfiles}
++                    type="button"
++                  >
++                    Collapse All
++                  </button>
++                </div>
++              </div>
++            </div>
++            
++            <div className={styles["profiles-container"]}>
++              {filteredQualificationProfilesData.map((profileData, index) => (
++                profileData.testsData.length > 0 && (
++                  <div key={index} className={styles["profile-section"]}>
++                    <div 
++                      className={`${styles["profile-header"]} ${styles["qualification-profile-header"]}`}
++                      onClick={() => toggleQualificationProfile(profileData.profileName)}
++                    >
++                      <button 
++                        className={styles["toggle-button"]}
++                        type="button"
++                        aria-expanded={expandedQualificationProfiles.has(profileData.profileName)}
++                      >
++                        {expandedQualificationProfiles.has(profileData.profileName) ? "−" : "+"}
++                      </button>
++                      <div className={styles["qualification-profile-info"]}>
++                        <h4 className={styles["profile-title"]}>{profileData.profileName}</h4>
++                      </div>
++                      <div className={styles["qualification-profile-summary"]}>
++                        {profileData.profileType === "qualification" && (
++                          <span className={`${styles["status-badge"]} ${styles[`status-${profileData.overallStatus}`]}`}>
++                            {profileData.overallStatus}
++                          </span>
++                        )}
++
++                        <span className={styles["table-test-count"]}>
++                          {profileData.totalTests}
++                        </span>
++                      </div>
++                    </div>
++                    
++                    {expandedQualificationProfiles.has(profileData.profileName) && (
++                      <div className={styles["profile-content"]}>
++                        <SortableTable
++                          title=""
++                          headers={profileData.hideStatusColumn ? [
++                            "ID",
++                            "Test Name", 
++                            "Metric",
++                            "Value",
++                            "Unit"
++                          ] : [
++                            "ID",
++                            "Test Name", 
++                            "Metric",
++                            "Value",
++                            "Unit",
++                            "Status"
++                          ]}
++                          data={profileData.testsData.map((test: any) => profileData.hideStatusColumn ? [
++                            test.id,
++                            test.testName,
++                            test.metric,
++                            test.value,
++                            test.unit
++                          ] : [
++                            test.id,
++                            test.testName,
++                            test.metric,
++                            test.value,
++                            test.unit,
++                            test.status
++                          ])}
++                          onRowClick={(rowIndex: number) => {
++                            const test = profileData.testsData[rowIndex];
++                            toggleTestDetails(test.fullId);
++                          }}
++                          expandedRows={profileData.testsData.map((test: any) => 
++                            expandedTestDetails.has(test.fullId)
++                          )}
++                          renderExpandedContent={(rowIndex: number) => {
++                            const test = profileData.testsData[rowIndex];
++                            const testId = test.fullId; // Use the full ID to access individual test results
++                            
++                            return (
++                              <div className={styles["test-details"]}>
++                                {individualTestResults[testId] ? (
++                                  <div>
++                                    {/* Overview Section */}
++                                    <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: 'white', borderRadius: '4px', border: '1px solid #e0e0e0' }}>
++                                      <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '600', color: '#333' }}>Overview</h4>
++                                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', fontSize: '12px' }}>
++                                        <div>
++                                          <span style={{ fontWeight: '500', color: '#666' }}>History: </span>
++                                          <span>{individualTestResults[testId]?.history?.length || "1"}</span>
++                                        </div>
++                                        <div>
++                                          <span style={{ fontWeight: '500', color: '#666' }}>Retries: </span>
++                                          <span>{individualTestResults[testId]?.retries?.length || '0'}</span>
++                                        </div>
++                                        <div>
++                                          <span style={{ fontWeight: '500', color: '#666' }}>Duration: </span>
++                                          <span>{individualTestResults[testId]?.duration 
++                                            ? `${(individualTestResults[testId].duration / 1000).toFixed(2)}s`
++                                            : 'N/A'}</span>
++                                        </div>
++                                      </div>
++                                    </div>
++
++                                    {/* Metadata Section */}
++                                    <MetadataTable metricsData={testFullMetrics[testId]} />
++
++                                    {/* Error Messages for Failed Tests */}
++                                    {test.status === 'failed' && individualTestResults[testId]?.error?.message && (
++                                      <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: '#fff5f5', borderRadius: '4px', border: '1px solid #fed7d7' }}>
++                                        <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '600', color: '#e53e3e' }}>Error Details</h4>
++                                        <pre style={{ margin: 0, fontSize: '11px', fontFamily: 'monospace', whiteSpace: 'pre-wrap', color: '#2d3748' }}>
++                                          {individualTestResults[testId].error.message}
++                                        </pre>
++                                        {individualTestResults[testId].error?.trace && (
++                                          <details style={{ marginTop: '8px' }}>
++                                            <summary style={{ cursor: 'pointer', fontSize: '12px', fontWeight: '500', color: '#666' }}>Stack Trace</summary>
++                                            <pre style={{ margin: '8px 0 0 0', fontSize: '10px', fontFamily: 'monospace', whiteSpace: 'pre-wrap', color: '#4a5568' }}>
++                                              {individualTestResults[testId].error.trace}
++                                            </pre>
++                                          </details>
++                                        )}
++                                      </div>
++                                    )}
++
++                                    {/* Status Details for Skipped and Broken Tests */}
++                                    {(test.status === 'skipped' || test.status === 'broken') && individualTestResults[testId]?.error?.message && (
++                                      <div style={{ 
++                                        marginBottom: '16px', 
++                                        padding: '12px', 
++                                        backgroundColor: test.status === 'skipped' ? '#f7fafc' : '#fffaf0', 
++                                        borderRadius: '4px', 
++                                        border: `1px solid ${test.status === 'skipped' ? '#cbd5e0' : '#fdcc6bff'}` 
++                                      }}>
++                                        <h4 style={{ 
++                                          margin: '0 0 8px 0', 
++                                          fontSize: '14px', 
++                                          fontWeight: '600', 
++                                          color: test.status === 'skipped' ? '#4a5568' : '#d69e2e' 
++                                        }}>
++                                          {test.status === 'skipped' ? 'Skip Details' : 'Broken Details'}
++                                        </h4>
++                                        {individualTestResults[testId].error.message && (
++                                          <pre style={{ margin: 0, fontSize: '11px', fontFamily: 'monospace', whiteSpace: 'pre-wrap', color: '#2d3748' }}>
++                                            {individualTestResults[testId].error.message}
++                                          </pre>
++                                        )}
++                                        {individualTestResults[testId].error?.trace && (
++                                          <details style={{ marginTop: '8px' }}>
++                                            <summary style={{ cursor: 'pointer', fontSize: '12px', fontWeight: '500', color: '#666' }}>Stack Trace</summary>
++                                            <pre style={{ margin: '8px 0 0 0', fontSize: '10px', fontFamily: 'monospace', whiteSpace: 'pre-wrap', color: '#4a5568' }}>
++                                              {individualTestResults[testId].error.trace}
++                                            </pre>
++                                          </details>
++                                        )}
++                                      </div>
++                                    )}
++
++                                    {/* Attachments Section */}
++                                    {(() => {
++                                      const testData = individualTestResults[testId];
++                                      const imageAttachments = testData?.attachments?.filter((attachment: any) => 
++                                        attachment.link?.contentType === "image/png" || 
++                                        attachment.link?.contentType === "image/jpeg"
++                                      ) || [];
++                                      
++                                      return imageAttachments.length > 0 ? (
++                                        <div style={{ padding: '12px', backgroundColor: 'white', borderRadius: '4px', border: '1px solid #e0e0e0' }}>
++                                          <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: '600', color: '#333' }}>Attachments</h4>
++                                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))', gap: '12px' }}>
++                                            {imageAttachments.map((attachment: any, index: number) => {
++                                              return (
++                                                <div key={index} style={{ 
++                                                  border: '1px solid #e0e0e0', 
++                                                  borderRadius: '4px',
++                                                  overflow: 'hidden',
++                                                  backgroundColor: '#f8f9fa',
++                                                  display: 'flex',
++                                                  flexDirection: 'column',
++                                                  height: '400px'
++                                                }}>
++                                                  <div style={{ 
++                                                    flex: '1',
++                                                    display: 'flex',
++                                                    alignItems: 'center',
++                                                    justifyContent: 'center',
++                                                    padding: '8px',
++                                                    backgroundColor: 'white'
++                                                  }}>
++                                                    <AttachmentImage 
++                                                      attachment={attachment}
++                                                      onError={() => console.warn('Failed to load attachment:', attachment.link?.id)}
++                                                    />
++                                                  </div>
++                                                  <div style={{ 
++                                                    padding: '8px', 
++                                                    fontSize: '11px', 
++                                                    color: '#666', 
++                                                    wordBreak: 'break-word',
++                                                    backgroundColor: '#f8f9fa',
++                                                    borderTop: '1px solid #e0e0e0',
++                                                    textAlign: 'center'
++                                                  }}>
++                                                    {attachment.name || attachment.link?.name || `Attachment ${index + 1}`}
++                                                  </div>
++                                                </div>
++                                              );
++                                            })}
++                                          </div>
++                                        </div>
++                                      ) : null;
++                                    })()}
++                                  </div>
++                                ) : (
++                                  <div style={{ padding: '16px', textAlign: 'center', color: '#666' }}>
++                                    Loading test details...
++                                  </div>
++                                )}
++                              </div>
++                            );
++                          }}
++                        />
++                      </div>
++                    )}
++                  </div>
++                )
++              ))}
++              
++              {qualificationSearchTerm && filteredQualificationProfilesData.every(profile => profile.testsData.length === 0) && (
++                <div className={styles["no-results"]}>
++                  <p>No matching qualification profiles or tests found for "{qualificationSearchTerm}"</p>
++                </div>
++              )}
++            </div>
++          </div>
++        </div>
++      )}
++
++      {/* Individual Profile Tables */}
++      {individualProfilesData.length > 0 && (
++        <div className={styles["overview-grid-item"]}>
++          <div className={styles["collapsible-section"]}>
++            <div className={styles["collapsible-header-enhanced"]}>
++              <div className={styles["header-left-enhanced"]}>
++                <h3 className={styles["section-title"]}>Test Results</h3>
++                {(() => {
++                  const sectionTierDisplayName = getSectionTierDisplayName(filteredProfilesData);
++                  return sectionTierDisplayName ? (
++                    <span className={styles["test-tier-label"]}>
++                      {sectionTierDisplayName}
++                    </span>
++                  ) : null;
++                })()}
++              </div>
++              <div className={styles["header-right-enhanced"]}>
++                <div className={styles["search-container-inline"]}>
++                  <div className={styles["search-box"]}>
++                    <input
++                      type="text"
++                      className={styles["search-input"]}
++                      placeholder="Search"
++                      value={searchTerm}
++                      onInput={handleSearchChange}
++                    />
++                    <button
++                      className={styles["clear-button"]}
++                      onClick={clearSearch}
++                      type="button"
++                      title="Clear search"
++                    >
++                      ×
++                    </button>
++                  </div>
++                </div>
++                <div className={styles["expand-collapse-controls"]}>
++                  <button 
++                    className={styles["secondary-button"]}
++                    onClick={expandAllProfiles}
++                    type="button"
++                  >
++                    Expand All
++                  </button>
++                  <button 
++                    className={styles["secondary-button"]}
++                    onClick={collapseAllProfiles}
++                    type="button"
++                  >
++                    Collapse All
++                  </button>
++                </div>
++              </div>
++            </div>
++            
++            <div className={styles["profiles-container"]}>
++              {filteredProfilesData.map((profileData, index) => (
++                profileData.testsData.length > 0 && (
++                  <div key={index} className={styles["profile-section"]}>
++                    <div 
++                      className={styles["profile-header"]}
++                      onClick={() => toggleProfile(profileData.profileName)}
++                    >
++                      <button 
++                        className={styles["toggle-button"]}
++                        type="button"
++                        aria-expanded={expandedProfiles.has(profileData.profileName)}
++                      >
++                        {expandedProfiles.has(profileData.profileName) ? "−" : "+"}
++                      </button>
++                      <div className={styles["qualification-profile-info"]}>
++                        <h4 className={styles["profile-title"]}>{profileData.profileName}</h4>
++                      </div>
++                      <div className={styles["qualification-profile-summary"]}>
++                        {(() => {
++                          const totalTests = profileData.testsData.length;
++                          
++                          // Only show status badge for qualification type profiles
++                          if (profileData.profileType === "qualification") {
++                            const failedTests = profileData.testsData.filter(test => test.status === "failed" || test.status === "broken").length;
++                            const overallStatus = failedTests > 0 ? "failed" : "passed";
++                            
++                            return (
++                              <>
++                                <span className={`${styles["status-badge"]} ${styles[`status-${overallStatus}`]}`}>
++                                  {overallStatus}
++                                </span>
++                                <span className={styles["table-test-count"]}>
++                                  {totalTests}
++                                </span>
++                              </>
++                            );
++                          } else {
++                            // For non-qualification profiles, show test count only
++                            return (
++                              <>
++                                <span className={styles["table-test-count"]}>
++                                  {totalTests}
++                                </span>
++                              </>
++                            );
++                          }
++                        })()}
++                      </div>
++                    </div>
++                    
++                    {expandedProfiles.has(profileData.profileName) && (
++                      <div className={styles["profile-content"]}>
++                        <SortableTable
++                          title=""
++                          headers={profileData.hideStatusColumn ? [
++                            "ID",
++                            "Test Name", 
++                            "Metric",
++                            "Value",
++                            "Unit"
++                          ] : [
++                            "ID",
++                            "Test Name", 
++                            "Metric",
++                            "Value",
++                            "Unit",
++                            "Status"
++                          ]}
++                          data={profileData.testsData.map((test: any) => profileData.hideStatusColumn ? [
++                            test.id,
++                            test.testName,
++                            test.metric,
++                            test.value,
++                            test.unit
++                          ] : [
++                            test.id,
++                            test.testName,
++                            test.metric,
++                            test.value,
++                            test.unit,
++                            test.status
++                          ])}
++                          onRowClick={(rowIndex: number) => {
++                            const test = profileData.testsData[rowIndex];
++                            toggleTestDetails(test.fullId);
++                          }}
++                          expandedRows={profileData.testsData.map((test: any) => 
++                            expandedTestDetails.has(test.fullId)
++                          )}
++                          renderExpandedContent={(rowIndex: number) => {
++                            const test = profileData.testsData[rowIndex];
++                            const testId = test.fullId; // Use the full ID to access individual test results
++                            
++                            return (
++                              <div className={styles["test-details"]}>
++                                {individualTestResults[testId] ? (
++                                  <div>
++                                    {/* Overview Section */}
++                                    <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: 'white', borderRadius: '4px', border: '1px solid #e0e0e0' }}>
++                                      <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '600', color: '#333' }}>Overview</h4>
++                                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', fontSize: '12px' }}>
++                                        <div>
++                                          <span style={{ fontWeight: '500', color: '#666' }}>History: </span>
++                                          <span>{individualTestResults[testId]?.history?.length || "1"}</span>
++                                        </div>
++                                        <div>
++                                          <span style={{ fontWeight: '500', color: '#666' }}>Retries: </span>
++                                          <span>{individualTestResults[testId]?.retries?.length || '0'}</span>
++                                        </div>
++                                        <div>
++                                          <span style={{ fontWeight: '500', color: '#666' }}>Duration: </span>
++                                          <span>{individualTestResults[testId]?.duration 
++                                            ? `${(individualTestResults[testId].duration / 1000).toFixed(2)}s`
++                                            : 'N/A'}</span>
++                                        </div>
++                                      </div>
++                                    </div>
++
++                                    {/* Metadata Section */}
++                                    <MetadataTable metricsData={testFullMetrics[testId]} />
++
++                                    {/* Error Messages for Failed Tests */}
++                                    {test.status === 'failed' && individualTestResults[testId]?.error?.message && (
++                                      <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: '#fff5f5', borderRadius: '4px', border: '1px solid #fed7d7' }}>
++                                        <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '600', color: '#e53e3e' }}>Error Details</h4>
++                                        <pre style={{ margin: 0, fontSize: '11px', fontFamily: 'monospace', whiteSpace: 'pre-wrap', color: '#2d3748' }}>
++                                          {individualTestResults[testId].error.message}
++                                        </pre>
++                                        {individualTestResults[testId].error?.trace && (
++                                          <details style={{ marginTop: '8px' }}>
++                                            <summary style={{ cursor: 'pointer', fontSize: '12px', fontWeight: '500', color: '#666' }}>Stack Trace</summary>
++                                            <pre style={{ margin: '8px 0 0 0', fontSize: '10px', fontFamily: 'monospace', whiteSpace: 'pre-wrap', color: '#4a5568' }}>
++                                              {individualTestResults[testId].error.trace}
++                                            </pre>
++                                          </details>
++                                        )}
++                                      </div>
++                                    )}
++
++                                    {/* Status Details for Skipped and Broken Tests */}
++                                    {(test.status === 'skipped' || test.status === 'broken') && individualTestResults[testId]?.error?.message && (
++                                      <div style={{ 
++                                        marginBottom: '16px', 
++                                        padding: '12px', 
++                                        backgroundColor: test.status === 'skipped' ? '#f7fafc' : '#fffaf0', 
++                                        borderRadius: '4px', 
++                                        border: `1px solid ${test.status === 'skipped' ? '#cbd5e0' : '#fdcc6bff'}` 
++                                      }}>
++                                        <h4 style={{ 
++                                          margin: '0 0 8px 0', 
++                                          fontSize: '14px', 
++                                          fontWeight: '600', 
++                                          color: test.status === 'skipped' ? '#4a5568' : '#d69e2e' 
++                                        }}>
++                                          {test.status === 'skipped' ? 'Skip Details' : 'Broken Details'}
++                                        </h4>
++                                        {individualTestResults[testId].error.message && (
++                                          <pre style={{ margin: 0, fontSize: '11px', fontFamily: 'monospace', whiteSpace: 'pre-wrap', color: '#2d3748' }}>
++                                            {individualTestResults[testId].error.message}
++                                          </pre>
++                                        )}
++                                        {individualTestResults[testId].error?.trace && (
++                                          <details style={{ marginTop: '8px' }}>
++                                            <summary style={{ cursor: 'pointer', fontSize: '12px', fontWeight: '500', color: '#666' }}>Stack Trace</summary>
++                                            <pre style={{ margin: '8px 0 0 0', fontSize: '10px', fontFamily: 'monospace', whiteSpace: 'pre-wrap', color: '#4a5568' }}>
++                                              {individualTestResults[testId].error.trace}
++                                            </pre>
++                                          </details>
++                                        )}
++                                      </div>
++                                    )}
++
++                                    {/* Attachments Section */}
++                                    {(() => {
++                                      const testData = individualTestResults[testId];
++                                      const imageAttachments = testData?.attachments?.filter((attachment: any) => 
++                                        attachment.link?.contentType === "image/png" || 
++                                        attachment.link?.contentType === "image/jpeg"
++                                      ) || [];
++                                      
++                                      return imageAttachments.length > 0 ? (
++                                        <div style={{ padding: '12px', backgroundColor: 'white', borderRadius: '4px', border: '1px solid #e0e0e0' }}>
++                                          <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: '600', color: '#333' }}>Attachments</h4>
++                                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))', gap: '12px' }}>
++                                            {imageAttachments.map((attachment: any, index: number) => {
++                                              return (
++                                                <div key={index} style={{ 
++                                                  border: '1px solid #e0e0e0', 
++                                                  borderRadius: '4px',
++                                                  overflow: 'hidden',
++                                                  backgroundColor: '#f8f9fa',
++                                                  display: 'flex',
++                                                  flexDirection: 'column',
++                                                  height: '400px'
++                                                }}>
++                                                  <div style={{ 
++                                                    flex: '1',
++                                                    display: 'flex',
++                                                    alignItems: 'center',
++                                                    justifyContent: 'center',
++                                                    padding: '8px',
++                                                    backgroundColor: 'white'
++                                                  }}>
++                                                    <AttachmentImage 
++                                                      attachment={attachment}
++                                                      onError={() => console.warn('Failed to load attachment:', attachment.link?.id)}
++                                                    />
++                                                  </div>
++                                                  <div style={{ 
++                                                    padding: '8px', 
++                                                    fontSize: '11px', 
++                                                    color: '#666', 
++                                                    wordBreak: 'break-word',
++                                                    backgroundColor: '#f8f9fa',
++                                                    borderTop: '1px solid #e0e0e0',
++                                                    textAlign: 'center'
++                                                  }}>
++                                                    {attachment.name || attachment.link?.name || `Attachment ${index + 1}`}
++                                                  </div>
++                                                </div>
++                                              );
++                                            })}
++                                          </div>
++                                        </div>
++                                      ) : null;
++                                    })()}
++                                  </div>
++                                ) : (
++                                  <div style={{ padding: '16px', textAlign: 'center', color: '#666' }}>
++                                    Loading test details...
++                                  </div>
++                                )}
++                              </div>
++                            );
++                          }}
++                        />
++                      </div>
++                    )}
++                  </div>
++                )
++              ))}
++              
++              {searchTerm && filteredProfilesData.every(profile => profile.testsData.length === 0) && (
++                <div className={styles["no-results"]}>
++                  <p>No matching profiles or tests found for "{searchTerm}"</p>
++                </div>
++              )}
++            </div>
++          </div>
++        </div>
++      )}
++    </div>
++  );
++};
+diff --git a/packages/web-awesome/src/components/Summary/styles.scss b/packages/web-awesome/src/components/Summary/styles.scss
+new file mode 100644
+index 000000000..7f6fa5b3c
+--- /dev/null
++++ b/packages/web-awesome/src/components/Summary/styles.scss
+@@ -0,0 +1,873 @@
++// Overview container with larger horizontal padding
++.overview {
++  padding: 0 80px;
++  width: 100%;
++  height: 100%;
++  overflow-y: auto;
++}
++
++// Summary-specific overrides for raised box styling
++.overview-grid-item {
++  background: var(--bg-base-primary);
++  border-radius: 8px;
++  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
++  border: 1px solid var(--on-border-secondary);
++  padding: 20px;
++  margin-bottom: 40px;
++}
++
++// Enhanced table wrapper styling
++.table-wrapper {
++  margin: 0;
++  overflow-x: auto;
++  
++  h3 {
++    margin: 0 0 16px 0;
++    padding-bottom: 8px;
++    // border-bottom: 2px solid #1976d2;
++    color: var(--text-primary);
++    font-weight: 600;
++    font-size: 1.2em;
++  }
++}
++
++// Enhanced table styling to match grid appearance
++.custom-table {
++  width: 100%;
++  border-collapse: collapse;
++  margin-bottom: 0;
++  font-size: 14px;
++  background: var(--bg-base-primary);
++  border-radius: 6px;
++  overflow: hidden;
++  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
++}
++
++.custom-table th {
++  background-color: #1976d2; // Material Blue 700
++  color: white;
++  text-align: left;
++  font-weight: normal;
++  padding: 12px 16px;
++  border: none;
++  
++  &.sortable-header {
++    cursor: pointer;
++    user-select: none;
++    transition: background-color 0.2s;
++    font-weight: normal;
++    
++    &:hover {
++      background-color: #115293; // Darker blue on hover
++    }
++  }
++}
++
++.custom-table td {
++  padding: 12px 16px;
++  border: none;
++  border-bottom: 1px solid var(--on-border-secondary);
++  background: var(--bg-base-primary);
++  color: var(--text-primary);
++}
++
++.custom-table tr:last-child td {
++  border-bottom: none;
++}
++
++.custom-table tr:hover td {
++  background: var(--bg-base-secondary);
++}
++
++// Status badge styling with soft dark material colors
++.status-passed {
++  background-color: #2e7d32; // Material Green 800
++  color: white;
++  padding: 4px 8px;
++  border-radius: 4px;
++  font-size: 12px;
++  font-weight: 500;
++  text-transform: uppercase;
++  letter-spacing: 0.5px;
++  display: inline-block;
++  min-width: 80px; // Increased for consistency
++  text-align: center;
++}
++
++.status-failed {
++  background-color: #d32f2f; // Material Red 700
++  color: white;
++  padding: 4px 8px;
++  border-radius: 4px;
++  font-size: 12px;
++  font-weight: 500;
++  text-transform: uppercase;
++  letter-spacing: 0.5px;
++  display: inline-block;
++  min-width: 80px; // Increased for consistency
++  text-align: center;
++}
++
++.status-broken {
++  background-color: #f57c00; // Material Orange 700
++  color: white;
++  padding: 4px 8px;
++  border-radius: 4px;
++  font-size: 12px;
++  font-weight: 500;
++  text-transform: uppercase;
++  letter-spacing: 0.5px;
++  display: inline-block;
++  min-width: 80px; // Increased for consistency
++  text-align: center;
++}
++
++.status-skipped {
++  background-color: #616161; // Material Grey 700
++  color: white;
++  padding: 4px 8px;
++  border-radius: 4px;
++  font-size: 12px;
++  font-weight: 500;
++  text-transform: uppercase;
++  letter-spacing: 0.5px;
++  display: inline-block;
++  min-width: 80px; // Increased for consistency
++  text-align: center;
++}
++
++.status-unknown {
++  background-color: #424242; // Material Grey 800
++  color: white;
++  padding: 4px 8px;
++  border-radius: 4px;
++  font-size: 12px;
++  font-weight: 500;
++  text-transform: uppercase;
++  letter-spacing: 0.5px;
++  display: inline-block;
++  min-width: 80px; // Increased for consistency
++  text-align: center;
++}
++
++// Status badge for zero values (default appearance)
++.status-zero {
++  background-color: white;
++  color: var(--text-primary);
++  padding: 4px 8px;
++  border-radius: 4px;
++  font-size: 12px;
++  font-weight: 500;
++  text-transform: uppercase;
++  letter-spacing: 0.5px;
++  display: inline-block;
++  min-width: 80px; // Increased for consistency
++  text-align: center;
++  border: 1px solid var(--on-border-secondary);
++}
++
++// Latest badge styling with blue background
++.status-latest {
++  background-color: #1976d2; // Material Blue 700
++  color: white;
++  padding: 4px 8px;
++  border-radius: 4px;
++  font-size: 12px;
++  font-weight: 500;
++  text-transform: uppercase;
++  letter-spacing: 0.5px;
++  display: inline-block;
++  min-width: 80px; // Increased for consistency
++  text-align: center;
++}
++
++.test-tier-label {
++  // background-color: var(--bg-base-secondary);
++  // color: var(--text-primary);
++  background-color: var(--bg-base-modal);
++  color: var(--text-primary);
++  border: 1px solid var(--bg-base-neutral);
++  padding: 6px 12px;
++  border-radius: 16px;
++  font-size: 12px;
++  font-weight: 500;
++  height: 32px;
++  // text-transform: uppercase;
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  box-sizing: border-box;
++  min-width: auto;
++  text-align: center;
++}
++
++// System Information table specific styling
++.system-info-header {
++  background-color: #1976d2 !important; // Material Blue 700
++  color: white !important;
++  text-align: left;
++  font-weight: normal;
++  padding: 12px 16px;
++  border: none;
++  width: auto;
++  
++  &:first-child {
++    width: 120px;
++    min-width: 120px;
++  }
++  
++  &:last-child {
++    width: auto;
++  }
++}
++
++.system-info-component {
++  background: var(--bg-base-primary);
++  color: var(--text-primary);
++  font-weight: 600;
++  padding: 16px;
++  border: none;
++  border-bottom: 1px solid var(--on-border-secondary);
++  vertical-align: top;
++  width: 120px;
++  min-width: 120px;
++}
++
++.system-info-details {
++  background: var(--bg-base-primary);
++  color: var(--text-primary);
++  padding: 16px;
++  border: none;
++  border-bottom: 1px solid var(--on-border-secondary);
++  vertical-align: top;
++  line-height: 1.5;
++}
++
++.system-info-detail-line {
++  margin-bottom: 4px;
++  
++  &:last-child {
++    margin-bottom: 0;
++  }
++}
++
++// Collapsible section styling
++.collapsible-section {
++  width: 100%;
++}
++
++.collapsible-header {
++  display: flex;
++  justify-content: space-between;
++  align-items: center;
++  margin-bottom: 20px;
++  padding-bottom: 12px;
++  // border-bottom: 2px solid #1976d2;
++}
++
++.header-left {
++  display: flex;
++  align-items: center;
++  gap: 20px;
++}
++
++.section-title {
++  margin: 0;
++  color: var(--text-primary);
++  font-weight: 600;
++  font-size: 1.2em;
++}
++
++.expand-collapse-controls {
++  display: flex;
++  gap: 12px;
++}
++
++.primary-button {
++  background-color: #1976d2;
++  color: white;
++  border: none;
++  padding: 0 16px;
++  border-radius: 4px;
++  font-size: 12px;
++  font-weight: 500;
++  text-transform: capitalize;
++  letter-spacing: 0.5px;
++  cursor: pointer;
++  transition: background-color 0.2s;
++  height: 32px; // Match search box height
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  box-sizing: border-box;
++  
++  &:hover {
++    background-color: #115293;
++  }
++  
++  &:active {
++    background-color: #0d3f73;
++  }
++}
++
++.secondary-button {
++  background-color: var(--bg-base-modal);
++  color: var(--text-primary);
++  border: 1px solid var(--bg-base-neutral);
++  padding: 0 16px;
++  border-radius: 4px;
++  font-size: 12px;
++  font-weight: 500;
++  text-transform: capitalize;
++  letter-spacing: 0.5px;
++  cursor: pointer;
++  transition: background-color 0.2s;
++  height: 32px; // Match search box height
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  box-sizing: border-box;
++  
++  &:hover {
++    background-color: var(--bg-base-secondary);
++  }
++}
++
++.profiles-container {
++  display: flex;
++  flex-direction: column;
++  gap: 12px;
++}
++
++.profile-section {
++  border: 1px solid var(--on-border-secondary);
++  border-radius: 6px;
++  overflow: hidden;
++  background: var(--bg-base-primary);
++  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
++}
++
++.profile-header {
++  display: flex;
++  align-items: center;
++  padding: 12px 16px;
++  background-color: var(--bg-base-secondary);
++  cursor: pointer;
++  transition: background-color 0.2s;
++  border-bottom: 1px solid var(--on-border-secondary);
++  
++  &:hover {
++    background-color: var(--bg-base-neutral);
++  }
++  
++  .dark & {
++    background-color: #2c2c2c;
++    
++    &:hover {
++      background-color: #333333;
++    }
++  }
++}
++
++// Profile Header - expand/collapse button styling
++.toggle-button {
++  background-color: var(--bg-base-modal);
++  border: none;
++  color: var(--text-primary);
++  font-size: 18px;
++  font-weight: normal;
++  width: 32px;
++  height: 32px;
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  cursor: pointer;
++  margin-right: 12px;
++  border-radius: 4px;
++  transition: background-color 0.2s;
++  
++  &:hover {
++    background-color: var(--bg-base-secondary);
++  }
++}
++
++.profile-title {
++  margin: 0;
++  color: var(--text-primary);
++  font-weight: 600;
++  font-size: 1em;
++}
++
++.profile-content {
++  padding: 0;
++  animation: slideDown 0.2s ease-out;
++  
++  // Override table wrapper margins for nested tables
++  .table-wrapper {
++    margin: 0;
++    
++    h3 {
++      display: none; // Hide the table title since we have the profile title
++    }
++  }
++  
++  // Ensure nested table fits properly
++  .custom-table {
++    border-radius: 0;
++    box-shadow: none;
++    border: none;
++  }
++}
++
++@keyframes slideDown {
++  from {
++    opacity: 0;
++    max-height: 0;
++  }
++  to {
++    opacity: 1;
++    max-height: 1000px;
++  }
++}
++
++// Search functionality styling
++.search-container {
++  margin-bottom: 20px;
++}
++
++.search-container-inline {
++  display: flex;
++  align-items: center;
++}
++
++.search-box {
++  display: flex;
++  align-items: center;
++  gap: 8px;
++  max-width: 300px;
++  background-color: var(--bg-base-secondary);
++  border: 1px solid var(--on-border-secondary);
++  border-radius: 4px;
++  padding: 4px;
++  height: 32px; // Match control button height
++  box-sizing: border-box;
++  
++  .dark & {
++    background-color: #2c2c2c;
++  }
++}
++
++.search-input {
++  flex: 1;
++  padding: 0 8px;
++  border: none;
++  border-radius: 2px;
++  font-size: 14px;
++  background: transparent;
++  color: var(--text-primary);
++  min-width: 200px;
++  height: 100%; // Fill the search box height
++  
++  &:focus {
++    outline: none;
++    background-color: var(--bg-base-secondary);
++  }
++  
++  &::placeholder {
++    color: var(--text-secondary);
++  }
++}
++
++.clear-button {
++  background: var(--bg-base-secondary);
++  border: none;
++  color: var(--text-primary);
++  font-size: 16px;
++  font-weight: bold;
++  width: 24px;
++  height: 24px;
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  cursor: pointer;
++  border-radius: 2px;
++  transition: all 0.2s;
++  
++  &:hover {
++    background-color: var(--bg-base-modal);
++  }
++  
++  &:active {
++    background-color: rgba(25, 118, 210, 0.2);
++  }
++}
++
++.no-results {
++  text-align: center;
++  padding: 40px 20px;
++  color: var(--text-secondary);
++  font-style: italic;
++  
++  p {
++    margin: 0;
++    font-size: 14px;
++  }
++}
++
++/* Test Details Collapsible Styles */
++.header-cell {
++  background-color: #f5f5f5;
++  color: #333;
++  font-weight: 600;
++  text-align: left;
++  padding: 12px 16px;
++  border-bottom: 2px solid #e0e0e0;
++  font-size: 14px;
++
++  &:first-child {
++    width: 80px;
++    min-width: 80px;
++  }
++
++  &:last-child {
++    width: 100px;
++    min-width: 100px;
++    text-align: center;
++  }
++}
++
++.data-row {
++  border-bottom: 1px solid #e0e0e0;
++  transition: background-color 0.2s ease;
++
++  &:hover {
++    background-color: #f8f9fa;
++  }
++}
++
++.data-cell {
++  padding: 12px 16px;
++  font-size: 14px;
++  color: #333;
++  border: none;
++  vertical-align: middle;
++
++  &:first-child {
++    width: 80px;
++    min-width: 80px;
++    font-family: monospace;
++    font-size: 12px;
++    color: #666;
++  }
++
++  &:last-child {
++    width: 100px;
++    min-width: 100px;
++    text-align: center;
++  }
++}
++
++.toggle-details-button {
++  background: #1976d2;
++  color: white;
++  border: none;
++  padding: 4px 8px;
++  border-radius: 4px;
++  font-size: 12px;
++  cursor: pointer;
++  transition: background-color 0.2s ease;
++
++  &:hover {
++    background: #1565c0;
++  }
++
++  &:focus {
++    outline: 2px solid #1976d2;
++    outline-offset: 2px;
++  }
++}
++
++.details-row {
++  background-color: #f8f9fa;
++}
++
++.details-cell {
++  padding: 0 !important;
++  border-bottom: 1px solid #e0e0e0;
++}
++
++.test-details {
++  padding: 16px 20px;
++  background-color: #f8f9fa;
++  border-left: 3px solid #1976d2;
++  margin: 0;
++}
++
++.details-grid {
++  display: grid;
++  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
++  gap: 12px;
++  margin: 0;
++}
++
++.detail-item {
++  display: flex;
++  align-items: center;
++  font-size: 14px;
++  color: #333;
++  
++  strong {
++    margin-right: 8px;
++    color: #1976d2;
++    font-weight: 600;
++    min-width: 120px;
++  }
++}
++
++/* Clickable row styling */
++.clickable-row {
++  transition: background-color 0.2s ease;
++  cursor: pointer;
++  
++  &:hover {
++    background-color: #f0f7ff !important;
++  }
++}
++
++/* Expansion indicator styling */
++.expansion-header {
++  background-color: #1976d2;
++  color: white;
++  text-align: center;
++  font-weight: normal;
++  padding: 12px 8px;
++  border: none;
++  width: 40px;
++  min-width: 40px;
++}
++
++.expansion-indicator {
++  text-align: center;
++  width: 40px;
++  min-width: 40px;
++  padding: 12px 8px;
++  border: none;
++  border-bottom: 1px solid var(--on-border-secondary);
++  background: var(--bg-base-primary);
++  color: var(--text-primary);
++}
++
++.expansion-toggle-button {
++  font-size: 18px;
++  font-weight: normal;
++  background-color: var(--bg-base-secondary);
++  color: var(--text-primary);
++  padding: 2px 6px;
++  border-radius: 4px;
++  transition: transform 0.2s ease;
++  display: inline-block;
++  cursor: pointer;
++  user-select: none;
++}
++
++/* Test attachments styling */
++.attachments-section {
++  margin-top: 16px;
++  padding-top: 16px;
++  border-top: 1px solid var(--on-border-secondary);
++}
++
++.attachments-title {
++  margin: 0 0 12px 0;
++  color: #1976d2;
++  font-weight: 600;
++  font-size: 14px;
++  text-transform: uppercase;
++  letter-spacing: 0.5px;
++}
++
++.attachments-grid {
++  display: grid;
++  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
++  gap: 16px;
++  margin-top: 12px;
++}
++
++.attachment-item {
++  border: 1px solid var(--on-border-secondary);
++  border-radius: 6px;
++  overflow: hidden;
++  background: var(--bg-base-primary);
++  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
++  transition: box-shadow 0.2s ease;
++  
++  &:hover {
++    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
++  }
++}
++
++.attachment-name {
++  padding: 8px 12px;
++  background: #f8f9fa;
++  color: var(--text-primary);
++  font-size: 12px;
++  font-weight: 500;
++  border-bottom: 1px solid var(--on-border-secondary);
++  word-break: break-word;
++  
++  .dark & {
++    background: #2c2c2c;
++  }
++}
++
++.attachment-image {
++  width: 100%;
++  height: auto;
++  max-height: 150px;
++  object-fit: contain;
++  display: block;
++  background: #f8f9fa;
++  cursor: pointer;
++  transition: transform 0.2s ease;
++  
++  &:hover {
++    transform: scale(1.02);
++  }
++  
++  .dark & {
++    background: #2c2c2c;
++  }
++}
++
++// Qualification profile specific styling
++.qualification-profile-header {
++  display: flex;
++  align-items: center;
++  padding: 16px;
++  background-color: var(--bg-base-secondary);
++  cursor: pointer;
++  transition: background-color 0.2s;
++  border-bottom: 1px solid var(--on-border-secondary);
++  
++  &:hover {
++    background-color: var(--bg-base-neutral);
++  }
++  
++  .dark & {
++    background-color: #2c2c2c;
++    
++    &:hover {
++      background-color: #333333;
++    }
++  }
++}
++
++.qualification-profile-info {
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  width: 100%;
++  margin-left: 12px;
++}
++
++.qualification-profile-summary {
++  display: flex;
++  align-items: center;
++  gap: 12px;
++}
++
++// Table header styling with consistent layout
++.collapsible-header-enhanced {
++  display: flex;
++  justify-content: space-between;
++  align-items: center;
++  margin-bottom: 20px;
++  padding-bottom: 12px;
++}
++
++.header-left-enhanced {
++  display: flex;
++  align-items: center;
++  gap: 20px;
++}
++
++.header-right-enhanced {
++  display: flex;
++  align-items: center;
++  gap: 12px;
++}
++
++.table-status-summary {
++  display: flex;
++  align-items: center;
++  gap: 12px;
++}
++
++.table-test-count {
++  background-color: var(--bg-base-modal);
++  color: var(--text-primary);
++  padding: 6px 12px;
++  border-radius: 4px;
++  font-size: 12px;
++  font-weight: 500;
++  height: 32px;
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  box-sizing: border-box;
++  min-width: 50px;
++  text-align: center;
++}
++
++.test-count {
++  font-size: 14px;
++  color: var(--text-secondary);
++  font-weight: 500;
++}
++
++// Individual profile header styling for consistent layout
++.profile-header {
++  display: flex;
++  align-items: center;
++  gap: 12px;
++  padding: 12px 16px;
++  background-color: var(--bg-base-secondary);
++  cursor: pointer;
++  border-bottom: 1px solid var(--allure-border-secondary);
++}
++
++.qualification-profile-info {
++  flex: 1;
++  display: flex;
++  align-items: center;
++}
++
++.qualification-profile-summary {
++  display: flex;
++  align-items: center;
++  gap: 8px;
++}
++
++.status-badge {
++  padding: 6px 12px; // Increased padding for larger height
++  border-radius: 4px;
++  font-size: 12px;
++  font-weight: 500;
++  text-transform: uppercase;
++  letter-spacing: 0.5px;
++  display: inline-block;
++  min-width: 80px; // Increased minimum width for consistency
++  text-align: center;
++  height: 32px; // Match toggle button height
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  box-sizing: border-box;
++}
++
++.status-count {
++  background-color: var(--on-border-secondary); // Material Blue 700 - same as control buttons
++  color: var(--text-primary);
++  text-transform: none; // Don't uppercase the test count
++  letter-spacing: normal; // Normal spacing for test count
++}
+diff --git a/packages/web-awesome/src/locales/en.json b/packages/web-awesome/src/locales/en.json
+index 1605b588e..479c325e3 100644
+--- a/packages/web-awesome/src/locales/en.json
++++ b/packages/web-awesome/src/locales/en.json
+@@ -142,7 +142,8 @@
+   },
+   "sections": {
+     "report": "Report",
+-    "charts": "Graphs"
++    "charts": "Graphs",
++    "summary": "Summary"
+   },
+   "charts": {
+     "trend": {
+diff --git a/packages/web-awesome/src/stores/sections.ts b/packages/web-awesome/src/stores/sections.ts
+index b970aa158..2e1cb2e2a 100644
+--- a/packages/web-awesome/src/stores/sections.ts
++++ b/packages/web-awesome/src/stores/sections.ts
+@@ -39,7 +39,7 @@ export const getSection = () => {
+   const sectionFromUrl = parseHash().category;
+   const sectionFromLS =
+     globalThis.localStorage.getItem("chosenSection") === ""
+-      ? ""
++      ? (defaultSectionFromReportOptions || "summary")
+       : globalThis.localStorage.getItem("chosenSection") || defaultSectionFromReportOptions;
+   currentSection.value = sectionFromUrl || sectionFromLS;
+ 

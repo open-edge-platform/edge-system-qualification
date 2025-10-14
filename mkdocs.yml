@@ -1,0 +1,139 @@
+site_name: Intel® Edge System Qualification
+site_url: https://open-edge-platform.github.io/edge-system-qualification/
+site_description: >-
+  A comprehensive framework for testing and evaluating edge computing systems.
+  Provides automated test suites, system validation, and detailed reporting 
+  for Intel edge platforms.
+repo_name: open-edge-platform/edge-system-qualification
+repo_url: https://github.com/open-edge-platform/edge-system-qualification
+docs_dir: docs/
+
+# Copyright
+copyright: Copyright &copy; 2025 Intel Corporation
+
+# Configuration
+theme:
+  name: material
+  custom_dir: docs/overrides
+  language: en
+  palette:
+    - scheme: default
+      primary: white
+      accent: white
+  favicon: assets/images/logo.svg
+  font:
+    text: Roboto
+    code: Roboto Mono
+  
+  # Features
+  features:
+    - announce.dismiss
+    - content.action.edit
+    - content.action.view
+    - content.code.annotate
+    - content.code.copy
+    - content.tabs.link
+    - content.tooltips
+    - navigation.expand
+    - navigation.footer
+    - navigation.indexes
+    - navigation.instant
+    - navigation.instant.prefetch
+    - navigation.sections
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.top
+    - navigation.tracking
+    - search.highlight
+    - search.share
+    - search.suggest
+    - toc.follow
+
+# Custom color schemes
+extra_css:
+- stylesheets/extra.css
+
+# Plugins
+plugins:
+  - search:
+      separator: '[\s\-,:!=\[\]()"`/]+|\.(?!\d)|&[lg]t;|(?!\b)(?=[A-Z][a-z])'
+  # - minify:
+  #     minify_html: true
+
+# Customization
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/open-edge-platform/edge-system-qualification
+  generator: false
+
+# Extensions
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - toc:
+      permalink: true
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.magiclink:
+      normalize_issue_symbols: true
+      repo_url_shorthand: true
+      user: squidfunk
+      repo: mkdocs-material
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.snippets:
+      auto_append:
+        - includes/mkdocs.md
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+      combine_header_slug: true
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+# Page tree
+nav:
+  - Home: index.md
+  - Getting Started:
+    - getting-started/index.md
+    - Quick Start: getting-started/quick-start.md
+    - Test Suites:
+      - getting-started/suites/index.md
+      - Manufacturing: getting-started/suites/manufacturing.md
+      - Retail: getting-started/suites/retail.md
+  - Guides:
+    - guides/index.md
+    - Optimization: guides/optimization.md
+    - Troubleshooting: guides/troubleshooting.md
+    - Developer: guides/developer.md
+  - About:
+    - about/index.md
+    - License: about/license.md
+    - Support: about/support.md
+    - Changelog: about/changelog.md

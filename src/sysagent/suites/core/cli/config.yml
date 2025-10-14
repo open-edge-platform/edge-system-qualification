@@ -1,0 +1,26 @@
+# Copyright (C) 2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+# Configuration for the CLI log, summary, and system attachment tests
+
+tests:
+  test_log:
+    params:
+      - display_name: "CLI Logs"
+        timeout: 60
+        labels:
+          type: "core"
+  
+  test_summary:
+    params:
+      - display_name: "CLI Summary"
+        timeout: 60
+        labels:
+          type: "core"
+
+  test_system:
+    params:
+      - display_name: "CLI System"
+        timeout: 60
+        labels:
+          type: "core"

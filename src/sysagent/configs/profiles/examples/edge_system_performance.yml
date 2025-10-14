@@ -1,0 +1,246 @@
+# Copyright (C) 2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+# System Performance Example Configuration
+
+name: "profile.example.system-performance"
+description: "System performance example for edge devices using sysbench tests."
+version: "1.0.0"
+params:
+  labels:
+    profile_display_name: "System Performance Example"
+    type: "suite"
+  requirements:
+    # Hardware requirements
+    cpu_min_cores: 2
+    cpu_min_sockets: 1
+    memory_min_gb: 4.0
+    storage_min_gb: 10.0
+    # GPU device requirements using PCI IDs
+    gpu_integrated_devices:
+      - "64A0"  # Intel® Arc™ Graphics
+      - "7D55"  # Intel® Arc™ Graphics
+      - "A780"  # Intel® UHD Graphics 770
+      - "46A0"  # Intel® Iris® Xe Graphics
+      - "9A40"  # Intel® Iris® Xe Graphics
+    gpu_discrete_devices:
+      - "56A0"  # Intel® Arc™ A770 Graphics
+      - "56A1"  # Intel® Arc™ A750 Graphics
+      - "56A2"  # Intel® Arc™ A580 Graphics
+      - "56A5"  # Intel® Arc™ A380 Graphics
+      - "56A6"  # Intel® Arc™ A310 Graphics
+      - "5690"  # Intel® Arc™ A770M Graphics
+      - "5691"  # Intel® Arc™ A730M Graphics
+      - "5696"  # Intel® Arc™ A570M Graphics
+      - "5692"  # Intel® Arc™ A550M Graphics
+    
+    # dGPU memory requirements (applies to all dGPU devices)
+    dgpu_min_vram_gb: 4.0  # Minimum dGPU memory in GB for Docker performance testing
+    
+    # Software requirements
+    os_type:
+      - "linux"
+    docker_required: true
+
+suites:
+  - name: "examples"
+    sub_suites:
+      - name: "docker"
+
+        # Global KPI definitions that override the sub-suite defaults
+        kpi:
+          cpu_speed:
+            name: "CPU Speed"
+            type: "numeric"
+            validation:
+              operator: "gte"  # greater than or equal
+              reference: 1600.0  # Higher performance requirement for qualification
+              enabled: true
+            unit: "events/sec"
+            severity: "critical"
+            description: "CPU performance metric from sysbench"
+            default_value: 0.0
+            
+          memory_throughput:
+            name: "Memory Throughput"
+            type: "numeric"
+            validation:
+              operator: "gte"
+              reference: 10000.0
+              enabled: true
+            unit: "MiB/sec"
+            severity: "critical"
+            description: "Memory performance metric from sysbench"
+            default_value: 0.0
+
+          operations_per_second:
+            name: "Operations per second"
+            type: "numeric"
+            validation:
+              operator: "gte"
+              reference: 2000000.0 
+              enabled: true
+            unit: "ops/sec"
+            severity: "critical"
+            description: "Memory performance metric from sysbench"
+            default_value: 0.0
+            
+          read_throughput:
+            name: "File I/O Read Throughput"
+            type: "numeric"
+            validation:
+              operator: "gte"
+              reference: 34.0
+              enabled: true
+            unit: "MiB/sec"
+            severity: "critical"
+            description: "File I/O performance metric from sysbench"
+            default_value: 0.0
+
+          write_throughput:
+            name: "File I/O Write Throughput"
+            type: "numeric"
+            validation:
+              operator: "gte"
+              reference: 22.0
+              enabled: true
+            unit: "MiB/sec"
+            severity: "critical"
+            description: "FIle I/O performance metric from sysbench"
+            default_value: 0.0
+
+          performance_score:
+            name: "Performance Score"
+            type: "numeric"
+            validation:
+              operator: "gte"
+              reference: 200.0
+              enabled: true
+            unit: "events/sec"
+            severity: "critical"
+            description: "Overall performance metric from sysbench"
+            default_value: 0.0
+          
+          events_per_second:
+            name: "Events Per Second"
+            type: "numeric"
+            validation:
+              operator: "gte"  
+              reference: 100.0
+              enabled: true
+            unit: "events/sec"
+            severity: "major"
+            description: "Number of events processed per second by sysbench"
+            default_value: 0.0
+
+          latency_avg_ms:
+            name: "Average Latency"
+            type: "numeric"
+            validation:
+              operator: "lte"
+              reference: 50.0
+              enabled: true
+            unit: "ms"
+            severity: "major"
+            description: "Average latency in milliseconds from sysbench"
+            default_value: 999.0
+
+          latency_max_ms:
+            name: "Maximum Latency"
+            type: "numeric"
+            validation:
+              operator: "lte"
+              reference: 250.0
+              enabled: true
+            unit: "ms"
+            severity: "critical"
+            description: "Maximum latency spike in milliseconds from sysbench"
+            default_value: 999.0
+        
+        # Test-specific configurations with parameterization
+        tests:
+          test_docker_system_performance:
+            params:
+              - test_id: "T0000"
+                display_name: "CPU Speed Performance"
+                test_duration: 10  # Longer test for more reliable results
+                test_threads: 2  # More threads for qualification
+                test_type: "cpu"
+                memory_size: "2G"  # More memory for qualification
+                file_size: "1G"
+                container_image_name: "example-sysbench-test"
+                container_tag: "latest"
+                timeout: 180
+                kpi_refs:
+                  - cpu_speed
+                  - latency_avg_ms
+                  - latency_max_ms
+                requirements:
+                  memory_min_gb: 6.0
+                  storage_min_gb: 0.5
+                  cpu_min_cores: 4
+                
+              - display_name: "Memory Throughput Performance"
+                description: "Memory throughput performance qualification test using sysbench"
+                test_duration: 10
+                test_threads: 2
+                test_type: "memory"
+                memory_size: "2G"
+                file_size: "1G"
+                container_image_name: "example-sysbench-test"
+                container_tag: "latest"
+                timeout: 180
+                kpi_refs:
+                  - memory_throughput
+                  - latency_avg_ms
+                  - latency_max_ms
+                requirements:
+                  memory_min_gb: 4.0
+                  storage_min_gb: 0.5
+                
+              - display_name: "File I/O Throughput Performance"
+                description: "File I/O performance qualification test using sysbench"
+                duration: 10
+                threads: 2
+                test_type: "fileio"
+                memory_size: "1G"
+                file_size: "2G"
+                container_image_name: "example-sysbench-test"
+                container_tag: "latest"
+                timeout: 180
+                kpi_refs:
+                  - read_throughput
+                  - write_throughput
+                  - performance_score
+                  - latency_avg_ms
+                  - latency_max_ms
+                requirements:
+                  memory_min_gb: 2.0
+                  storage_min_gb: 3.0
+                kpi_override:
+                  performance_score:
+                    validation:
+                      reference: 56.0  # Combined read/write performance value
+                    unit: "MiB/sec"  # Use MiB/sec for file I/O performance
+                  latency_max_ms:
+                    validation:
+                      reference: 300.0  # Allow slightly higher latency for file I/O test
+              
+              - display_name: "Mixed Workload Performance"
+                description: "Mixed workload qualification test using multiple sysbench tests in sequence"
+                test_duration: 5
+                test_threads: 4
+                test_type: "cpu"
+                memory_size: "2G"
+                file_size: "2G"
+                container_image_name: "example-sysbench-test"
+                container_tag: "latest"
+                timeout: 240 
+                kpi_refs:
+                  - cpu_speed
+                  - latency_avg_ms
+                  - latency_max_ms
+                requirements:
+                  memory_min_gb: 6.0
+                  storage_min_gb: 3.0
+                  cpu_min_cores: 4

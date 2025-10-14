@@ -1,0 +1,110 @@
+# Copyright (C) 2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+name: "profile.suite.ai.vision"
+description: "Vision AI suite profile"
+version: "1.0.0"
+params:
+  labels:
+    profile_display_name: "Vision AI"
+    type: "suite"
+  requirements:
+    # Hardware requirements
+    cpu_min_cores: 2
+    memory_min_gb: 5.0
+    storage_min_gb: 10.0
+    # Software requirements
+    os_type:
+      - "linux"
+    docker_required: true
+  videos:
+    - name: "1192116-hd_1920_1080_15fps_30s.mp4"
+      url: "https://videos.pexels.com/video-files/1192116/1192116-hd_1920_1080_30fps.mp4"
+      sha256: "65d836330fda9cfe6aa7a6bb4b2a81df4897325133da096b275e40b359e2d4ea"
+      fps: 15
+      duration: 30
+  models:
+    - id: "yolo11n"
+      source: "ultralytics"
+      precision: "fp16"
+      format: "pt"
+  pipeline_params:
+    DECODE_ELEMENTS:
+      cpu: "parsebin ! avdec_h264 ! 'video/x-raw'"
+      gpu_integrated: "parsebin ! vah264dec ! vapostproc ! 'video/x-raw(memory:VAMemory)'"
+      gpu_discrete: "parsebin ! varenderD{RENDER_DEVICE_NUM}h264dec ! {VIDEO_RAW_TYPE}"
+      npu: "parsebin ! vah264dec ! 'video/x-raw(memory:VAMemory)'"
+    INFERENCE_ELEMENTS:
+      cpu: "pre-process-backend={PRE_PROCESS_BACKEND}"
+      gpu_integrated: "pre-process-backend={PRE_PROCESS_BACKEND} model-instance-id=inst0"
+      gpu_discrete: "pre-process-backend={PRE_PROCESS_BACKEND}"
+      npu: "pre-process-backend={PRE_PROCESS_BACKEND}"
+    PRE_PROCESS_BACKEND:
+      cpu: "ie"
+      gpu_integrated: "va-surface-sharing"
+      gpu_discrete: "va-surface-sharing"
+      npu: "va"
+    VIDEO_RAW_TYPE:
+      default: "'video/x-raw(memory:VAMemory)'"
+      overrides:
+        FULL_DEVICE_NAME:
+          "Intel(R) Unsupported video type": "'video/x-raw'"
+
+suites:
+  - name: "ai"
+    sub_suites:
+      - name: "vision"
+
+        tests:
+          test_dlstreamer:
+            params:
+              - test_id: "T0001"
+                display_name: "YOLO11n FP16 - 15 FPS"
+                pipeline: |
+                  filesrc location=./videos/1192116-hd_1920_1080_15fps_30s.mp4
+                    ! ${DECODE_ELEMENTS}
+                    ! gvadetect model=./models/yolo11n/fp16/yolo11n.xml device=${DEVICE_ID} ${INFERENCE_ELEMENTS} batch-size=1
+                    ! queue
+                devices: [cpu, igpu, dgpu, npu]
+
+              - test_id: "T0100"
+                display_name: "YOLO11n FP16 - 15 FPS (CPU)"
+                pipeline: |
+                  filesrc location=./videos/1192116-hd_1920_1080_15fps_30s.mp4
+                    ! ${DECODE_ELEMENTS}
+                    ! gvadetect model=./models/yolo11n/fp16/yolo11n.xml device=${DEVICE_ID} ${INFERENCE_ELEMENTS} batch-size=1
+                    ! queue
+                devices: [cpu]
+
+              - test_id: "T0101"
+                display_name: "YOLO11n FP16 - 15 FPS (iGPU)"
+                pipeline: |
+                  filesrc location=./videos/1192116-hd_1920_1080_15fps_30s.mp4
+                    ! ${DECODE_ELEMENTS}
+                    ! gvadetect model=./models/yolo11n/fp16/yolo11n.xml device=${DEVICE_ID} ${INFERENCE_ELEMENTS} batch-size=1
+                    ! queue
+                devices: [igpu]
+                requirements:
+                  igpu_required: true
+
+              - test_id: "T0102"
+                display_name: "YOLO11n FP16 - 15 FPS (dGPU)"
+                pipeline: |
+                  filesrc location=./videos/1192116-hd_1920_1080_15fps_30s.mp4
+                    ! ${DECODE_ELEMENTS}
+                    ! gvadetect model=./models/yolo11n/fp16/yolo11n.xml device=${DEVICE_ID} ${INFERENCE_ELEMENTS} batch-size=1
+                    ! queue
+                devices: [dgpu]
+                requirements:
+                  dgpu_required: true
+
+              - test_id: "T0103"
+                display_name: "YOLO11n FP16 - 15 FPS (NPU)"
+                pipeline: |
+                  filesrc location=./videos/1192116-hd_1920_1080_15fps_30s.mp4
+                    ! ${DECODE_ELEMENTS}
+                    ! gvadetect model=./models/yolo11n/fp16/yolo11n.xml device=${DEVICE_ID} ${INFERENCE_ELEMENTS} batch-size=1
+                    ! queue
+                devices: [npu]
+                requirements:
+                  npu_required: true

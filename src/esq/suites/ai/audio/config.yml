@@ -1,0 +1,23 @@
+# Copyright (C) 2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+# Configurations for the AI Audio tests
+
+kpi:
+  inference_time:
+    name: "Inference Time"
+    type: "numeric"
+    validation:
+      operator: "lte"
+      reference: 5.0
+      enabled: false
+    unit: "secs"
+    severity: "normal"
+    description: "Time taken for AI audio inference in seconds"
+    default_value: -1.0
+
+tests:
+  test_automatic_speech_recognition:
+    params:
+      - display_name: "Automatic Speech Recognition - Default"
+        devices: [cpu]

@@ -1,0 +1,136 @@
+# Copyright (C) 2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+kpi:
+  streams_max:
+    name: "Maximum Streams"
+    type: "numeric"
+    validation:
+      operator: "gte"
+      reference: 2
+      enabled: false
+    unit: "streams"
+    severity: "normal"
+    description: "Maximum number of concurrent video streams"
+    default_value: -1.0
+
+  streams_max_cpu:
+    name: "Maximum Streams CPU"
+    type: "numeric"
+    validation:
+      operator: "gte"
+      reference: 2
+      enabled: false
+    unit: "streams"
+    severity: "normal"
+    description: "Maximum number of concurrent video streams on CPU"
+    default_value: -1.0
+
+  streams_max_igpu:
+    name: "Maximum Streams iGPU"
+    type: "numeric"
+    validation:
+      operator: "gte"
+      reference: 2
+      enabled: false
+    unit: "streams"
+    severity: "normal"
+    description: "Maximum number of concurrent video streams on iGPU"
+    default_value: -1.0
+
+  streams_max_dgpu:
+    name: "Maximum Streams dGPU"
+    type: "numeric"
+    validation:
+      operator: "gte"
+      reference: 2
+      enabled: false
+    unit: "streams"
+    severity: "normal"
+    description: "Maximum number of concurrent video streams on dGPU"
+    default_value: -1.0
+
+  streams_max_npu:
+    name: "Maximum Streams NPU"
+    type: "numeric"
+    validation:
+      operator: "gte"
+      reference: 2
+      enabled: false
+    unit: "streams"
+    severity: "normal"
+    description: "Maximum number of concurrent video streams on NPU"
+    default_value: -1.0
+
+tests:
+  test_dlstreamer:
+    params:
+      - display_name: "DL Streamer - Default"
+        videos:
+          - name: "1192116-hd_1920_1080_15fps_30s.mp4"
+            url: "https://videos.pexels.com/video-files/1192116/1192116-hd_1920_1080_30fps.mp4"
+            sha256: "65d836330fda9cfe6aa7a6bb4b2a81df4897325133da096b275e40b359e2d4ea"
+            fps: 15
+            duration: 30
+          - name: "warehouse.avi"
+            url: "https://github.com/open-edge-platform/edge-ai-resources/raw/c13b8dbf23d514c2667d39b66615bd1400cb889d/videos/warehouse.avi"
+            sha256: "cec6414d5197c3974896bc8f5b15c4a6a683b654f6ec01e9706fcee1b034d748"
+        models:
+          - id: "yolo11n"
+            source: "ultralytics"
+            precision: "fp16"  # supported precision to be exported: fp32, fp16, int8
+            format: "pt"
+          - id: "yoloxtiny_pallet_defect_detection"
+            source: "zip"
+            url: "https://github.com/open-edge-platform/edge-ai-resources/raw/c13b8dbf23d514c2667d39b66615bd1400cb889d/models/pallet_defect_detection.zip"
+            sha256: "05284de2f3a48c646cc341d0dc93e936e2afd0f37b751338b9b78b6fd3bf171c"
+            precision: "fp32" # exported model precision metadata
+            format: "openvino"
+          - id: "efficientnet_b0"
+            source: "files"
+            url: 
+              - xml: "https://raw.githubusercontent.com/dlstreamer/pipeline-zoo-models/refs/heads/main/storage/efficientnet-b0_INT8/FP16-INT8/efficientnet-b0.xml"
+              - bin: "https://raw.githubusercontent.com/dlstreamer/pipeline-zoo-models/refs/heads/main/storage/efficientnet-b0_INT8/FP16-INT8/efficientnet-b0.bin"
+            sha256:
+              - xml: "e9f959bb05ea1dc4d4735acc62e3d959fa2982b82e9608325157ba3598b5b999"
+              - bin: "2ee5a5ad5a9a1a00d057e50af5da56e3bf09f633f66e9f77b9a1915ab862c536"
+            precision: "fp16" # exported model precision metadata
+            format: "openvino"
+        assets:
+          - id: "imagenet_2012.txt"
+            url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-libraries/main/libraries/dl-streamer/samples/labels/imagenet_2012.txt"
+            sha256: "acf75ef0abe89694b19056e0796401068b459c457baa30335f240c7692857355"
+            path: "./labels/imagenet_2012.txt"
+        pipeline: |
+          filesrc location=./videos/1192116-hd_1920_1080_15fps_30s.mp4
+            ! ${DECODE_ELEMENTS}
+            ! gvadetect model=./models/yolo11n/fp16/yolo11n.xml device=${DEVICE_ID} ${INFERENCE_ELEMENTS} batch-size=1
+            ! queue
+        pipeline_params:
+          DECODE_ELEMENTS:
+            cpu: "parsebin ! avdec_h264 ! 'video/x-raw'"
+            gpu_integrated: "parsebin ! vah264dec ! vapostproc ! 'video/x-raw(memory:VAMemory)'"
+            gpu_discrete: "parsebin ! varenderD{RENDER_DEVICE_NUM}h264dec ! {VIDEO_RAW_TYPE}"
+            npu: "parsebin ! vah264dec ! 'video/x-raw(memory:VAMemory)'"
+          INFERENCE_ELEMENTS:
+            cpu: "pre-process-backend={PRE_PROCESS_BACKEND}"
+            gpu_integrated: "pre-process-backend={PRE_PROCESS_BACKEND} model-instance-id=inst0"
+            gpu_discrete: "pre-process-backend={PRE_PROCESS_BACKEND}"
+            npu: "pre-process-backend={PRE_PROCESS_BACKEND}"
+          PRE_PROCESS_BACKEND:
+            cpu: "ie"
+            gpu_integrated: "va-surface-sharing"
+            gpu_discrete: "va-surface-sharing"
+            npu: "va"
+          VIDEO_RAW_TYPE:
+            default: "'video/x-raw(memory:VAMemory)'"
+            overrides:
+              FULL_DEVICE_NAME:
+                "Intel(R) Unsupported video type": "'video/x-raw'"
+        # devices: [cpu, igpu, dgpu, npu] # options: [cpu, igpu, dgpu, npu]
+        devices: [dgpu] # options: [cpu, igpu, dgpu, npu]
+        # Set visualize_stream as true to enable visualization of the stream for debugging
+        # Run command 'xhost +local:root' on terminal before running the test
+        visualize_stream: false 
+        kpi_refs:
+          - streams_max_dgpu

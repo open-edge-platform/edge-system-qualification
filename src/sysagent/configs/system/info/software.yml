@@ -1,0 +1,23 @@
+# Copyright (C) 2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+---
+# Software package configuration for sysagent
+# This file defines which packages to track for system information collection
+
+system_packages:
+  - intel-fw-npu
+  - intel-level-zero-npu
+  - intel-driver-compiler-npu
+  - intel-gsc
+  - intel-media-va-driver-non-free
+
+python_packages:
+  - docker
+  - openvino
+  - pytest
+  - allure-pytest
+  - psutil
+  - requests
+  - numpy
+  - matplotlib
+  - py-cpuinfo

@@ -1,0 +1,113 @@
+[build-system]
+requires = ["setuptools>=80", "setuptools-scm", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "esq"
+dynamic = ["version"]
+description = "Edge System Qualification (ESQ) package for evaluating and qualifying edge computing systems"
+readme = "README.md"
+authors = [
+    {name = "esq"}
+]
+license = "Apache-2.0"
+classifiers = [
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Operating System :: OS Independent",
+]
+requires-python = ">=3.10"
+dependencies = [
+    "pyyaml>=6.0.2",
+    "pytest>=8.4.1",
+    "allure-pytest>=2.14.3",
+    "pytest-check>=2.5.3",
+    "rich>=14.0.0",
+    "tqdm>=4.67.1",
+    "tomli>=2.2.1",
+    "matplotlib>=3.10.3",
+    "psutil>=7.0.0",
+    "py-cpuinfo>=9.0.0",
+    "requests>=2.32.4",
+    "openvino>=2025.2.0",
+    "docker>=7.1.0",
+    "pydub>=0.25.1",
+    "httpx>=0.28.1",
+    "huggingface-hub>=0.33.4", 
+    "transformers>=4.36",
+    "openvino_tokenizers>=2025.2.0.1",
+    "Jinja2>=3.1.6",
+    "optimum-intel@git+https://github.com/huggingface/optimum-intel.git@3b2cffb40c3de6bd3bf90c1e8a98d902e87db80d",
+    "ultralytics>=8.3.170",
+    "py-libnuma>=1.2",
+    "nncf>=2.17.0",
+]
+
+[project.scripts]
+esq = "sysagent.cli:main"
+
+[project.entry-points.sysagent]
+sysagent_suites = "esq"
+sysagent_configs = "esq"
+
+[project.entry-points.pytest11]
+sysagent_plugin = "sysagent.utils.plugins"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["sysagent", "esq"]
+
+[tool.setuptools.package-data]
+sysagent = [
+  "configs/**/*",
+  "suites/**/*",
+  "utils/**/*"
+]
+esq = [
+  "configs/**/*",
+  "suites/**/*",
+  "utils/**/*",
+  "pyproject.toml"
+]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools_scm]
+version_scheme = "post-release"    # e.g., 1.0.0.post0.dev4+gabcdef
+local_scheme = "node-and-date"     # include commit hash and date
+root = "."                         # root of the git repo
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+exclude = [
+  ".git",
+  "__pycache__",
+  ".venv",
+  "venv",
+  "build",
+  "dist"
+]
+
+[tool.ruff.format]
+indent-style = "space"
+quote-style = "double"
+
+[tool.ruff.lint]
+extend-select = ["E501"]
+
+[tool.sysagent]
+github_dependencies = [
+  { name = "edge-developer-kit-reference-scripts", url = "https://github.com/intel/edge-developer-kit-reference-scripts.git", ref = "4f05e9a" },
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.13.1",
+]

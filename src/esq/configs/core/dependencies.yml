@@ -1,0 +1,100 @@
+# Copyright (C) 2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+version: "1.0"
+
+# ESQ package dependency configuration
+# This file contains dependencies specific to the ESQ (Edge System Qualification) package
+# including Docker and Intel Edge hardware drivers
+
+# Dependency installation order (dependencies will be processed in this order)
+install_order:
+  - "system_drivers"
+  - "docker"
+
+# Dependency groups for logical organization
+groups:
+  edge_hardware:
+    name: "Edge Hardware"
+    description: "Intel Edge hardware drivers and system configuration"
+    dependencies: ["system_drivers"]
+    optional: false
+    
+  containerization:
+    name: "Containerization"
+    description: "Docker container platform for edge workloads"
+    dependencies: ["docker"]
+    optional: false
+
+# Individual dependency definitions
+dependencies:
+  system_drivers:
+    name: "system_drivers"
+    description: "Intel Edge hardware drivers and system configuration"
+    required: true
+    priority: 5
+    installations:
+      - os_type: "linux"
+        install_method: "manual_setup"
+        documentation_url: "https://github.com/intel/edge-developer-kit-reference-scripts"
+        notes:
+          - "Install Intel hardware drivers and configure your system"
+          - "Follow the official Intel Edge Developer Kit guide"
+          - "This includes GPU drivers, NPU drivers, and system optimizations"
+          - "Required for proper hardware acceleration and AI workloads"
+          - "Reboot may be required after driver installation"
+
+  system_packages:
+    name: "system_packages"
+    description: "Additional system utilities and development libraries"
+    required: true
+    priority: 10
+    installations:
+      - os_type: "linux"
+        install_method: "system_package"
+        packages: 
+          # Media and codec libraries
+          - "ffmpeg"    # Multimedia framework for audio/video processing
+        validation:
+          check_method: "dpkg"
+        notes:
+          - "Installs additional system utilities and development libraries"
+          - "Required for building and running applications"
+      - os_type: "windows"
+        install_method: "manual_setup"
+        documentation_url: "coming soon"
+        notes:
+          - "Coming soon"
+
+  docker:
+    name: "docker"
+    description: "Docker container platform for building and running edge applications"
+    required: true
+    priority: 20
+    installations:
+      - os_type: "linux"
+        install_method: "manual_setup"
+        documentation_url: "https://docs.docker.com/engine/install/"
+        notes:
+          - "Follow the official Docker Engine installation guide for your Linux distribution"
+          - "After installation, add your user to the docker group: sudo usermod -aG docker $USER"
+          - "Log out and log back in for group changes to take effect"
+          - "Start and enable Docker service: sudo systemctl start docker && sudo systemctl enable docker"
+          - "Verify installation with: docker --version"
+          - "Test Docker daemon access: docker run hello-world"
+        validation:
+          check_command: "docker ps"
+          expected_return_code: 0
+          check_service_running: "docker"
+      - os_type: "windows"
+        install_method: "manual_setup"
+        documentation_url: "https://docs.docker.com/engine/install/"
+        notes:
+          - "Download and install Docker Engine Community Edition from the official website"
+          - "Follow the Windows-specific installation instructions in the documentation"
+          - "Docker Engine provides core containerization without Desktop UI overhead"
+          - "Ensure Docker Engine service is running before using the application"
+          - "Verify installation by running: docker --version"
+        validation:
+          check_command: "docker --version"
+          expected_return_code: 0

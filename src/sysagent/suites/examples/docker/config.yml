@@ -1,0 +1,127 @@
+# Copyright (C) 2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+# Configuration for the Docker tests within the examples suite.
+
+# KPIs specific to Docker containerized performance tests using sysbench
+kpi:
+  performance_score:
+    name: "Performance Score"
+    type: "numeric"
+    validation:
+      operator: "gte"  # greater than or equal
+      reference: 100.0  # Minimum acceptable performance score
+      enabled: true
+    unit: "events/sec"
+    severity: "major"
+    description: "Primary performance metric from sysbench (events per second, MB/sec, etc.)"
+    default_value: 0.0
+  
+  events_per_second:
+    name: "Events Per Second"
+    type: "numeric"
+    validation:
+      operator: "gte"  # greater than or equal
+      reference: 50.0   # Minimum events per second
+      enabled: true
+    unit: "events/sec"
+    severity: "minor"
+    description: "Number of events processed per second by sysbench"
+    default_value: 0.0
+
+  latency_avg_ms:
+    name: "Average Latency"
+    type: "numeric"
+    validation:
+      operator: "lte"  # less than or equal
+      reference: 100.0
+      enabled: true
+    unit: "ms"
+    severity: "minor"
+    description: "Average latency in milliseconds from sysbench"
+    default_value: 999.0
+
+  latency_max_ms:
+    name: "Maximum Latency"
+    type: "numeric"
+    validation:
+      operator: "lte"  # less than or equal
+      reference: 500.0
+      enabled: true
+    unit: "ms"
+    severity: "major"
+    description: "Maximum latency spike in milliseconds from sysbench"
+    default_value: 999.0
+
+# Test-specific configurations with parameterization
+tests:
+  test_docker_system_performance:
+    params:
+      - name: "cpu_basic"
+        display_name: "Docker CPU Performance Test - Basic"
+        description: "Basic CPU performance test using sysbench in Ubuntu 24.04 container"
+        test_duration: 5
+        test_threads: 1
+        test_type: "cpu"
+        memory_size: "1G"
+        file_size: "1G"
+        container_image_name: "example-sysbench-test"
+        container_tag: "latest"
+        timeout: 120
+        severity: "normal"
+        container_network_mode: "bridge"
+        container_remove_after: true
+        docker_required: true
+        kpi_refs:
+          - performance_score
+          - events_per_second
+          - latency_avg_ms
+        requirements:
+          memory_min_gb: 5.0
+          storage_min_gb: 0.2
+        
+      - name: "memory_basic"
+        display_name: "Docker Memory Performance Test - Basic"
+        description: "Basic memory performance test using sysbench in Ubuntu 24.04 container"
+        test_duration: 5
+        test_threads: 1
+        test_type: "memory"
+        memory_size: "1G"
+        file_size: "1G"
+        container_image_name: "example-sysbench-test"
+        container_tag: "latest"
+        timeout: 120
+        severity: "normal"
+        container_network_mode: "bridge"
+        container_remove_after: true
+        docker_required: true
+        kpi_refs:
+          - performance_score
+          - events_per_second
+          - latency_avg_ms
+        requirements:
+          memory_min_gb: 1.0
+          storage_min_gb: 0.2
+        
+      - name: "fileio_basic"
+        display_name: "Docker File I/O Performance Test - Basic"
+        description: "Basic file I/O performance test using sysbench in Ubuntu 24.04 container"
+        test_duration: 5
+        test_threads: 1
+        test_type: "fileio"
+        memory_size: "1G"
+        file_size: "1G"
+        container_image_name: "example-sysbench-test"
+        container_tag: "latest"
+        timeout: 120
+        severity: "normal"
+        container_network_mode: "bridge"
+        container_remove_after: true
+        docker_required: true
+        kpi_refs:
+          - performance_score
+          - events_per_second
+          - latency_avg_ms
+        requirements:
+          memory_min_gb: 0.5
+          storage_min_gb: 1.0

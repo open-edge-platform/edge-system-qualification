@@ -1,0 +1,19 @@
+# Copyright (C) 2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+---
+# Software package configuration for esq
+# This file defines which packages to track for system information collection
+
+system_packages:
+  - ffmpeg
+
+python_packages:
+  - optimum-intel
+  - ultralytics
+  - nncf
+  - py-libnuma
+  - huggingface-hub
+  - openvino_tokenizers
+  - transformers
+  - pydub

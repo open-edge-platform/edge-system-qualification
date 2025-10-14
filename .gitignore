@@ -1,0 +1,34 @@
+# Python bytecode and build artifacts
+__pycache__/
+*.py[cod]
+*.so
+build/
+dist/
+*.egg-info/
+
+# Virtual environments
+.env
+.venv
+.venv_sysagent
+env/
+venv/
+
+# Test and coverage outputs
+.tox/
+.pytest_cache/
+
+# Project-specific data and logs
+*_data/
+.allure
+*.log
+
+# MkDocs build outputs
+site/
+
+# Ruff linting
+.ruff_cache/
+
+# Tests
+tests/scans/*/
+tests/fuzz/*/
+.hypothesis/

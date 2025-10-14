@@ -1,0 +1,50 @@
+# Copyright (C) 2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+tiers:
+  scalable_performance_xeon:
+    name: "Scalable Performance Xeon"
+    priority: 1
+    requirements:
+      cpu_xeon_required: true
+      cpu_min_cores: 16
+      memory_min_gb: 64.0
+      dgpu_required: true
+      dgpu_min_devices: 2
+      dgpu_min_vram_gb: 26.0
+
+  scalable_performance_core:
+    name: "Scalable Performance Core"
+    priority: 2
+    requirements:
+      cpu_core_required: true
+      cpu_min_cores: 8
+      memory_min_gb: 32.0
+      dgpu_required: true
+      dgpu_min_vram_gb: 8.0
+
+  efficiency_optimized:
+    name: "Efficiency Optimized"
+    priority: 3
+    requirements:
+      cpu_ultra_required: true
+      cpu_min_cores: 8
+      memory_min_gb: 32.0
+      igpu_required: true
+
+  mainstream:
+    name: "Mainstream"
+    priority: 4
+    requirements:
+      cpu_core_required: true
+      cpu_min_cores: 8
+      memory_min_gb: 32.0
+      igpu_required: true
+
+  entry:
+    name: "Entry"
+    priority: 5
+    requirements:
+      cpu_min_cores: 8
+      memory_min_gb: 16.0
+      igpu_required: true

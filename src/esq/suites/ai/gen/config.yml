@@ -1,0 +1,83 @@
+# Copyright (C) 2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+# Configurations for the AI - GenAI tests
+
+kpi:
+  duration_s:
+    name: "Duration"
+    type: "numeric"
+    validation:
+      operator: "lte"
+      reference: 15.0
+      enabled: false
+    unit: "secs"
+    severity: "normal"
+    description: "Time taken for Text to Image generation in seconds"
+    default_value: -1.0
+
+  throughput:
+    name: "Throughput"
+    type: "numeric"
+    validation:
+      operator: "gte"
+      reference: 10.0
+      enabled: false
+    unit: "tokens/sec"
+    severity: "normal"
+    description: "Throughput for Text Generation in tokens per second"
+    default_value: -1.0
+
+  throughput_cpu:
+    name: "Throughput CPU"
+    type: "numeric"
+    validation:
+      operator: "gte"
+      reference: 10.0
+      enabled: false
+    unit: "tokens/sec"
+    severity: "normal"
+    description: "Throughput for Text Generation on CPU in tokens per second"
+    default_value: -1.0
+
+  throughput_igpu:
+    name: "Throughput iGPU"
+    type: "numeric"
+    validation:
+      operator: "gte"
+      reference: 10.0
+      enabled: false
+    unit: "tokens/sec"
+    severity: "normal"
+    description: "Throughput for Text Generation on iGPU in tokens per second"
+    default_value: -1.0
+
+  throughput_dgpu:
+    name: "Throughput dGPU"
+    type: "numeric"
+    validation:
+      operator: "gte"
+      reference: 10.0
+      enabled: false
+    unit: "tokens/sec"
+    severity: "normal"
+    description: "Throughput for Text Generation on dGPU in tokens per second"
+    default_value: -1.0
+
+  throughput_npu:
+    name: "Throughput NPU"
+    type: "numeric"
+    validation:
+      operator: "gte"
+      reference: 10.0
+      enabled: false
+    unit: "tokens/sec"
+    severity: "normal"
+    description: "Throughput for Text Generation on NPU in tokens per second"
+    default_value: -1.0
+
+tests:
+  test_text_generation:
+    params:
+      - display_name: "Text Generation - Default"
+        devices: [cpu]

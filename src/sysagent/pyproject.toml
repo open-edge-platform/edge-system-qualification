@@ -1,0 +1,70 @@
+[build-system]
+requires = ["setuptools>=80", "setuptools-scm", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sysagent"
+dynamic = ["version"]
+description = "A flexible, extensible CLI framework for system management."
+readme = "README.md"
+authors = [
+    {name = "sysagent"}
+]
+license = "Apache-2.0"
+classifiers = [
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Operating System :: OS Independent",
+]
+requires-python = ">=3.8"
+dependencies = [
+    "pyyaml>=6.0.2",
+    "pytest>=8.4.1",
+    "allure-pytest>=2.14.3",
+    "pytest-check>=2.5.3",
+    "rich>=14.0.0",
+    "tqdm>=4.67.1",
+    "tomli>=2.2.1",
+    "matplotlib>=3.10.3",
+    "psutil>=7.0.0",
+    "py-cpuinfo>=9.0.0",
+    "requests>=2.32.4",
+    "openvino>=2025.2.0",
+]
+
+[project.scripts]
+sysagent = "sysagent.cli:main"
+
+[project.entry-points.pytest11]
+sysagent_plugin = "sysagent.utils.plugins"
+
+[tool.setuptools.packages.find]
+where = ["../../src"]
+include = ["sysagent"]
+
+[tool.setuptools_scm]
+version_scheme = "post-release"    # e.g., 1.0.0.post0.dev4+gabcdef
+local_scheme = "node-and-date"     # include commit hash and date
+root = "../.."                         # root of the git repo
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_functions = "test_*"
+addopts = [
+  "-p no:logging"
+]
+
+[tool.sysagent]
+node_version = "v22.17.0"
+allure_version = "v3.0.0-beta.15"
+github_dependencies = [
+  { name = "allure3", url = "https://github.com/allure-framework/allure3.git", ref = "v3.0.0-beta.15" },
+]

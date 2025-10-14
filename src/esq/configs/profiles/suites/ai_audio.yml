@@ -1,0 +1,160 @@
+# Copyright (C) 2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+name: "profile.suite.ai.audio"
+description: "Audio AI suite profile"
+version: "1.0.0"
+params:
+  labels:
+    profile_display_name: "Audio AI"
+    type: "suite"
+  requirements:
+    # Hardware requirements
+    cpu_min_cores: 2
+    memory_min_gb: 4.0
+    storage_min_gb: 10.0
+    # Software requirements
+    os_type:
+      - "linux"
+    docker_required: true
+    required_system_packages:
+      - "ffmpeg"
+
+suites:
+  - name: "ai"
+    sub_suites:
+      - name: "audio"
+      
+        tests:
+          test_automatic_speech_recognition:
+            params:
+              - test_id: "T0049"
+                display_name: "openai/whisper-tiny (CPU)"
+                model_id: "openai/whisper-tiny"
+                devices: [cpu]
+
+              - test_id: "T0050"
+                display_name: "openai/whisper-tiny (iGPU)"
+                model_id: "openai/whisper-tiny"
+                devices: [igpu]
+                requirements:
+                  igpu_required: true
+                
+              - test_id: "T0051"
+                display_name: "openai/whisper-tiny (dGPU)"
+                model_id: "openai/whisper-tiny"
+                devices: [dgpu]
+                requirements:
+                  dgpu_required: true
+
+              - test_id: "T0052"
+                display_name: "openai/whisper-tiny (NPU)"
+                model_id: "openai/whisper-tiny"
+                devices: [npu]
+                requirements:
+                  npu_required: true
+
+              - test_id: "T0053"
+                display_name: "openai/whisper-small (CPU)"
+                model_id: "openai/whisper-small"
+                devices: [cpu]
+                
+              - test_id: "T0054"
+                display_name: "openai/whisper-small (iGPU)"
+                model_id: "openai/whisper-small"
+                devices: [igpu]
+                requirements:
+                  igpu_required: true
+                
+              - test_id: "T0055"
+                display_name: "openai/whisper-small (dGPU)"
+                model_id: "openai/whisper-small"
+                devices: [dgpu]
+                requirements:
+                  dgpu_required: true
+
+              - test_id: "T0056"
+                display_name: "openai/whisper-small (NPU)"
+                model_id: "openai/whisper-small"
+                devices: [npu]
+                requirements:
+                  npu_required: true
+
+              - test_id: "T0057"
+                display_name: "openai/whisper-medium (CPU)"
+                model_id: "openai/whisper-medium"
+                devices: [cpu]
+
+              - test_id: "T0058"
+                display_name: "openai/whisper-medium (iGPU)"
+                model_id: "openai/whisper-medium"
+                devices: [igpu]
+                requirements:
+                  igpu_required: true
+                
+              - test_id: "T0059"
+                display_name: "openai/whisper-medium (dGPU)"
+                model_id: "openai/whisper-medium"
+                devices: [dgpu]
+                requirements:
+                  dgpu_required: true
+
+              - test_id: "T0060"
+                display_name: "openai/whisper-medium (NPU)"
+                model_id: "openai/whisper-medium"
+                devices: [npu]
+                requirements:
+                  npu_required: true
+
+              - test_id: "T0061"
+                display_name: "openai/whisper-large-v3 (CPU)"
+                model_id: "openai/whisper-large-v3"
+                devices: [cpu]
+                timeout: 10
+                
+              - test_id: "T0062"
+                display_name: "openai/whisper-large-v3 (iGPU)"
+                model_id: "openai/whisper-large-v3"
+                devices: [igpu]
+                requirements:
+                  igpu_required: true
+                
+              - test_id: "T0063"
+                display_name: "openai/whisper-large-v3 (dGPU)"
+                model_id: "openai/whisper-large-v3"
+                devices: [dgpu]
+                requirements:
+                  dgpu_required: true
+
+              - test_id: "T0064"
+                display_name: "openai/whisper-large-v3 (NPU)"
+                model_id: "openai/whisper-large-v3"
+                devices: [npu]
+                requirements:
+                  npu_required: true
+
+              - test_id: "T0065"
+                display_name: "openai/whisper-large-v3-turbo (CPU)"
+                model_id: "openai/whisper-large-v3-turbo"
+                devices: [cpu]
+
+              - test_id: "T0066"
+                display_name: "openai/whisper-large-v3-turbo (iGPU)"
+                model_id: "openai/whisper-large-v3-turbo"
+                devices: [igpu]
+                requirements:
+                  igpu_required: true
+                
+              - test_id: "T0067"
+                display_name: "openai/whisper-large-v3-turbo (dGPU)"
+                model_id: "openai/whisper-large-v3-turbo"
+                devices: [dgpu]
+                requirements:
+                  dgpu_required: true
+
+              - test_id: "T0068"
+                display_name: "openai/whisper-large-v3-turbo (NPU)"
+                model_id: "openai/whisper-large-v3-turbo"
+                devices: [npu]
+                requirements:
+                  npu_required: true

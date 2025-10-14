@@ -1,0 +1,139 @@
+name: Docs Build
+
+on:
+  push:
+    branches:
+      - main
+      - release/*
+    paths:
+      - 'docs/**'
+      - 'mkdocs.yml'
+      - 'requirements-docs.txt'
+      - '.github/workflows/docs-build.yml'
+  pull_request:
+    branches:
+      - main
+      - release/*
+    paths:
+      - 'docs/**'
+      - 'mkdocs.yml'
+      - 'requirements-docs.txt'
+      - '.github/workflows/docs-build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Setup runner configuration
+  setup:
+    name: Setup Runner Configuration
+    runs-on: ubuntu-latest
+    
+    env:
+      EXTERNAL_REPO: 'open-edge-platform/edge-system-qualification'
+    
+    outputs:
+      runner_labels: ${{ steps.configure.outputs.runner_labels }}
+    
+    steps:
+      - name: Configure runner settings
+        id: configure
+        run: |
+          if [[ "${{ github.repository }}" == "${{ env.EXTERNAL_REPO }}" ]]; then
+            RUNNER_LABELS='["ubuntu-latest"]'
+            echo "Repository type: External"
+            echo "Repository: ${{ github.repository }}"
+          else
+            # Internal repo: use self-hosted runner with 'vm' label
+            RUNNER_LABELS='["self-hosted", "vm"]'
+            echo "Repository type: Internal"
+            echo "Repository: ${{ github.repository }}"
+          fi
+          
+          echo "runner_labels=${RUNNER_LABELS}" >> $GITHUB_OUTPUT
+          echo "Runner configuration: ${RUNNER_LABELS}"
+      
+      - name: Generate configuration summary
+        run: |
+          echo "## ⚙️ Runner Configuration" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Setting | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Repository | \`${{ github.repository }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| External Repo | \`${{ env.EXTERNAL_REPO }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Runner Labels | \`${{ steps.configure.outputs.runner_labels }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+  # Build documentation
+  build:
+    name: Build Documentation
+    needs: setup
+    runs-on: ${{ fromJSON(needs.setup.outputs.runner_labels) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        run: |
+          if ! command -v uv &> /dev/null; then
+            echo "uv not found, installing..."
+            curl -LsSf https://astral.sh/uv/install.sh | sh
+            export PATH="$HOME/.local/bin:$PATH"
+            echo "$HOME/.local/bin" >> $GITHUB_PATH
+          else
+            echo "uv is already installed"
+          fi
+          
+      - name: Setup Python virtual environment with uv
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          uv venv .venv_docs
+
+      - name: Install dependencies with uv
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          source .venv_docs/bin/activate
+          uv pip install -r requirements-docs.txt
+
+      - name: Build documentation
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          source .venv_docs/bin/activate
+          mkdocs build --clean
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: documentation-site
+          path: site/
+
+      - name: Build Summary
+        if: always()
+        run: |
+          echo "## 🔰 Documentation Build" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Runner Name | \`${{ runner.name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Runner Environment | ${{ runner.environment }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Event | ${{ github.event_name }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Branch | \`${{ github.ref_name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Commit | [\`${{ github.sha }}\`](https://github.com/${{ github.repository }}/commit/${{ github.sha }}) |" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ "${{ job.status }}" == "success" ]]; then
+            echo "| Status | ✅ Build Successful |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Status | ❌ Build Failed |" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Documentation artifacts have been uploaded and are available for download." >> $GITHUB_STEP_SUMMARY

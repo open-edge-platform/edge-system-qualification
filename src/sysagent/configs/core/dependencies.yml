@@ -1,0 +1,45 @@
+# Copyright (C) 2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+version: "1.0"
+
+# SysAgent core dependency configuration
+# This file contains base system dependencies for the sysagent framework
+
+# Dependency installation order (dependencies will be processed in this order)
+install_order:
+  - "system_packages"
+
+# Dependency groups for logical organization
+groups:
+  system_packages:
+    name: "System Packages"
+    description: "Essential system utilities and libraries"
+    dependencies: ["system_packages"]
+    optional: false
+
+# Individual dependency definitions
+dependencies:
+  system_packages:
+    name: "system_packages"
+    description: "Essential system utilities and development libraries"
+    required: true
+    priority: 10
+    installations:
+      - os_type: "linux"
+        install_method: "system_package"
+        packages: 
+          # Essential utilities
+          - "curl"
+          - "git"
+          - "wget"
+        validation:
+          check_method: "dpkg"
+        notes:
+          - "Installs essential system utilities and development libraries"
+          - "Required for building and running applications"
+      - os_type: "windows"
+        install_method: "manual_setup"
+        documentation_url: "coming soon"
+        notes:
+          - "Coming soon"

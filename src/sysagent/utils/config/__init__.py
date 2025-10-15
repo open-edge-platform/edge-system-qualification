@@ -9,12 +9,78 @@ including pyproject.toml, YAML files, environment variables, and entrypoints.
 """
 
 # Import local modules directly without backward compatibility
-from .config import *
-from .config_loader import *
+from .config import (
+    apply_environment_overrides,
+    apply_profile_overrides,
+    deep_update,
+    ensure_dir_permissions,
+    filter_profile_by_tier,
+    find_config_file,
+    get_active_profile_configs,
+    get_cache_dir,
+    get_config_checksum,
+    get_config_hash,
+    get_config_value,
+    get_core_directory,
+    get_environment_config,
+    get_logs_dir,
+    get_profile_config,
+    get_project_name,
+    get_reports_directory,
+    get_results_dir,
+    get_suite_directory,
+    get_sysagent_core_directory,
+    get_thirdparty_dir,
+    get_tier_config,
+    list_profiles,
+    list_suites,
+    list_tiers,
+    load_config_with_fallback,
+    load_test_config,
+    load_test_configs,
+    load_test_configurations,
+    load_yaml_config,
+    load_yaml_file,
+    merge_configs,
+    override_test_config,
+    save_yaml_config,
+    set_config_value,
+    setup_data_dir,
+    update_dict_recursively,
+    validate_config_schema,
+    validate_tier_config,
+)
+from .config_loader import (
+    discover_entrypoint_paths,
+    discover_project_roots,
+    find_config_files,
+    get_allure_version,
+    get_cli_aware_project_name,
+    get_dist_name,
+    get_dist_version,
+    get_entrypoint_config,
+    get_node_version,
+    get_runtime_config,
+    load_merged_tool_config,
+    load_pyproject_config,
+    load_tool_config,
+    validate_config_integrity,
+)
+from .profile_dependencies import (
+    CircularDependencyError,
+    MissingDependencyError,
+    ProfileDependencyError,
+    expand_profile_with_dependencies,
+    get_dependency_tree,
+    get_profile_dependencies,
+    resolve_profile_dependencies,
+    validate_profile_dependencies,
+)
 
 # Re-export all functions and classes
 __all__ = [
     # From config
+    "ensure_dir_permissions",
     "setup_data_dir",
     "get_thirdparty_dir",
     "get_cache_dir",
@@ -35,7 +101,6 @@ __all__ = [
     "get_tier_config",
     "validate_tier_config",
     "get_project_name",
-    "discover_entrypoint_paths",
     "list_profiles",
     "get_profile_config",
     "get_active_profile_configs",
@@ -54,9 +119,9 @@ __all__ = [
     "load_test_configs",
     "apply_profile_overrides",
     # From config_loader
+    "discover_entrypoint_paths",
     "load_yaml_file",
     "get_dist_version",
-    "ensure_dir_permissions",
     "load_tool_config",
     "load_merged_tool_config",
     "get_dist_name",
@@ -69,4 +134,13 @@ __all__ = [
     "get_runtime_config",
     "validate_config_integrity",
     "get_cli_aware_project_name",
+    # From profile_dependencies
+    "get_profile_dependencies",
+    "resolve_profile_dependencies",
+    "expand_profile_with_dependencies",
+    "validate_profile_dependencies",
+    "get_dependency_tree",
+    "ProfileDependencyError",
+    "CircularDependencyError",
+    "MissingDependencyError",
 ]

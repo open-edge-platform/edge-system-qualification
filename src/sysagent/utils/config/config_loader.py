@@ -624,7 +624,7 @@ def load_merged_tool_config(section: str = "tool.sysagent") -> Dict[str, Any]:
                 merged_config[key] = value
                 logger.debug(f"Added {key} from {package_name}")
 
-    logger.info(
+    logger.debug(
         f"Merged tool config with {len(merged_config)} keys from {1 if sysagent_config else 0} core + {len(extension_configs)} extension packages"
     )
     return merged_config

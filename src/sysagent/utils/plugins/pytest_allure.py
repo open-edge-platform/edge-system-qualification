@@ -412,7 +412,7 @@ def _set_allure_suite_names(item):
         logger.debug(f"  Parent suite: {parent_suite}")
         logger.debug(f"  Suite: {suite_name}")
         logger.debug(f"  Sub-suite: {sub_suite_name}")
-        logger.info(f"Allure suite hierarchy: {parent_suite} > {suite_name} > {sub_suite_name}")
+        logger.debug(f"Allure suite hierarchy: {parent_suite} > {suite_name} > {sub_suite_name}")
 
     except Exception as e:
         logger.warning(f"Failed to set Allure suite names for {item.fspath}: {e}")

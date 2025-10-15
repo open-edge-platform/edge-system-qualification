@@ -178,6 +178,79 @@ def _run_profile_tests(
     Returns:
         tuple: (exit_code, tests_ran) where tests_ran indicates if pytest actually executed
     """
+    # Import dependency resolver
+    from sysagent.utils.config import expand_profile_with_dependencies, get_profile_dependencies
+
+    # Get all available profiles with their configs
+    all_profiles_data = list_profiles(include_examples=True)
+    all_profiles_dict = {}
+
+    for profile_type, profiles in all_profiles_data.items():
+        for profile in profiles:
+            configs = profile.get("configs")
+            if configs:
+                profile_name_key = configs.get("name")
+                if profile_name_key:
+                    all_profiles_dict[profile_name_key] = configs
+
+    # Check if profile exists
+    if profile_name not in all_profiles_dict:
+        logger.error(f"Profile not found: {profile_name}")
+        return 1, False
+
+    # Expand profile with dependencies (dependencies first, then the profile)
+    try:
+        execution_order = expand_profile_with_dependencies(profile_name, all_profiles_dict)
+
+        # Log dependency information
+        dependencies = get_profile_dependencies(all_profiles_dict[profile_name])
+        if dependencies:
+            logger.info(f"Profile '{profile_name}' has dependencies: {', '.join(dependencies)}")
+            logger.info("Execution order:")
+            for i, prof in enumerate(execution_order, 1):
+                prefix = "  └─" if i == len(execution_order) else "  ├─"
+                suffix = " (requested)" if prof == profile_name else ""
+                logger.info(f"{prefix} {prof}{suffix}")
+
+    except Exception as e:
+        logger.error(f"Failed to resolve dependencies for profile '{profile_name}': {e}")
+        return 1, False
+
+    # Execute profiles in dependency order
+    final_exit_code = 0
+    tests_ran = False
+
+    for current_profile_name in execution_order:
+        result_code, profile_tests_ran = _run_single_profile(
+            current_profile_name,
+            pytest_args,
+            skip_system_check,
+            data_dir,
+            filters if current_profile_name == profile_name else None,  # Only apply filters to requested profile
+        )
+
+        tests_ran = tests_ran or profile_tests_ran
+
+        # Track the worst exit code
+        if result_code != 0:
+            final_exit_code = result_code
+
+        # Stop on failure if it's a dependency
+        if result_code != 0 and current_profile_name != profile_name:
+            logger.error(f"Dependency profile '{current_profile_name}' failed. Stopping execution.")
+            return final_exit_code, tests_ran
+
+    return final_exit_code, tests_ran
+
+
+def _run_single_profile(
+    profile_name: str, pytest_args: List[str], skip_system_check: bool, data_dir: str, filters: Dict[str, Any] = None
+) -> tuple:
+    """Run a single profile without dependency resolution.
+
+    Returns:
+        tuple: (exit_code, tests_ran) where tests_ran indicates if pytest actually executed
+    """
     logger.info(f"Running profile: {profile_name}")
     os.environ["ACTIVE_PROFILE"] = profile_name
 
@@ -299,17 +372,45 @@ def _run_all_profiles(skip_system_check: bool, data_dir: str, verbose: bool, deb
     Returns:
         tuple: (exit_code, tests_ran) where tests_ran indicates if any pytest actually executed
     """
+    from sysagent.utils.config import resolve_profile_dependencies, validate_profile_dependencies
+
     all_profiles = list_profiles(include_examples=False)
     logger.debug(f"Found {sum(len(profiles) for profiles in all_profiles.values())} profiles")
 
     all_profile_items = []
+    all_profiles_dict = {}
+
     for profile_type, profiles in all_profiles.items():
         for profile in profiles:
-            all_profile_items.append((profile_type, profile))
+            configs = profile.get("configs")
+            if configs:
+                profile_name = configs.get("name")
+                if profile_name:
+                    all_profile_items.append((profile_type, profile))
+                    all_profiles_dict[profile_name] = configs
 
     if not all_profile_items:
         logger.error("No profiles found")
         return 1, False
+
+    # Validate profile dependencies
+    dep_errors = validate_profile_dependencies(all_profiles_dict)
+    if dep_errors:
+        logger.warning("Profile dependency validation warnings:")
+        for error in dep_errors:
+            logger.warning(f"  - {error}")
+
+    # Resolve execution order based on dependencies
+    try:
+        execution_order = resolve_profile_dependencies(all_profiles_dict)
+        logger.info("Profile execution order (respecting dependencies):")
+        for i, profile_name in enumerate(execution_order, 1):
+            prefix = "  └─" if i == len(execution_order) else "  ├─"
+            logger.info(f"{prefix} {profile_name}")
+    except Exception as e:
+        logger.error(f"Failed to resolve profile dependencies: {e}")
+        logger.info("Falling back to alphabetical order")
+        execution_order = sorted(all_profiles_dict.keys())
 
     # Validate all profiles if not explicitly skipped
     valid_profiles, failed_profiles = _validate_all_profiles(all_profile_items, skip_system_check)
@@ -326,12 +427,30 @@ def _run_all_profiles(skip_system_check: bool, data_dir: str, verbose: bool, deb
         logger.error("No valid profiles found after validation. Aborting test run.")
         return 1, False
 
-    # Run each valid profile
-    logger.info(f"Running tests for {len(valid_profiles)} valid profiles")
-    result = 0
-
+    # Create mapping of profile names to (profile_type, profile) tuples
+    valid_profiles_map = {}
     for profile_type, profile in valid_profiles:
-        result = _run_single_profile_in_batch(profile, data_dir, verbose, debug)
+        configs = profile.get("configs")
+        if configs:
+            profile_name = configs.get("name")
+            if profile_name:
+                valid_profiles_map[profile_name] = (profile_type, profile)
+
+    # Run profiles in dependency order (only those that are valid)
+    logger.info(f"Running tests for {len(valid_profiles)} valid profiles in dependency order")
+    result = 0
+    executed_profiles = set()
+
+    for profile_name in execution_order:
+        # Only run if profile is valid
+        if profile_name in valid_profiles_map:
+            # Skip if already executed (in case of duplicate handling)
+            if profile_name in executed_profiles:
+                continue
+
+            profile_type, profile = valid_profiles_map[profile_name]
+            result = _run_single_profile_in_batch(profile, data_dir, verbose, debug)
+            executed_profiles.add(profile_name)
 
     logger.info(f"All profiles processed. Results: {result}")
     return result, True

@@ -139,7 +139,7 @@ def get_test_configs_for_test(test_func: Callable) -> List[Dict[str, Any]]:
         import sysagent.utils.config.config
 
         importlib.reload(sysagent.utils.config.config)
-        logger.info(f"Reloaded config module for {test_name}")
+        logger.debug(f"Reloaded config module for {test_name}")
     except Exception as e:
         logger.warning(f"Failed to reload config module: {e}")
 

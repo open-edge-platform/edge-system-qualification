@@ -33,7 +33,7 @@ def suite_configs(request):
         import sysagent.utils.config.config
 
         importlib.reload(sysagent.utils.config.config)
-        logger.info("Reloaded config module for suite_configs fixture")
+        logger.debug("Reloaded config module for suite_configs fixture")
     except Exception as e:
         logger.warning(f"Failed to reload config module: {e}")
 
@@ -69,7 +69,7 @@ def suite_configs(request):
         logger.warning(f"Could not determine suite or sub-suite from path: {test_file}")
         return {}
 
-    logger.info(f"Determined suite: {suite_name}, sub-suite: {sub_suite_name}")
+    logger.debug(f"Determined suite: {suite_name}, sub-suite: {sub_suite_name}")
 
     # Load base configs from the sub-suite
     config_dir = os.path.dirname(test_file)
@@ -86,16 +86,16 @@ def suite_configs(request):
             logger.debug(f"Config file not found in parent directory either: {parent_dir}")
             return {}
 
-    logger.info(f"Using configuration file: {config_path}")
-    logger.info(f"Loading configuration from: {config_path}")
+    logger.debug(f"Using configuration file: {config_path}")
+    logger.debug(f"Loading configuration from: {config_path}")
 
     try:
         from sysagent.utils.config import load_yaml_file
 
         base_configs = load_yaml_file(config_path)
-        logger.info(f"Loaded configuration keys: {list(base_configs.keys())}")
+        logger.debug(f"Loaded configuration keys: {list(base_configs.keys())}")
         if "kpi" in base_configs:
-            logger.info(f"Found KPI definitions: {list(base_configs['kpi'].keys())}")
+            logger.debug(f"Found KPI definitions: {list(base_configs['kpi'].keys())}")
     except ImportError:
         # Fallback to direct loading if import fails
         try:

@@ -8,6 +8,7 @@ Provides functionality to generate JSON summary results from Allure test results
 including durations, test status, and metadata for creating test summary tables.
 """
 
+from .extractor import TestResultsExtractor
 from .generator import CoreResultsSummaryGenerator
 from .parser import AllureResultsParser
 from .table import TestSummaryTableGenerator
@@ -16,5 +17,6 @@ from .table import TestSummaryTableGenerator
 __all__ = [
     "AllureResultsParser",
     "CoreResultsSummaryGenerator",
+    "TestResultsExtractor",
     "TestSummaryTableGenerator",
 ]

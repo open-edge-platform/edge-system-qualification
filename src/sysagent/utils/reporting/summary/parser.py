@@ -34,7 +34,7 @@ class AllureResultsParser:
         Parse all Allure result JSON files.
 
         Returns:
-            List of parsed test result dictionaries
+            List of parsed test result dictionaries (with added 'file_uuid' field)
         """
         test_results = []
         result_files = glob.glob(os.path.join(self.allure_results_dir, "*-result.json"))
@@ -45,6 +45,10 @@ class AllureResultsParser:
             try:
                 with open(result_file, "r", encoding="utf-8") as f:
                     result_data = json.load(f)
+                    # Extract filename UUID (the actual filename, not the JSON uuid field)
+                    filename = os.path.basename(result_file)
+                    file_uuid = filename.replace("-result.json", "")
+                    result_data["file_uuid"] = file_uuid
                     test_results.append(result_data)
             except Exception as e:
                 logger.warning(f"Failed to parse result file {result_file}: {e}")
@@ -86,9 +90,7 @@ class AllureResultsParser:
 
         metadata = {
             "uuid": test_result.get("uuid", ""),  # Unique execution ID
-            "test_case_id": test_result.get(
-                "testCaseId", ""
-            ),  # Test case ID (base test file)
+            "test_case_id": test_result.get("testCaseId", ""),  # Test case ID (base test file)
             "history_id": history_id,
             "test_name": display_name,
             "status": test_result.get("status", "unknown"),

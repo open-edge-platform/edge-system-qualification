@@ -2,6 +2,9 @@
 
 Install all required dependencies to run all tests and evaluate your edge system.
 
+!!! info
+    This is a preview release of ESQ framework, to perform systems qualification please refer to [Intel® ESQ for Intel® AI Edge Systems](https://www.intel.com/content/www/us/en/developer/articles/guide/esq-for-ai-edge-systems.html)
+
 ## Requirements
 
 Before starting, ensure your system meets the following requirements:

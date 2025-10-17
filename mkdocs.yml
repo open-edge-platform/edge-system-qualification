@@ -125,8 +125,7 @@ nav:
     - Quick Start: getting-started/quick-start.md
     - Test Suites:
       - getting-started/suites/index.md
-      - Manufacturing: getting-started/suites/manufacturing.md
-      - Retail: getting-started/suites/retail.md
+
   - Guides:
     - guides/index.md
     - Optimization: guides/optimization.md

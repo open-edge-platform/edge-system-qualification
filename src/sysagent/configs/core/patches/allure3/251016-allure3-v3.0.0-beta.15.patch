@@ -14,7 +14,7 @@ index 64e67a73a..c7eb0fe38 100644
 +data
 \ No newline at end of file
 diff --git a/allurerc.mjs b/allurerc.mjs
-index 31265892d..3f27bfafd 100644
+index 31265892d..11a857c7a 100644
 --- a/allurerc.mjs
 +++ b/allurerc.mjs
 @@ -1,15 +1,19 @@
@@ -27,7 +27,8 @@ index 31265892d..3f27bfafd 100644
    plugins: {
      awesome: {
        options: {
-         singleFile: false,
+-        singleFile: false,
++        singleFile: true,
 +        allureVersion: "2025.1.0",
          reportLanguage: "en",
          reportName: "Allure 3 Report",
@@ -246,10 +247,10 @@ index c8841a643..3cd80c9fb 100644
    return <div className={styles.layout}>{sectionMap[currentSection.value] || sectionMap.report}</div>;
 diff --git a/packages/web-awesome/src/components/Summary/index.tsx b/packages/web-awesome/src/components/Summary/index.tsx
 new file mode 100644
-index 000000000..21b803731
+index 000000000..dbadc6cb3
 --- /dev/null
 +++ b/packages/web-awesome/src/components/Summary/index.tsx
-@@ -0,0 +1,2569 @@
+@@ -0,0 +1,3159 @@
 +import { useEffect, useState } from "preact/hooks";
 +import { fetchAttachment } from "@allurereport/web-commons";
 +import * as styles from "./styles.scss";
@@ -869,52 +870,66 @@ index 000000000..21b803731
 +                {row.expandable && row.packageData && expandedPackageDetails?.has(row.component) && (
 +                  <div style={{ 
 +                    marginTop: '12px', 
-+                    backgroundColor: 'var(--bg-base-secondary)', 
-+                    borderRadius: '6px',
-+                    border: '1px solid var(--on-border-secondary)'
++                    backgroundColor: 'white', 
++                    borderRadius: '4px'
 +                  }}>
 +                    <table style={{
 +                      width: '100%',
 +                      borderCollapse: 'collapse',
 +                      fontSize: '12px',
-+                      fontFamily: 'monospace',
++                      border: '1px solid #e0e0e0'
 +                    }}>
++                      <thead>
++                        <tr>
++                          <th style={{ 
++                            backgroundColor: '#f8f9fa', 
++                            color: '#333', 
++                            textAlign: 'left', 
++                            fontWeight: '500', 
++                            padding: '8px 12px', 
++                            border: '1px solid #e0e0e0',
++                            width: '60%'
++                          }}>
++                            Package
++                          </th>
++                          <th style={{ 
++                            backgroundColor: '#f8f9fa', 
++                            color: '#333', 
++                            textAlign: 'left', 
++                            fontWeight: '500', 
++                            padding: '8px 12px', 
++                            border: '1px solid #e0e0e0'
++                          }}>
++                            Version
++                          </th>
++                        </tr>
++                      </thead>
 +                      <tbody>
 +                        {Object.entries(row.packageData)
 +                          .sort(([a], [b]) => a.toLowerCase().localeCompare(b.toLowerCase()))
-+                          .map(([name, version], index) => (
-+                            <tr 
-+                              key={name} 
-+                              style={{
-+                                backgroundColor: index % 2 === 0 ? 'var(--bg-base-primary)' : 'var(--bg-base-secondary)',
-+                                opacity: index % 2 === 0 ? 1 : 0.7,
-+                                borderBottom: index < Object.keys(row.packageData).length - 1 ? 
-+                                  '1px solid var(--on-border-secondary)' : 'none',
-+                                transition: 'background-color 0.2s ease',
-+                                cursor: 'default'
-+                              }}
-+                              onMouseEnter={(e) => {
-+                                (e.target as HTMLElement).style.backgroundColor = 'var(--bg-base-neutral)';
-+                              }}
-+                              onMouseLeave={(e) => {
-+                                (e.target as HTMLElement).style.backgroundColor = index % 2 === 0 ? 'var(--bg-base-primary)' : 'var(--bg-base-secondary)';
-+                              }}
-+                            >
++                          .map(([name, version]) => (
++                            <tr key={name}>
 +                              <td style={{
-+                                padding: '4px 12px',
-+                                color: 'var(--text-primary)',
++                                padding: '8px 12px',
++                                border: '1px solid #e0e0e0',
++                                backgroundColor: 'white',
 +                                fontWeight: '500',
++                                color: '#555',
++                                verticalAlign: 'top',
++                                fontFamily: 'monospace',
 +                                wordBreak: 'break-word',
 +                                fontSize: '12px'
 +                              }}>
 +                                {name}
 +                              </td>
 +                              <td style={{
-+                                padding: '4px 12px',
-+                                color: 'var(--text-secondary)',
-+                                fontSize: '11px',
-+                                opacity: version ? 1 : 0.7,
-+                                width: 'auto'
++                                padding: '8px 12px',
++                                border: '1px solid #e0e0e0',
++                                backgroundColor: 'white',
++                                color: '#333',
++                                verticalAlign: 'top',
++                                fontFamily: 'monospace',
++                                fontSize: '11px'
 +                              }}>
 +                                {version || 'unknown'}
 +                              </td>
@@ -1269,10 +1284,15 @@ index 000000000..21b803731
 +  const [loadingTests, setLoadingTests] = useState(true);
 +  const [testMetrics, setTestMetrics] = useState<Record<string, any>>({}); // Store metrics data from attachments
 +  const [testFullMetrics, setTestFullMetrics] = useState<Record<string, any>>({}); // Store full metrics data for metadata tables
++  const [testReferences, setTestReferences] = useState<Record<string, string>>({}); // Store reference data from KPIs
 +  
 +  // State for qualifications profiles
 +  const [expandedQualificationProfiles, setExpandedQualificationProfiles] = useState<Set<string>>(new Set());
 +  const [qualificationSearchTerm, setQualificationSearchTerm] = useState<string>("");
++
++  // State for vertical profiles
++  const [expandedVerticalProfiles, setExpandedVerticalProfiles] = useState<Set<string>>(new Set());
++  const [verticalSearchTerm, setVerticalSearchTerm] = useState<string>("");
 +
 +  useEffect(() => {
 +    // Fetch navigation data and individual test results
@@ -1317,19 +1337,23 @@ index 000000000..21b803731
 +
 +      const metricsData: Record<string, any> = {};
 +      const fullMetricsData: Record<string, any> = {};
++      const referencesData: Record<string, string> = {};
 +      
 +      // Fetch metrics for each test
 +      for (const testResult of Object.values(individualTestResults)) {
 +        const metrics = await getMetricsFromAttachment(testResult);
 +        const fullMetrics = await getFullMetricsFromAttachment(testResult);
++        const reference = await getReferenceFromAttachment(testResult);
 +        if ((testResult as any).id) {
 +          metricsData[(testResult as any).id] = metrics;
 +          fullMetricsData[(testResult as any).id] = fullMetrics;
++          referencesData[(testResult as any).id] = reference;
 +        }
 +      }
 +      
 +      setTestMetrics(metricsData);
 +      setTestFullMetrics(fullMetricsData);
++      setTestReferences(referencesData);
 +    };
 +
 +    fetchAllMetrics();
@@ -1390,6 +1414,37 @@ index 000000000..21b803731
 +  const handleQualificationSearchChange = (event: Event) => {
 +    const target = event.target as HTMLInputElement;
 +    setQualificationSearchTerm(target.value);
++  };
++
++  // Vertical profile management functions
++  const toggleVerticalProfile = (profileName: string) => {
++    setExpandedVerticalProfiles((prev: Set<string>) => {
++      const newSet = new Set(prev);
++      if (newSet.has(profileName)) {
++        newSet.delete(profileName);
++      } else {
++        newSet.add(profileName);
++      }
++      return newSet;
++    });
++  };
++
++  const expandAllVerticalProfiles = () => {
++    const allVerticalProfileNames = verticalProfilesData.map((profile: any) => profile.profileName);
++    setExpandedVerticalProfiles(new Set(allVerticalProfileNames));
++  };
++
++  const collapseAllVerticalProfiles = () => {
++    setExpandedVerticalProfiles(new Set());
++  };
++
++  const clearVerticalSearch = () => {
++    setVerticalSearchTerm("");
++  };
++
++  const handleVerticalSearchChange = (event: Event) => {
++    const target = event.target as HTMLInputElement;
++    setVerticalSearchTerm(target.value);
 +  };
 +
 +  const clearSearch = () => {
@@ -1582,25 +1637,80 @@ index 000000000..21b803731
 +    return [];
 +  };
 +
++  // Helper function to get reference value from KPIs in test attachment
++  const getReferenceFromAttachment = async (testResult: any) => {
++    const fullMetrics = await getFullMetricsFromAttachment(testResult);
++    
++    if (!fullMetrics?.kpis || Object.keys(fullMetrics.kpis).length === 0) {
++      return "N/A";
++    }
++
++    // Operator display mapping
++    const operatorDisplayMap: Record<string, string> = {
++      "eq": "==",
++      "neq": "!=",
++      "gt": ">",
++      "gte": ">=",
++      "lt": "<",
++      "lte": "<=",
++      "between": "between",
++      "contains": "contains",
++      "not_contains": "not contains",
++      "matches": "matches",
++      "in": "in",
++      "not_in": "not in"
++    };
++
++    // Find the first KPI with a reference value
++    for (const [key, kpiData] of Object.entries(fullMetrics.kpis)) {
++      if (kpiData && typeof kpiData === 'object') {
++        const config = (kpiData as any).config || {};
++        const validation = config.validation || {};
++        
++        if (validation.reference !== undefined) {
++          const operator = validation.operator || "gte";
++          const operatorSymbol = operatorDisplayMap[operator] || operator;
++          const reference = validation.reference;
++          const unit = config.unit || "";
++          
++          return `${operatorSymbol} ${reference}${unit ? ` ${unit}` : ""}`;
++        }
++      }
++    }
++
++    return "N/A";
++  };
++
 +  // Create profile table data for test results (type: "suite")
-+  const createTestResultProfilesFromTestResults = () => {
++  const createTestResultProfilesFromTestResults = (groupBy: "group" | "parentSuite" = "group") => {
 +    if (loadingTests || Object.keys(individualTestResults).length === 0) {
 +      return [];
 +    }
 +
-+    // Group tests by parentSuite for suite type only
++    // Group tests by specified grouping method for suite type only
 +    const profileGroups: Record<string, any[]> = {};
 +    
 +    Object.values(individualTestResults).forEach((testResult: any) => {
 +      const parentSuite = testResult.labels?.find((label: any) => label.name === "parentSuite")?.value;
++      const groupLabel = testResult.labels?.find((label: any) => label.name === "group")?.value;
 +      const typeLabel = testResult.labels?.find((label: any) => label.name === "type")?.value;
 +      
 +      // Include only profiles that have "type" label with value "suite" and exclude "core" type
-+      if (parentSuite && typeLabel === "suite") {
-+        if (!profileGroups[parentSuite]) {
-+          profileGroups[parentSuite] = [];
++      if (typeLabel === "suite") {
++        // Determine grouping key based on groupBy parameter
++        let groupingKey: string;
++        if (groupBy === "group") {
++          groupingKey = groupLabel || "unknown group";
++        } else {
++          groupingKey = parentSuite || "unknown suite";
 +        }
-+        profileGroups[parentSuite].push(testResult);
++        
++        if (groupingKey && (groupBy === "group" || parentSuite)) { // For parentSuite grouping, ensure parentSuite exists
++          if (!profileGroups[groupingKey]) {
++            profileGroups[groupingKey] = [];
++          }
++          profileGroups[groupingKey].push(testResult);
++        }
 +      }
 +    });
 +
@@ -1610,6 +1720,8 @@ index 000000000..21b803731
 +      const firstTest = tests[0];
 +      const profileDisplayName = firstTest?.labels?.find((label: any) => label.name === "profile_display_name")?.value;
 +      const displayStatus = firstTest?.labels?.find((label: any) => label.name === "display_status")?.value;
++      const displayReference = firstTest?.labels?.find((label: any) => label.name === "display_reference")?.value;
++      const displayId = firstTest?.labels?.find((label: any) => label.name === "display_id")?.value;
 +      
 +      // Find tier_display_name from any test in the group (not just the first one)
 +      let tierDisplayName: string | undefined;
@@ -1623,10 +1735,17 @@ index 000000000..21b803731
 +      
 +      // Check if status column should be hidden
 +      const hideStatusColumn = displayStatus === "False" || displayStatus === "false";
++      
++      // Check if reference column should be displayed (must be explicitly set to "True" or "true")
++      const showReferenceColumn = displayReference === "True" || displayReference === "true";
++      
++      // Check if ID column should be hidden (default is hidden unless explicitly set to "True" or "true")
++      const hideIdColumn = displayId !== "True" && displayId !== "true";
 +
 +      const testsData = tests.map((test: any) => {
 +        // Get metrics from cached data
 +        const cachedMetrics = testMetrics[test.id] || { metric: "N/A", value: "N/A", unit: "N/A" };
++        const cachedReference = testReferences[test.id] || "N/A";
 +        
 +        // Calculate history and retries data
 +        const historyCount = test.history?.length || 0;
@@ -1643,6 +1762,7 @@ index 000000000..21b803731
 +          metric: cachedMetrics.metric,
 +          value: cachedMetrics.value,
 +          unit: cachedMetrics.unit,
++          reference: cachedReference,
 +          status: test.status,
 +          // Additional data for expanded content
 +          historyCount,
@@ -1660,6 +1780,8 @@ index 000000000..21b803731
 +        profileName: profileDisplayName || profileName.replace(/^profile\.(suite|qualification)\./, ""), // Use profile_display_name or fallback to processed profileName
 +        testsData,
 +        hideStatusColumn, // Pass this flag to the table rendering
++        showReferenceColumn, // Pass flag for showing reference column
++        hideIdColumn, // Pass flag for hiding ID column
 +        profileType, // Add profile type for conditional rendering
 +        tierDisplayName // Add tier display name for badge rendering
 +      };
@@ -1667,24 +1789,35 @@ index 000000000..21b803731
 +  };
 +
 +  // Create profile table data for qualifications (type: "qualification")
-+  const createQualificationProfilesFromTestResults = () => {
++  const createQualificationProfilesFromTestResults = (groupBy: "group" | "parentSuite" = "group") => {
 +    if (loadingTests || Object.keys(individualTestResults).length === 0) {
 +      return [];
 +    }
 +
-+    // Group tests by parentSuite for qualification type only
++    // Group tests by specified grouping method for qualification type only
 +    const profileGroups: Record<string, any[]> = {};
 +    
 +    Object.values(individualTestResults).forEach((testResult: any) => {
 +      const parentSuite = testResult.labels?.find((label: any) => label.name === "parentSuite")?.value;
++      const groupLabel = testResult.labels?.find((label: any) => label.name === "group")?.value;
 +      const typeLabel = testResult.labels?.find((label: any) => label.name === "type")?.value;
 +      
 +      // Include only profiles that have "type" label with value "qualification"
-+      if (parentSuite && ( typeLabel === "qualification" || typeLabel === "vertical") ) {
-+        if (!profileGroups[parentSuite]) {
-+          profileGroups[parentSuite] = [];
++      if (typeLabel === "qualification") {
++        // Determine grouping key based on groupBy parameter
++        let groupingKey: string;
++        if (groupBy === "group") {
++          groupingKey = groupLabel || "unknown group";
++        } else {
++          groupingKey = parentSuite || "unknown suite";
 +        }
-+        profileGroups[parentSuite].push(testResult);
++        
++        if (groupingKey && (groupBy === "group" || parentSuite)) { // For parentSuite grouping, ensure parentSuite exists
++          if (!profileGroups[groupingKey]) {
++            profileGroups[groupingKey] = [];
++          }
++          profileGroups[groupingKey].push(testResult);
++        }
 +      }
 +    });
 +
@@ -1694,6 +1827,8 @@ index 000000000..21b803731
 +      const firstTest = tests[0];
 +      const profileDisplayName = firstTest?.labels?.find((label: any) => label.name === "profile_display_name")?.value;
 +      const displayStatus = firstTest?.labels?.find((label: any) => label.name === "display_status")?.value;
++      const displayReference = firstTest?.labels?.find((label: any) => label.name === "display_reference")?.value;
++      const displayId = firstTest?.labels?.find((label: any) => label.name === "display_id")?.value;
 +      
 +      // Find tier_display_name from any test in the group (not just the first one)
 +      let tierDisplayName: string | undefined;
@@ -1707,6 +1842,12 @@ index 000000000..21b803731
 +      
 +      // Check if status column should be hidden
 +      const hideStatusColumn = displayStatus === "False" || displayStatus === "false";
++      
++      // Check if reference column should be displayed (must be explicitly set to "True" or "true")
++      const showReferenceColumn = displayReference === "True" || displayReference === "true";
++      
++      // Check if ID column should be hidden (default is hidden unless explicitly set to "True" or "true")
++      const hideIdColumn = displayId !== "True" && displayId !== "true";
 +
 +      // Calculate overall status and test count for the profile
 +      const totalTests = tests.length;
@@ -1726,6 +1867,7 @@ index 000000000..21b803731
 +      const testsData = tests.map((test: any) => {
 +        // Get metrics from cached data
 +        const cachedMetrics = testMetrics[test.id] || { metric: "N/A", value: "N/A", unit: "N/A" };
++        const cachedReference = testReferences[test.id] || "N/A";
 +        
 +        // Calculate history and retries data
 +        const historyCount = test.history?.length || 0;
@@ -1742,6 +1884,7 @@ index 000000000..21b803731
 +          metric: cachedMetrics.metric,
 +          value: cachedMetrics.value,
 +          unit: cachedMetrics.unit,
++          reference: cachedReference,
 +          status: test.status,
 +          // Additional data for expanded content
 +          historyCount,
@@ -1759,6 +1902,8 @@ index 000000000..21b803731
 +        profileName: profileDisplayName || profileName.replace(/^profile\.(suite|qualification)\./, ""), // Use profile_display_name or fallback to processed profileName
 +        testsData,
 +        hideStatusColumn, // Pass this flag to the table rendering
++        showReferenceColumn, // Pass flag for showing reference column
++        hideIdColumn, // Pass flag for hiding ID column
 +        profileType, // Add profile type for conditional rendering
 +        tierDisplayName, // Add tier display name for badge rendering
 +        // Additional data for qualification profiles
@@ -1788,6 +1933,142 @@ index 000000000..21b803731
 +  const individualProfilesData = createTestResultProfilesFromTestResults();
 +  const qualificationProfilesData = createQualificationProfilesFromTestResults();
 +
++  // Create profile table data for vertical profiles (type: "vertical")
++  const createVerticalProfilesFromTestResults = (groupBy: "group" | "parentSuite" = "group") => {
++    if (loadingTests || Object.keys(individualTestResults).length === 0) {
++      return [];
++    }
++
++    // Group tests by specified grouping method for vertical type only
++    const profileGroups: Record<string, any[]> = {};
++    
++    Object.values(individualTestResults).forEach((testResult: any) => {
++      const parentSuite = testResult.labels?.find((label: any) => label.name === "parentSuite")?.value;
++      const groupLabel = testResult.labels?.find((label: any) => label.name === "group")?.value;
++      const typeLabel = testResult.labels?.find((label: any) => label.name === "type")?.value;
++      
++      // Include only profiles that have "type" label with value "vertical"
++      if (typeLabel === "vertical") {
++        // Determine grouping key based on groupBy parameter
++        let groupingKey: string;
++        if (groupBy === "group") {
++          groupingKey = groupLabel || "unknown group";
++        } else {
++          groupingKey = parentSuite || "unknown suite";
++        }
++        
++        if (groupingKey && (groupBy === "group" || parentSuite)) { // For parentSuite grouping, ensure parentSuite exists
++          if (!profileGroups[groupingKey]) {
++            profileGroups[groupingKey] = [];
++          }
++          profileGroups[groupingKey].push(testResult);
++        }
++      }
++    });
++
++    // Create profile table data similar to qualifications
++    const profilesArray = Object.entries(profileGroups).map(([profileName, tests]) => {
++      // Get profile_display_name from the first test in the group
++      const firstTest = tests[0];
++      const profileDisplayName = firstTest?.labels?.find((label: any) => label.name === "profile_display_name")?.value;
++      const displayStatus = firstTest?.labels?.find((label: any) => label.name === "display_status")?.value;
++      const displayReference = firstTest?.labels?.find((label: any) => label.name === "display_reference")?.value;
++      const displayId = firstTest?.labels?.find((label: any) => label.name === "display_id")?.value;
++      
++      // Find tier_display_name from any test in the group (not just the first one)
++      let tierDisplayName: string | undefined;
++      for (const test of tests) {
++        const tierLabel = test.labels?.find((label: any) => label.name === "tier_display_name")?.value;
++        if (tierLabel) {
++          tierDisplayName = tierLabel;
++          break;
++        }
++      }
++      
++      // Check if status column should be hidden
++      const hideStatusColumn = displayStatus === "False" || displayStatus === "false";
++      
++      // Check if reference column should be displayed (must be explicitly set to "True" or "true")
++      const showReferenceColumn = displayReference === "True" || displayReference === "true";
++      
++      // Check if ID column should be hidden (default is hidden unless explicitly set to "True" or "true")
++      const hideIdColumn = displayId !== "True" && displayId !== "true";
++
++      // Calculate overall status and test count for the profile
++      const totalTests = tests.length;
++      const passedTests = tests.filter(test => test.status === "passed").length;
++      const failedTests = tests.filter(test => test.status === "failed").length;
++      const brokenTests = tests.filter(test => test.status === "broken").length;
++      const skippedTests = tests.filter(test => test.status === "skipped").length;
++      const unknownTests = tests.filter(test => test.status === "unknown").length;
++      
++      // Determine overall status
++      let overallStatus = "passed";
++      if (failedTests > 0 || brokenTests > 0 || skippedTests > 0 || unknownTests > 0) {
++        overallStatus = "failed";
++      }
++
++      const testsData = tests.map((test: any) => {
++        // Get metrics from cached data
++        const cachedMetrics = testMetrics[test.id] || { metric: "N/A", value: "N/A", unit: "N/A" };
++        const cachedReference = testReferences[test.id] || "N/A";
++        
++        // Calculate history and retries data
++        const historyCount = test.history?.length || 0;
++        const retriesCount = test.retries?.length || 0;
++        const totalDuration = test.duration || 0;
++
++        // Get test title from test_title label, fallback to test name
++        const testTitle = test.labels?.find((label: any) => label.name === "test_title")?.value;
++
++        return {
++          id: test.id.substring(0, 8), // Display ID (shortened)
++          fullId: test.id, // Full ID for accessing individual test results
++          testName: testTitle || test.name, // Use test_title label if available, otherwise use test name
++          metric: cachedMetrics.metric,
++          value: cachedMetrics.value,
++          unit: cachedMetrics.unit,
++          reference: cachedReference,
++          status: test.status,
++          // Additional data for expanded content
++          historyCount,
++          retriesCount,
++          duration: formatDuration(totalDuration / 1000), // Convert from ms to seconds
++          testResult: test // Store full test result for detailed view
++        };
++      });
++
++      // Get the type from the first test in the group to identify profile type
++      const firstTestForType = tests[0];
++      const profileType = firstTestForType?.labels?.find((label: any) => label.name === "type")?.value;
++
++      return {
++        profileName: profileDisplayName || profileName.replace(/^profile\.(suite|qualification|vertical)\./, ""), // Use profile_display_name or fallback to processed profileName
++        testsData,
++        hideStatusColumn, // Pass this flag to the table rendering
++        showReferenceColumn, // Pass flag for showing reference column
++        hideIdColumn, // Pass flag for hiding ID column
++        profileType, // Add profile type for conditional rendering
++        tierDisplayName, // Add tier display name for badge rendering
++        // Additional data for vertical profiles
++        totalTests,
++        passedTests,
++        failedTests,
++        brokenTests,
++        skippedTests,
++        unknownTests,
++        overallStatus
++      };
++    });
++
++    // Sort profiles by profile name alphabetically
++    return profilesArray.sort((a, b) => {
++      return a.profileName.localeCompare(b.profileName);
++    });
++  };
++
++  const verticalProfilesData = createVerticalProfilesFromTestResults();
++
 +  // Filter profiles and their tests based on search term
 +  const filteredProfilesData = individualProfilesData.map(profile => {
 +    if (!searchTerm.trim()) {
@@ -1816,6 +2097,8 @@ index 000000000..21b803731
 +      profileName: profile.profileName,
 +      testsData: filteredTests,
 +      hideStatusColumn: profile.hideStatusColumn, // Preserve the hideStatusColumn flag
++      showReferenceColumn: profile.showReferenceColumn, // Preserve the showReferenceColumn flag
++      hideIdColumn: profile.hideIdColumn, // Preserve the hideIdColumn flag
 +      profileType: profile.profileType, // Preserve the profileType flag
 +      tierDisplayName: profile.tierDisplayName, // Preserve the tierDisplayName flag
 +      hasMatches: filteredTests.length > 0 || profileNameMatches
@@ -1852,6 +2135,37 @@ index 000000000..21b803731
 +      hasMatches: filteredTests.length > 0 || profileNameMatches
 +    };
 +  }).filter(profile => (profile as any).hasMatches || !qualificationSearchTerm.trim());
++
++  // Filter vertical profiles and their tests based on search term
++  const filteredVerticalProfilesData = verticalProfilesData.map(profile => {
++    if (!verticalSearchTerm.trim()) {
++      return profile; // No search term, return all data
++    }
++
++    const searchLower = verticalSearchTerm.toLowerCase();
++    
++    // Filter tests within this profile
++    const filteredTests = profile.testsData.filter((test: any) => {
++      // Check if any field contains the search term
++      return [
++        test.id,
++        test.testName,
++        test.metric,
++        test.value,
++        test.unit,
++        test.status
++      ].some(field => String(field).toLowerCase().includes(searchLower));
++    });
++
++    // Only include profiles that have matching tests or whose name matches
++    const profileNameMatches = profile.profileName.toLowerCase().includes(searchLower);
++    
++    return {
++      ...profile, // Include all original properties (totalTests, overallStatus, etc.)
++      testsData: filteredTests,
++      hasMatches: filteredTests.length > 0 || profileNameMatches
++    };
++  }).filter(profile => (profile as any).hasMatches || !verticalSearchTerm.trim());
 +
 +  // Helper function to get system information from test attachments
 +  const getSystemInfoFromAttachment = async () => {
@@ -2056,12 +2370,6 @@ index 000000000..21b803731
 +        osDetails.push(`Kernel ${os.kernel.version}`);
 +      } else if (os.release) {
 +        osDetails.push(`Kernel ${os.release}`);
-+      }
-+      
-+      if (os.uptime_seconds) {
-+        const days = Math.floor(os.uptime_seconds / 86400);
-+        const hours = Math.floor((os.uptime_seconds % 86400) / 3600);
-+        osDetails.push(`System uptime: ${days} days, ${hours} hours`);
 +      }
 +      
 +      if (osDetails.length > 0) {
@@ -2311,34 +2619,36 @@ index 000000000..21b803731
 +                      <div className={styles["profile-content"]}>
 +                        <SortableTable
 +                          title=""
-+                          headers={profileData.hideStatusColumn ? [
-+                            "ID",
-+                            "Test Name", 
-+                            "Metric",
-+                            "Value",
-+                            "Unit"
-+                          ] : [
-+                            "ID",
-+                            "Test Name", 
-+                            "Metric",
-+                            "Value",
-+                            "Unit",
-+                            "Status"
-+                          ]}
-+                          data={profileData.testsData.map((test: any) => profileData.hideStatusColumn ? [
-+                            test.id,
-+                            test.testName,
-+                            test.metric,
-+                            test.value,
-+                            test.unit
-+                          ] : [
-+                            test.id,
-+                            test.testName,
-+                            test.metric,
-+                            test.value,
-+                            test.unit,
-+                            test.status
-+                          ])}
++                          headers={(() => {
++                            const baseHeaders = [];
++                            if (!profileData.hideIdColumn) {
++                              baseHeaders.push("ID");
++                            }
++                            baseHeaders.push("Test Name", "Metric");
++                            if (profileData.showReferenceColumn) {
++                              baseHeaders.push("Reference");
++                            }
++                            baseHeaders.push("Value", "Unit");
++                            if (!profileData.hideStatusColumn) {
++                              baseHeaders.push("Status");
++                            }
++                            return baseHeaders;
++                          })()}
++                          data={profileData.testsData.map((test: any) => {
++                            const baseData = [];
++                            if (!profileData.hideIdColumn) {
++                              baseData.push(test.id);
++                            }
++                            baseData.push(test.testName, test.metric);
++                            if (profileData.showReferenceColumn) {
++                              baseData.push(test.reference);
++                            }
++                            baseData.push(test.value, test.unit);
++                            if (!profileData.hideStatusColumn) {
++                              baseData.push(test.status);
++                            }
++                            return baseData;
++                          })}
 +                          onRowClick={(rowIndex: number) => {
 +                            const test = profileData.testsData[rowIndex];
 +                            toggleTestDetails(test.fullId);
@@ -2509,6 +2819,282 @@ index 000000000..21b803731
 +        </div>
 +      )}
 +
++      {/* Vertical Profiles */}
++      {verticalProfilesData.length > 0 && (
++        <div className={styles["overview-grid-item"]}>
++          <div className={styles["collapsible-section"]}>
++            <div className={styles["collapsible-header-enhanced"]}>
++              <div className={styles["header-left-enhanced"]}>
++                <h3 className={styles["section-title"]}>Vertical</h3>
++              </div>
++              <div className={styles["header-right-enhanced"]}>
++                <div className={styles["search-container-inline"]}>
++                  <div className={styles["search-box"]}>
++                    <input
++                      type="text"
++                      className={styles["search-input"]}
++                      placeholder="Search"
++                      value={verticalSearchTerm}
++                      onInput={handleVerticalSearchChange}
++                    />
++                    <button
++                      className={styles["clear-button"]}
++                      onClick={clearVerticalSearch}
++                      type="button"
++                      title="Clear search"
++                    >
++                      ×
++                    </button>
++                  </div>
++                </div>
++                <div className={styles["expand-collapse-controls"]}>
++                  <button 
++                    className={styles["secondary-button"]}
++                    onClick={expandAllVerticalProfiles}
++                    type="button"
++                  >
++                    Expand All
++                  </button>
++                  <button 
++                    className={styles["secondary-button"]}
++                    onClick={collapseAllVerticalProfiles}
++                    type="button"
++                  >
++                    Collapse All
++                  </button>
++                </div>
++              </div>
++            </div>
++            
++            <div className={styles["profiles-container"]}>
++              {filteredVerticalProfilesData.map((profileData, index) => (
++                profileData.testsData.length > 0 && (
++                  <div key={index} className={styles["profile-section"]}>
++                    <div 
++                      className={`${styles["profile-header"]} ${styles["qualification-profile-header"]}`}
++                      onClick={() => toggleVerticalProfile(profileData.profileName)}
++                    >
++                      <button 
++                        className={styles["toggle-button"]}
++                        type="button"
++                        aria-expanded={expandedVerticalProfiles.has(profileData.profileName)}
++                      >
++                        {expandedVerticalProfiles.has(profileData.profileName) ? "−" : "+"}
++                      </button>
++                      <div className={styles["qualification-profile-info"]}>
++                        <h4 className={styles["profile-title"]}>{profileData.profileName}</h4>
++                      </div>
++                      <div className={styles["qualification-profile-summary"]}>
++                        <span className={styles["table-test-count"]}>
++                          {profileData.totalTests}
++                        </span>
++                      </div>
++                    </div>
++                    
++                    {expandedVerticalProfiles.has(profileData.profileName) && (
++                      <div className={styles["profile-content"]}>
++                        <SortableTable
++                          title=""
++                          headers={(() => {
++                            const baseHeaders = [];
++                            if (!profileData.hideIdColumn) {
++                              baseHeaders.push("ID");
++                            }
++                            baseHeaders.push("Test Name", "Metric");
++                            if (profileData.showReferenceColumn) {
++                              baseHeaders.push("Reference");
++                            }
++                            baseHeaders.push("Value", "Unit");
++                            if (!profileData.hideStatusColumn) {
++                              baseHeaders.push("Status");
++                            }
++                            return baseHeaders;
++                          })()}
++                          data={profileData.testsData.map((test: any) => {
++                            const baseData = [];
++                            if (!profileData.hideIdColumn) {
++                              baseData.push(test.id);
++                            }
++                            baseData.push(test.testName, test.metric);
++                            if (profileData.showReferenceColumn) {
++                              baseData.push(test.reference);
++                            }
++                            baseData.push(test.value, test.unit);
++                            if (!profileData.hideStatusColumn) {
++                              baseData.push(test.status);
++                            }
++                            return baseData;
++                          })}
++                          onRowClick={(rowIndex: number) => {
++                            const test = profileData.testsData[rowIndex];
++                            toggleTestDetails(test.fullId);
++                          }}
++                          expandedRows={profileData.testsData.map((test: any) => 
++                            expandedTestDetails.has(test.fullId)
++                          )}
++                          renderExpandedContent={(rowIndex: number) => {
++                            const test = profileData.testsData[rowIndex];
++                            const testId = test.fullId; // Use the full ID to access individual test results
++                            
++                            return (
++                              <div className={styles["test-details"]}>
++                                {individualTestResults[testId] ? (
++                                  <div>
++                                    {/* Overview Section */}
++                                    <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: 'white', borderRadius: '4px', border: '1px solid #e0e0e0' }}>
++                                      <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '600', color: '#333' }}>Overview</h4>
++                                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', fontSize: '12px' }}>
++                                        <div>
++                                          <span style={{ fontWeight: '500', color: '#666' }}>History: </span>
++                                          <span>{individualTestResults[testId]?.history?.length || "1"}</span>
++                                        </div>
++                                        <div>
++                                          <span style={{ fontWeight: '500', color: '#666' }}>Retries: </span>
++                                          <span>{individualTestResults[testId]?.retries?.length || '0'}</span>
++                                        </div>
++                                        <div>
++                                          <span style={{ fontWeight: '500', color: '#666' }}>Duration: </span>
++                                          <span>{individualTestResults[testId]?.duration 
++                                            ? `${(individualTestResults[testId].duration / 1000).toFixed(2)}s`
++                                            : 'N/A'}</span>
++                                        </div>
++                                      </div>
++                                    </div>
++
++                                    {/* Metadata Section */}
++                                    <MetadataTable metricsData={testFullMetrics[testId]} />
++
++                                    {/* Error Messages for Failed Tests */}
++                                    {test.status === 'failed' && individualTestResults[testId]?.error?.message && (
++                                      <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: '#fff5f5', borderRadius: '4px', border: '1px solid #fed7d7' }}>
++                                        <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '600', color: '#e53e3e' }}>Error Details</h4>
++                                        <pre style={{ margin: 0, fontSize: '11px', fontFamily: 'monospace', whiteSpace: 'pre-wrap', color: '#2d3748' }}>
++                                          {individualTestResults[testId].error.message}
++                                        </pre>
++                                        {individualTestResults[testId].error?.trace && (
++                                          <details style={{ marginTop: '8px' }}>
++                                            <summary style={{ cursor: 'pointer', fontSize: '12px', fontWeight: '500', color: '#666' }}>Stack Trace</summary>
++                                            <pre style={{ margin: '8px 0 0 0', fontSize: '10px', fontFamily: 'monospace', whiteSpace: 'pre-wrap', color: '#4a5568' }}>
++                                              {individualTestResults[testId].error.trace}
++                                            </pre>
++                                          </details>
++                                        )}
++                                      </div>
++                                    )}
++
++                                    {/* Status Details for Skipped and Broken Tests */}
++                                    {(test.status === 'skipped' || test.status === 'broken') && individualTestResults[testId]?.error?.message && (
++                                      <div style={{ 
++                                        marginBottom: '16px', 
++                                        padding: '12px', 
++                                        backgroundColor: test.status === 'skipped' ? '#f7fafc' : '#fffaf0', 
++                                        borderRadius: '4px', 
++                                        border: `1px solid ${test.status === 'skipped' ? '#cbd5e0' : '#fdcc6bff'}` 
++                                      }}>
++                                        <h4 style={{ 
++                                          margin: '0 0 8px 0', 
++                                          fontSize: '14px', 
++                                          fontWeight: '600', 
++                                          color: test.status === 'skipped' ? '#4a5568' : '#d69e2e' 
++                                        }}>
++                                          {test.status === 'skipped' ? 'Skip Details' : 'Broken Details'}
++                                        </h4>
++                                        {individualTestResults[testId].error.message && (
++                                          <pre style={{ margin: 0, fontSize: '11px', fontFamily: 'monospace', whiteSpace: 'pre-wrap', color: '#2d3748' }}>
++                                            {individualTestResults[testId].error.message}
++                                          </pre>
++                                        )}
++                                        {individualTestResults[testId].error?.trace && (
++                                          <details style={{ marginTop: '8px' }}>
++                                            <summary style={{ cursor: 'pointer', fontSize: '12px', fontWeight: '500', color: '#666' }}>Stack Trace</summary>
++                                            <pre style={{ margin: '8px 0 0 0', fontSize: '10px', fontFamily: 'monospace', whiteSpace: 'pre-wrap', color: '#4a5568' }}>
++                                              {individualTestResults[testId].error.trace}
++                                            </pre>
++                                          </details>
++                                        )}
++                                      </div>
++                                    )}
++
++                                    {/* Attachments Section */}
++                                    {(() => {
++                                      const testData = individualTestResults[testId];
++                                      const imageAttachments = testData?.attachments?.filter((attachment: any) => 
++                                        attachment.link?.contentType === "image/png" || 
++                                        attachment.link?.contentType === "image/jpeg"
++                                      ) || [];
++                                      
++                                      return imageAttachments.length > 0 ? (
++                                        <div style={{ padding: '12px', backgroundColor: 'white', borderRadius: '4px', border: '1px solid #e0e0e0' }}>
++                                          <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: '600', color: '#333' }}>Attachments</h4>
++                                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))', gap: '12px' }}>
++                                            {imageAttachments.map((attachment: any, index: number) => {
++                                              return (
++                                                <div key={index} style={{ 
++                                                  border: '1px solid #e0e0e0', 
++                                                  borderRadius: '4px',
++                                                  overflow: 'hidden',
++                                                  backgroundColor: '#f8f9fa',
++                                                  display: 'flex',
++                                                  flexDirection: 'column',
++                                                  height: '400px'
++                                                }}>
++                                                  <div style={{ 
++                                                    flex: '1',
++                                                    display: 'flex',
++                                                    alignItems: 'center',
++                                                    justifyContent: 'center',
++                                                    padding: '8px',
++                                                    backgroundColor: 'white'
++                                                  }}>
++                                                    <AttachmentImage 
++                                                      attachment={attachment}
++                                                      onError={() => console.warn('Failed to load attachment:', attachment.link?.id)}
++                                                    />
++                                                  </div>
++                                                  <div style={{ 
++                                                    padding: '8px', 
++                                                    fontSize: '11px', 
++                                                    color: '#666', 
++                                                    wordBreak: 'break-word',
++                                                    backgroundColor: '#f8f9fa',
++                                                    borderTop: '1px solid #e0e0e0',
++                                                    textAlign: 'center'
++                                                  }}>
++                                                    {attachment.name || attachment.link?.name || `Attachment ${index + 1}`}
++                                                  </div>
++                                                </div>
++                                              );
++                                            })}
++                                          </div>
++                                        </div>
++                                      ) : null;
++                                    })()}
++                                  </div>
++                                ) : (
++                                  <div style={{ padding: '16px', textAlign: 'center', color: '#666' }}>
++                                    Loading test details...
++                                  </div>
++                                )}
++                              </div>
++                            );
++                          }}
++                        />
++                      </div>
++                    )}
++                  </div>
++                )
++              ))}
++              
++              {verticalSearchTerm && filteredVerticalProfilesData.every(profile => profile.testsData.length === 0) && (
++                <div className={styles["no-results"]}>
++                  <p>No matching vertical profiles or tests found for "{verticalSearchTerm}"</p>
++                </div>
++              )}
++            </div>
++          </div>
++        </div>
++      )}
++
 +      {/* Individual Profile Tables */}
 +      {individualProfilesData.length > 0 && (
 +        <div className={styles["overview-grid-item"]}>
@@ -2619,34 +3205,39 @@ index 000000000..21b803731
 +                      <div className={styles["profile-content"]}>
 +                        <SortableTable
 +                          title=""
-+                          headers={profileData.hideStatusColumn ? [
-+                            "ID",
-+                            "Test Name", 
-+                            "Metric",
-+                            "Value",
-+                            "Unit"
-+                          ] : [
-+                            "ID",
-+                            "Test Name", 
-+                            "Metric",
-+                            "Value",
-+                            "Unit",
-+                            "Status"
-+                          ]}
-+                          data={profileData.testsData.map((test: any) => profileData.hideStatusColumn ? [
-+                            test.id,
-+                            test.testName,
-+                            test.metric,
-+                            test.value,
-+                            test.unit
-+                          ] : [
-+                            test.id,
-+                            test.testName,
-+                            test.metric,
-+                            test.value,
-+                            test.unit,
-+                            test.status
-+                          ])}
++                          headers={(() => {
++                            const baseHeaders = [];
++                            if (!profileData.hideIdColumn) {
++                              baseHeaders.push("ID");
++                            }
++                            baseHeaders.push("Test Name", "Metric");
++                            if (profileData.showReferenceColumn) {
++                              baseHeaders.push("Reference");
++                            }
++                            baseHeaders.push("Value", "Unit");
++                            if (!profileData.hideStatusColumn) {
++                              baseHeaders.push("Status");
++                            }
++                            return baseHeaders;
++                          })()}
++                          data={profileData.testsData.map((test: any) => {
++                            const baseData = [];
++                            if (!profileData.hideIdColumn) {
++                              baseData.push(test.id);
++                            }
++                            baseData.push(test.testName, test.metric);
++                            if (profileData.showReferenceColumn) {
++                              baseData.push(test.reference);
++                            }
++                            baseData.push(
++                              test.value,
++                              test.unit
++                            );
++                            if (!profileData.hideStatusColumn) {
++                              baseData.push(test.status);
++                            }
++                            return baseData;
++                          })}
 +                          onRowClick={(rowIndex: number) => {
 +                            const test = profileData.testsData[rowIndex];
 +                            toggleTestDetails(test.fullId);

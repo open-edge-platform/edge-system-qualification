@@ -124,9 +124,7 @@ class CoreResultsSummaryGenerator:
                     if cpu.get("brand"):
                         cpu_summary["brand"] = cpu["brand"]
                     if cpu.get("logical_cores") or cpu.get("logical_count"):
-                        cpu_summary["logical_cores"] = cpu.get(
-                            "logical_cores"
-                        ) or cpu.get("logical_count", "Unknown")
+                        cpu_summary["logical_cores"] = cpu.get("logical_cores") or cpu.get("logical_count", "Unknown")
                     if cpu.get("frequency"):
                         freq = cpu["frequency"]
                         if isinstance(freq, dict) and freq.get("max"):
@@ -229,9 +227,7 @@ class CoreResultsSummaryGenerator:
                         if system.get("product_name"):
                             system_summary["product_name"] = system["product_name"]
                         if system.get("product_version"):
-                            system_summary["product_version"] = system[
-                                "product_version"
-                            ]
+                            system_summary["product_version"] = system["product_version"]
                         if system.get("product_family"):
                             system_summary["product_family"] = system["product_family"]
                         if system_summary:
@@ -307,9 +303,7 @@ class CoreResultsSummaryGenerator:
                         )
 
                     if python_info.get("in_virtualenv"):
-                        python_summary["virtual_environment"] = python_info[
-                            "in_virtualenv"
-                        ]
+                        python_summary["virtual_environment"] = python_info["in_virtualenv"]
 
                     if python_info.get("pip_version"):
                         python_summary["pip_version"] = python_info["pip_version"]
@@ -331,9 +325,7 @@ class CoreResultsSummaryGenerator:
                     software_summary["system_packages"] = {
                         "installed": system_packages.get("installed", {}),
                         "missing": system_packages.get("missing", []),
-                        "package_manager": system_packages.get(
-                            "package_manager", "unknown"
-                        ),
+                        "package_manager": system_packages.get("package_manager", "unknown"),
                     }
 
                 system_data["software"] = software_summary
@@ -376,9 +368,7 @@ class CoreResultsSummaryGenerator:
         suite_name = None
 
         if not os.path.exists(self.allure_results_dir):
-            logger.warning(
-                f"Allure results directory not found: {self.allure_results_dir}"
-            )
+            logger.warning(f"Allure results directory not found: {self.allure_results_dir}")
             return self._create_empty_summary(profile_name, suite_name)
 
         # Parse Allure results
@@ -394,9 +384,7 @@ class CoreResultsSummaryGenerator:
 
         return summary
 
-    def _create_empty_summary(
-        self, profile_name: Optional[str], suite_name: Optional[str]
-    ) -> Dict[str, Any]:
+    def _create_empty_summary(self, profile_name: Optional[str], suite_name: Optional[str]) -> Dict[str, Any]:
         """Create empty summary when no results are available."""
         return {
             "summary": {
@@ -414,6 +402,7 @@ class CoreResultsSummaryGenerator:
                 },
                 "pass_rate": 0.0,
                 "tests_by_profile": {},
+                "tests_by_group": {},
                 "tests_by_status": {},
                 "longest_test": None,
                 "shortest_test": None,
@@ -477,9 +466,7 @@ class CoreResultsSummaryGenerator:
 
         for history_id, runs in test_groups_by_history_id.items():
             # Sort runs by stop_timestamp to get the latest
-            sorted_runs = sorted(
-                runs, key=lambda x: x.get("stop_timestamp", 0), reverse=True
-            )
+            sorted_runs = sorted(runs, key=lambda x: x.get("stop_timestamp", 0), reverse=True)
             latest_run = sorted_runs[0]
 
             # Collect all UUIDs for this history group
@@ -499,9 +486,7 @@ class CoreResultsSummaryGenerator:
             all_durations = [run.get("duration_seconds", 0) for run in runs]
             total_duration = sum(all_durations)
             longest_duration = max(all_durations) if all_durations else 0
-            average_duration = (
-                total_duration / len(all_durations) if all_durations else 0
-            )
+            average_duration = total_duration / len(all_durations) if all_durations else 0
 
             # Create unique test case using latest run data + aggregated stats
             unique_test_case = {
@@ -509,9 +494,7 @@ class CoreResultsSummaryGenerator:
                 "test_name": latest_run.get("test_name", "Unknown"),
                 "status": latest_run.get("status", "unknown"),
                 "total_runs": total_runs,
-                "duration_seconds": latest_run.get(
-                    "duration_seconds", 0
-                ),  # Latest run duration
+                "duration_seconds": latest_run.get("duration_seconds", 0),  # Latest run duration
                 "longest_duration_seconds": longest_duration,
                 "total_duration_seconds": total_duration,
                 "average_duration_seconds": round(average_duration, 3),
@@ -538,9 +521,7 @@ class CoreResultsSummaryGenerator:
 
         # Calculate aggregate statistics
         total_tests = len(unique_test_cases)
-        total_duration = sum(
-            test["total_duration_seconds"] for test in unique_test_cases
-        )
+        total_duration = sum(test["total_duration_seconds"] for test in unique_test_cases)
 
         # Build tests_by_profile (grouped by parentSuite from labels)
         tests_by_profile = {}
@@ -559,9 +540,26 @@ class CoreResultsSummaryGenerator:
 
             tests_by_profile[parent_suite]["total"] += 1
             tests_by_profile[parent_suite][test_case["status"]] += 1
-            tests_by_profile[parent_suite]["duration_seconds"] += test_case[
-                "total_duration_seconds"
-            ]
+            tests_by_profile[parent_suite]["duration_seconds"] += test_case["total_duration_seconds"]
+
+        # Build tests_by_group (grouped by group label from test metadata)
+        tests_by_group = {}
+        for test_case in unique_test_cases:
+            group_label = test_case.get("labels", {}).get("group", "unknown")
+            if group_label not in tests_by_group:
+                tests_by_group[group_label] = {
+                    "total": 0,
+                    "passed": 0,
+                    "failed": 0,
+                    "broken": 0,
+                    "skipped": 0,
+                    "unknown": 0,
+                    "duration_seconds": 0.0,
+                }
+
+            tests_by_group[group_label]["total"] += 1
+            tests_by_group[group_label][test_case["status"]] += 1
+            tests_by_group[group_label]["duration_seconds"] += test_case["total_duration_seconds"]
 
         # Calculate status counts
         status_counts = {
@@ -570,16 +568,12 @@ class CoreResultsSummaryGenerator:
             "broken": sum(1 for tc in unique_test_cases if tc["status"] == "broken"),
             "skipped": sum(1 for tc in unique_test_cases if tc["status"] == "skipped"),
             "unknown": sum(
-                1
-                for tc in unique_test_cases
-                if tc["status"] not in ["passed", "failed", "broken", "skipped"]
+                1 for tc in unique_test_cases if tc["status"] not in ["passed", "failed", "broken", "skipped"]
             ),
         }
 
         # Calculate pass rate
-        pass_rate = (
-            (status_counts["passed"] / total_tests * 100) if total_tests > 0 else 0.0
-        )
+        pass_rate = (status_counts["passed"] / total_tests * 100) if total_tests > 0 else 0.0
 
         # Collect system information
         system_summary_data = self._collect_system_summary_data()
@@ -599,9 +593,7 @@ class CoreResultsSummaryGenerator:
                     all_uuids = test.get("all_run_uuids", [])
                     existing_uuids.update(all_uuids)
 
-                logger.debug(
-                    f"Loaded {len(existing_uuids)} existing UUIDs from previous summary"
-                )
+                logger.debug(f"Loaded {len(existing_uuids)} existing UUIDs from previous summary")
             except Exception as e:
                 logger.debug(f"Could not load existing summary: {e}")
 
@@ -616,9 +608,7 @@ class CoreResultsSummaryGenerator:
                 actual_current_run_uuids.append(latest_uuid)
                 actual_current_run_duration += test_case.get("duration_seconds", 0)
 
-        logger.debug(
-            f"Found {len(actual_current_run_uuids)} new test UUIDs in current run"
-        )
+        logger.debug(f"Found {len(actual_current_run_uuids)} new test UUIDs in current run")
         logger.debug(f"Current run duration: {actual_current_run_duration:.3f} seconds")
 
         summary = {
@@ -634,10 +624,9 @@ class CoreResultsSummaryGenerator:
                 "status_counts": status_counts,
                 "pass_rate": round(pass_rate, 2),
                 "tests_by_profile": tests_by_profile,
+                "tests_by_group": tests_by_group,
                 "unique_test_scenarios": len(test_groups_by_history_id),
-                "cache_optimization_detected": any(
-                    len(runs) > 1 for runs in test_groups_by_history_id.values()
-                ),
+                "cache_optimization_detected": any(len(runs) > 1 for runs in test_groups_by_history_id.values()),
                 "system_summary": system_summary_data,
             },
             "tests": unique_test_cases,
@@ -645,9 +634,7 @@ class CoreResultsSummaryGenerator:
 
         return summary
 
-    def save_summary_to_file(
-        self, summary: Dict[str, Any], filename: Optional[str] = None
-    ) -> str:
+    def save_summary_to_file(self, summary: Dict[str, Any], filename: Optional[str] = None) -> str:
         """
         Save summary to JSON file.
 
@@ -676,9 +663,7 @@ class CoreResultsSummaryGenerator:
             logger.error(f"Failed to save summary to {filepath}: {e}")
             raise
 
-    def generate_and_save_summary(
-        self, verbose: bool = False, filename: Optional[str] = None
-    ) -> str:
+    def generate_and_save_summary(self, verbose: bool = False, filename: Optional[str] = None) -> str:
         """
         Generate and save test results summary in one call.
 

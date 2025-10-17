@@ -328,8 +328,13 @@ def test_text_generation(
         except Exception as summary_error:
             logger.error(f"Test result summarization failed: {summary_error}", exc_info=True)
 
+        is_qualification = configs.get("labels", {}).get("type") == "qualification"
+
         if test_interrupted:
-            raise RuntimeError(failure_message)
+            if is_qualification:
+                pytest.fail(failure_message)
+            else:
+                raise RuntimeError(failure_message)
         if test_failed:
             pytest.fail(failure_message)
 

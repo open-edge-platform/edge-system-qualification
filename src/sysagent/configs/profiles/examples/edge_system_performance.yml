@@ -9,6 +9,7 @@ version: "1.0.0"
 params:
   labels:
     profile_display_name: "System Performance Example"
+    group: "example.docker"
     type: "suite"
   requirements:
     # Hardware requirements

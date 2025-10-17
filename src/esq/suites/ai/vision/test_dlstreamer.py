@@ -478,8 +478,13 @@ def test_dlstreamer(
         except Exception as cleanup_error:
             logger.error(f"Cleanup failed: {cleanup_error}")
 
+        is_qualification = configs.get("labels", {}).get("type") == "qualification"
+
         if test_interrupted:
-            raise RuntimeError(failure_message)
+            if is_qualification:
+                pytest.fail(failure_message)
+            else:
+                raise RuntimeError(failure_message)
         if test_failed:
             pytest.fail(failure_message)
 

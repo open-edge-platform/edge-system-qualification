@@ -520,8 +520,13 @@ def test_automatic_speech_recognition(
             except Exception as fallback_error:
                 logger.error(f"Even fallback attachment failed: {fallback_error}")
 
+        is_qualification = configs.get("labels", {}).get("type") == "qualification"
+
         if test_interrupted:
-            raise RuntimeError(failure_message)
+            if is_qualification:
+                pytest.fail(failure_message)
+            else:
+                raise RuntimeError(failure_message)
         if test_failed:
             pytest.fail(failure_message)
 

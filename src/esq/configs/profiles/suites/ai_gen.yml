@@ -7,7 +7,9 @@ version: "1.0.0"
 params:
   labels:
     profile_display_name: "Gen AI"
+    group: "ai.gen"
     type: "suite"
+    display_status: false
   requirements:
     # Hardware requirements
     cpu_min_cores: 2

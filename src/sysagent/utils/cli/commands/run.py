@@ -231,14 +231,18 @@ def _run_profile_tests(
 
         tests_ran = tests_ran or profile_tests_ran
 
-        # Track the worst exit code
-        if result_code != 0:
-            final_exit_code = result_code
-
-        # Stop on failure if it's a dependency
+        # Track the worst exit code from dependency profiles
+        # Note: We continue execution even if dependencies fail, as the main profile
+        # may need to run (e.g., to summarize results from failed/passed dependencies)
         if result_code != 0 and current_profile_name != profile_name:
-            logger.error(f"Dependency profile '{current_profile_name}' failed. Stopping execution.")
-            return final_exit_code, tests_ran
+            logger.warning(
+                f"Dependency profile '{current_profile_name}' completed with exit code {result_code}. "
+                f"Continuing to execute main profile '{profile_name}'."
+            )
+            # Don't update final_exit_code yet - let main profile determine final status
+        elif result_code != 0 and current_profile_name == profile_name:
+            # Only set non-zero exit code if the main profile itself fails
+            final_exit_code = result_code
 
     return final_exit_code, tests_ran
 

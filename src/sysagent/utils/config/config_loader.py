@@ -462,8 +462,8 @@ def get_node_version() -> str:
     except Exception:
         pass
 
-    # Fallback version
-    return "v22.17.0"
+    # Fallback version if not found in /src/sysagent/pyproject.toml
+    return "v24.11.0"
 
 
 def load_tool_config(section: str = "tool.sysagent", package: str = "sysagent") -> Dict[str, Any]:

@@ -177,7 +177,7 @@ def run_dlstreamer_analyzer_container(
         result = docker_client.run_container(**common_params)
 
         # Exclude certain keys from result output in debug log
-        exclude_keys = {"container_logs_text", "result_text", "main_process_error"}
+        exclude_keys = {"container_logs_text", "result_text"}
         result_log = {k: v for k, v in result.items() if k not in exclude_keys}
         logger.debug(f"Container {container_name} execution result: {json.dumps(result_log, indent=2)}")
 

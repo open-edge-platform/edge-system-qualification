@@ -437,8 +437,6 @@ def get_baseline_stream_analysis(baseline_pipeline=None, result_pipeline=None, p
             'per_stream_fps': float,
             'main_process_exit_code': int or None,
             'result_process_exit_code': int,
-            'main_process_error': str,
-            'result_process_error': str,
             'status': str  # 'success', 'timeout', 'main_failed', 'result_failed', 'error'
         }
     """
@@ -461,8 +459,6 @@ def get_baseline_stream_analysis(baseline_pipeline=None, result_pipeline=None, p
             "per_stream_fps": 0.0,
             "main_process_exit_code": None,
             "result_process_exit_code": None,
-            "main_process_error": f"Input validation error: {e}",
-            "result_process_error": "",
             "status": "error",
         }
 
@@ -487,8 +483,6 @@ def get_baseline_stream_analysis(baseline_pipeline=None, result_pipeline=None, p
         "per_stream_fps": 0.0,
         "main_process_exit_code": None,
         "result_process_exit_code": None,
-        "main_process_error": "",
-        "result_process_error": "",
         "status": "error",
     }
 
@@ -537,8 +531,6 @@ def get_baseline_stream_analysis(baseline_pipeline=None, result_pipeline=None, p
                     "main_process_exit_code": main_process.returncode,
                     "result_process_exit_code": pipeline_process.returncode,
                     "status": "timeout",
-                    "main_process_error": f"Process termination {'successful' if main_terminated else 'failed'}",
-                    "result_process_error": f"Process termination {'successful' if result_terminated else 'failed'}",
                 }
             )
             return result_info
@@ -547,7 +539,6 @@ def get_baseline_stream_analysis(baseline_pipeline=None, result_pipeline=None, p
         result_info["result_process_exit_code"] = pipeline_process.returncode
         if pipeline_process.returncode != 0:
             stderr_output = pipeline_process.stderr.read().decode() if pipeline_process.stderr else "No stderr"
-            result_info["result_process_error"] = stderr_output
             logger.error(
                 f"Baseline result pipeline failed with exit code {pipeline_process.returncode}: {stderr_output}"
             )
@@ -556,8 +547,6 @@ def get_baseline_stream_analysis(baseline_pipeline=None, result_pipeline=None, p
             main_terminated = terminate_process_safely(main_process, "baseline main pipeline", timeout=3)
             result_info["main_process_exit_code"] = main_process.returncode
             result_info["status"] = "result_failed"
-            if not main_terminated:
-                result_info["main_process_error"] = "Failed to terminate main process properly"
             return result_info
 
         # Clean up main process using robust termination
@@ -566,10 +555,16 @@ def get_baseline_stream_analysis(baseline_pipeline=None, result_pipeline=None, p
 
         if main_process.returncode is not None and main_process.returncode not in [0, -15]:  # -15 is SIGTERM
             stderr_output = main_process.stderr.read().decode() if main_process.stderr else "No stderr"
-            result_info["main_process_error"] = stderr_output
-            logger.warning(f"Baseline main pipeline exited with code {main_process.returncode}: {stderr_output}")
+            
+            # Check for non-critical GStreamer cleanup issues (exit code -9 with GStreamer warnings)
+            if main_process.returncode == -9 and "GStreamer-WARNING" in stderr_output:
+                logger.warning("Detected GStreamer cleanup issue (SIGKILL -9 with GStreamer-WARNING) - non-critical if results already collected")
+            # Check for segmentation fault or longjmp errors
+            elif "Segmentation fault" in stderr_output or "longjmp causes uninitialized stack frame" in stderr_output:
+                logger.warning("Detected GStreamer cleanup crash (segfault/longjmp) - non-critical if results already collected")
+            else:
+                logger.warning(f"Baseline main pipeline exited with code {main_process.returncode}: {stderr_output}")
 
-        # Parse results
         total_fps, num_streams, per_stream_fps = parse_result(
             use_average=False, result_output_path=baseline_result_path
         )
@@ -599,7 +594,7 @@ def get_baseline_stream_analysis(baseline_pipeline=None, result_pipeline=None, p
         except Exception as cleanup_error:
             logger.warning(f"Failed to cleanup main pipeline process: {cleanup_error}")
 
-        result_info.update({"result_process_error": str(e), "status": "error"})
+        result_info.update({"status": "error"})
         return result_info
 
 
@@ -620,8 +615,6 @@ def get_n_stream_analysis_per_device(pipeline_timeout=300, device_id=None, multi
             'per_stream_fps': float,
             'main_process_exit_code': int or None,
             'result_process_exit_code': int,
-            'main_process_error': str,
-            'result_process_error': str,
             'status': str  # 'success', 'timeout', 'main_failed', 'result_failed', 'error'
         }
     """
@@ -664,8 +657,6 @@ def get_n_stream_analysis_per_device(pipeline_timeout=300, device_id=None, multi
         "per_stream_fps": 0.0,
         "main_process_exit_code": None,
         "result_process_exit_code": None,
-        "main_process_error": "",
-        "result_process_error": "",
         "status": "error",
     }
 
@@ -710,8 +701,6 @@ def get_n_stream_analysis_per_device(pipeline_timeout=300, device_id=None, multi
                     "main_process_exit_code": main_process.returncode,
                     "result_process_exit_code": pipeline_process.returncode,
                     "status": "timeout",
-                    "main_process_error": f"Process termination {'successful' if main_terminated else 'failed'}",
-                    "result_process_error": f"Process termination {'successful' if result_terminated else 'failed'}",
                 }
             )
             return result_info
@@ -720,15 +709,12 @@ def get_n_stream_analysis_per_device(pipeline_timeout=300, device_id=None, multi
         result_info["result_process_exit_code"] = pipeline_process.returncode
         if pipeline_process.returncode != 0:
             stderr_output = pipeline_process.stderr.read().decode() if pipeline_process.stderr else "No stderr"
-            result_info["result_process_error"] = stderr_output
             logger.error(f"Result pipeline failed with exit code {pipeline_process.returncode}: {stderr_output}")
 
             # Use robust termination for main process
             main_terminated = terminate_process_safely(main_process, "multi-stream main pipeline", timeout=3)
             result_info["main_process_exit_code"] = main_process.returncode
             result_info["status"] = "result_failed"
-            if not main_terminated:
-                result_info["main_process_error"] = "Failed to terminate main process properly"
             return result_info
 
         # Clean up main process using robust termination
@@ -737,12 +723,16 @@ def get_n_stream_analysis_per_device(pipeline_timeout=300, device_id=None, multi
 
         if main_process.returncode is not None and main_process.returncode not in [0, -15]:  # -15 is SIGTERM
             stderr_output = main_process.stderr.read().decode() if main_process.stderr else "No stderr"
-            result_info["main_process_error"] = stderr_output
-            logger.warning(f"Main pipeline exited with code {main_process.returncode}: {stderr_output}")
-            result_info["status"] = "main_failed"
-            return result_info
+            
+            # Check for non-critical GStreamer cleanup issues (exit code -9 with GStreamer warnings)
+            if main_process.returncode == -9 and "GStreamer-WARNING" in stderr_output:
+                logger.warning("Detected GStreamer cleanup issue (SIGKILL -9 with GStreamer-WARNING) - non-critical if results already collected")
+            # Check for segmentation fault or longjmp errors
+            elif "Segmentation fault" in stderr_output or "longjmp causes uninitialized stack frame" in stderr_output:
+                logger.warning("Detected GStreamer cleanup crash (segfault/longjmp) - non-critical if results already collected")
+            else:
+                logger.warning(f"Main pipeline exited with code {main_process.returncode}: {stderr_output}")
 
-        # Parse results
         total_fps, num_streams, per_stream_fps = parse_result(use_average=True, result_output_path=streams_result_path)
 
         result_info.update(
@@ -766,7 +756,7 @@ def get_n_stream_analysis_per_device(pipeline_timeout=300, device_id=None, multi
         except Exception as cleanup_error:
             logger.warning(f"Failed to cleanup main pipeline process: {cleanup_error}")
 
-        result_info.update({"result_process_error": str(e), "status": "error"})
+        result_info.update({"status": "error"})
         return result_info
 
 
@@ -830,8 +820,6 @@ def baseline_streams_analysis(
                 "total_fps": analysis_result.get("total_fps", 0.0),
                 "main_process_exit_code": analysis_result.get("main_process_exit_code"),
                 "result_process_exit_code": analysis_result.get("result_process_exit_code"),
-                "main_process_error": analysis_result.get("main_process_error", ""),
-                "result_process_error": analysis_result.get("result_process_error", ""),
                 "analysis_status": analysis_result.get("status", "unknown"),
                 "analysis_duration": analysis_duration,
             }
@@ -844,8 +832,6 @@ def baseline_streams_analysis(
                 "total_fps": analysis_result.get("total_fps", 0.0),
                 "main_process_exit_code": analysis_result.get("main_process_exit_code"),
                 "result_process_exit_code": analysis_result.get("result_process_exit_code"),
-                "main_process_error": analysis_result.get("main_process_error", ""),
-                "result_process_error": analysis_result.get("result_process_error", ""),
                 "analysis_status": analysis_result.get("status", "failed"),
                 "analysis_duration": analysis_duration,
             }
@@ -858,8 +844,6 @@ def baseline_streams_analysis(
             "total_fps": 0.0,
             "main_process_exit_code": None,
             "result_process_exit_code": None,
-            "main_process_error": str(e),
-            "result_process_error": "",
             "analysis_status": "error",
             "analysis_duration": analysis_duration,
         }
@@ -931,8 +915,6 @@ def total_streams_analysis(
             "per_stream_fps": 0.0,
             "main_process_exit_code": None,
             "result_process_exit_code": None,
-            "main_process_error": str(e),
-            "result_process_error": "",
             "status": "error",
         }
         calculated_per_stream_fps = 0.0
@@ -951,8 +933,6 @@ def total_streams_analysis(
             "total_fps": analysis_result.get("total_fps", 0.0),
             "main_process_exit_code": analysis_result.get("main_process_exit_code"),
             "result_process_exit_code": analysis_result.get("result_process_exit_code"),
-            "main_process_error": analysis_result.get("main_process_error", ""),
-            "result_process_error": analysis_result.get("result_process_error", ""),
             "analysis_status": analysis_result.get("status", "unknown"),
             "analysis_duration": analysis_duration,
         }

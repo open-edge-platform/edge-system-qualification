@@ -1,5 +1,5 @@
 diff --git a/.gitignore b/.gitignore
-index 64e67a73a..c7eb0fe38 100644
+index 64e67a73a..5a67e7f4e 100644
 --- a/.gitignore
 +++ b/.gitignore
 @@ -51,4 +51,7 @@ build
@@ -12,7 +12,6 @@ index 64e67a73a..c7eb0fe38 100644
 +
 +# ignore data folder
 +data
-\ No newline at end of file
 diff --git a/allurerc.mjs b/allurerc.mjs
 index 31265892d..11a857c7a 100644
 --- a/allurerc.mjs
@@ -245,17 +244,276 @@ index c8841a643..3cd80c9fb 100644
    };
  
    return <div className={styles.layout}>{sectionMap[currentSection.value] || sectionMap.report}</div>;
+diff --git a/packages/web-awesome/src/components/Summary/BulletChart.tsx b/packages/web-awesome/src/components/Summary/BulletChart.tsx
+new file mode 100644
+index 000000000..058d7471c
+--- /dev/null
++++ b/packages/web-awesome/src/components/Summary/BulletChart.tsx
+@@ -0,0 +1,97 @@
++import { FunctionComponent } from "preact";
++import * as styles from "./BulletChartStyle.scss";
++
++interface BulletChartData {
++  metric: string;
++  value: number;
++  reference: number;
++  unit: string;
++  status: "passed" | "failed" | "broken" | "skipped" | "unknown";
++}
++
++interface BulletChartProps {
++  data: BulletChartData[];
++}
++
++export const BulletChart: FunctionComponent<BulletChartProps> = ({ data }) => {
++  if (!data || data.length === 0) {
++    return (
++      <div className={styles.emptyState}>
++        No metrics data available for visualization
++      </div>
++    );
++  }
++
++  return (
++    <div className={styles.bulletChartContainer}>
++      {data.map((metric, index) => {
++        // Calculate percentages for positioning
++        const maxValue = Math.max(metric.value, metric.reference, metric.reference * 1.2);
++        const valuePercent = (metric.value / maxValue) * 100;
++        const referencePercent = (metric.reference / maxValue) * 100;
++        const referenceZoneStart = 0; // Start from 0
++        const referenceZoneWidth = referencePercent - referenceZoneStart;
++
++        const statusClass = metric.status === "passed" ? styles.passed : styles.failed;
++
++        return (
++          <div key={index} className={styles.bulletRow}>
++            {/* Metric title */}
++            <div className={styles.metricTitle}>{metric.metric}</div>
++
++            {/* Chart area */}
++            <div className={styles.chartArea}>
++              {/* Background range */}
++              <div className={styles.backgroundRange}>
++                {/* Reference threshold zone */}
++                <div
++                  className={`${styles.referenceZone} ${statusClass}`}
++                  style={{
++                    left: `${referenceZoneStart}%`,
++                    width: `${referenceZoneWidth}%`,
++                  }}
++                />
++
++                {/* Actual value bar */}
++                <div
++                  className={`${styles.actualBar} ${statusClass}`}
++                  style={{ width: `${valuePercent}%` }}
++                />
++
++                {/* Reference marker line */}
++                <div
++                  className={styles.referenceMarker}
++                  style={{ left: `${referencePercent}%` }}
++                />
++
++                {/* Reference value label (above the marker) */}
++                <div
++                  className={styles.referenceLabel}
++                  style={{ left: `${referencePercent}%` }}
++                >
++                  Ref: {metric.reference.toFixed(1)} {metric.unit}
++                </div>
++
++                {/* Actual value label (to the right of the bar) */}
++                <div
++                  className={styles.actualLabel}
++                  style={{ left: `${valuePercent}%`, marginLeft: '5px' }}
++                >
++                  Actual: {metric.value.toFixed(1)} {metric.unit}
++                </div>
++              </div>
++
++              {/* Scale labels */}
++              <div className={styles.scaleLabels}>
++                <span className={styles.minLabel}>0</span>
++                <span className={styles.maxLabel}>
++                  {maxValue.toFixed(1)} {metric.unit}
++                </span>
++              </div>
++            </div>
++          </div>
++        );
++      })}
++    </div>
++  );
++};
+diff --git a/packages/web-awesome/src/components/Summary/BulletChartStyle.scss b/packages/web-awesome/src/components/Summary/BulletChartStyle.scss
+new file mode 100644
+index 000000000..2722f1005
+--- /dev/null
++++ b/packages/web-awesome/src/components/Summary/BulletChartStyle.scss
+@@ -0,0 +1,148 @@
++// Wrapper styling for bullet chart component
++.bulletChartWrapper {
++  background: var(--bg-base-primary);
++  border-radius: 4px;
++  padding: 12px;
++  border: 1px solid var(--on-border-secondary);
++}
++
++.bulletChartContainer {
++  width: 100%;
++  padding: 0;
++}
++
++.emptyState {
++  padding: 20px;
++  text-align: center;
++  color: var(--text-secondary);
++  font-style: italic;
++}
++
++.bulletRow {
++  display: grid;
++  grid-template-columns: 200px 1fr;
++  grid-template-rows: auto;
++  gap: 0;
++  margin-bottom: 60px; // Increased to accommodate labels
++  position: relative;
++
++  &:last-child {
++    margin-bottom: 0;
++  }
++}
++
++.metricTitle {
++  grid-column: 1;
++  grid-row: 1;
++  display: flex;
++  align-items: center;
++  padding-right: 10px;
++  font-size: 12px;
++  font-weight: 500;
++  color: var(--text-primary);
++  text-align: right;
++  justify-content: flex-end;
++}
++
++.chartArea {
++  grid-column: 2;
++  grid-row: 1;
++  position: relative;
++  height: 24px;
++  margin-left: 0;
++  margin-right: 120px; // Reserve space on the right for value labels (same as D3 margin.right)
++}
++
++.backgroundRange {
++  position: relative;
++  width: 100%;
++  height: 24px;
++  // background-color: #f1f5f7ff;
++  background-color: var(--bg-base-secondary);
++  border: 1px solid var(--on-border-secondary);
++  border-radius: 2px;
++}
++
++.referenceZone {
++  position: absolute;
++  top: 0;
++  height: 100%;
++  z-index: 1;
++
++  &.passed {
++    background-color: rgba(46, 125, 50, 0.15);
++  }
++
++  &.failed {
++    background-color: rgba(211, 47, 47, 0.15);
++  }
++}
++
++.actualBar {
++  position: absolute;
++  top: 50%;
++  transform: translateY(-50%);
++  height: 12px;
++  z-index: 2;
++  opacity: 0.9;
++
++  &.passed {
++    background-color: #2e7d32;
++  }
++
++  &.failed {
++    background-color: #d32f2f;
++  }
++}
++
++.referenceMarker {
++  position: absolute;
++  top: 0;
++  height: 100%;
++  width: 2px;
++  background-color: var(--on-text-primary);
++  z-index: 3;
++}
++
++.scaleLabels {
++  position: absolute;
++  top: 100%;
++  left: 0;
++  right: 0;
++  display: flex;
++  justify-content: space-between;
++  margin-top: 2px;
++  font-size: 9px;
++  color: var(--text-secondary);
++}
++
++.minLabel {
++  text-align: left;
++}
++
++.maxLabel {
++  text-align: right;
++}
++
++.actualLabel {
++  position: absolute;
++  top: 50%;
++  transform: translateY(-50%);
++  font-size: 10px;
++  font-weight: 600;
++  color: var(--text-primary);
++  white-space: nowrap;
++  z-index: 4;
++}
++
++.referenceLabel {
++  position: absolute;
++  bottom: 100%;
++  margin-bottom: 5px;
++  font-size: 10px;
++  font-weight: 500;
++  color: var(--text-primary);
++  white-space: nowrap;
++  transform: translateX(-50%);
++  z-index: 4;
++}
 diff --git a/packages/web-awesome/src/components/Summary/index.tsx b/packages/web-awesome/src/components/Summary/index.tsx
 new file mode 100644
-index 000000000..dbadc6cb3
+index 000000000..036ee119d
 --- /dev/null
 +++ b/packages/web-awesome/src/components/Summary/index.tsx
-@@ -0,0 +1,3159 @@
+@@ -0,0 +1,3313 @@
 +import { useEffect, useState } from "preact/hooks";
 +import { fetchAttachment } from "@allurereport/web-commons";
 +import * as styles from "./styles.scss";
 +import { availableSections } from "../../stores/sections";
 +import { testResultNavStore, fetchTestResultNav, testResultStore, fetchTestResult } from "../../stores/testResults";
++import { BulletChart } from "./BulletChart";
++import * as bulletChartStyles from "./BulletChartStyle.scss";
 +
 +// Summary table components
 +interface SortableTableProps {
@@ -369,22 +627,204 @@ index 000000000..dbadc6cb3
 +    );
 +  }
 +
++  const handleDownload = () => {
++    const link = document.createElement('a');
++    link.href = imageData;
++    link.download = attachment.name || 'attachment';
++    document.body.appendChild(link);
++    link.click();
++    document.body.removeChild(link);
++  };
++
 +  return (
-+    <img 
-+      src={imageData}
-+      alt={attachment.name || "Attachment"}
-+      style={{ 
-+        maxWidth: '100%', 
-+        maxHeight: '100%', 
-+        objectFit: 'contain',
-+        cursor: 'pointer'
-+      }}
-+      onClick={() => window.open(imageData, '_blank')}
-+      onError={() => {
++    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
++      <img 
++        src={imageData}
++        alt={attachment.name || "Attachment"}
++        style={{ 
++          maxWidth: '100%', 
++          maxHeight: '100%', 
++          objectFit: 'contain',
++          cursor: 'pointer'
++        }}
++        onClick={() => window.open(imageData, '_blank')}
++        onError={() => {
++          setError(true);
++          onError?.();
++        }}
++      />
++      <button
++        className={styles["image-download-button"]}
++        onClick={(e) => {
++          e.stopPropagation();
++          handleDownload();
++        }}
++      >
++        Download
++      </button>
++    </div>
++  );
++};
++
++// Attachment CSV component for Summary
++interface AttachmentCSVProps {
++  attachment: {
++    link: {
++      id: string;
++      name: string;
++      contentType: string;
++      ext?: string;
++    };
++    name?: string;
++  };
++  onError?: () => void;
++}
++
++const AttachmentCSV = ({ attachment, onError }: AttachmentCSVProps) => {
++  const [csvData, setCsvData] = useState<string[][] | null>(null);
++  const [csvText, setCsvText] = useState<string>(''); // Store raw CSV text for download
++  const [loading, setLoading] = useState(true);
++  const [error, setError] = useState(false);
++
++  useEffect(() => {
++    const loadAttachment = async () => {
++      try {
++        setLoading(true);
++        setError(false);
++
++        const attachmentId = attachment.link.id;
++        const contentType = attachment.link.contentType;
++        const ext = attachment.link.ext || ".csv";
++
++        // Fetch CSV attachment as text
++        const result = await fetchAttachment(attachmentId, ext, contentType);
++
++        if (result?.text) {
++          // Store raw CSV text for download
++          setCsvText(result.text);
++          // Parse CSV text into table data
++          const parsedData = parseCSV(result.text);
++          setCsvData(parsedData);
++        } else {
++          throw new Error("Failed to load CSV attachment - no text data returned");
++        }
++
++      } catch (err) {
++        console.error("Failed to load CSV attachment:", err);
 +        setError(true);
 +        onError?.();
-+      }}
-+    />
++      } finally {
++        setLoading(false);
++      }
++    };
++
++    loadAttachment();
++  }, [attachment.link.id, attachment.link.contentType, onError]);
++
++  // Simple CSV parser
++  const parseCSV = (text: string): string[][] => {
++    const lines = text.trim().split('\n');
++    return lines.map(line => {
++      // Simple CSV parsing - handles basic cases
++      // For more complex CSV with quoted fields, a proper CSV parser would be needed
++      const cells: string[] = [];
++      let currentCell = '';
++      let insideQuotes = false;
++      
++      for (let i = 0; i < line.length; i++) {
++        const char = line[i];
++        
++        if (char === '"') {
++          insideQuotes = !insideQuotes;
++        } else if (char === ',' && !insideQuotes) {
++          cells.push(currentCell.trim());
++          currentCell = '';
++        } else {
++          currentCell += char;
++        }
++      }
++      cells.push(currentCell.trim());
++      
++      return cells;
++    });
++  };
++
++  if (loading) {
++    return (
++      <div style={{ 
++        display: 'flex', 
++        alignItems: 'center', 
++        justifyContent: 'center', 
++        padding: '20px',
++        color: '#666',
++        fontSize: '12px'
++      }}>
++        Loading CSV data...
++      </div>
++    );
++  }
++
++  if (error || !csvData || csvData.length === 0) {
++    return (
++      <div style={{ 
++        display: 'flex', 
++        alignItems: 'center', 
++        justifyContent: 'center', 
++        padding: '20px',
++        color: '#999',
++        fontSize: '12px',
++        fontStyle: 'italic'
++      }}>
++        Failed to load CSV data
++      </div>
++    );
++  }
++
++  const headers = csvData[0];
++  const rows = csvData.slice(1);
++
++  const handleDownload = () => {
++    const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8;' });
++    const link = document.createElement('a');
++    const url = URL.createObjectURL(blob);
++    link.href = url;
++    link.download = attachment.name || 'data.csv';
++    document.body.appendChild(link);
++    link.click();
++    document.body.removeChild(link);
++    URL.revokeObjectURL(url);
++  };
++
++  return (
++    <div style={{ position: 'relative' }}>
++      <div className={styles["csv-title-container"]}>
++        <h4 className={styles["csv-title"]}>{attachment.name || attachment.link?.name || 'CSV Data'}</h4>
++        <button
++          className={styles["download-button"]}
++          onClick={handleDownload}
++        >
++          Download CSV
++        </button>
++      </div>
++      <table className={styles["csv-table"]}>
++        <thead>
++          <tr>
++            {headers.map((header, index) => (
++              <th key={index}>{header}</th>
++            ))}
++          </tr>
++        </thead>
++        <tbody>
++          {rows.map((row, rowIndex) => (
++            <tr key={rowIndex}>
++              {row.map((cell, cellIndex) => (
++                <td key={cellIndex}>{cell}</td>
++              ))}
++            </tr>
++          ))}
++        </tbody>
++      </table>
++    </div>
 +  );
 +};
 +
@@ -501,180 +941,131 @@ index 000000000..dbadc6cb3
 +};
 +
 +// Helper function to render KPIs section with custom table structure
-+const renderKpisSection = (transformResult: {
-+  data: Array<{
-+    name: string;
-+    value: string;
-+    reference: string;
-+    status: string;
-+    unit: string;
++const renderKpisSection = (
++  transformResult: {
++    data: Array<{
++      name: string;
++      value: string;
++      reference: string;
++      status: string;
++      unit: string;
++      validationMode: string;
++    }>;
 +    validationMode: string;
-+  }>;
-+  validationMode: string;
-+}) => {
++  },
++  expandedSections: Set<string>,
++  toggleSection: (sectionId: string) => void
++) => {
 +  if (transformResult.data.length === 0) {
 +    return null;
 +  }
 +
 +  const { data: kpisData, validationMode } = transformResult;
++  const isExpanded = expandedSections.has('kpis');
 +
 +  // Helper function to get status badge color
 +  const getStatusColor = (status: string) => {
 +    switch (status) {
 +      case 'PASSED':
-+        return '#2e7d32'; // Green
++        return 'passed';
 +      case 'FAILED':
-+        return '#d32f2f'; // Red
++        return 'failed';
 +      case 'SKIPPED':
-+        return '#616161'; // Gray
++        return 'skipped';
 +      default:
-+        return '#424242'; // Dark gray
++        return 'unknown';
 +    }
 +  };
 +
 +  return (
-+    <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: 'white', borderRadius: '4px', border: '1px solid #e0e0e0' }}>
-+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-+        <h4 style={{ margin: '0', fontSize: '14px', fontWeight: '600', color: '#333' }}>KPIs</h4>
-+        <div style={{ 
-+          fontSize: '11px', 
-+          color: '#666', 
-+          fontWeight: '500',
-+          padding: '2px 6px',
-+          backgroundColor: '#f0f0f0',
-+          borderRadius: '3px',
-+          textTransform: 'uppercase'
-+        }}>
-+          Validation Mode: {validationMode}
-+        </div>
++    <div className={styles["kpis-section"]}>
++      <div 
++        className={`${styles["kpis-section-header"]} ${isExpanded ? styles["expanded"] : ""}`}
++        onClick={() => toggleSection('kpis')}
++      >
++        <button
++          className={styles["toggle-button-small"]}
++          type="button"
++          style={{ marginRight: '8px' }}
++        >
++          {isExpanded ? '−' : '+'}
++        </button>
++        <h4 className={styles["metadata-section-title"]}>KPIs</h4>
++        <span className={styles["kpis-validation-mode"]}>
++          {validationMode}
++        </span>
 +      </div>
-+      <div style={{ fontSize: '11px', color: '#888', marginBottom: '8px', fontStyle: 'italic' }}>
-+        {validationMode === 'skip' 
-+          ? 'All KPI validations are disabled and provided for reference purposes only' 
-+          : validationMode === 'any' 
-+            ? 'At least one KPI must pass for overall pass status' 
-+            : 'All KPIs must pass for overall pass status'}
-+      </div>
-+      <table style={{ 
-+        width: '100%', 
-+        borderCollapse: 'collapse', 
-+        fontSize: '12px',
-+        border: '1px solid #e0e0e0'
-+      }}>
-+        <thead>
-+          <tr>
-+            <th style={{ 
-+              backgroundColor: '#f8f9fa', 
-+              color: '#333', 
-+              textAlign: 'left', 
-+              fontWeight: '500', 
-+              padding: '8px 12px', 
-+              border: '1px solid #e0e0e0',
-+              width: '30%'
-+            }}>
-+              KPI Name
-+            </th>
-+            <th style={{ 
-+              backgroundColor: '#f8f9fa', 
-+              color: '#333', 
-+              textAlign: 'left', 
-+              fontWeight: '500', 
-+              padding: '8px 12px', 
-+              border: '1px solid #e0e0e0',
-+              width: '30%'
-+            }}>
-+              Reference
-+            </th>
-+            <th style={{ 
-+              backgroundColor: '#f8f9fa', 
-+              color: '#333', 
-+              textAlign: 'left', 
-+              fontWeight: '500', 
-+              padding: '8px 12px', 
-+              border: '1px solid #e0e0e0',
-+              width: '20%'
-+            }}>
-+              Value
-+            </th>
-+            <th style={{ 
-+              backgroundColor: '#f8f9fa', 
-+              color: '#333', 
-+              textAlign: 'center', 
-+              fontWeight: '500', 
-+              padding: '8px 12px', 
-+              border: '1px solid #e0e0e0',
-+              width: '20%'
-+            }}>
-+              Status
-+            </th>
-+          </tr>
-+        </thead>
-+        <tbody>
-+          {kpisData.map((kpi, idx) => (
-+            <tr key={idx}>
-+              <td style={{ 
-+                padding: '8px 12px', 
-+                border: '1px solid #e0e0e0', 
-+                backgroundColor: 'white',
-+                fontWeight: '500',
-+                color: '#555',
-+                verticalAlign: 'top'
-+              }}>
-+                {kpi.name}
-+              </td>
-+              <td style={{ 
-+                padding: '8px 12px', 
-+                border: '1px solid #e0e0e0', 
-+                backgroundColor: 'white',
-+                color: '#333',
-+                verticalAlign: 'top'
-+              }}>
-+                {kpi.reference}
-+              </td>
-+              <td style={{ 
-+                padding: '8px 12px', 
-+                border: '1px solid #e0e0e0', 
-+                backgroundColor: 'white',
-+                color: '#333',
-+                verticalAlign: 'top'
-+              }}>
-+                {kpi.value}
-+              </td>
-+              <td style={{ 
-+                padding: '8px 12px', 
-+                border: '1px solid #e0e0e0', 
-+                backgroundColor: 'white',
-+                textAlign: 'center',
-+                verticalAlign: 'top'
-+              }}>
-+                <span style={{
-+                  border: `1px solid ${getStatusColor(kpi.status)}`,
-+                  color: getStatusColor(kpi.status),
-+                  backgroundColor: 'transparent',
-+                  padding: '2px 6px',
-+                  borderRadius: '3px',
-+                  fontSize: '11px',
-+                  fontWeight: '500',
-+                  textTransform: 'uppercase',
-+                  display: 'inline-block',
-+                  minWidth: '70px',
-+                  textAlign: 'center'
-+                }}>
-+                  {kpi.status}
-+                </span>
-+              </td>
-+            </tr>
-+          ))}
-+        </tbody>
-+      </table>
++      {isExpanded && (
++        <>
++          <div className={styles["kpis-description"]}>
++            {validationMode === 'skip' 
++              ? 'All KPI validations are disabled and provided for reference purposes only' 
++              : validationMode === 'any' 
++                ? 'At least one KPI must pass for overall pass status' 
++                : 'All KPIs must pass for overall pass status'}
++          </div>
++          <table className={styles["kpis-table"]}>
++            <thead>
++              <tr>
++                <th className={`${styles["kpis-table-header"]} ${styles["col-30"]}`}>
++                  KPI Name
++                </th>
++                <th className={`${styles["kpis-table-header"]} ${styles["col-30"]}`}>
++                  Reference
++                </th>
++                <th className={`${styles["kpis-table-header"]} ${styles["col-20"]}`}>
++                  Value
++                </th>
++                <th className={`${styles["kpis-table-header"]} ${styles["center"]} ${styles["col-20"]}`}>
++                  Status
++                </th>
++              </tr>
++            </thead>
++            <tbody>
++              {kpisData.map((kpi, idx) => (
++                <tr key={idx}>
++                  <td className={`${styles["kpis-table-cell"]} ${styles["name-cell"]}`}>
++                    {kpi.name}
++                  </td>
++                  <td className={`${styles["kpis-table-cell"]} ${styles["value-cell"]}`}>
++                    {kpi.reference}
++                  </td>
++                  <td className={`${styles["kpis-table-cell"]} ${styles["value-cell"]}`}>
++                    {kpi.value}
++                  </td>
++                  <td className={`${styles["kpis-table-cell"]} ${styles["center"]}`}>
++                    <span className={`${styles["kpis-status-badge"]} ${styles[getStatusColor(kpi.status)]}`}>
++                      {kpi.status}
++                    </span>
++                  </td>
++                </tr>
++              ))}
++            </tbody>
++          </table>
++        </>
++      )}
 +    </div>
 +  );
 +};
 +
 +const MetadataTable = ({ metricsData }: MetadataTableProps) => {
++  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set()); // Collapsed by default
++  
 +  if (!metricsData) {
 +    return null;
 +  }
++
++  const toggleSection = (sectionName: string) => {
++    setExpandedSections((prev: Set<string>) => {
++      const newSet = new Set(prev);
++      if (newSet.has(sectionName)) {
++        newSet.delete(sectionName);
++      } else {
++        newSet.add(sectionName);
++      }
++      return newSet;
++    });
++  };
 +
 +  // Helper function to render value as string
 +  const renderValue = (value: any): string => {
@@ -691,87 +1082,61 @@ index 000000000..dbadc6cb3
 +  };
 +
 +  // Helper function to render an individual section
-+  const renderIndividualSection = (title: string, data: Record<string, any>) => {
++  const renderIndividualSection = (title: string, data: Record<string, any>, sectionId: string) => {
 +    const entries = Object.entries(data);
 +    if (entries.length === 0) {
 +      return null;
 +    }
 +
++    const isExpanded = expandedSections.has(sectionId);
++
 +    return (
-+      <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: 'white', borderRadius: '4px', border: '1px solid #e0e0e0' }}>
-+        <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '600', color: '#333' }}>{title}</h4>
-+        <table style={{ 
-+          width: '100%', 
-+          borderCollapse: 'collapse', 
-+          fontSize: '12px',
-+          border: '1px solid #e0e0e0'
-+        }}>
-+          <thead>
-+            <tr>
-+              <th style={{ 
-+                backgroundColor: '#f8f9fa', 
-+                color: '#333', 
-+                textAlign: 'left', 
-+                fontWeight: '500', 
-+                padding: '8px 12px', 
-+                border: '1px solid #e0e0e0',
-+                width: '30%'
-+              }}>
-+                Property
-+              </th>
-+              <th style={{ 
-+                backgroundColor: '#f8f9fa', 
-+                color: '#333', 
-+                textAlign: 'left', 
-+                fontWeight: '500', 
-+                padding: '8px 12px', 
-+                border: '1px solid #e0e0e0'
-+              }}>
-+                Value
-+              </th>
-+            </tr>
-+          </thead>
-+          <tbody>
-+            {entries.map(([key, value], idx) => (
-+              <tr key={idx}>
-+                <td style={{ 
-+                  padding: '8px 12px', 
-+                  border: '1px solid #e0e0e0', 
-+                  backgroundColor: 'white',
-+                  fontWeight: '500',
-+                  color: '#555',
-+                  verticalAlign: 'top'
-+                }}>
-+                  {key}
-+                </td>
-+                <td style={{ 
-+                  padding: '8px 12px', 
-+                  border: '1px solid #e0e0e0', 
-+                  backgroundColor: 'white',
-+                  color: '#333',
-+                  verticalAlign: 'top'
-+                }}>
-+                  {renderValue(value).includes('\n') ? (
-+                    <pre style={{ 
-+                      margin: 0, 
-+                      fontSize: '11px', 
-+                      fontFamily: 'monospace', 
-+                      whiteSpace: 'pre-wrap', 
-+                      wordBreak: 'break-word',
-+                      color: '#333',
-+                      maxHeight: '200px',
-+                      overflow: 'auto'
-+                    }}>
-+                      {renderValue(value)}
-+                    </pre>
-+                  ) : (
-+                    <span style={{ wordBreak: 'break-word' }}>{renderValue(value)}</span>
-+                  )}
-+                </td>
++      <div className={styles["metadata-section"]}>
++        <div 
++          className={`${styles["metadata-section-header"]} ${isExpanded ? styles["expanded"] : ""}`}
++          onClick={() => toggleSection(sectionId)}
++        >
++          <button 
++            className={styles["toggle-button-small"]}
++            type="button"
++            style={{ marginRight: '8px' }}
++          >
++            {isExpanded ? "−" : "+"}
++          </button>
++          <h4 className={styles["metadata-section-title"]}>{title}</h4>
++        </div>
++        {isExpanded && (
++          <table className={styles["metadata-table"]}>
++            <thead>
++              <tr>
++                <th className={`${styles["metadata-table-header"]} ${styles["property-column"]}`}>
++                  Property
++                </th>
++                <th className={styles["metadata-table-header"]}>
++                  Value
++                </th>
 +              </tr>
-+            ))}
-+          </tbody>
-+        </table>
++            </thead>
++            <tbody>
++              {entries.map(([key, value], idx) => (
++                <tr key={idx}>
++                  <td className={`${styles["metadata-table-cell"]} ${styles["property-cell"]}`}>
++                    {key}
++                  </td>
++                  <td className={`${styles["metadata-table-cell"]} ${styles["value-cell"]}`}>
++                    {renderValue(value).includes('\n') ? (
++                      <pre className={styles["metadata-table-pre"]}>
++                        {renderValue(value)}
++                      </pre>
++                    ) : (
++                      <span className={styles["metadata-table-span"]}>{renderValue(value)}</span>
++                    )}
++                  </td>
++                </tr>
++              ))}
++            </tbody>
++          </table>
++        )}
 +      </div>
 +    );
 +  };
@@ -797,18 +1162,18 @@ index 000000000..dbadc6cb3
 +        metricsForDisplay[key] = metricData;
 +      }
 +    });
-+    sections.push(renderIndividualSection('Metrics', metricsForDisplay));
++    sections.push(renderIndividualSection('Metrics', metricsForDisplay, 'metrics'));
 +  }
 +
 +  // Metadata section
 +  if (metricsData.metadata && Object.keys(metricsData.metadata).length > 0) {
-+    sections.push(renderIndividualSection('Metadata', metricsData.metadata));
++    sections.push(renderIndividualSection('Metadata', metricsData.metadata, 'metadata'));
 +  }
 +
 +  // KPIs section - transform to display readable format
 +  if (metricsData.kpis && Object.keys(metricsData.kpis).length > 0) {
 +    const transformResult = transformKpisData(metricsData.kpis, metricsData);
-+    sections.push(renderKpisSection(transformResult));
++    sections.push(renderKpisSection(transformResult, expandedSections, toggleSection));
 +  }
 +
 +  if (sections.length === 0) {
@@ -2536,14 +2901,6 @@ index 000000000..dbadc6cb3
 +            <div className={styles["collapsible-header-enhanced"]}>
 +              <div className={styles["header-left-enhanced"]}>
 +                <h3 className={styles["section-title"]}>Qualifications</h3>
-+                {(() => {
-+                  const sectionTierDisplayName = getSectionTierDisplayName(filteredQualificationProfilesData);
-+                  return sectionTierDisplayName ? (
-+                    <span className={styles["test-tier-label"]}>
-+                      {sectionTierDisplayName}
-+                    </span>
-+                  ) : null;
-+                })()}
 +              </div>
 +              <div className={styles["header-right-enhanced"]}>
 +                <div className={styles["search-container-inline"]}>
@@ -2583,6 +2940,131 @@ index 000000000..dbadc6cb3
 +                </div>
 +              </div>
 +            </div>
++
++            {/* Qualification Summary Section - Bullet Chart + Tier Bar */}
++            {(() => {
++              const sectionTierDisplayName = getSectionTierDisplayName(filteredQualificationProfilesData);
++              if (!sectionTierDisplayName) return null;
++              
++              // Tiers ordered from highest to lowest (top to bottom display)
++              // This creates a bottom-to-top visual hierarchy where Entry is at the bottom
++              const tiers = [
++                "Scalable AI Graphics and Media",
++                "Scalable Performance",
++                "Efficiency Optimized",
++                "Mainstream",
++                "Entry"
++              ];
++
++              // Collect all metrics from all qualification profiles for bullet chart
++              // Extract numeric reference values from full metrics data (KPIs)
++              const allMetrics = filteredQualificationProfilesData.flatMap(profile =>
++                profile.testsData
++                  .filter((test: any) => {
++                    // Get the full metrics data from cache to extract numeric reference
++                    const fullMetrics = testFullMetrics[test.fullId];
++                    
++                    // Parse the actual value from test data
++                    const valueStr = String(test.value);
++                    if (valueStr === "N/A" || !valueStr) {
++                      return false;
++                    }
++                    
++                    const value = parseFloat(valueStr);
++                    if (isNaN(value) || value <= 0) {
++                      return false;
++                    }
++                    
++                    // Extract numeric reference from KPIs in full metrics
++                    if (!fullMetrics?.kpis) {
++                      return false;
++                    }
++                    
++                    // Check if we can extract a valid numeric reference from KPIs
++                    let hasValidReference = false;
++                    for (const kpiData of Object.values(fullMetrics.kpis)) {
++                      if (kpiData && typeof kpiData === 'object') {
++                        const config = (kpiData as any).config || {};
++                        const validation = config.validation || {};
++                        if (validation.reference !== undefined) {
++                          const ref = parseFloat(String(validation.reference));
++                          if (!isNaN(ref) && ref > 0) {
++                            hasValidReference = true;
++                            break;
++                          }
++                        }
++                      }
++                    }
++                    
++                    return hasValidReference;
++                  })
++                  .map((test: any) => {
++                    // Get the full metrics data from cache
++                    const fullMetrics = testFullMetrics[test.fullId];
++                    
++                    // Parse the actual value
++                    const valueStr = String(test.value);
++                    const value = parseFloat(valueStr);
++                    
++                    // Extract numeric reference from KPIs (first valid one)
++                    let reference = 0;
++                    for (const kpiData of Object.values(fullMetrics.kpis)) {
++                      if (kpiData && typeof kpiData === 'object') {
++                        const config = (kpiData as any).config || {};
++                        const validation = config.validation || {};
++                        if (validation.reference !== undefined) {
++                          const ref = parseFloat(String(validation.reference));
++                          if (!isNaN(ref) && ref > 0) {
++                            reference = ref;
++                            break;
++                          }
++                        }
++                      }
++                    }
++                    
++                    return {
++                      metric: test.metric || test.testName || "Unknown Metric",
++                      value: value,
++                      reference: reference,
++                      unit: test.unit || "",
++                      status: test.status
++                    };
++                  })
++              );
++              
++              return (
++                <div className={styles["qualification-summary-section"]}>
++                  {/* Left side: Bullet Chart (3/4) */}
++                  <div className={styles["bullet-chart-section"]}>
++                    {/* <div className={styles["bullet-chart-title"]}>Metrics Overview</div> */}
++                    <div className={bulletChartStyles.bulletChartWrapper}>
++                      {allMetrics.length > 0 ? (
++                        <BulletChart data={allMetrics} />
++                      ) : (
++                        <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '12px' }}>
++                          No metrics data available for visualization
++                        </div>
++                      )}
++                    </div>
++                  </div>
++
++                  {/* Right side: Vertical Tier Bar (1/4) */}
++                  <div className={styles["tier-bar-section"]}>
++                    {/* <div className={styles["tier-bar-title"]}>System Tier</div> */}
++                    <div className={styles["tier-bar"]}>
++                      {tiers.map((tier) => (
++                        <div 
++                          key={tier}
++                          className={`${styles["tier-item"]} ${tier === sectionTierDisplayName ? styles["active"] : ""}`}
++                        >
++                          <span className={styles["tier-item-name"]}>{tier}</span>
++                        </div>
++                      ))}
++                    </div>
++                  </div>
++                </div>
++              );
++            })()}
 +            
 +            <div className={styles["profiles-container"]}>
 +              {filteredQualificationProfilesData.map((profileData, index) => (
@@ -2664,20 +3146,44 @@ index 000000000..dbadc6cb3
 +                              <div className={styles["test-details"]}>
 +                                {individualTestResults[testId] ? (
 +                                  <div>
++                                    {/* Error Messages for Failed Tests */}
++                                    {test.status === 'failed' && individualTestResults[testId]?.error?.message && (
++                                      <div className={styles["detail-section-error"]}>
++                                        <h4 className={styles["detail-section-title-dark"]}>Error Details</h4>
++                                        <pre className={styles["detail-section-message"]}>
++                                          {individualTestResults[testId].error.message}
++                                        </pre>
++                                      </div>
++                                    )}
++
++                                    {/* Status Details for Skipped and Broken Tests */}
++                                    {(test.status === 'skipped' || test.status === 'broken') && individualTestResults[testId]?.error?.message && (
++                                      <div className={test.status === 'skipped' ? styles["detail-section-skipped"] : styles["detail-section-broken"]}>
++                                        <h4 className={styles["detail-section-title-dark"]}>
++                                          {test.status === 'skipped' ? 'Skip Details' : 'Broken Details'}
++                                        </h4>
++                                        {individualTestResults[testId].error.message && (
++                                          <pre className={styles["detail-section-message"]}>
++                                            {individualTestResults[testId].error.message}
++                                          </pre>
++                                        )}
++                                      </div>
++                                    )}
++
 +                                    {/* Overview Section */}
-+                                    <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: 'white', borderRadius: '4px', border: '1px solid #e0e0e0' }}>
-+                                      <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '600', color: '#333' }}>Overview</h4>
-+                                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', fontSize: '12px' }}>
++                                    <div className={styles["detail-section"]}>
++                                      <h4 className={styles["detail-section-title"]}>Overview</h4>
++                                      <div className={styles["detail-grid-3col"]}>
 +                                        <div>
-+                                          <span style={{ fontWeight: '500', color: '#666' }}>History: </span>
++                                          <span className={styles["detail-label"]}>History: </span>
 +                                          <span>{individualTestResults[testId]?.history?.length || "1"}</span>
 +                                        </div>
 +                                        <div>
-+                                          <span style={{ fontWeight: '500', color: '#666' }}>Retries: </span>
++                                          <span className={styles["detail-label"]}>Retries: </span>
 +                                          <span>{individualTestResults[testId]?.retries?.length || '0'}</span>
 +                                        </div>
 +                                        <div>
-+                                          <span style={{ fontWeight: '500', color: '#666' }}>Duration: </span>
++                                          <span className={styles["detail-label"]}>Duration: </span>
 +                                          <span>{individualTestResults[testId]?.duration 
 +                                            ? `${(individualTestResults[testId].duration / 1000).toFixed(2)}s`
 +                                            : 'N/A'}</span>
@@ -2688,57 +3194,6 @@ index 000000000..dbadc6cb3
 +                                    {/* Metadata Section */}
 +                                    <MetadataTable metricsData={testFullMetrics[testId]} />
 +
-+                                    {/* Error Messages for Failed Tests */}
-+                                    {test.status === 'failed' && individualTestResults[testId]?.error?.message && (
-+                                      <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: '#fff5f5', borderRadius: '4px', border: '1px solid #fed7d7' }}>
-+                                        <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '600', color: '#e53e3e' }}>Error Details</h4>
-+                                        <pre style={{ margin: 0, fontSize: '11px', fontFamily: 'monospace', whiteSpace: 'pre-wrap', color: '#2d3748' }}>
-+                                          {individualTestResults[testId].error.message}
-+                                        </pre>
-+                                        {individualTestResults[testId].error?.trace && (
-+                                          <details style={{ marginTop: '8px' }}>
-+                                            <summary style={{ cursor: 'pointer', fontSize: '12px', fontWeight: '500', color: '#666' }}>Stack Trace</summary>
-+                                            <pre style={{ margin: '8px 0 0 0', fontSize: '10px', fontFamily: 'monospace', whiteSpace: 'pre-wrap', color: '#4a5568' }}>
-+                                              {individualTestResults[testId].error.trace}
-+                                            </pre>
-+                                          </details>
-+                                        )}
-+                                      </div>
-+                                    )}
-+
-+                                    {/* Status Details for Skipped and Broken Tests */}
-+                                    {(test.status === 'skipped' || test.status === 'broken') && individualTestResults[testId]?.error?.message && (
-+                                      <div style={{ 
-+                                        marginBottom: '16px', 
-+                                        padding: '12px', 
-+                                        backgroundColor: test.status === 'skipped' ? '#f7fafc' : '#fffaf0', 
-+                                        borderRadius: '4px', 
-+                                        border: `1px solid ${test.status === 'skipped' ? '#cbd5e0' : '#fdcc6bff'}` 
-+                                      }}>
-+                                        <h4 style={{ 
-+                                          margin: '0 0 8px 0', 
-+                                          fontSize: '14px', 
-+                                          fontWeight: '600', 
-+                                          color: test.status === 'skipped' ? '#4a5568' : '#d69e2e' 
-+                                        }}>
-+                                          {test.status === 'skipped' ? 'Skip Details' : 'Broken Details'}
-+                                        </h4>
-+                                        {individualTestResults[testId].error.message && (
-+                                          <pre style={{ margin: 0, fontSize: '11px', fontFamily: 'monospace', whiteSpace: 'pre-wrap', color: '#2d3748' }}>
-+                                            {individualTestResults[testId].error.message}
-+                                          </pre>
-+                                        )}
-+                                        {individualTestResults[testId].error?.trace && (
-+                                          <details style={{ marginTop: '8px' }}>
-+                                            <summary style={{ cursor: 'pointer', fontSize: '12px', fontWeight: '500', color: '#666' }}>Stack Trace</summary>
-+                                            <pre style={{ margin: '8px 0 0 0', fontSize: '10px', fontFamily: 'monospace', whiteSpace: 'pre-wrap', color: '#4a5568' }}>
-+                                              {individualTestResults[testId].error.trace}
-+                                            </pre>
-+                                          </details>
-+                                        )}
-+                                      </div>
-+                                    )}
-+
 +                                    {/* Attachments Section */}
 +                                    {(() => {
 +                                      const testData = individualTestResults[testId];
@@ -2746,50 +3201,53 @@ index 000000000..dbadc6cb3
 +                                        attachment.link?.contentType === "image/png" || 
 +                                        attachment.link?.contentType === "image/jpeg"
 +                                      ) || [];
++                                      const csvAttachments = testData?.attachments?.filter((attachment: any) => 
++                                        attachment.link?.contentType === "text/csv"
++                                      ) || [];
 +                                      
-+                                      return imageAttachments.length > 0 ? (
-+                                        <div style={{ padding: '12px', backgroundColor: 'white', borderRadius: '4px', border: '1px solid #e0e0e0' }}>
-+                                          <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: '600', color: '#333' }}>Attachments</h4>
-+                                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))', gap: '12px' }}>
-+                                            {imageAttachments.map((attachment: any, index: number) => {
-+                                              return (
-+                                                <div key={index} style={{ 
-+                                                  border: '1px solid #e0e0e0', 
-+                                                  borderRadius: '4px',
-+                                                  overflow: 'hidden',
-+                                                  backgroundColor: '#f8f9fa',
-+                                                  display: 'flex',
-+                                                  flexDirection: 'column',
-+                                                  height: '400px'
++                                      const hasAttachments = imageAttachments.length > 0 || csvAttachments.length > 0;
++                                      
++                                      return hasAttachments ? (
++                                        <div className={styles["attachment-section"]}>
++                                          {/* Image Attachments */}
++                                          {imageAttachments.length > 0 && (
++                                            <div className={styles["attachment-container"]} style={{ marginBottom: csvAttachments.length > 0 ? '12px' : '0' }}>
++                                              <h4 className={styles["detail-section-title"]}>Image Attachments</h4>
++                                              <div className={styles["attachment-image-grid"]}>
++                                                {imageAttachments.map((attachment: any, index: number) => {
++                                                  return (
++                                                    <div key={index} className={styles["attachment-image-item"]}>
++                                                      <div className={styles["attachment-image-wrapper"]}>
++                                                        <AttachmentImage 
++                                                          attachment={attachment}
++                                                          onError={() => console.warn('Failed to load attachment:', attachment.link?.id)}
++                                                        />
++                                                      </div>
++                                                      <div className={styles["attachment-image-name"]}>
++                                                        {attachment.name || attachment.link?.name || `Attachment ${index + 1}`}
++                                                      </div>
++                                                    </div>
++                                                  );
++                                                })}
++                                              </div>
++                                            </div>
++                                          )}
++                                          
++                                          {/* CSV Attachments - Full Width */}
++                                          {csvAttachments.length > 0 && (
++                                            <div className={styles["csv-attachments"]}>
++                                              {csvAttachments.map((attachment: any, index: number) => (
++                                                <div key={index} className={styles["attachment-container"]} style={{ 
++                                                  marginBottom: index < csvAttachments.length - 1 ? '12px' : '0'
 +                                                }}>
-+                                                  <div style={{ 
-+                                                    flex: '1',
-+                                                    display: 'flex',
-+                                                    alignItems: 'center',
-+                                                    justifyContent: 'center',
-+                                                    padding: '8px',
-+                                                    backgroundColor: 'white'
-+                                                  }}>
-+                                                    <AttachmentImage 
-+                                                      attachment={attachment}
-+                                                      onError={() => console.warn('Failed to load attachment:', attachment.link?.id)}
-+                                                    />
-+                                                  </div>
-+                                                  <div style={{ 
-+                                                    padding: '8px', 
-+                                                    fontSize: '11px', 
-+                                                    color: '#666', 
-+                                                    wordBreak: 'break-word',
-+                                                    backgroundColor: '#f8f9fa',
-+                                                    borderTop: '1px solid #e0e0e0',
-+                                                    textAlign: 'center'
-+                                                  }}>
-+                                                    {attachment.name || attachment.link?.name || `Attachment ${index + 1}`}
-+                                                  </div>
++                                                  <AttachmentCSV 
++                                                    attachment={attachment}
++                                                    onError={() => console.warn('Failed to load CSV attachment:', attachment.link?.id)}
++                                                  />
 +                                                </div>
-+                                              );
-+                                            })}
-+                                          </div>
++                                              ))}
++                                            </div>
++                                          )}
 +                                        </div>
 +                                      ) : null;
 +                                    })()}
@@ -2940,20 +3398,44 @@ index 000000000..dbadc6cb3
 +                              <div className={styles["test-details"]}>
 +                                {individualTestResults[testId] ? (
 +                                  <div>
++                                    {/* Error Messages for Failed Tests */}
++                                    {test.status === 'failed' && individualTestResults[testId]?.error?.message && (
++                                      <div className={styles["detail-section-error"]}>
++                                        <h4 className={styles["detail-section-title-dark"]}>Error Details</h4>
++                                        <pre className={styles["detail-section-message"]}>
++                                          {individualTestResults[testId].error.message}
++                                        </pre>
++                                      </div>
++                                    )}
++
++                                    {/* Status Details for Skipped and Broken Tests */}
++                                    {(test.status === 'skipped' || test.status === 'broken') && individualTestResults[testId]?.error?.message && (
++                                      <div className={test.status === 'skipped' ? styles["detail-section-skipped"] : styles["detail-section-broken"]}>
++                                        <h4 className={styles["detail-section-title-dark"]}>
++                                          {test.status === 'skipped' ? 'Skip Details' : 'Broken Details'}
++                                        </h4>
++                                        {individualTestResults[testId].error.message && (
++                                          <pre className={styles["detail-section-message"]}>
++                                            {individualTestResults[testId].error.message}
++                                          </pre>
++                                        )}
++                                      </div>
++                                    )}
++
 +                                    {/* Overview Section */}
-+                                    <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: 'white', borderRadius: '4px', border: '1px solid #e0e0e0' }}>
-+                                      <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '600', color: '#333' }}>Overview</h4>
-+                                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', fontSize: '12px' }}>
++                                    <div className={styles["detail-section"]}>
++                                      <h4 className={styles["detail-section-title"]}>Overview</h4>
++                                      <div className={styles["detail-grid-3col"]}>
 +                                        <div>
-+                                          <span style={{ fontWeight: '500', color: '#666' }}>History: </span>
++                                          <span className={styles["detail-label"]}>History: </span>
 +                                          <span>{individualTestResults[testId]?.history?.length || "1"}</span>
 +                                        </div>
 +                                        <div>
-+                                          <span style={{ fontWeight: '500', color: '#666' }}>Retries: </span>
++                                          <span className={styles["detail-label"]}>Retries: </span>
 +                                          <span>{individualTestResults[testId]?.retries?.length || '0'}</span>
 +                                        </div>
 +                                        <div>
-+                                          <span style={{ fontWeight: '500', color: '#666' }}>Duration: </span>
++                                          <span className={styles["detail-label"]}>Duration: </span>
 +                                          <span>{individualTestResults[testId]?.duration 
 +                                            ? `${(individualTestResults[testId].duration / 1000).toFixed(2)}s`
 +                                            : 'N/A'}</span>
@@ -2964,57 +3446,6 @@ index 000000000..dbadc6cb3
 +                                    {/* Metadata Section */}
 +                                    <MetadataTable metricsData={testFullMetrics[testId]} />
 +
-+                                    {/* Error Messages for Failed Tests */}
-+                                    {test.status === 'failed' && individualTestResults[testId]?.error?.message && (
-+                                      <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: '#fff5f5', borderRadius: '4px', border: '1px solid #fed7d7' }}>
-+                                        <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '600', color: '#e53e3e' }}>Error Details</h4>
-+                                        <pre style={{ margin: 0, fontSize: '11px', fontFamily: 'monospace', whiteSpace: 'pre-wrap', color: '#2d3748' }}>
-+                                          {individualTestResults[testId].error.message}
-+                                        </pre>
-+                                        {individualTestResults[testId].error?.trace && (
-+                                          <details style={{ marginTop: '8px' }}>
-+                                            <summary style={{ cursor: 'pointer', fontSize: '12px', fontWeight: '500', color: '#666' }}>Stack Trace</summary>
-+                                            <pre style={{ margin: '8px 0 0 0', fontSize: '10px', fontFamily: 'monospace', whiteSpace: 'pre-wrap', color: '#4a5568' }}>
-+                                              {individualTestResults[testId].error.trace}
-+                                            </pre>
-+                                          </details>
-+                                        )}
-+                                      </div>
-+                                    )}
-+
-+                                    {/* Status Details for Skipped and Broken Tests */}
-+                                    {(test.status === 'skipped' || test.status === 'broken') && individualTestResults[testId]?.error?.message && (
-+                                      <div style={{ 
-+                                        marginBottom: '16px', 
-+                                        padding: '12px', 
-+                                        backgroundColor: test.status === 'skipped' ? '#f7fafc' : '#fffaf0', 
-+                                        borderRadius: '4px', 
-+                                        border: `1px solid ${test.status === 'skipped' ? '#cbd5e0' : '#fdcc6bff'}` 
-+                                      }}>
-+                                        <h4 style={{ 
-+                                          margin: '0 0 8px 0', 
-+                                          fontSize: '14px', 
-+                                          fontWeight: '600', 
-+                                          color: test.status === 'skipped' ? '#4a5568' : '#d69e2e' 
-+                                        }}>
-+                                          {test.status === 'skipped' ? 'Skip Details' : 'Broken Details'}
-+                                        </h4>
-+                                        {individualTestResults[testId].error.message && (
-+                                          <pre style={{ margin: 0, fontSize: '11px', fontFamily: 'monospace', whiteSpace: 'pre-wrap', color: '#2d3748' }}>
-+                                            {individualTestResults[testId].error.message}
-+                                          </pre>
-+                                        )}
-+                                        {individualTestResults[testId].error?.trace && (
-+                                          <details style={{ marginTop: '8px' }}>
-+                                            <summary style={{ cursor: 'pointer', fontSize: '12px', fontWeight: '500', color: '#666' }}>Stack Trace</summary>
-+                                            <pre style={{ margin: '8px 0 0 0', fontSize: '10px', fontFamily: 'monospace', whiteSpace: 'pre-wrap', color: '#4a5568' }}>
-+                                              {individualTestResults[testId].error.trace}
-+                                            </pre>
-+                                          </details>
-+                                        )}
-+                                      </div>
-+                                    )}
-+
 +                                    {/* Attachments Section */}
 +                                    {(() => {
 +                                      const testData = individualTestResults[testId];
@@ -3022,50 +3453,53 @@ index 000000000..dbadc6cb3
 +                                        attachment.link?.contentType === "image/png" || 
 +                                        attachment.link?.contentType === "image/jpeg"
 +                                      ) || [];
++                                      const csvAttachments = testData?.attachments?.filter((attachment: any) => 
++                                        attachment.link?.contentType === "text/csv"
++                                      ) || [];
 +                                      
-+                                      return imageAttachments.length > 0 ? (
-+                                        <div style={{ padding: '12px', backgroundColor: 'white', borderRadius: '4px', border: '1px solid #e0e0e0' }}>
-+                                          <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: '600', color: '#333' }}>Attachments</h4>
-+                                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))', gap: '12px' }}>
-+                                            {imageAttachments.map((attachment: any, index: number) => {
-+                                              return (
-+                                                <div key={index} style={{ 
-+                                                  border: '1px solid #e0e0e0', 
-+                                                  borderRadius: '4px',
-+                                                  overflow: 'hidden',
-+                                                  backgroundColor: '#f8f9fa',
-+                                                  display: 'flex',
-+                                                  flexDirection: 'column',
-+                                                  height: '400px'
++                                      const hasAttachments = imageAttachments.length > 0 || csvAttachments.length > 0;
++                                      
++                                      return hasAttachments ? (
++                                        <div className={styles["attachment-section"]}>
++                                          {/* Image Attachments */}
++                                          {imageAttachments.length > 0 && (
++                                            <div className={styles["attachment-container"]} style={{ marginBottom: csvAttachments.length > 0 ? '12px' : '0' }}>
++                                              <h4 className={styles["detail-section-title"]}>Image Attachments</h4>
++                                              <div className={styles["attachment-image-grid"]}>
++                                                {imageAttachments.map((attachment: any, index: number) => {
++                                                  return (
++                                                    <div key={index} className={styles["attachment-image-item"]}>
++                                                      <div className={styles["attachment-image-wrapper"]}>
++                                                        <AttachmentImage 
++                                                          attachment={attachment}
++                                                          onError={() => console.warn('Failed to load attachment:', attachment.link?.id)}
++                                                        />
++                                                      </div>
++                                                      <div className={styles["attachment-image-name"]}>
++                                                        {attachment.name || attachment.link?.name || `Attachment ${index + 1}`}
++                                                      </div>
++                                                    </div>
++                                                  );
++                                                })}
++                                              </div>
++                                            </div>
++                                          )}
++                                          
++                                          {/* CSV Attachments - Full Width */}
++                                          {csvAttachments.length > 0 && (
++                                            <div className={styles["csv-attachments"]}>
++                                              {csvAttachments.map((attachment: any, index: number) => (
++                                                <div key={index} className={styles["attachment-container"]} style={{ 
++                                                  marginBottom: index < csvAttachments.length - 1 ? '12px' : '0'
 +                                                }}>
-+                                                  <div style={{ 
-+                                                    flex: '1',
-+                                                    display: 'flex',
-+                                                    alignItems: 'center',
-+                                                    justifyContent: 'center',
-+                                                    padding: '8px',
-+                                                    backgroundColor: 'white'
-+                                                  }}>
-+                                                    <AttachmentImage 
-+                                                      attachment={attachment}
-+                                                      onError={() => console.warn('Failed to load attachment:', attachment.link?.id)}
-+                                                    />
-+                                                  </div>
-+                                                  <div style={{ 
-+                                                    padding: '8px', 
-+                                                    fontSize: '11px', 
-+                                                    color: '#666', 
-+                                                    wordBreak: 'break-word',
-+                                                    backgroundColor: '#f8f9fa',
-+                                                    borderTop: '1px solid #e0e0e0',
-+                                                    textAlign: 'center'
-+                                                  }}>
-+                                                    {attachment.name || attachment.link?.name || `Attachment ${index + 1}`}
-+                                                  </div>
++                                                  <AttachmentCSV 
++                                                    attachment={attachment}
++                                                    onError={() => console.warn('Failed to load CSV attachment:', attachment.link?.id)}
++                                                  />
 +                                                </div>
-+                                              );
-+                                            })}
-+                                          </div>
++                                              ))}
++                                            </div>
++                                          )}
 +                                        </div>
 +                                      ) : null;
 +                                    })()}
@@ -3253,20 +3687,44 @@ index 000000000..dbadc6cb3
 +                              <div className={styles["test-details"]}>
 +                                {individualTestResults[testId] ? (
 +                                  <div>
++                                    {/* Error Messages for Failed Tests */}
++                                    {test.status === 'failed' && individualTestResults[testId]?.error?.message && (
++                                      <div className={styles["detail-section-error"]}>
++                                        <h4 className={styles["detail-section-title-dark"]}>Error Details</h4>
++                                        <pre className={styles["detail-section-message"]}>
++                                          {individualTestResults[testId].error.message}
++                                        </pre>
++                                      </div>
++                                    )}
++
++                                    {/* Status Details for Skipped and Broken Tests */}
++                                    {(test.status === 'skipped' || test.status === 'broken') && individualTestResults[testId]?.error?.message && (
++                                      <div className={test.status === 'skipped' ? styles["detail-section-skipped"] : styles["detail-section-broken"]}>
++                                        <h4 className={styles["detail-section-title-dark"]}>
++                                          {test.status === 'skipped' ? 'Skip Details' : 'Broken Details'}
++                                        </h4>
++                                        {individualTestResults[testId].error.message && (
++                                          <pre className={styles["detail-section-message"]}>
++                                            {individualTestResults[testId].error.message}
++                                          </pre>
++                                        )}
++                                      </div>
++                                    )}
++
 +                                    {/* Overview Section */}
-+                                    <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: 'white', borderRadius: '4px', border: '1px solid #e0e0e0' }}>
-+                                      <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '600', color: '#333' }}>Overview</h4>
-+                                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', fontSize: '12px' }}>
++                                    <div className={styles["detail-section"]}>
++                                      <h4 className={styles["detail-section-title"]}>Overview</h4>
++                                      <div className={styles["detail-grid-3col"]}>
 +                                        <div>
-+                                          <span style={{ fontWeight: '500', color: '#666' }}>History: </span>
++                                          <span className={styles["detail-label"]}>History: </span>
 +                                          <span>{individualTestResults[testId]?.history?.length || "1"}</span>
 +                                        </div>
 +                                        <div>
-+                                          <span style={{ fontWeight: '500', color: '#666' }}>Retries: </span>
++                                          <span className={styles["detail-label"]}>Retries: </span>
 +                                          <span>{individualTestResults[testId]?.retries?.length || '0'}</span>
 +                                        </div>
 +                                        <div>
-+                                          <span style={{ fontWeight: '500', color: '#666' }}>Duration: </span>
++                                          <span className={styles["detail-label"]}>Duration: </span>
 +                                          <span>{individualTestResults[testId]?.duration 
 +                                            ? `${(individualTestResults[testId].duration / 1000).toFixed(2)}s`
 +                                            : 'N/A'}</span>
@@ -3277,57 +3735,6 @@ index 000000000..dbadc6cb3
 +                                    {/* Metadata Section */}
 +                                    <MetadataTable metricsData={testFullMetrics[testId]} />
 +
-+                                    {/* Error Messages for Failed Tests */}
-+                                    {test.status === 'failed' && individualTestResults[testId]?.error?.message && (
-+                                      <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: '#fff5f5', borderRadius: '4px', border: '1px solid #fed7d7' }}>
-+                                        <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '600', color: '#e53e3e' }}>Error Details</h4>
-+                                        <pre style={{ margin: 0, fontSize: '11px', fontFamily: 'monospace', whiteSpace: 'pre-wrap', color: '#2d3748' }}>
-+                                          {individualTestResults[testId].error.message}
-+                                        </pre>
-+                                        {individualTestResults[testId].error?.trace && (
-+                                          <details style={{ marginTop: '8px' }}>
-+                                            <summary style={{ cursor: 'pointer', fontSize: '12px', fontWeight: '500', color: '#666' }}>Stack Trace</summary>
-+                                            <pre style={{ margin: '8px 0 0 0', fontSize: '10px', fontFamily: 'monospace', whiteSpace: 'pre-wrap', color: '#4a5568' }}>
-+                                              {individualTestResults[testId].error.trace}
-+                                            </pre>
-+                                          </details>
-+                                        )}
-+                                      </div>
-+                                    )}
-+
-+                                    {/* Status Details for Skipped and Broken Tests */}
-+                                    {(test.status === 'skipped' || test.status === 'broken') && individualTestResults[testId]?.error?.message && (
-+                                      <div style={{ 
-+                                        marginBottom: '16px', 
-+                                        padding: '12px', 
-+                                        backgroundColor: test.status === 'skipped' ? '#f7fafc' : '#fffaf0', 
-+                                        borderRadius: '4px', 
-+                                        border: `1px solid ${test.status === 'skipped' ? '#cbd5e0' : '#fdcc6bff'}` 
-+                                      }}>
-+                                        <h4 style={{ 
-+                                          margin: '0 0 8px 0', 
-+                                          fontSize: '14px', 
-+                                          fontWeight: '600', 
-+                                          color: test.status === 'skipped' ? '#4a5568' : '#d69e2e' 
-+                                        }}>
-+                                          {test.status === 'skipped' ? 'Skip Details' : 'Broken Details'}
-+                                        </h4>
-+                                        {individualTestResults[testId].error.message && (
-+                                          <pre style={{ margin: 0, fontSize: '11px', fontFamily: 'monospace', whiteSpace: 'pre-wrap', color: '#2d3748' }}>
-+                                            {individualTestResults[testId].error.message}
-+                                          </pre>
-+                                        )}
-+                                        {individualTestResults[testId].error?.trace && (
-+                                          <details style={{ marginTop: '8px' }}>
-+                                            <summary style={{ cursor: 'pointer', fontSize: '12px', fontWeight: '500', color: '#666' }}>Stack Trace</summary>
-+                                            <pre style={{ margin: '8px 0 0 0', fontSize: '10px', fontFamily: 'monospace', whiteSpace: 'pre-wrap', color: '#4a5568' }}>
-+                                              {individualTestResults[testId].error.trace}
-+                                            </pre>
-+                                          </details>
-+                                        )}
-+                                      </div>
-+                                    )}
-+
 +                                    {/* Attachments Section */}
 +                                    {(() => {
 +                                      const testData = individualTestResults[testId];
@@ -3335,50 +3742,53 @@ index 000000000..dbadc6cb3
 +                                        attachment.link?.contentType === "image/png" || 
 +                                        attachment.link?.contentType === "image/jpeg"
 +                                      ) || [];
++                                      const csvAttachments = testData?.attachments?.filter((attachment: any) => 
++                                        attachment.link?.contentType === "text/csv"
++                                      ) || [];
 +                                      
-+                                      return imageAttachments.length > 0 ? (
-+                                        <div style={{ padding: '12px', backgroundColor: 'white', borderRadius: '4px', border: '1px solid #e0e0e0' }}>
-+                                          <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: '600', color: '#333' }}>Attachments</h4>
-+                                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))', gap: '12px' }}>
-+                                            {imageAttachments.map((attachment: any, index: number) => {
-+                                              return (
-+                                                <div key={index} style={{ 
-+                                                  border: '1px solid #e0e0e0', 
-+                                                  borderRadius: '4px',
-+                                                  overflow: 'hidden',
-+                                                  backgroundColor: '#f8f9fa',
-+                                                  display: 'flex',
-+                                                  flexDirection: 'column',
-+                                                  height: '400px'
++                                      const hasAttachments = imageAttachments.length > 0 || csvAttachments.length > 0;
++                                      
++                                      return hasAttachments ? (
++                                        <div className={styles["attachment-section"]}>
++                                          {/* Image Attachments */}
++                                          {imageAttachments.length > 0 && (
++                                            <div className={styles["attachment-container"]} style={{ marginBottom: csvAttachments.length > 0 ? '12px' : '0' }}>
++                                              <h4 className={styles["detail-section-title"]}>Image Attachments</h4>
++                                              <div className={styles["attachment-image-grid"]}>
++                                                {imageAttachments.map((attachment: any, index: number) => {
++                                                  return (
++                                                    <div key={index} className={styles["attachment-image-item"]}>
++                                                      <div className={styles["attachment-image-wrapper"]}>
++                                                        <AttachmentImage 
++                                                          attachment={attachment}
++                                                          onError={() => console.warn('Failed to load attachment:', attachment.link?.id)}
++                                                        />
++                                                      </div>
++                                                      <div className={styles["attachment-image-name"]}>
++                                                        {attachment.name || attachment.link?.name || `Attachment ${index + 1}`}
++                                                      </div>
++                                                    </div>
++                                                  );
++                                                })}
++                                              </div>
++                                            </div>
++                                          )}
++                                          
++                                          {/* CSV Attachments - Full Width */}
++                                          {csvAttachments.length > 0 && (
++                                            <div className={styles["csv-attachments"]}>
++                                              {csvAttachments.map((attachment: any, index: number) => (
++                                                <div key={index} className={styles["attachment-container"]} style={{ 
++                                                  marginBottom: index < csvAttachments.length - 1 ? '12px' : '0'
 +                                                }}>
-+                                                  <div style={{ 
-+                                                    flex: '1',
-+                                                    display: 'flex',
-+                                                    alignItems: 'center',
-+                                                    justifyContent: 'center',
-+                                                    padding: '8px',
-+                                                    backgroundColor: 'white'
-+                                                  }}>
-+                                                    <AttachmentImage 
-+                                                      attachment={attachment}
-+                                                      onError={() => console.warn('Failed to load attachment:', attachment.link?.id)}
-+                                                    />
-+                                                  </div>
-+                                                  <div style={{ 
-+                                                    padding: '8px', 
-+                                                    fontSize: '11px', 
-+                                                    color: '#666', 
-+                                                    wordBreak: 'break-word',
-+                                                    backgroundColor: '#f8f9fa',
-+                                                    borderTop: '1px solid #e0e0e0',
-+                                                    textAlign: 'center'
-+                                                  }}>
-+                                                    {attachment.name || attachment.link?.name || `Attachment ${index + 1}`}
-+                                                  </div>
++                                                  <AttachmentCSV 
++                                                    attachment={attachment}
++                                                    onError={() => console.warn('Failed to load CSV attachment:', attachment.link?.id)}
++                                                  />
 +                                                </div>
-+                                              );
-+                                            })}
-+                                          </div>
++                                              ))}
++                                            </div>
++                                          )}
 +                                        </div>
 +                                      ) : null;
 +                                    })()}
@@ -3412,10 +3822,10 @@ index 000000000..dbadc6cb3
 +};
 diff --git a/packages/web-awesome/src/components/Summary/styles.scss b/packages/web-awesome/src/components/Summary/styles.scss
 new file mode 100644
-index 000000000..7f6fa5b3c
+index 000000000..05441a53a
 --- /dev/null
 +++ b/packages/web-awesome/src/components/Summary/styles.scss
-@@ -0,0 +1,873 @@
+@@ -0,0 +1,1617 @@
 +// Overview container with larger horizontal padding
 +.overview {
 +  padding: 0 80px;
@@ -3495,6 +3905,52 @@ index 000000000..7f6fa5b3c
 +
 +.custom-table tr:hover td {
 +  background: var(--bg-base-secondary);
++}
++
++// CSV table specific styling - matches metadata table style
++.csv-table {
++  width: 100%;
++  border-collapse: collapse;
++  margin-bottom: 0;
++  font-size: 12px;
++  background: var(--bg-base-primary);
++  border: 1px solid var(--bg-base-neutral);
++  table-layout: fixed; // Fixed layout to enforce equal column distribution and wrapping
++}
++
++.csv-table th {
++  background-color: #1976d2; // Material Blue 700
++  color: white;
++  text-align: left;
++  font-weight: 500;
++  padding: 8px 12px;
++  border: 1px solid var(--bg-base-neutral);
++  white-space: normal; // Allow header text wrapping to fit window
++  word-wrap: break-word; // Break long header names if necessary
++  vertical-align: top;
++}
++
++.csv-table td {
++  padding: 8px 12px;
++  border: 1px solid var(--bg-base-neutral);
++  // background: var(--bg-base-primary);
++  background-color: var(--bg-base-primary) !important;
++  color: var(--text-primary);
++  white-space: normal; // Allow text wrapping to fit window width
++  word-wrap: break-word; // Break long words if necessary
++  font-family: monospace; // Use monospace for data consistency
++  font-size: 11px;
++  vertical-align: top;
++  max-width: 300px; // Set reasonable max width to encourage wrapping
++}
++
++// No hover effect for CSV tables - explicitly prevent background color change
++.csv-table tr:hover td {
++  background: var(--bg-base-secondary) !important; // Keep original background, no hover effect
++}
++
++.csv-table tbody tr:hover td {
++  background: var(--bg-base-secondary) !important; // Keep original background, no hover effect
 +}
 +
 +// Status badge styling with soft dark material colors
@@ -3617,6 +4073,95 @@ index 000000000..7f6fa5b3c
 +  box-sizing: border-box;
 +  min-width: auto;
 +  text-align: center;
++}
++
++// Tier bar visualization
++.tier-bar-container {
++  margin-bottom: 20px;
++  border-radius: 6px;
++  border: 1px solid var(--on-border-secondary);
++}
++
++.tier-bar-title {
++  margin: 0 0 12px 0;
++  font-size: 13px;
++  font-weight: 600;
++  color: var(--text-primary);
++}
++
++.tier-bar {
++  display: flex;
++  flex-direction: column;
++  gap: 0;
++  background-color: var(--bg-base-secondary);
++  border-radius: 4px;
++  overflow: hidden;
++  border: 1px solid var(--bg-base-neutral);
++}
++
++.tier-item {
++  flex: 1;
++  padding: 8px 10px;
++  text-align: left;
++  font-size: 11px;
++  font-weight: 500;
++  color: var(--text-secondary);
++  opacity: 0.5;
++  // background-color: var(--bg-base-primary);
++  background-color: var(--bg-base-secondary);
++  border-bottom: 1px solid var(--bg-base-neutral);
++  transition: all 0.2s ease;
++  position: relative;
++  
++  &:last-child {
++    border-bottom: none;
++  }
++  
++  &.active {
++    // background-color: #1976d2;
++    background-color: var(--bg-base-primary);
++    // color: white;
++    color: var(--text-primary);
++    opacity: 1;
++    font-weight: 600;
++  }
++}
++
++.tier-item-name {
++  display: block;
++  line-height: 1.3;
++  word-wrap: break-word;
++}
++
++// Qualification summary section - 3/4 bullet chart + 1/4 tier bar
++.qualification-summary-section {
++  margin-bottom: 20px;
++  // padding: 16px;
++  background-color: var(--bg-base-primary);
++  // background-color: #ffffff;
++  border-radius: 0px;
++  // border: 1px solid var(--on-border-secondary);
++  border: none;
++  display: grid;
++  grid-template-columns: 3fr 1fr;
++  gap: 20px;
++  align-items: start;
++}
++
++.bullet-chart-section {
++  flex: 2;
++  min-width: 0;
++}
++
++.bullet-chart-title {
++  margin: 0 0 12px 0;
++  font-size: 13px;
++  font-weight: 600;
++  color: var(--text-primary);
++}
++
++.tier-bar-section {
++  flex: 0 0 25%;
 +}
 +
 +// System Information table specific styling
@@ -3751,6 +4296,71 @@ index 000000000..7f6fa5b3c
 +  }
 +}
 +
++// Download button styling (for image and CSV attachments)
++.download-button {
++  background-color: var(--bg-base-modal);
++  color: var(--text-primary);
++  border: 1px solid var(--bg-base-neutral);
++  padding: 0 12px;
++  border-radius: 4px;
++  font-size: 11px;
++  font-weight: 500;
++  cursor: pointer;
++  transition: background-color 0.2s;
++  height: 28px;
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  box-sizing: border-box;
++  white-space: nowrap;
++  
++  &:hover {
++    background-color: var(--bg-base-secondary);
++  }
++}
++
++// Image download button (positioned over image)
++.image-download-button {
++  position: absolute;
++  top: 8px;
++  right: 8px;
++  z-index: 10;
++  background-color: var(--bg-base-modal);
++  color: var(--text-primary);
++  border: 1px solid var(--bg-base-neutral);
++  padding: 0 12px;
++  border-radius: 4px;
++  font-size: 11px;
++  font-weight: 500;
++  cursor: pointer;
++  transition: background-color 0.2s;
++  height: 28px;
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  box-sizing: border-box;
++  white-space: nowrap;
++  
++  &:hover {
++    background-color: var(--bg-base-secondary);
++  }
++}
++
++// CSV title container (title + download button)
++.csv-title-container {
++  display: flex;
++  justify-content: space-between;
++  align-items: center;
++  margin-bottom: 12px;
++}
++
++.csv-title {
++  margin: 0;
++  color: var(--text-primary);
++  font-size: 14px;
++  font-weight: 600;
++}
++
 +.profiles-container {
 +  display: flex;
 +  flex-direction: column;
@@ -3760,7 +4370,8 @@ index 000000000..7f6fa5b3c
 +.profile-section {
 +  border: 1px solid var(--on-border-secondary);
 +  border-radius: 6px;
-+  overflow: hidden;
++  overflow-x: auto; // Allow horizontal scrolling for wide content
++  overflow-y: visible;
 +  background: var(--bg-base-primary);
 +  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 +}
@@ -3790,11 +4401,12 @@ index 000000000..7f6fa5b3c
 +// Profile Header - expand/collapse button styling
 +.toggle-button {
 +  background-color: var(--bg-base-modal);
-+  border: none;
++  // border: none;
++  border: 1px solid var(--bg-base-neutral);
 +  color: var(--text-primary);
 +  font-size: 18px;
 +  font-weight: normal;
-+  width: 32px;
++  width: 34px;
 +  height: 32px;
 +  display: flex;
 +  align-items: center;
@@ -3834,6 +4446,30 @@ index 000000000..7f6fa5b3c
 +    border-radius: 0;
 +    box-shadow: none;
 +    border: none;
++  }
++}
++
++// toggle button - expand/collapse button styling
++.toggle-button-small {
++  background-color: var(--bg-base-modal);
++  // background-color: var(--bg-base-primary);
++  border: 1px solid var(--bg-base-neutral);
++  // border: none;
++  color: var(--text-primary);
++  font-size: 12px;
++  font-weight: normal;
++  width: 22px;
++  height: 22px;
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  cursor: pointer;
++  margin-right: 12px;
++  border-radius: 4px;
++  transition: background-color 0.2s;
++  
++  &:hover {
++    background-color: var(--bg-base-secondary);
 +  }
 +}
 +
@@ -3956,11 +4592,6 @@ index 000000000..7f6fa5b3c
 +
 +.data-row {
 +  border-bottom: 1px solid #e0e0e0;
-+  transition: background-color 0.2s ease;
-+
-+  &:hover {
-+    background-color: #f8f9fa;
-+  }
 +}
 +
 +.data-cell {
@@ -4016,9 +4647,309 @@ index 000000000..7f6fa5b3c
 +
 +.test-details {
 +  padding: 16px 20px;
-+  background-color: #f8f9fa;
++  // background-color: #f8f9fa;
++  // background-color: var(--bg-base-secondary);
++  background-color: var(--bg-base-primary);
 +  border-left: 3px solid #1976d2;
 +  margin: 0;
++}
++
++// Test detail sections styling
++.detail-section {
++  margin-bottom: 16px;
++  padding: 12px;
++  // background-color: var(--bg-base-primary);
++  background-color: var(--bg-base-secondary);
++  border-radius: 4px;
++  border: 1px solid var(--on-border-secondary);
++}
++
++.detail-section-title {
++  margin: 0 0 8px 0;
++  font-size: 14px;
++  font-weight: 600;
++  color: var(--text-primary);
++}
++
++.detail-section-title-dark {
++  margin: 0 0 8px 0;
++  font-size: 14px;
++  font-weight: 600;
++  color: #2d3748;
++}
++
++.detail-section-error {
++  margin-bottom: 16px;
++  padding: 12px;
++  background-color: #fff5f5;
++  border-radius: 4px;
++  border: 1px solid #fed7d7;
++  
++  .dark & {
++    background-color: rgba(254, 215, 215, 0.1);
++    border-color: rgba(254, 215, 215, 0.3);
++  }
++}
++
++.detail-section-error-title {
++  margin: 0 0 8px 0;
++  font-size: 14px;
++  font-weight: 600;
++  color: #e53e3e;
++}
++
++.detail-section-error-message {
++  margin: 0;
++  font-size: 11px;
++  font-family: monospace;
++  white-space: pre-wrap;
++  color: #2d3748;
++  
++  .dark & {
++    color: var(--text-primary);
++  }
++}
++
++.detail-section-status {
++  margin-bottom: 16px;
++  padding: 12px;
++  border-radius: 4px;
++  
++  &.status-skipped {
++    background-color: #f7fafc;
++    border: 1px solid #cbd5e0;
++    
++    .dark & {
++      background-color: rgba(203, 213, 224, 0.1);
++      border-color: rgba(203, 213, 224, 0.3);
++    }
++  }
++  
++  &.status-broken {
++    background-color: #fffaf0;
++    border: 1px solid #fdcc6b;
++    
++    .dark & {
++      background-color: rgba(253, 204, 107, 0.1);
++      border-color: rgba(253, 204, 107, 0.3);
++    }
++  }
++}
++
++.detail-section-status-title {
++  margin: 0 0 8px 0;
++  font-size: 14px;
++  font-weight: 600;
++  
++  &.status-skipped {
++    color: #4a5568;
++  }
++  
++  &.status-broken {
++    color: #d69e2e;
++  }
++}
++
++.detail-section-status-message {
++  margin: 0;
++  font-size: 11px;
++  font-family: monospace;
++  white-space: pre-wrap;
++  color: #2d3748;
++  
++  .dark & {
++    color: var(--text-primary);
++  }
++}
++
++.detail-section-skipped {
++  margin-bottom: 16px;
++  padding: 12px;
++  background-color: #f7fafc;
++  border-radius: 4px;
++  border: 1px solid #cbd5e0;
++  
++  .dark & {
++    background-color: rgba(203, 213, 224, 0.1);
++    border-color: rgba(203, 213, 224, 0.3);
++  }
++}
++
++.detail-section-broken {
++  margin-bottom: 16px;
++  padding: 12px;
++  background-color: #fffaf0;
++  border-radius: 4px;
++  border: 1px solid #fdcc6b;
++  
++  .dark & {
++    background-color: rgba(253, 204, 107, 0.1);
++    border-color: rgba(253, 204, 107, 0.3);
++  }
++}
++
++.detail-grid-3col {
++  display: grid;
++  grid-template-columns: repeat(3, 1fr);
++  gap: 12px;
++  font-size: 12px;
++}
++
++.detail-label {
++  font-weight: 500;
++  color: var(--text-secondary);
++  // color: #666;
++  
++  // .dark & {
++  //   color: var(--text-secondary);
++  // }
++}
++
++.attachment-section {
++  margin-bottom: 16px;
++}
++
++.attachment-container {
++  padding: 12px;
++  // background-color: var(--bg-base-primary);
++  background-color: var(--bg-base-secondary);
++  border-radius: 4px;
++  border: 1px solid var(--on-border-secondary);
++}
++
++.attachment-image-grid {
++  display: grid;
++  grid-template-columns: repeat(auto-fill, minmax(550px, 1fr));
++  gap: 12px;
++}
++
++.attachment-image-item {
++  // border: 1px solid var(--on-border-secondary);
++  border: 1px solid var(--bg-base-neutral);
++  border-radius: 4px;
++  overflow: hidden;
++  background-color: var(--bg-base-secondary);
++  display: flex;
++  flex-direction: column;
++}
++
++.csv-attachments {
++  display: flex;
++  flex-direction: column;
++}
++
++.overview-grid {
++  display: grid;
++  grid-template-columns: repeat(3, 1fr);
++  gap: 12px;
++  font-size: 12px;
++}
++
++.overview-grid-item-detail {
++  span:first-child {
++    font-weight: 500;
++    color: #666;
++    
++    .dark & {
++      color: var(--text-secondary);
++    }
++  }
++}
++
++.attachments-container {
++  margin-bottom: 16px;
++}
++
++.image-attachments-section {
++  padding: 12px;
++  background-color: var(--bg-base-primary);
++  border-radius: 4px;
++  border: 1px solid var(--on-border-secondary);
++  margin-bottom: 12px;
++}
++
++.image-attachments-title {
++  margin: 0 0 12px 0;
++  font-size: 14px;
++  font-weight: 600;
++  color: var(--text-primary);
++}
++
++.image-attachments-grid {
++  display: grid;
++  grid-template-columns: repeat(auto-fill, minmax(550px, 1fr));
++  gap: 12px;
++}
++
++.image-attachment-item {
++  border: 1px solid var(--on-border-secondary);
++  border-radius: 4px;
++  overflow: hidden;
++  background-color: var(--bg-base-secondary);
++  display: flex;
++  flex-direction: column;
++}
++
++.image-attachment-content {
++  flex: 1;
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  padding: 8px;
++  background-color: var(--bg-base-primary);
++}
++
++.attachment-image-name {
++  padding: 8px;
++  font-size: 11px;
++  font-weight: 500;
++  // color: #666;
++  color: var(--text-primary);
++  word-break: break-word;
++  background-color: var(--bg-base-primary);
++  border-top: 1px solid var(--bg-base-neutral);
++  text-align: center;
++  
++  .dark & {
++    color: var(--text-secondary);
++  }
++}
++
++.attachment-image-wrapper {
++  flex: 1;
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  padding: 8px;
++  background-color: var(--bg-base-primary);
++}
++
++.detail-section-message {
++  margin: 0;
++  font-size: 11px;
++  font-family: monospace;
++  white-space: pre-wrap;
++  color: #2d3748;
++  
++  .dark & {
++    color: var(--text-primary);
++  }
++}
++
++.csv-attachments-section {
++  margin-bottom: 12px;
++}
++
++.csv-attachment-item {
++  padding: 12px;
++  background-color: var(--bg-base-primary);
++  border-radius: 4px;
++  border: 1px solid var(--on-border-secondary);
++  margin-bottom: 12px;
++  
++  &:last-child {
++    margin-bottom: 0;
++  }
 +}
 +
 +.details-grid {
@@ -4044,12 +4975,7 @@ index 000000000..7f6fa5b3c
 +
 +/* Clickable row styling */
 +.clickable-row {
-+  transition: background-color 0.2s ease;
 +  cursor: pointer;
-+  
-+  &:hover {
-+    background-color: #f0f7ff !important;
-+  }
 +}
 +
 +/* Expansion indicator styling */
@@ -4075,17 +5001,24 @@ index 000000000..7f6fa5b3c
 +  color: var(--text-primary);
 +}
 +
++// test details toggle button
 +.expansion-toggle-button {
 +  font-size: 18px;
 +  font-weight: normal;
-+  background-color: var(--bg-base-secondary);
++  // background-color: var(--bg-base-secondary);
 +  color: var(--text-primary);
++  background-color: var(--bg-base-modal);
++  border: 1px solid var(--bg-base-neutral);
 +  padding: 2px 6px;
 +  border-radius: 4px;
 +  transition: transform 0.2s ease;
 +  display: inline-block;
 +  cursor: pointer;
 +  user-select: none;
++
++  &:hover {
++    background-color: var(--bg-base-secondary);
++  }
 +}
 +
 +/* Test attachments styling */
@@ -4288,6 +5221,227 @@ index 000000000..7f6fa5b3c
 +  color: var(--text-primary);
 +  text-transform: none; // Don't uppercase the test count
 +  letter-spacing: normal; // Normal spacing for test count
++}
++
++// Metadata, Metrics, and KPIs section styles
++.metadata-section {
++  margin-bottom: 16px;
++  padding: 12px;
++  // background-color: var(--bg-base-primary);
++  background-color: var(--bg-base-secondary);
++  border-radius: 4px;
++  // border: 1px solid var(--bg-base-neutral);
++}
++
++.metadata-section-header {
++  display: flex;
++  align-items: center;
++  cursor: pointer;
++  margin-bottom: 0;
++  
++  &.expanded {
++    margin-bottom: 8px;
++  }
++}
++
++.metadata-section-title {
++  margin: 0;
++  font-size: 14px;
++  font-weight: 600;
++  color: var(--text-primary);
++}
++
++.metadata-table {
++  width: 100%;
++  border-collapse: collapse;
++  font-size: 12px;
++  // border: 1px solid #e0e0e0;
++  border: 1px solid var(--bg-base-neutral);
++}
++
++.metadata-table-header {
++  background-color: #f8f9fa;
++  color: var(--text-primary);
++  text-align: left;
++  font-weight: 500 !important;
++  padding: 8px 12px !important;
++  border: 1px solid var(--bg-base-neutral) !important;
++  
++  &.property-column {
++    width: 30%;
++  }
++}
++
++.metadata-table-cell {
++  padding: 8px 12px !important;
++  border: 1px solid var(--bg-base-neutral) !important;
++  background-color: var(--bg-base-primary) !important;
++  vertical-align: top;
++  
++  &.property-cell {
++    font-weight: 500;
++    color: var(--text-secondary);
++  }
++  
++  &.value-cell {
++    color: var(--text-primary);
++  }
++}
++
++.metadata-table-pre {
++  margin: 0;
++  font-size: 11px;
++  font-family: monospace;
++  white-space: pre-wrap;
++  word-break: break-word;
++  color: var(--text-primary);
++  max-height: 200px;
++  overflow: auto;
++}
++
++.metadata-table-span {
++  word-break: break-word;
++}
++
++// KPIs section styles
++.kpis-section {
++  margin-bottom: 16px;
++  padding: 12px;
++  background-color: var(--bg-base-secondary);
++  border-radius: 4px;
++}
++
++.kpis-section-header {
++  display: flex;
++  align-items: center;
++  cursor: pointer;
++  margin-bottom: 0;
++  
++  &.expanded {
++    margin-bottom: 8px;
++  }
++}
++
++.kpis-validation-mode {
++  margin-left: auto;
++  font-size: 11px;
++  color: var(--text-secondary);
++  font-weight: 500;
++  padding: 2px 6px;
++  background-color: var(--bg-base-modal);
++  // border: 1px solid var(--bg-base-neutral);
++  border-radius: 3px;
++  text-transform: uppercase;
++}
++
++.kpis-description {
++  font-size: 11px;
++  color: var(--text-secondary);
++  margin-bottom: 8px;
++  font-style: italic;
++}
++
++.kpis-table {
++  width: 100%;
++  border-collapse: collapse;
++  font-size: 12px;
++  border: 1px solid var(--bg-base-neutral);
++}
++
++.kpis-table-header {
++  background-color: #f8f9fa;
++  color: var(--text-primary);
++  text-align: left;
++  font-weight: 500 !important;
++  padding: 8px 12px !important;
++  border: 1px solid var(--bg-base-neutral) !important;
++  
++  &.center {
++    text-align: center;
++  }
++  
++  &.col-30 {
++    width: 30%;
++  }
++  
++  &.col-20 {
++    width: 20%;
++  }
++}
++
++.kpis-table-cell {
++  padding: 8px 12px !important;
++  border: 1px solid var(--bg-base-neutral) !important;
++  background-color: var(--bg-base-primary) !important;
++  vertical-align: top;
++  
++  &.name-cell {
++    font-weight: 500;
++    color: var(--text-secondary);
++  }
++  
++  &.value-cell {
++    color: var(--text-primary);
++  }
++  
++  &.center {
++    text-align: center;
++  }
++}
++
++.kpis-status-badge {
++  padding: 2px 6px;
++  border-radius: 3px;
++  font-size: 11px;
++  font-weight: 500;
++  text-transform: uppercase;
++  display: inline-block;
++  min-width: 70px;
++  text-align: center;
++  
++  &.passed {
++    border: 1px solid #2e7d32;
++    color: #2e7d32;
++    background-color: transparent;
++    
++    .dark & {
++      border-color: #4caf50;
++      color: #4caf50;
++    }
++  }
++  
++  &.failed {
++    border: 1px solid #d32f2f;
++    color: #d32f2f;
++    background-color: transparent;
++    
++    .dark & {
++      border-color: #f44336;
++      color: #f44336;
++    }
++  }
++  
++  &.skipped {
++    border: 1px solid #616161;
++    color: #616161;
++    background-color: transparent;
++    
++    .dark & {
++      border-color: #9e9e9e;
++      color: #9e9e9e;
++    }
++  }
++  
++  &.unknown {
++    border: 1px solid #424242;
++    color: #424242;
++    background-color: transparent;
++    
++    .dark & {
++      border-color: #757575;
++      color: #757575;
++    }
++  }
 +}
 diff --git a/packages/web-awesome/src/locales/en.json b/packages/web-awesome/src/locales/en.json
 index 1605b588e..479c325e3 100644

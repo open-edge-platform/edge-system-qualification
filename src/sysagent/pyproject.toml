@@ -63,7 +63,7 @@ addopts = [
 ]
 
 [tool.sysagent]
-node_version = "v22.17.0"
+node_version = "v24.11.0"
 allure_version = "v3.0.0-beta.15"
 github_dependencies = [
   { name = "allure3", url = "https://github.com/allure-framework/allure3.git", ref = "v3.0.0-beta.15" },

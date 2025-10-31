@@ -234,7 +234,19 @@ def _apply_allure_metadata_from_configs(item):
             # Add tier as a dynamic Allure label for the results table
             allure.dynamic.label("tier", str(active_tier))
             logger.debug(f"Set Allure tier label: {active_tier}")
-            tier_display_name = active_tier.replace("_", " ").title()
+
+            # Get tier display name from tier config YAML instead of string transformation
+            from sysagent.utils.config import get_tier_config
+
+            tier_config = get_tier_config(active_tier)
+            if tier_config and "name" in tier_config:
+                tier_display_name = tier_config["name"]
+                logger.debug(f"Retrieved tier display name from config: {tier_display_name}")
+            else:
+                # Fallback to string transformation if tier config not found
+                tier_display_name = active_tier.replace("_", " ").title()
+                logger.debug(f"Tier config not found, using fallback display name: {tier_display_name}")
+
             allure.dynamic.label("tier_display_name", tier_display_name)
             logger.debug(f"Set Allure tier_display_name label: {tier_display_name}")
 

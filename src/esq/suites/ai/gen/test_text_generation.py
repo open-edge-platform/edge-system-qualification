@@ -43,22 +43,22 @@ def test_text_generation(
     test_display_name = configs.get("display_name", test_name)
     kpi_validation_mode = configs.get("kpi_validation_mode", "all")
     model_id = configs.get("model_id", "microsoft/Phi-4-mini-instruct")
-    model_precision = configs.get("model_precision", "int4")
+    # model_precision is optional - if None, use pre-quantized OpenVINO model directly
+    model_precision = configs.get("model_precision", None)
     test_num_prompts = configs.get("test_num_prompts", 5)
     test_request_rate = configs.get("test_request_rate", 1)
     test_max_concurrent_requests = configs.get("test_max_concurrent_requests", 1)
     devices = configs.get("devices", [])
     timeout = configs.get("timeout", 300)
-    server_timeout = configs.get("server_timeout", 300)
-    benchmark_timeout = configs.get("benchmark_timeout", 1800)
+    server_timeout = configs.get("server_timeout", 600)
+    benchmark_timeout = configs.get("benchmark_timeout", 600)
+    export_timeout = configs.get("export_timeout", 600)
     hf_dataset_url = configs.get(
         "hf_dataset_url",
         "https://huggingface.co/datasets/anon8231489123/ShareGPT_Vicuna_unfiltered/resolve/main/ShareGPT_V3_unfiltered_cleaned_split.json",
     )
-    hf_dataset_url_path = hf_dataset_url.replace("https://huggingface.co/", "")
     hf_dataset_filename = hf_dataset_url.split("/")[-1]
     docker_image_tag = f"{configs.get('container_image_name', 'genai-ovms')}:{configs.get('container_tag', 'latest')}"
-    docker_buildargs = {"HF_ENDPOINT": os.getenv("HF_ENDPOINT", "https://huggingface.co")}
     benchmark_docker_base_image = f"{configs.get('benchmark_container_image', 'vllm/vllm-openai:v0.9.2')}"
     ovms_docker_base_image = f"{configs.get('ovms_container_image', 'openvino/model_server:2025.2-gpu')}"
 
@@ -69,7 +69,6 @@ def test_text_generation(
     data_dir = os.path.join(core_data_dir, "data", "suites", "ai", "gen")
     models_dir = os.path.join(data_dir, "models")
     thirdparty_dir = os.path.join(data_dir, "thirdparty")
-    results_dir = os.path.join(data_dir, "results", "text_generation")
     dataset_path = os.path.join(thirdparty_dir, hf_dataset_filename)
 
     logger.info(f"Starting Text Generation Test: {test_display_name}")
@@ -96,7 +95,7 @@ def test_text_generation(
 
     # Get current system info
     system_info = SystemInfoCache()
-    hardware_info = system_info.get_hardware_info()
+    system_info.get_hardware_info()
 
     # Use modularized cleanup functions
     def cleanup() -> None:
@@ -118,7 +117,6 @@ def test_text_generation(
             prepare_func=lambda: prepare_assets(
                 docker_client=docker_client,
                 docker_image_tag=docker_image_tag,
-                docker_buildargs=docker_buildargs,
                 benchmark_docker_base_image=benchmark_docker_base_image,
                 ovms_docker_base_image=ovms_docker_base_image,
                 hf_dataset_url=hf_dataset_url,
@@ -136,14 +134,40 @@ def test_text_generation(
         sorted_device_list = sort_devices_by_priority(device_list)
 
         # Prepare result template
+        # Generate actual metric names based on device IDs (with indexing for multiple dGPUs)
         default_metrics = [(get_metric_name_for_device(dev, prefix="throughput"), "tokens/sec") for dev in device_list]
+
+        # Build mapping from generic KPI names to actual device-specific metric names
+        # This handles cases where kpi_refs uses "throughput_dgpu" but actual metrics are
+        # "throughput_dgpu1", "throughput_dgpu2"
+        kpi_to_metric_map = {}
         current_kpi_refs = configs.get("kpi_refs", [])
+
         if not current_kpi_refs:
+            # No KPI refs - use all device metrics
             all_metrics = {name: unit for name, unit in default_metrics}
         else:
+            # Map KPI refs to actual device metrics
             all_metrics = {}
             for kpi in current_kpi_refs:
-                all_metrics[kpi] = get_kpi_config(kpi).get("unit", "")
+                kpi_unit = get_kpi_config(kpi).get("unit", "tokens/sec")
+
+                # Check if this KPI matches any device metrics
+                # Handle cases like "throughput_dgpu" matching "throughput_dgpu1", "throughput_dgpu2"
+                matched_metrics = []
+                for metric_name, metric_unit in default_metrics:
+                    if metric_name == kpi or metric_name.startswith(f"{kpi}"):
+                        matched_metrics.append(metric_name)
+                        all_metrics[metric_name] = metric_unit
+
+                # Store mapping for later use
+                if matched_metrics:
+                    kpi_to_metric_map[kpi] = matched_metrics
+                else:
+                    # No match - add the KPI itself as metric
+                    all_metrics[kpi] = kpi_unit
+                    kpi_to_metric_map[kpi] = [kpi]
+
         metrics = {kpi: Metrics(unit=unit, value=-1.0) for kpi, unit in all_metrics.items()}
 
         # Initialize results template using from_test_config for automatic metadata application
@@ -202,8 +226,10 @@ def test_text_generation(
                     test_max_concurrent_requests=test_max_concurrent_requests,
                     server_timeout=server_timeout,
                     benchmark_timeout=benchmark_timeout,
+                    export_timeout=export_timeout,
                     dataset_path=dataset_path,
                     metrics=default_metrics,
+                    configs=configs,
                 ),
                 test_name=test_name,
                 configs=configs,
@@ -228,6 +254,18 @@ def test_text_generation(
             results.metadata[f"Device {device_id} Output Throughput"] = result.metadata.get("Output Throughput", -1.0)
             results.metadata[f"Device {device_id} Mean TTFT (ms)"] = result.metadata.get("Mean TTFT (ms)", -1.0)
             results.metadata[f"Device {device_id} Mean TPOT (ms)"] = result.metadata.get("Mean TPOT (ms)", -1.0)
+
+            # Track per-device duration (includes export + benchmark time)
+            if "total_duration_seconds" in result.metadata:
+                results.metadata[f"Device {device_id} total_duration_seconds"] = result.metadata.get(
+                    "total_duration_seconds", 0.0
+                )
+
+            # Track per-device export duration
+            if "model_export_duration_seconds" in result.metadata:
+                results.metadata[f"Device {device_id} model_export_duration_seconds"] = result.metadata.get(
+                    "model_export_duration_seconds", 0.0
+                )
 
         # Process results using modular function
         process_device_results(
@@ -280,6 +318,13 @@ def test_text_generation(
     finally:
         # Cleanup
         cleanup()
+
+        # Update timestamps and calculate total duration
+        if results:
+            results.update_timestamps()
+            logger.info(f"Test completed - Duration: {results.metadata.get('total_duration_seconds', 0):.2f} seconds")
+            if "model_export_duration_seconds" in results.metadata:
+                logger.info(f"Model export duration: {results.metadata['model_export_duration_seconds']:.2f} seconds")
 
         # Step 4: Validate test results (always run to populate validation_results)
         try:

@@ -21,9 +21,7 @@ try:
 
     HAVE_OPENVINO = True
 except ImportError:
-    logger.warning(
-        "OpenVINO package not found. GPU and OpenVINO CPU info will be limited."
-    )
+    logger.warning("OpenVINO package not found. GPU and OpenVINO CPU info will be limited.")
 
 
 def is_openvino_available() -> bool:
@@ -87,13 +85,8 @@ def get_openvino_device_properties(device_name: str, core=None) -> Dict[str, Any
 
         # Get basic device properties
         try:
-            supported_properties = core.get_property(
-                device_name, "SUPPORTED_PROPERTIES"
-            )
-            logger.debug(
-                f"OpenVINO device {device_name} supported properties: "
-                f"{len(supported_properties)}"
-            )
+            supported_properties = core.get_property(device_name, "SUPPORTED_PROPERTIES")
+            logger.debug(f"OpenVINO device {device_name} supported properties: {len(supported_properties)}")
 
             for prop in supported_properties:
                 try:
@@ -118,9 +111,7 @@ def get_openvino_device_properties(device_name: str, core=None) -> Dict[str, Any
                         quick_access["device_architecture"] = serialized_value
 
                 except Exception as e:
-                    logger.debug(
-                        f"Could not get property {prop} for {device_name}: {e}"
-                    )
+                    logger.debug(f"Could not get property {prop} for {device_name}: {e}")
 
         except Exception as e:
             logger.debug(f"Could not get supported properties for {device_name}: {e}")
@@ -137,9 +128,7 @@ def get_openvino_device_properties(device_name: str, core=None) -> Dict[str, Any
         return device_info
 
     except Exception as e:
-        logger.warning(
-            f"Error getting OpenVINO device properties for {device_name}: {e}"
-        )
+        logger.warning(f"Error getting OpenVINO device properties for {device_name}: {e}")
         return {"device_name": device_name, "error": str(e)}
 
 
@@ -159,10 +148,7 @@ def _enhance_device_info(device_info: Dict[str, Any], device_name: str, core) ->
         # Add device UUID for GPU devices
         if device_name.startswith("GPU"):
             try:
-                if (
-                    "DEVICE_UUID" not in quick_access
-                    and "DEVICE_UUID" in all_properties
-                ):
+                if "DEVICE_UUID" not in quick_access and "DEVICE_UUID" in all_properties:
                     quick_access["device_uuid"] = all_properties["DEVICE_UUID"]
             except Exception:
                 pass
@@ -170,13 +156,8 @@ def _enhance_device_info(device_info: Dict[str, Any], device_name: str, core) ->
         # Add device architecture for supported devices
         if device_name.startswith(("GPU", "NPU")):
             try:
-                if (
-                    "DEVICE_ARCHITECTURE" not in quick_access
-                    and "DEVICE_ARCHITECTURE" in all_properties
-                ):
-                    quick_access["device_architecture"] = all_properties[
-                        "DEVICE_ARCHITECTURE"
-                    ]
+                if "DEVICE_ARCHITECTURE" not in quick_access and "DEVICE_ARCHITECTURE" in all_properties:
+                    quick_access["device_architecture"] = all_properties["DEVICE_ARCHITECTURE"]
             except Exception:
                 pass
 
@@ -184,17 +165,13 @@ def _enhance_device_info(device_info: Dict[str, Any], device_name: str, core) ->
         if device_name.startswith("GPU"):
             try:
                 if "GPU_MEMORY_STATISTICS" in all_properties:
-                    quick_access["memory_statistics"] = all_properties[
-                        "GPU_MEMORY_STATISTICS"
-                    ]
+                    quick_access["memory_statistics"] = all_properties["GPU_MEMORY_STATISTICS"]
             except Exception:
                 pass
         elif device_name.startswith("NPU"):
             try:
                 if "NPU_DEVICE_TOTAL_MEM_SIZE" in all_properties:
-                    quick_access["memory_statistics"] = all_properties[
-                        "NPU_DEVICE_TOTAL_MEM_SIZE"
-                    ]
+                    quick_access["memory_statistics"] = all_properties["NPU_DEVICE_TOTAL_MEM_SIZE"]
             except Exception:
                 pass
 
@@ -202,9 +179,7 @@ def _enhance_device_info(device_info: Dict[str, Any], device_name: str, core) ->
         logger.debug(f"Error enhancing device info for {device_name}: {e}")
 
 
-def collect_openvino_devices() -> Tuple[
-    Dict[str, Any], Optional[Dict[str, Any]], Dict[str, Any]
-]:
+def collect_openvino_devices() -> Tuple[Dict[str, Any], Optional[Dict[str, Any]], Dict[str, Any]]:
     """
     Collect OpenVINO device information.
 
@@ -288,9 +263,7 @@ def get_openvino_npu_devices() -> List[Dict[str, Any]]:
     return npu_info.get("devices", [])
 
 
-def get_available_devices(
-    device: str = None, device_type: str = None, filter_list: List[str] = []
-) -> List[str]:
+def get_available_devices(device: str = None, device_type: str = None, filter_list: List[str] = []) -> List[str]:
     """
     Get list of available OpenVINO devices.
 
@@ -316,9 +289,7 @@ def get_available_devices(
             filtered_devices = [d for d in filtered_devices if device in d]
 
         if device_type:
-            filtered_devices = [
-                d for d in filtered_devices if d.startswith(device_type)
-            ]
+            filtered_devices = [d for d in filtered_devices if d.startswith(device_type)]
 
         return filtered_devices
 
@@ -337,10 +308,7 @@ def get_openvino_device_type(device_id: str) -> str:
     try:
         core = openvino.Core()
         if device_id not in core.available_devices:
-            logger.warning(
-                f"Device {device_id} not found in available OpenVINO devices: "
-                f"{core.available_devices}"
-            )
+            logger.warning(f"Device {device_id} not found in available OpenVINO devices: {core.available_devices}")
             return None
         device_type = core.get_property(device_id, "DEVICE_TYPE")
         logger.debug(f"OpenVINO DEVICE_TYPE for {device_id}: {device_type}")
@@ -356,12 +324,15 @@ def get_available_devices_by_category(
     """
     Get available devices organized by category.
 
+    Supports hetero-dgpu category which returns a virtual HETERO device combining all available dGPUs.
+
     Args:
-        device_categories: List of device categories to include
+        device_categories: List of device categories to include (cpu, igpu, dgpu, npu, hetero-dgpu)
         filter_list: List of devices to exclude
 
     Returns:
-        Dict with category as key and device info as value
+        Dict with device ID as key and device info as value.
+        For hetero-dgpu, returns a virtual device with format "HETERO:GPU.0,GPU.1,..."
     """
     device_dict = {}
 
@@ -373,19 +344,8 @@ def get_available_devices_by_category(
         available_devices = get_available_devices(filter_list=filter_list)
         logger.debug(f"Available devices: {available_devices}")
 
-        # for category in device_categories:
-        #     logger.debug(f"Checking category: {category}")
-        #     category_devices = {}
-        #     for device in available_devices:
-        #         device_type = get_openvino_device_type(device)
-        #         logger.debug(f"Device: {device}, Type: {device_type}")
-        #         if device_type.upper() == category.upper():
-        #             category_devices[device] = device_type
-
-        #     if category_devices:
-        #         result[category] = category_devices
-
-        # return result
+        # First pass: collect discrete GPUs for hetero-dgpu
+        discrete_gpus = []
 
         for ov_device in available_devices:
             if ov_device in filter_list:
@@ -400,6 +360,16 @@ def get_available_devices_by_category(
             except Exception as e:
                 logger.debug(f"Error getting properties for {ov_device}: {e}")
                 continue
+
+            # Collect discrete GPUs for hetero support
+            if ov_device.upper().startswith("GPU") and "discrete" in device_type.lower():
+                discrete_gpus.append(
+                    {
+                        "device_id": ov_device,
+                        "device_type": device_type,
+                        "full_name": full_name,
+                    }
+                )
 
             # Check if device matches requested categories
             include_device = False
@@ -424,6 +394,29 @@ def get_available_devices_by_category(
                     "device_type": device_type,
                     "full_name": full_name,
                 }
+
+        # Handle hetero-dgpu category: create virtual HETERO device combining all dGPUs
+        if "hetero-dgpu" in device_categories and len(discrete_gpus) >= 2:
+            # Build HETERO device string: "HETERO:GPU.0,GPU.1,..."
+            hetero_device_list = [gpu["device_id"] for gpu in discrete_gpus]
+            hetero_device_id = "HETERO:" + ",".join(hetero_device_list)
+
+            # Create combined device name
+            gpu_names = [gpu["full_name"] for gpu in discrete_gpus]
+            combined_name = f"HETERO ({len(discrete_gpus)} dGPUs: {', '.join(gpu_names)})"
+
+            device_dict[hetero_device_id] = {
+                "device_type": "Type.DISCRETE",  # HETERO is considered discrete
+                "full_name": combined_name,
+                "is_hetero": True,
+                "hetero_devices": hetero_device_list,
+            }
+            logger.info(f"Created HETERO device: {hetero_device_id}")
+        elif "hetero-dgpu" in device_categories and len(discrete_gpus) < 2:
+            logger.warning(
+                f"hetero-dgpu category requested but only {len(discrete_gpus)} "
+                f"discrete GPU(s) found. Need at least 2 for HETERO."
+            )
 
         return device_dict
 

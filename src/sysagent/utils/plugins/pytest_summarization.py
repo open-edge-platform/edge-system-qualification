@@ -58,6 +58,7 @@ def summarize_test_results():
         get_kpi_config: Optional[callable] = None,
         test_name: str = "Unknown",
         iteration_data: Optional[Dict[str, Any]] = None,
+        enable_visualizations: bool = False,
     ) -> None:
         logger.info(f"Generating test result summary for test: {test_name}")
         results_dict = results.to_dict()
@@ -68,19 +69,39 @@ def summarize_test_results():
             display_name = configs.get("display_name", test_name)
             results_dict["name"] = f"{test_id} - {display_name}"
 
-        # Import the visualization utilities
-        try:
-            import matplotlib.pyplot as plt
+        visualization_enabled = bool(enable_visualizations)
+        plt_module = None
+        create_results_table = None
+        create_time_series_chart = None
 
-            from sysagent.utils.reporting.visualization import (
-                create_results_table,
-                create_time_series_chart,
-            )
+        if visualization_enabled:
+            try:
+                import matplotlib.pyplot as plt_module  # type: ignore
 
-            with allure.step("Summarize test results"):
-                logger.debug(
-                    f"Generating detailed test result summary for test: {test_name}"
+                from sysagent.utils.reporting.visualization import (
+                    create_results_table as _create_results_table,
                 )
+                from sysagent.utils.reporting.visualization import (
+                    create_time_series_chart as _create_time_series_chart,
+                )
+
+                create_results_table = _create_results_table
+                create_time_series_chart = _create_time_series_chart
+            except ImportError as exc:
+                logger.error(
+                    "Visualization utilities not available for test summarization: %s",
+                    exc,
+                )
+                visualization_enabled = False
+                plt_module = None
+            except Exception as exc:  # pragma: no cover - unexpected import failure
+                logger.error("Failed to initialize visualization utilities: %s", exc)
+                visualization_enabled = False
+                plt_module = None
+
+        try:
+            with allure.step("Summarize test results"):
+                logger.debug(f"Generating detailed test result summary for test: {test_name}")
 
                 # Skip summarization if no results available
                 if not results_dict:
@@ -102,92 +123,82 @@ def summarize_test_results():
                         attachment_type=allure.attachment_type.JSON,
                     )
 
-                # Create a results table visualization
-                with allure.step("Generate test results table"):
-                    try:
-                        # Create a results table: result metrics (metric, value, unit)
-                        metrics = results_dict.get("metrics", {})
-                        if metrics:
-                            display_name = results_dict.get("parameters", {}).get(
-                                "Display Name", test_name
-                            )
-                            image_bytes, fig = create_results_table(
-                                metrics,
-                                title=f"{display_name} - Metrics",
-                                columns=["Metric", "Value", "Unit"],
-                            )
-                            allure.attach(
-                                image_bytes,
-                                name="Metrics Table",
-                                attachment_type=allure.attachment_type.PNG,
-                            )
-                            plt.close(fig)
-                        else:
-                            logger.warning(
-                                "No metrics section found in results for metrics table."
-                            )
-
-                    except Exception as e:
-                        logger.error(
-                            f"Error generating test results tables for summary: {e}"
-                        )
-                        allure.attach(
-                            json.dumps(
-                                {"error": str(e), "results": results_dict}, indent=2
-                            ),
-                            name="Results Summary Error",
-                            attachment_type=allure.attachment_type.JSON,
-                        )
-
-                # Create visualization for iteration data if provided
                 if iteration_data:
-                    with allure.step("Generate iteration trend charts"):
-                        try:
-                            allure.attach(
-                                json.dumps(iteration_data, indent=2),
-                                name="Iteration Data",
-                                attachment_type=allure.attachment_type.JSON,
-                            )
-                            from sysagent.utils.reporting.visualization import (
-                                create_time_series_chart,
-                            )
+                    allure.attach(
+                        json.dumps(iteration_data, indent=2),
+                        name="Iteration Data",
+                        attachment_type=allure.attachment_type.JSON,
+                    )
 
-                            chart_path = create_time_series_chart(
-                                iteration_data, test_name
-                            )
-                            if chart_path:
-                                with open(chart_path, "rb") as f:
-                                    allure.attach(
-                                        f.read(),
-                                        name=f"{test_name} Performance Chart",
-                                        attachment_type=allure.attachment_type.PNG,
-                                    )
-                                logger.debug(
-                                    f"Added time series chart from {chart_path}"
+                if visualization_enabled and create_results_table and plt_module:
+                    with allure.step("Generate test results table"):
+                        try:
+                            metrics = results_dict.get("metrics", {})
+                            if metrics:
+                                display_name = results_dict.get("parameters", {}).get("Display Name", test_name)
+                                image_bytes, fig = create_results_table(
+                                    metrics,
+                                    title=f"{display_name} - Metrics",
+                                    columns=["Metric", "Value", "Unit"],
                                 )
+                                allure.attach(
+                                    image_bytes,
+                                    name="Metrics Table",
+                                    attachment_type=allure.attachment_type.PNG,
+                                )
+                                plt_module.close(fig)
                             else:
-                                logger.warning("Failed to create time series chart")
-                        except Exception as e:
+                                logger.warning("No metrics section found in results for metrics table.")
+
+                        except Exception as exc:
                             logger.error(
-                                f"Error generating iteration data for summary: {e}"
+                                "Error generating test results tables for summary: %s",
+                                exc,
                             )
                             allure.attach(
                                 json.dumps(
-                                    {"error": str(e), "iteration_data": iteration_data},
+                                    {"error": str(exc), "results": results_dict},
+                                    indent=2,
+                                ),
+                                name="Results Summary Error",
+                                attachment_type=allure.attachment_type.JSON,
+                            )
+                else:
+                    logger.debug("Visualization disabled; skipping metrics table generation")
+
+                if visualization_enabled and create_time_series_chart and iteration_data:
+                    with allure.step("Generate iteration trend charts"):
+                        try:
+                            chart_path = create_time_series_chart(iteration_data, test_name)
+                            if chart_path:
+                                with open(chart_path, "rb") as chart_file:
+                                    allure.attach(
+                                        chart_file.read(),
+                                        name=f"{test_name} Performance Chart",
+                                        attachment_type=allure.attachment_type.PNG,
+                                    )
+                                logger.debug("Added time series chart from %s", chart_path)
+                            else:
+                                logger.warning("Failed to create time series chart")
+                        except Exception as exc:
+                            logger.error(
+                                "Error generating iteration data for summary: %s",
+                                exc,
+                            )
+                            allure.attach(
+                                json.dumps(
+                                    {"error": str(exc), "iteration_data": iteration_data},
                                     indent=2,
                                 ),
                                 name="Iteration Summary Error",
                                 attachment_type=allure.attachment_type.JSON,
                             )
+                elif iteration_data:
+                    logger.debug("Visualization disabled; skipping iteration chart generation")
 
                 logger.info("Test result summary completed successfully")
 
-        except ImportError as e:
-            logger.error(
-                f"Failed to import visualization utilities for test summarization: {e}"
-            )
-
-        except Exception as e:
-            logger.error(f"Unexpected error in test result summarization: {e}")
+        except Exception as exc:  # pragma: no cover - unexpected summarization failure
+            logger.error("Unexpected error in test result summarization: %s", exc)
 
     return _summarize_results

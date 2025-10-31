@@ -2,49 +2,94 @@
 # SPDX-License-Identifier: Apache-2.0
 
 tiers:
-  scalable_performance_xeon:
-    name: "Scalable Performance Xeon"
+  scalable_ai_graphics_media_hetero_52gb:
+    name: "Scalable AI Graphics Media"
     priority: 1
     requirements:
-      cpu_xeon_required: true
-      cpu_min_cores: 16
-      memory_min_gb: 64.0
-      dgpu_required: true
+      dgpu_min_vram_gb: 52.0
       dgpu_min_devices: 2
-      dgpu_min_vram_gb: 26.0
 
-  scalable_performance_core:
-    name: "Scalable Performance Core"
+  scalable_ai_graphics_media_hetero_24gb:
+    name: "Scalable AI Graphics Media"
     priority: 2
     requirements:
-      cpu_core_required: true
-      cpu_min_cores: 8
-      memory_min_gb: 32.0
-      dgpu_required: true
-      dgpu_min_vram_gb: 8.0
+      dgpu_min_vram_gb: 24.0
+      dgpu_max_vram_gb: 51.9
+      dgpu_min_devices: 2
+
+  scalable_ai_graphics_media_hetero_10gb:
+    name: "Scalable AI Graphics Media"
+    priority: 3
+    requirements:
+      dgpu_min_vram_gb: 10.0
+      dgpu_max_vram_gb: 23.9
+      dgpu_min_devices: 2
+
+  scalable_ai_graphics_media_hetero:
+    name: "Scalable AI Graphics Media"
+    priority: 4
+    requirements:
+      dgpu_max_vram_gb: 9.9
+      dgpu_min_devices: 2
+
+  scalable_ai_graphics_media_52gb:
+    name: "Scalable AI Graphics Media"
+    priority: 5
+    requirements:
+      dgpu_min_vram_gb: 52.0
+      dgpu_min_devices: 1
+      dgpu_max_devices: 1
+
+  scalable_ai_graphics_media_24gb:
+    name: "Scalable AI Graphics Media"
+    priority: 6
+    requirements:
+      dgpu_min_vram_gb: 24.0
+      dgpu_max_vram_gb: 51.9
+      dgpu_min_devices: 1
+      dgpu_max_devices: 1
+
+  scalable_ai_graphics_media_10gb:
+    name: "Scalable AI Graphics Media"
+    priority: 7
+    requirements:
+      dgpu_min_vram_gb: 10.0
+      dgpu_max_vram_gb: 23.9
+      dgpu_min_devices: 1
+      dgpu_max_devices: 1
+
+  scalable_ai_graphics_media:
+    name: "Scalable AI Graphics Media"
+    priority: 8
+    requirements:
+      dgpu_max_vram_gb: 9.9
+      dgpu_min_devices: 1
+      dgpu_max_devices: 1
+
+  scalable_performance:
+    name: "Scalable Performance"
+    priority: 9
+    requirements:
+      cpu_xeon_required: true
 
   efficiency_optimized:
     name: "Efficiency Optimized"
-    priority: 3
+    priority: 10
     requirements:
-      cpu_ultra_required: true
-      cpu_min_cores: 8
-      memory_min_gb: 32.0
+      cpu_ultra_mobile_required: true
       igpu_required: true
 
   mainstream:
     name: "Mainstream"
-    priority: 4
+    priority: 11
     requirements:
       cpu_core_required: true
-      cpu_min_cores: 8
-      memory_min_gb: 32.0
+      cpu_entry_excluded: true
       igpu_required: true
 
   entry:
     name: "Entry"
-    priority: 5
+    priority: 12
     requirements:
-      cpu_min_cores: 8
-      memory_min_gb: 16.0
+      cpu_entry_required: true
       igpu_required: true

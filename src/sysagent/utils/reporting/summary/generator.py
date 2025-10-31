@@ -516,6 +516,9 @@ class CoreResultsSummaryGenerator:
                 # Updated tracking fields
                 "latest_uuid": latest_uuid,
                 "all_run_uuids": all_uuids,  # Store all UUIDs for this test history
+                # Include metadata and metrics from latest run if available
+                "metadata": latest_run.get("metadata", {}),
+                "metrics": latest_run.get("metrics", {}),
             }
             unique_test_cases.append(unique_test_case)
 

@@ -95,6 +95,8 @@ def _convert_profile_requirements_to_system_format(
             "cpu_xeon_required",
             "cpu_core_required",
             "cpu_ultra_required",
+            "cpu_ultra_mobile_required",
+            "cpu_entry_required",
         ]:
             if cpu_field in profile_requirements:
                 system_format["hardware"][cpu_field] = profile_requirements[cpu_field]
@@ -102,16 +104,12 @@ def _convert_profile_requirements_to_system_format(
         # Memory requirements - direct mapping
         for memory_field in ["memory_min_gb"]:
             if memory_field in profile_requirements:
-                system_format["hardware"][memory_field] = profile_requirements[
-                    memory_field
-                ]
+                system_format["hardware"][memory_field] = profile_requirements[memory_field]
 
         # Storage requirements - direct mapping
         for storage_field in ["storage_min_gb"]:
             if storage_field in profile_requirements:
-                system_format["hardware"][storage_field] = profile_requirements[
-                    storage_field
-                ]
+                system_format["hardware"][storage_field] = profile_requirements[storage_field]
 
         # GPU requirements - direct mapping
         for gpu_field in [
@@ -140,9 +138,7 @@ def _convert_profile_requirements_to_system_format(
         # Direct Python requirements
         for python_field in ["min_python_version", "max_python_version"]:
             if python_field in profile_requirements:
-                system_format["software"][python_field] = profile_requirements[
-                    python_field
-                ]
+                system_format["software"][python_field] = profile_requirements[python_field]
 
         # Direct package requirements
         for package_field in [
@@ -151,9 +147,7 @@ def _convert_profile_requirements_to_system_format(
             "required_python_packages",
         ]:
             if package_field in profile_requirements:
-                system_format["software"][package_field] = profile_requirements[
-                    package_field
-                ]
+                system_format["software"][package_field] = profile_requirements[package_field]
 
     return system_format
 
@@ -188,20 +182,14 @@ def get_failed_requirements(profile_configs: Dict[str, Any]) -> list:
     """
     try:
         results = validate_profile_requirements(profile_configs)
-        failed_checks = [
-            check
-            for check in results.get("checks", [])
-            if not check.get("passed", True)
-        ]
+        failed_checks = [check for check in results.get("checks", []) if not check.get("passed", True)]
         return [check.get("name", "Unknown requirement") for check in failed_checks]
     except Exception as e:
         logger.error(f"Error getting failed requirements: {e}")
         return [f"Error checking requirements: {str(e)}"]
 
 
-def log_profile_validation_results(
-    profile_name: str, profile_configs: Dict[str, Any]
-) -> None:
+def log_profile_validation_results(profile_name: str, profile_configs: Dict[str, Any]) -> None:
     """
     Log detailed profile validation results using latest system info structure.
 
@@ -217,33 +205,21 @@ def log_profile_validation_results(
         else:
             logger.warning(f"Profile '{profile_name}' requirements validation: FAILED")
 
-            failed_checks = [
-                check
-                for check in results.get("checks", [])
-                if not check.get("passed", True)
-            ]
+            failed_checks = [check for check in results.get("checks", []) if not check.get("passed", True)]
 
             for check in failed_checks:
                 requirement = check.get("name", "Unknown")
                 actual = check.get("actual", "Unknown")
                 required = check.get("required", "Unknown")
-                logger.warning(
-                    f"  ✗ {requirement}: actual={actual}, required={required}"
-                )
+                logger.warning(f"  ✗ {requirement}: actual={actual}, required={required}")
 
         # Log summary
         total_checks = len(results.get("checks", []))
-        pass_checks = len(
-            [check for check in results.get("checks", []) if check.get("passed", True)]
-        )
-        logger.info(
-            f"Profile validation summary: {pass_checks}/{total_checks} requirements met"
-        )
+        pass_checks = len([check for check in results.get("checks", []) if check.get("passed", True)])
+        logger.info(f"Profile validation summary: {pass_checks}/{total_checks} requirements met")
 
     except Exception as e:
-        logger.error(
-            f"Error logging profile validation results for '{profile_name}': {e}"
-        )
+        logger.error(f"Error logging profile validation results for '{profile_name}': {e}")
 
 
 class ProfileValidationError(Exception):
@@ -252,8 +228,5 @@ class ProfileValidationError(Exception):
     def __init__(self, profile_name: str, failed_requirements: list):
         self.profile_name = profile_name
         self.failed_requirements = failed_requirements
-        message = (
-            f"Profile '{profile_name}' validation failed. Requirements not met: "
-            f"{', '.join(failed_requirements)}"
-        )
+        message = f"Profile '{profile_name}' validation failed. Requirements not met: {', '.join(failed_requirements)}"
         super().__init__(message)

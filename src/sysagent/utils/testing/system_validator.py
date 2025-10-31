@@ -64,18 +64,13 @@ class SystemValidator:
         logger.debug(f"System validation completed: {results['passed']}")
         return results
 
-    def _validate_hardware(
-        self, hw_requirements: Dict[str, Any]
-    ) -> List[Dict[str, Any]]:
+    def _validate_hardware(self, hw_requirements: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Validate hardware requirements using latest system info structure."""
         results = []
         hardware = self.system_info.get("hardware", {})
 
         # CPU Xeon requirement
-        if (
-            "cpu_xeon_required" in hw_requirements
-            and hw_requirements["cpu_xeon_required"]
-        ):
+        if "cpu_xeon_required" in hw_requirements and hw_requirements["cpu_xeon_required"]:
             cpu_info = hardware.get("cpu", {})
             cpu_brand = cpu_info.get("brand", "")
             is_xeon = "xeon" in cpu_brand.lower()
@@ -89,29 +84,27 @@ class SystemValidator:
                 }
             )
 
-        # CPU Core requirement
-        if (
-            "cpu_core_required" in hw_requirements
-            and hw_requirements["cpu_core_required"]
-        ):
+        # CPU Core requirement (includes Ultra Desktop)
+        if "cpu_core_required" in hw_requirements and hw_requirements["cpu_core_required"]:
             cpu_info = hardware.get("cpu", {})
             cpu_brand = cpu_info.get("brand", "")
+            # Core requirement matches: "Core" keyword OR Ultra Desktop
+            # Ultra Desktop falls under mainstream/core category
             is_core = "core" in cpu_brand.lower()
+            is_ultra_desktop = self._is_ultra_desktop_cpu(cpu_brand) if "ultra" in cpu_brand.lower() else False
+            passed = is_core or is_ultra_desktop
             results.append(
                 {
                     "name": "Intel Core CPU",
-                    "passed": is_core,
+                    "passed": passed,
                     "actual": cpu_brand,
-                    "required": "Intel Core CPU",
+                    "required": "Intel Core CPU (includes Ultra Desktop)",
                     "category": "hardware.cpu.core",
                 }
             )
 
         # CPU Ultra requirement
-        if (
-            "cpu_ultra_required" in hw_requirements
-            and hw_requirements["cpu_ultra_required"]
-        ):
+        if "cpu_ultra_required" in hw_requirements and hw_requirements["cpu_ultra_required"]:
             cpu_info = hardware.get("cpu", {})
             cpu_brand = cpu_info.get("brand", "")
             is_ultra = "ultra" in cpu_brand.lower()
@@ -122,6 +115,53 @@ class SystemValidator:
                     "actual": cpu_brand,
                     "required": "Intel Ultra CPU",
                     "category": "hardware.cpu.ultra",
+                }
+            )
+
+        # CPU Ultra Mobile requirement (suffixes: H, U, V, HX, P)
+        if "cpu_ultra_mobile_required" in hw_requirements and hw_requirements["cpu_ultra_mobile_required"]:
+            cpu_info = hardware.get("cpu", {})
+            cpu_brand = cpu_info.get("brand", "")
+            is_ultra_mobile = self._is_ultra_mobile_cpu(cpu_brand)
+            results.append(
+                {
+                    "name": "Intel Ultra Mobile CPU",
+                    "passed": is_ultra_mobile,
+                    "actual": cpu_brand,
+                    "required": "Intel Ultra CPU with mobile suffix (H, U, V, HX, P)",
+                    "category": "hardware.cpu.ultra.mobile",
+                }
+            )
+
+        # CPU Entry requirement (N-series, Atom x6000/x7000, Processor N-series)
+        if "cpu_entry_required" in hw_requirements and hw_requirements["cpu_entry_required"]:
+            cpu_info = hardware.get("cpu", {})
+            cpu_brand = cpu_info.get("brand", "")
+            is_entry = self._is_entry_cpu(cpu_brand)
+            results.append(
+                {
+                    "name": "Intel Entry CPU",
+                    "passed": is_entry,
+                    "actual": cpu_brand,
+                    "required": "Intel Entry CPU (N-series, Atom x6000/x7000, or Processor N-series)",
+                    "category": "hardware.cpu.entry",
+                }
+            )
+
+        # CPU Entry exclusion (for mainstream tier to exclude entry-level Core processors)
+        if "cpu_entry_excluded" in hw_requirements and hw_requirements["cpu_entry_excluded"]:
+            cpu_info = hardware.get("cpu", {})
+            cpu_brand = cpu_info.get("brand", "")
+            is_entry = self._is_entry_cpu(cpu_brand)
+            # Pass if CPU is NOT entry-level (inverted logic)
+            passed = not is_entry
+            results.append(
+                {
+                    "name": "Entry CPU excluded",
+                    "passed": passed,
+                    "actual": cpu_brand,
+                    "required": "Not an entry-level CPU (excludes N-series, Atom x6000/x7000, Processor N-series)",
+                    "category": "hardware.cpu.entry.excluded",
                 }
             )
 
@@ -220,7 +260,23 @@ class SystemValidator:
                     "passed": passed,
                     "actual": f"{discrete_count} discrete GPU(s)",
                     "required": f">= {min_devices} discrete GPUs",
-                    "category": "hardware.gpu.discrete_count",
+                    "category": "hardware.gpu.discrete_count_min",
+                }
+            )
+
+        # Discrete GPU maximum devices
+        if "dgpu_max_devices" in hw_requirements:
+            max_devices = hw_requirements["dgpu_max_devices"]
+            gpu_info = hardware.get("gpu", {})
+            discrete_count = gpu_info.get("discrete_count", 0)
+            passed = discrete_count <= max_devices
+            results.append(
+                {
+                    "name": f"Discrete GPUs <= {max_devices}",
+                    "passed": passed,
+                    "actual": f"{discrete_count} discrete GPU(s)",
+                    "required": f"<= {max_devices} discrete GPUs",
+                    "category": "hardware.gpu.discrete_count_max",
                 }
             )
 
@@ -248,7 +304,35 @@ class SystemValidator:
                     "passed": passed,
                     "actual": f"{total_vram_gb:.1f} GB total",
                     "required": f">= {min_vram} GB",
-                    "category": "hardware.gpu.vram",
+                    "category": "hardware.gpu.vram_min",
+                }
+            )
+
+        # Discrete GPU maximum VRAM
+        if "dgpu_max_vram_gb" in hw_requirements:
+            max_vram = hw_requirements["dgpu_max_vram_gb"]
+            gpu_info = hardware.get("gpu", {})
+            gpu_devices = gpu_info.get("devices", [])
+
+            # Calculate total VRAM from discrete GPUs using new structure
+            total_vram_gb = 0
+            for device in gpu_devices:
+                if device.get("is_discrete", False):
+                    # Get VRAM from OpenVINO info in new structure
+                    openvino_info = device.get("openvino", {})
+                    if openvino_info and "memory_gb" in openvino_info:
+                        vram_gb = openvino_info["memory_gb"]
+                        total_vram_gb += vram_gb
+                        logger.debug(f"Found discrete GPU VRAM: {vram_gb:.1f} GB")
+
+            passed = total_vram_gb <= max_vram
+            results.append(
+                {
+                    "name": f"Discrete GPU VRAM <= {max_vram} GB",
+                    "passed": passed,
+                    "actual": f"{total_vram_gb:.1f} GB total",
+                    "required": f"<= {max_vram} GB",
+                    "category": "hardware.gpu.vram_max",
                 }
             )
 
@@ -285,9 +369,7 @@ class SystemValidator:
 
         return results
 
-    def _validate_software(
-        self, sw_requirements: Dict[str, Any]
-    ) -> List[Dict[str, Any]]:
+    def _validate_software(self, sw_requirements: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Validate software requirements using latest system info structure."""
         results = []
         software = self.system_info.get("software", {})
@@ -378,9 +460,7 @@ class SystemValidator:
             packages = system_packages.get("packages", {})
 
             for package in required_packages:
-                is_installed = (
-                    package in packages and packages[package]
-                )  # Check package exists and has version
+                is_installed = package in packages and packages[package]  # Check package exists and has version
                 results.append(
                     {
                         "name": f"System package '{package}' required",
@@ -401,9 +481,7 @@ class SystemValidator:
             packages = python_packages.get("packages", {})
 
             for package in required_packages:
-                is_installed = (
-                    package in packages and packages[package]
-                )  # Check package exists and has version
+                is_installed = package in packages and packages[package]  # Check package exists and has version
                 results.append(
                     {
                         "name": f"Python package '{package}' required",
@@ -416,6 +494,134 @@ class SystemValidator:
 
         return results
 
+    def _is_ultra_mobile_cpu(self, cpu_brand: str) -> bool:
+        """
+        Check if CPU is Intel Ultra Mobile (suffixes: H, U, V, HX, P).
+
+        Mobile suffixes take priority over desktop suffixes when both present.
+        Examples:
+        - Intel Core Ultra 7 processor 165H (mobile)
+        - Intel Core Ultra 7 processor 288V (mobile)
+        - Intel Core Ultra 5 processor 125U (mobile)
+        - Intel Core Ultra 9 processor 285HX (mobile - HX for high performance mobile)
+
+        Args:
+            cpu_brand: CPU brand string from system info
+
+        Returns:
+            True if CPU is Ultra with any mobile suffix
+        """
+        if not cpu_brand or "ultra" not in cpu_brand.lower():
+            return False
+
+        # Check for mobile suffixes: H, U, V, HX, P
+        # Mobile suffixes have priority - if ANY mobile suffix present, it's mobile
+        # Pattern: number followed by mobile suffix (e.g., "165H", "288V", "125U", "285HX")
+        import re
+
+        mobile_pattern = r"\d+(HX|H|U|V|P)\b"
+        return bool(re.search(mobile_pattern, cpu_brand, re.IGNORECASE))
+
+    def _is_ultra_desktop_cpu(self, cpu_brand: str) -> bool:
+        """
+        Check if CPU is Intel Ultra Desktop (suffixes: K, F, KF, T, or no suffix).
+
+        Desktop includes:
+        - Suffixes: K, F, KF, T
+        - No suffix: Core Ultra 9 285, Core Ultra 7 265 (default to desktop)
+
+        Mobile takes priority: If ANY mobile suffix (H, U, V, HX, P) present, NOT desktop.
+
+        Examples:
+        - Intel Core Ultra 9 processor 285K (desktop with K)
+        - Intel Core Ultra 7 processor 265KF (desktop with KF)
+        - Intel Core Ultra 9 processor 285 (desktop, no suffix)
+        - Intel Core Ultra 7 processor 265 (desktop, no suffix)
+
+        Args:
+            cpu_brand: CPU brand string from system info
+
+        Returns:
+            True if CPU is Ultra Desktop (with desktop suffix OR no suffix, excluding mobile)
+        """
+        if not cpu_brand or "ultra" not in cpu_brand.lower():
+            return False
+
+        # First check: if it has ANY mobile suffix, it's NOT desktop
+        if self._is_ultra_mobile_cpu(cpu_brand):
+            return False
+
+        import re
+
+        # Check for desktop suffixes: K, F, KF, T
+        # Pattern: number followed by desktop suffix (e.g., "285K", "265KF")
+        desktop_pattern = r"\d+(K|KF|F|T)\b"
+        has_desktop_suffix = bool(re.search(desktop_pattern, cpu_brand, re.IGNORECASE))
+
+        # Check for no suffix: "Ultra X processor YYY" where YYY is just numbers
+        # Pattern: "ultra" followed by number, "processor", then just numbers (no suffix)
+        no_suffix_pattern = r"ultra\s+\d+\s+processor\s+(\d+)\b"
+        has_no_suffix = bool(re.search(no_suffix_pattern, cpu_brand, re.IGNORECASE))
+
+        # Desktop if: has desktop suffix OR has no suffix (default to desktop)
+        return has_desktop_suffix or has_no_suffix
+
+    def _is_entry_cpu(self, cpu_brand: str) -> bool:
+        """
+        Check if CPU is Intel Entry level.
+
+        Entry includes:
+        - N-series: Core 3 N-series (e.g., Core i3-N305, N355)
+        - Processor N-series: Intel Processor N150, N250
+        - Atom x6000/x7000 series: Atom x6000E, x7000RE, etc.
+        - Historical: Pentium, Celeron (pre-2023)
+
+        Examples:
+        - Intel Processor N150
+        - Intel Core 3 Processor N355
+        - Intel Atom x7000E
+        - Intel Atom x6211E
+        - Intel Core i3-N305
+        - Intel Pentium Silver N6000
+        - Intel Celeron N5105
+
+        Args:
+            cpu_brand: CPU brand string from system info
+
+        Returns:
+            True if CPU is entry-level
+        """
+        if not cpu_brand:
+            return False
+
+        brand_lower = cpu_brand.lower()
+
+        # Check for N-series patterns
+        import re
+
+        # Pattern 1: "Processor N" followed by numbers
+        if re.search(r"processor\s+n\d+", brand_lower):
+            return True
+
+        # Pattern 2: "Core 3" with N-series or any Core with N in model number
+        if re.search(r"core\s+3.*n\d+", brand_lower):
+            return True
+        if re.search(r"core\s+i3-n\d+", brand_lower):
+            return True
+        if re.search(r"core.*\bn\d{3}\b", brand_lower):  # Core with N### pattern
+            return True
+
+        # Pattern 3: Atom x6000/x7000 series
+        # Match "atom x" followed by 6 or 7, then digits, optionally followed by letters
+        if re.search(r"atom.*\bx[67]\d{3}[a-z]*\b", brand_lower):
+            return True
+
+        # Pattern 4: Historical Pentium and Celeron
+        if "pentium" in brand_lower or "celeron" in brand_lower:
+            return True
+
+        return False
+
     def _check_docker_available(self) -> bool:
         """Check if Docker is available on the system."""
         try:
@@ -425,9 +631,7 @@ class SystemValidator:
             return False
 
 
-def validate_system_requirements(
-    requirements: Dict[str, Any], cache_dir: Optional[str] = None
-) -> Dict[str, Any]:
+def validate_system_requirements(requirements: Dict[str, Any], cache_dir: Optional[str] = None) -> Dict[str, Any]:
     """
     Convenience function to validate system requirements.
 
@@ -442,9 +646,7 @@ def validate_system_requirements(
     return validator.validate_requirements(requirements)
 
 
-def check_system_ready_for_tests(
-    requirements: Dict[str, Any], cache_dir: Optional[str] = None
-) -> bool:
+def check_system_ready_for_tests(requirements: Dict[str, Any], cache_dir: Optional[str] = None) -> bool:
     """
     Check if the system meets all requirements for running tests.
 

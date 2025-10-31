@@ -18,8 +18,9 @@ RUN uv pip install --system --no-cache -r /tmp/requirements.txt && \
     rm -f /tmp/requirements.txt
 
 # Set up workspace directory with secure permissions (770 prevents world access)
+# Note: vLLM v0.9.2 uses standalone benchmark_serving.py script
+#       Command: python3 /vllm-workspace/benchmarks/benchmark_serving.py [args]
 RUN mkdir -p /vllm-workspace/results && \
-    chmod +x /vllm-workspace/benchmarks/benchmark_serving.py && \
     chmod 770 /vllm-workspace/results && \
     chown -R user:user /vllm-workspace
 

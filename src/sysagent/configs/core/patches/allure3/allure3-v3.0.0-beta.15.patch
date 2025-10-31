@@ -2949,7 +2949,7 @@ index 000000000..036ee119d
 +              // Tiers ordered from highest to lowest (top to bottom display)
 +              // This creates a bottom-to-top visual hierarchy where Entry is at the bottom
 +              const tiers = [
-+                "Scalable AI Graphics and Media",
++                "Scalable AI Graphics Media",
 +                "Scalable Performance",
 +                "Efficiency Optimized",
 +                "Mainstream",

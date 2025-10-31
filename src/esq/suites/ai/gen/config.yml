@@ -64,6 +64,18 @@ kpi:
     description: "Throughput for Text Generation on dGPU in tokens per second"
     default_value: -1.0
 
+  throughput_hetero_dgpu:
+    name: "Throughput Hetero dGPU"
+    type: "numeric"
+    validation:
+      operator: "gte"
+      reference: 10.0
+      enabled: false
+    unit: "tokens/sec"
+    severity: "normal"
+    description: "Throughput for Text Generation on Hetero dGPU in tokens per second"
+    default_value: -1.0
+
   throughput_npu:
     name: "Throughput NPU"
     type: "numeric"
@@ -79,5 +91,10 @@ kpi:
 tests:
   test_text_generation:
     params:
-      - display_name: "Text Generation - Default"
+      - display_name: "Text Generation - Default (Pre-quantized OpenVINO Model)"
         devices: [cpu]
+        # model_precision not specified - uses pre-quantized OpenVINO model directly
+      - display_name: "Text Generation - With Quantization"
+        devices: [cpu]
+        model_precision: "int4"
+        # model_precision specified - quantizes original model on-demand

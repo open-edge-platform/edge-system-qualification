@@ -1,0 +1,248 @@
+# Copyright (C) 2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+name: "profile.qualification.ai-edge-system"
+description: "AI Edge System qualification"
+version: "1.0.0"
+params:
+  labels:
+    profile_display_name: "AI Edge System"
+    group: "ai-edge-system"
+    type: "qualification"
+    display_reference: true
+    kpi_enabled: true
+  tiers:
+    - entry
+    - mainstream
+    - efficiency_optimized
+    # Xeon based specific tier
+    - scalable_performance
+    # dGPU based specific tiers
+    - scalable_ai_graphics_media
+    - scalable_ai_graphics_media_10gb
+    - scalable_ai_graphics_media_24gb
+    - scalable_ai_graphics_media_52gb
+    - scalable_ai_graphics_media_hetero
+    - scalable_ai_graphics_media_hetero_10gb
+    - scalable_ai_graphics_media_hetero_24gb
+    - scalable_ai_graphics_media_hetero_52gb
+  requirements:
+    memory_min_gb: 8.0
+    os_type:
+      - "linux"
+    docker_required: true
+
+suites:
+  - name: "ai"
+    sub_suites:
+      - name: "gen"
+        tests:
+          test_text_generation:
+            params:
+              # Entry
+              - test_id: "AES-GEN-001"
+                display_name: "Gen AI - LLM Serving Benchmark - DeepSeek-R1-Distill-Qwen-1.5B INT4"
+                model_id: "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"
+                model_precision: "int4"
+                devices: [cpu, igpu]
+                tiers:
+                  - entry
+                kpi_refs:
+                  - throughput_cpu
+                  - throughput_igpu
+                kpi_validation_mode: "any"
+                kpi_override:
+                  throughput_cpu:
+                    validation:
+                      reference: 10.0
+                      enabled: true
+                  throughput_igpu:
+                    validation:
+                      reference: 10.0
+                      enabled: true
+
+              # Mainstream
+              - test_id: "AES-GEN-001"
+                display_name: "Gen AI - LLM Serving Benchmark - Phi-4-mini-reasoning 3.8B INT4"
+                model_id: "microsoft/Phi-4-mini-reasoning"
+                model_precision: "int4"
+                devices: [cpu, igpu]
+                tiers:
+                  - mainstream
+                kpi_refs:
+                  - throughput_cpu
+                  - throughput_igpu
+                kpi_validation_mode: "any"
+                kpi_override:
+                  throughput_cpu:
+                    validation:
+                      reference: 10.0
+                      enabled: true
+                  throughput_igpu:
+                    validation:
+                      reference: 10.0
+                      enabled: true
+
+              # Efficiency Optimized
+              - test_id: "AES-GEN-001"
+                display_name: "Gen AI - LLM Serving Benchmark - DeepSeek-R1-Distill-Qwen-14B INT4"
+                model_id: "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B"
+                model_precision: "int4"
+                devices: [cpu, igpu, npu]
+                tiers:
+                  - efficiency_optimized
+                kpi_refs:
+                  - throughput_cpu
+                  - throughput_igpu
+                  - throughput_npu
+                kpi_validation_mode: "any"
+                kpi_override:
+                  throughput_cpu:
+                    validation:
+                      reference: 10.0
+                      enabled: true
+                  throughput_igpu:
+                    validation:
+                      reference: 10.0
+                      enabled: true
+                  throughput_npu:
+                    validation:
+                      reference: 10.0
+                      enabled: true
+
+              # Scalable Performance
+              - test_id: "AES-GEN-001"
+                display_name: "Gen AI - LLM Serving Benchmark - Qwen3-32B INT4 (CPU)"
+                model_id: "Qwen/Qwen3-32B"
+                model_precision: "int4"
+                devices: [cpu]
+                tiers:
+                  - scalable_performance
+                kpi_refs:
+                  - throughput_cpu
+                kpi_override:
+                  throughput_cpu:
+                    validation:
+                      reference: 10.0
+                      enabled: true
+
+              # Scalable AI Graphics Media
+              - test_id: "AES-GEN-001"
+                display_name: "Gen AI - LLM Serving Benchmark - Phi-4-mini-reasoning 3.8B INT4 (dGPU)"
+                model_id: "microsoft/Phi-4-mini-reasoning"
+                model_precision: "int4"
+                devices: [dgpu]
+                tiers:
+                  - scalable_ai_graphics_media
+                kpi_refs:
+                  - throughput_dgpu
+                kpi_override:
+                  throughput_dgpu:
+                    validation:
+                      reference: 10.0
+                      enabled: true
+
+              - test_id: "AES-GEN-001"
+                display_name: "Gen AI - LLM Serving Benchmark - Phi-4-mini-reasoning 3.8B INT4 (Hetero dGPU)"
+                model_id: "microsoft/Phi-4-mini-reasoning"
+                model_precision: "int4"
+                devices: [hetero-dgpu]
+                tiers:
+                  - scalable_ai_graphics_media_hetero
+                kpi_refs:
+                  - throughput_hetero_dgpu
+                kpi_override:
+                  throughput_hetero_dgpu:
+                    validation:
+                      reference: 10.0
+                      enabled: true
+
+              - test_id: "AES-GEN-001"
+                display_name: "Gen AI - LLM Serving Benchmark - DeepSeek-R1-Distill-Qwen-14B INT4 (dGPU)"
+                model_id: "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B"
+                model_precision: "int4"
+                devices: [dgpu]
+                tiers:
+                  - scalable_ai_graphics_media_10gb
+                kpi_refs:
+                  - throughput_dgpu
+                kpi_override:
+                  throughput_dgpu:
+                    validation:
+                      reference: 10.0
+                      enabled: true
+
+              - test_id: "AES-GEN-001"
+                display_name: "Gen AI - LLM Serving Benchmark - DeepSeek-R1-Distill-Qwen-14B INT4 (Hetero dGPU)"
+                model_id: "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B"
+                model_precision: "int4"
+                devices: [hetero-dgpu]
+                tiers:
+                  - scalable_ai_graphics_media_hetero_10gb
+                kpi_refs:
+                  - throughput_hetero_dgpu
+                kpi_override:
+                  throughput_hetero_dgpu:
+                    validation:
+                      reference: 10.0
+                      enabled: true
+
+              - test_id: "AES-GEN-001"
+                display_name: "Gen AI - LLM Serving Benchmark - Qwen3-32B INT4 (dGPU)"
+                model_id: "Qwen/Qwen3-32B"
+                model_precision: "int4"
+                devices: [dgpu]
+                tiers:
+                  - scalable_ai_graphics_media_24gb
+                kpi_refs:
+                  - throughput_dgpu
+                kpi_override:
+                  throughput_dgpu:
+                    validation:
+                      reference: 10.0
+                      enabled: true
+
+              - test_id: "AES-GEN-001"
+                display_name: "Gen AI - LLM Serving Benchmark - Qwen3-32B INT4 (Hetero dGPU)"
+                model_id: "Qwen/Qwen3-32B"
+                model_precision: "int4"
+                devices: [hetero-dgpu]
+                tiers:
+                  - scalable_ai_graphics_media_hetero_24gb
+                kpi_refs:
+                  - throughput_hetero_dgpu
+                kpi_override:
+                  throughput_hetero_dgpu:
+                    validation:
+                      reference: 10.0
+                      enabled: true
+
+              - test_id: "AES-GEN-001"
+                display_name: "Gen AI - LLM Serving Benchmark - DeepSeek-R1-Distill-Llama-70B INT4 (dGPU)"
+                model_id: "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
+                model_precision: "int4"
+                devices: [dgpu]
+                tiers:
+                  - scalable_ai_graphics_media_52gb
+                kpi_refs:
+                  - throughput_dgpu
+                kpi_override:
+                  throughput_dgpu:
+                    validation:
+                      reference: 10.0
+                      enabled: true
+
+              - test_id: "AES-GEN-001"
+                display_name: "Gen AI - LLM Serving Benchmark - DeepSeek-R1-Distill-Llama-70B INT4 (Hetero dGPU)"
+                model_id: "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
+                model_precision: "int4"
+                devices: [hetero-dgpu]
+                tiers:
+                  - scalable_ai_graphics_media_hetero_52gb
+                kpi_refs:
+                  - throughput_hetero_dgpu
+                kpi_override:
+                  throughput_hetero_dgpu:
+                    validation:
+                      reference: 10.0
+                      enabled: true

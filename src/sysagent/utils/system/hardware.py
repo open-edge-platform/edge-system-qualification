@@ -203,7 +203,7 @@ def collect_gpu_info(pci_devices, openvino_gpu=None) -> dict:
             mem_size = all_props["GPU_DEVICE_TOTAL_MEM_SIZE"]
             if isinstance(mem_size, (int, float)):
                 normalized_device["memory_bytes"] = mem_size
-                normalized_device["memory_gb"] = mem_size / (1024**3)
+                normalized_device["memory_gb"] = mem_size / (1000**3)  # Use GB (1000^3) standard
 
         # Extract performance-related properties
         if "GPU_EXECUTION_UNITS_COUNT" in all_props:
@@ -434,7 +434,7 @@ def collect_npu_info(pci_devices, openvino_npu=None) -> dict:
             mem_size = all_props["NPU_DEVICE_TOTAL_MEM_SIZE"]
             if isinstance(mem_size, (int, float)):
                 normalized_device["memory_bytes"] = mem_size
-                normalized_device["memory_gb"] = mem_size / (1024**3)
+                normalized_device["memory_gb"] = mem_size / (1000**3)  # Use GB (1000^3) standard
 
         # Extract performance-related properties
         if "NPU_DEVICE_ARCHITECTURE" in all_props:

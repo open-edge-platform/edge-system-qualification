@@ -23,9 +23,7 @@ from sysagent.utils.core import Result
 logger = logging.getLogger(__name__)
 
 
-def mark_step_as_failed(
-    step_name: str, error_msg: str, validation_mode: str = "all", result_json=None
-):
+def mark_step_as_failed(step_name: str, error_msg: str, validation_mode: str = "all", result_json=None):
     """
     Mark an Allure step as failed but continue test execution.
 
@@ -129,8 +127,7 @@ def validate_test_results():
         for key, value in configs.items():
             if isinstance(value, dict):
                 logger.debug(
-                    f"Config key '{key}', Value: "
-                    f"(See the test parameters section in the test report for details)"
+                    f"Config key '{key}', Value: (See the test parameters section in the test report for details)"
                 )
             else:
                 logger.debug(f"Config Key: '{key}', Value: {value}")
@@ -179,9 +176,7 @@ def validate_test_results():
                 all_disabled = True
                 for kpi_name in current_kpi_refs:
                     kpi_config = get_kpi_config(kpi_name)
-                    if kpi_config and kpi_config.get("validation", {}).get(
-                        "enabled", True
-                    ):
+                    if kpi_config and kpi_config.get("validation", {}).get("enabled", True):
                         all_disabled = False
                         break
                 if all_disabled:
@@ -194,9 +189,7 @@ def validate_test_results():
         # If skipping, create a standardized skipped step and return
         if should_skip:
             # Collect KPI config details for all referenced KPIs
-            kpi_configs = {
-                kpi_name: get_kpi_config(kpi_name) for kpi_name in current_kpi_refs
-            }
+            kpi_configs = {kpi_name: get_kpi_config(kpi_name) for kpi_name in current_kpi_refs}
             with allure.step("Validate test results ⚪"):
                 allure.attach(
                     json.dumps(
@@ -226,11 +219,31 @@ def validate_test_results():
             # Skip validation if KPI validation is explicitly disabled
             if not kpi_config.get("validation", {}).get("enabled", True):
                 continue
+
+            # Handle mapping from generic KPI names to indexed device metrics
+            # e.g., "throughput_dgpu" -> ["throughput_dgpu1", "throughput_dgpu2"]
+            matched_metrics = []
             if kpi_name in results.metrics:
-                kpi_entry = results.metrics[kpi_name]
+                # Exact match found
+                matched_metrics = [kpi_name]
+            else:
+                # Check for indexed variants (e.g., throughput_dgpu1, throughput_dgpu2)
+                for metric_name in results.metrics.keys():
+                    if metric_name.startswith(f"{kpi_name}") and metric_name != kpi_name:
+                        # Check if the suffix is a digit (to avoid false matches)
+                        suffix = metric_name[len(kpi_name) :]
+                        if suffix and suffix[0].isdigit():
+                            matched_metrics.append(metric_name)
+
+            # Validate using the first matching metric (highest priority)
+            if matched_metrics:
+                # Sort to ensure consistent ordering (dgpu1 before dgpu2)
+                matched_metrics.sort()
+                metric_name = matched_metrics[0]
+                kpi_entry = results.metrics[metric_name]
                 value = kpi_entry.value
                 unit = kpi_entry.unit or ""
-                logger.debug(f"Pre-validating KPI: {kpi_name} with value: {value}")
+                logger.debug(f"Pre-validating KPI: {kpi_name} using metric: {metric_name} with value: {value}")
                 from sysagent.utils.core.kpi import validate_kpi
 
                 result = validate_kpi(value, kpi_config)
@@ -241,6 +254,7 @@ def validate_test_results():
                     validation_passed = False
                 validation_count += 1
             else:
+                logger.warning(f"KPI {kpi_name} not found in results metrics")
                 validation_passed = False
                 validation_count += 1
 
@@ -249,10 +263,7 @@ def validate_test_results():
             overall_passed = at_least_one_passed
         else:  # "all"
             overall_passed = validation_passed
-        logger.debug(
-            f"Overall validation status for test {test_name} "
-            f"with mode '{mode}': {overall_passed}"
-        )
+        logger.debug(f"Overall validation status for test {test_name} with mode '{mode}': {overall_passed}")
 
         validation_results["passed"] = overall_passed
 
@@ -264,9 +275,7 @@ def validate_test_results():
         if overall_passed:
             logger.info(f"KPI validations passed {step_suffix}")
         else:
-            logger.info(
-                f"KPI validation failed {step_suffix} - see test report for details"
-            )
+            logger.info(f"KPI validation failed {step_suffix} - see test report for details")
 
         # Now create the step with the appropriate title based on pre-validation
         with allure.step(f"Validate test results {step_icon}"):
@@ -279,9 +288,7 @@ def validate_test_results():
                 # Skip validation if KPI config is not defined
                 if not kpi_config:
                     with allure.step(f"Validate KPI: {kpi_name} ⚪"):
-                        logger.warning(
-                            f"KPI {kpi_name} config not found - skipping validation"
-                        )
+                        logger.warning(f"KPI {kpi_name} config not found - skipping validation")
                         result_json = {
                             "kpi_name": kpi_name,
                             "status": "SKIPPED",
@@ -292,18 +299,43 @@ def validate_test_results():
                             name="KPI Validation Result",
                             attachment_type=allure.attachment_type.JSON,
                         )
-                        logger.info(
-                            f"Skipped validation for KPI {kpi_name} - not defined"
-                        )
+                        logger.info(f"Skipped validation for KPI {kpi_name} - not defined")
                         validation_results["validations"][kpi_name] = {
                             "skipped": True,
                             "reason": "KPI configuration not defined",
                         }
                     continue
+
+                # Handle mapping from generic KPI names to indexed device metrics
+                # e.g., "throughput_dgpu" -> ["throughput_dgpu1", "throughput_dgpu2"]
+                matched_metrics = []
                 if kpi_name in results.metrics:
-                    kpi_entry = results.metrics[kpi_name]
+                    # Exact match found
+                    matched_metrics = [kpi_name]
+                else:
+                    # Check for indexed variants (e.g., throughput_dgpu1, throughput_dgpu2)
+                    for metric_name in results.metrics.keys():
+                        if metric_name.startswith(f"{kpi_name}") and metric_name != kpi_name:
+                            # Check if the suffix is a digit (to avoid false matches)
+                            suffix = metric_name[len(kpi_name) :]
+                            if suffix and suffix[0].isdigit():
+                                matched_metrics.append(metric_name)
+
+                # Validate using the first matching metric (highest priority)
+                if matched_metrics:
+                    # Sort to ensure consistent ordering (dgpu1 before dgpu2)
+                    matched_metrics.sort()
+                    metric_name = matched_metrics[0]
+                    kpi_entry = results.metrics[metric_name]
                     value = kpi_entry.value
                     unit = kpi_entry.unit or ""
+
+                    # Log if using an indexed variant instead of exact match
+                    if metric_name != kpi_name:
+                        logger.info(
+                            f"Using metric '{metric_name}' for KPI '{kpi_name}' "
+                            f"(first of {len(matched_metrics)} matched metrics)"
+                        )
 
                     from sysagent.utils.core.kpi import validate_kpi
 
@@ -325,9 +357,7 @@ def validate_test_results():
                         "not_in": "not in",
                     }
                     operator_str = operator_display_map.get(
-                        result.operator
-                        if isinstance(result.operator, str)
-                        else result.operator.value,
+                        result.operator if isinstance(result.operator, str) else result.operator.value,
                         str(result.operator),
                     )
                     # Log the validation result
@@ -385,9 +415,7 @@ def validate_test_results():
                             f"Validate KPI: {kpi_name} - Actual: {actual_str} "
                             f"{operator_str} Expected: {expected_str} {unit}"
                         )
-                        mark_step_as_failed(
-                            failed_step_name, error_msg, mode, result_json
-                        )
+                        mark_step_as_failed(failed_step_name, error_msg, mode, result_json)
                     validation_count += 1
                     validation_results["validations"][kpi_name] = result.to_dict()
                 else:
@@ -411,9 +439,7 @@ def validate_test_results():
             logger.info(f"Completed KPI validation with result: {overall_passed}")
 
             # Trigger pytest_check failure if overall_passed is False
-            check.equal(
-                overall_passed, True, f"KPI validation failed for test: {test_name}"
-            )
+            check.equal(overall_passed, True, f"KPI validation failed for test: {test_name}")
 
         return validation_results
 
@@ -522,9 +548,7 @@ def validate_system_requirements_from_configs():
                 attach_requirements_info()
                 all_checks = validation_results["checks"]
                 passed_checks = [check for check in all_checks if check["passed"]]
-                details = [
-                    f"✓ {format_check_details(check)}" for check in passed_checks
-                ]
+                details = [f"✓ {format_check_details(check)}" for check in passed_checks]
                 passed_details_message = "\n".join(details)
                 logger.info("✓ System requirements validation passed")
                 for detail in details:
@@ -551,20 +575,10 @@ def validate_system_requirements_from_configs():
         else:
             with allure.step("Validate system requirements 🔴"):
                 attach_requirements_info()
-                failed_checks = [
-                    check
-                    for check in validation_results["checks"]
-                    if not check["passed"]
-                ]
-                passed_checks = [
-                    check for check in validation_results["checks"] if check["passed"]
-                ]
-                failed_details = [
-                    f"✗ {format_check_details(check)}" for check in failed_checks
-                ]
-                passed_details = [
-                    f"✓ {format_check_details(check)}" for check in passed_checks
-                ]
+                failed_checks = [check for check in validation_results["checks"] if not check["passed"]]
+                passed_checks = [check for check in validation_results["checks"] if check["passed"]]
+                failed_details = [f"✗ {format_check_details(check)}" for check in failed_checks]
+                passed_details = [f"✓ {format_check_details(check)}" for check in passed_checks]
                 reason = "; ".join(format_check_details(c) for c in failed_checks)
                 skip_message = f"System requirements not met: {reason}"
                 failed_details_message = "\n".join(failed_details)

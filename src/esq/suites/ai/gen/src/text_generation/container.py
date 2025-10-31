@@ -44,7 +44,11 @@ def run_ovms_server_container(
     """
     # Normalize model_id to use just the basename and make it lowercase
     model_basename = os.path.basename(model_id.replace("/", "_")).lower()
-    container_name = f"{docker_container_prefix}server_{model_basename}_{device_id.replace('.', '_')}".lower()
+
+    # Normalize device_id for container naming
+    # HETERO:GPU.0,GPU.1 -> hetero_gpu_0_gpu_1
+    device_name_safe = device_id.replace(":", "_").replace(".", "_").replace(",", "_").lower()
+    container_name = f"{docker_container_prefix}server_{model_basename}_{device_name_safe}".lower()
 
     # Container configuration
     container_config = {
@@ -102,39 +106,59 @@ def run_ovms_server_container(
         docker_client.start_log_streaming(container, container_name)
 
         # Wait for container to be ready using original model availability check
-        if not wait_for_ovms_model_ready(model_id, 8000, server_timeout):
-            logger.error("OVMS server failed to become ready")
-            docker_client.stop_log_streaming(container_name)
-            docker_client.remove_container(container.id)
-            raise RuntimeError("OVMS server startup failed")
+        ready_status = wait_for_ovms_model_ready(model_id, 8000, server_timeout)
+        if not ready_status:
+            error_msg = (
+                f"OVMS server failed to serve the model: Model initialization timed out after {server_timeout} seconds"
+            )
+            logger.error(error_msg)
+            try:
+                docker_client.cleanup_container(container_name)
+            except Exception as cleanup_error:
+                logger.warning(f"Failed to cleanup container after timeout: {cleanup_error}")
+            raise RuntimeError(error_msg)
 
         return container_config
 
+    except RuntimeError:
+        # Re-raise RuntimeError to preserve the original error message
+        raise
     except Exception as e:
+        # For other exceptions, cleanup and re-raise
         logger.error(f"Failed to start OVMS container: {e}")
+        if container_name:
+            try:
+                docker_client.cleanup_container(container_name)
+            except Exception as cleanup_error:
+                logger.warning(f"Failed to cleanup container after error: {cleanup_error}")
         raise
 
 
 def wait_for_ovms_model_ready(model_id: str, port: int, timeout: int = 300) -> bool:
     """
-    Wait for OVMS model to be ready - using original implementation logic.
+    Wait for OVMS model or MediaPipe graph to be ready.
 
     Args:
-        model_id: Model identifier to check
+        model_id: Model identifier to check (can be original model ID or safe name for MediaPipe)
         port: HTTP port to check
         timeout: Maximum wait time in seconds
 
     Returns:
-        True if model becomes ready, False otherwise
+        True if model/servable becomes ready, False otherwise
     """
     api_url = f"http://localhost:{port}/v1/config"
     start_time = time.time()
+
+    # Generate both possible identifiers
+    safe_model_id = model_id.replace("/", "_")
 
     while time.time() - start_time < timeout:
         try:
             response = requests.get(api_url)
             if response.status_code == 200:
                 server_results = response.json()
+
+                # Check if model is available in model_config_list (traditional models)
                 if (
                     server_results
                     and model_id in server_results
@@ -144,8 +168,34 @@ def wait_for_ovms_model_ready(model_id: str, port: int, timeout: int = 300) -> b
                     and "state" in server_results[model_id]["model_version_status"][0]
                     and server_results[model_id]["model_version_status"][0]["state"] == "AVAILABLE"
                 ):
-                    logger.info("OVMS model is available and ready.")
+                    logger.info(f"OVMS model {model_id} is available and ready.")
                     return True
+
+                # Check if model is available in model_config_list using safe name (traditional models)
+                if (
+                    server_results
+                    and safe_model_id in server_results
+                    and "model_version_status" in server_results[safe_model_id]
+                    and server_results[safe_model_id]["model_version_status"]
+                    and len(server_results[safe_model_id]["model_version_status"]) > 0
+                    and "state" in server_results[safe_model_id]["model_version_status"][0]
+                    and server_results[safe_model_id]["model_version_status"][0]["state"] == "AVAILABLE"
+                ):
+                    logger.info(f"OVMS model {safe_model_id} is available and ready.")
+                    return True
+
+                # Check if MediaPipe graph is available (for LLM serving)
+                # MediaPipe servables don't show in the response keys like traditional models
+                # Instead, we check if mediapipe_config_list exists and is not empty
+                # If the server started without errors and /v1/config is accessible, MediaPipe is ready
+                if "mediapipe_config_list" in server_results and server_results["mediapipe_config_list"]:
+                    # MediaPipe graphs don't report status in the same way
+                    # If the server is up and the config lists the mediapipe, it's ready
+                    mediapipe_names = [mp["name"] for mp in server_results.get("mediapipe_config_list", [])]
+                    if model_id in mediapipe_names or safe_model_id in mediapipe_names:
+                        logger.info(f"OVMS MediaPipe servable {safe_model_id} is available and ready.")
+                        return True
+                    logger.info(f"MediaPipe servables found: {mediapipe_names}, waiting for {safe_model_id}...")
                 else:
                     logger.info("OVMS service is up but model not ready, retrying ...")
             else:
@@ -165,6 +215,7 @@ def run_benchmark_container(
     docker_container_prefix: str,
     data_dir: str,
     model_id: str,
+    ovms_model_name: str,  # Actual model name with quantization suffix
     model_precision: str,
     device_id: str,
     dataset_path: str,
@@ -174,6 +225,7 @@ def run_benchmark_container(
     test_request_rate: int,
     test_max_concurrent_requests: int,
     benchmark_timeout: int = 300,
+    models_dir: str = None,  # Add models_dir parameter
 ) -> Dict[str, Any]:
     """
     Run benchmark container for performance testing using pre-built image with uv package manager.
@@ -182,7 +234,8 @@ def run_benchmark_container(
         docker_client: Docker client instance
         docker_container_prefix: Container name prefix
         data_dir: Host data directory
-        model_id: Model identifier
+        model_id: Original model identifier (for HuggingFace fallback and naming)
+        ovms_model_name: Actual model name used in OVMS (with quantization suffix if applicable)
         model_precision: Model precision
         device_id: Device identifier
         dataset_path: Path to dataset file
@@ -192,13 +245,18 @@ def run_benchmark_container(
         test_request_rate: Request rate
         test_max_concurrent_requests: Max concurrent requests
         benchmark_timeout: Benchmark timeout
+        models_dir: Models directory path (for local tokenizer access)
 
     Returns:
         Dict with benchmark results
     """
     # Normalize model_id to use just the basename and make it lowercase
     model_basename = os.path.basename(model_id.replace("/", "_")).lower()
-    container_name = f"{docker_container_prefix}benchmark_{model_basename}_{device_id.replace('.', '_')}".lower()
+
+    # Normalize device_id for container naming
+    # HETERO:GPU.0,GPU.1 -> hetero_gpu_0_gpu_1
+    device_name_safe = device_id.replace(":", "_").replace(".", "_").replace(",", "_").lower()
+    container_name = f"{docker_container_prefix}benchmark_{model_basename}_{device_name_safe}".lower()
 
     # Results directory setup with proper permissions like original
     results_dir = os.path.join(data_dir, "results", "text_generation")
@@ -209,29 +267,66 @@ def run_benchmark_container(
 
     ensure_dir_permissions(results_dir, uid=os.getuid(), gid=os.getgid(), mode=0o775)
 
-    # Volume mounts - similar to original implementation
+    # Volume mounts - mount both dataset and models directory for local tokenizer access
     volumes = {
         dataset_path: {"bind": f"/vllm-workspace/benchmarks/{hf_dataset_filename}", "mode": "ro"},
         results_dir: {"bind": "/vllm-workspace/results", "mode": "rw"},
     }
 
-    # Build benchmark command using original implementation approach (runtime pip install + fixed port)
+    # Add models directory mount if provided (for local tokenizer access)
+    tokenizer_path = None
+    if models_dir:
+        volumes[models_dir] = {"bind": "/vllm-workspace/models", "mode": "ro"}
+        # Tokenizer path inside container - use actual model name with quantization suffix
+        # For pre-quantized models, tokenizer is in version subdirectory
+        if model_precision is None:
+            # Pre-quantized model: use safe name + version subdirectory
+            model_safe_name_for_path = model_id.replace("/", "_")
+            tokenizer_path = f"/vllm-workspace/models/{model_safe_name_for_path}/1"
+        else:
+            # Quantized model: use actual model name with quantization suffix
+            tokenizer_path = f"/vllm-workspace/models/{ovms_model_name}"
+
+    # Build benchmark command using vLLM v0.9.2 standalone script approach
+    # Using the original benchmark_serving.py script that supports external OpenAI-compatible servers
+    # Note: OVMS uses /v3/chat/completions endpoint (not standard OpenAI /v1/ endpoints)
+    # Using 'openai-chat' backend for chat completions format
+    # Model name for OVMS: use actual model name (with quantization suffix for quantized models)
+    # Tokenizer parameter points to local model directory mounted in container
+
+    # For pre-quantized models, OVMS uses safe name without suffix
+    # For quantized models, OVMS uses actual name with quantization suffix
+    model_name_for_ovms = ovms_model_name
+
+    # Handle model_precision being None for pre-quantized models
+    # Use "prequantized" as a placeholder for filename generation
+    precision_str = model_precision if model_precision else "prequantized"
+
+    # Device ID format for filename: normalize special characters
+    # HETERO:GPU.0,GPU.1 -> HETERO_GPU_0_GPU_1
+    device_id_safe = device_id.replace(":", "_").replace(".", "_").replace(",", "_")
+
+    # Build tokenizer argument - use local path if available, otherwise original model_id
+    tokenizer_arg = f"--tokenizer {tokenizer_path} " if tokenizer_path else f"--tokenizer {model_id} "
+
     benchmark_cmd = [
         "-c",
         (
             "python3 /vllm-workspace/benchmarks/benchmark_serving.py "
             f"--host 127.0.0.1 "  # Use localhost to access OVMS server bound to 127.0.0.1
-            "--port 8000 "  # Use fixed port like original
+            f"--port {ovms_port} "  # Use OVMS server port (typically 8000)
             "--endpoint /v3/chat/completions "
             "--backend openai-chat "
-            f"--model {model_id} "
+            f"--model {model_name_for_ovms} "  # Use actual OVMS model name (with suffix if quantized)
+            f"{tokenizer_arg}"  # Use local tokenizer path if available, fallback to HuggingFace
+            "--dataset-name sharegpt "
             f"--dataset-path /vllm-workspace/benchmarks/{hf_dataset_filename} "
             f"--request-rate {test_request_rate} "
             f"--max-concurrency {test_max_concurrent_requests} "
             f"--num-prompts {test_num_prompts} "
             "--save-result "
             "--result-dir /vllm-workspace/results "
-            f"--result-filename ovms-{model_id.replace('/', '_')}-{model_precision}-{device_id}.json"
+            f"--result-filename ovms-{model_name_for_ovms}-{precision_str}-{device_id_safe}.json"
         ),
     ]
 
@@ -265,15 +360,15 @@ def run_benchmark_container(
         logger.info(f"OVMS benchmark container {container_name} executed successfully")
 
         # Return result information with container details
+        # Use consistent filename generation with the benchmark command
+        results_filename = f"ovms-{model_name_for_ovms}-{precision_str}-{device_id_safe}.json"
         return {
             "container_name": container_name,
             "exit_code": result.get("container_info", {}).get("exit_code", 0),
             "logs": result.get("container_logs_text", ""),
             "success": True,
             "container_info": result.get("container_info", {}),
-            "results_file": os.path.join(
-                results_dir, f"ovms-{model_id.replace('/', '_')}-{model_precision}-{device_id}.json"
-            ),
+            "results_file": os.path.join(results_dir, results_filename),
         }
 
     except Exception as e:

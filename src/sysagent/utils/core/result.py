@@ -32,7 +32,12 @@ class Result:
 
     The Result class automatically includes default metadata:
     - created_at: ISO timestamp of result creation
+    - updated_at: ISO timestamp of result completion (updated via update_timestamps())
+    - total_duration_seconds: Total test duration calculated from created_at to updated_at
     - kpi_validation_status: Overall KPI validation status ("skipped", "passed", or "failed")
+
+    Additional metadata can be added for test-specific information:
+    - model_export_duration_seconds: Duration of model export operation (if applicable)
 
     The Result class supports automatic metadata merging from profile and test configurations.
     Use Result.from_test_config() or result.apply_config_metadata() to apply configuration metadata.
@@ -57,6 +62,10 @@ class Result:
         if "created_at" not in self.metadata:
             self.metadata["created_at"] = datetime.now().astimezone().isoformat()
 
+        # Add updated_at to metadata if not already present
+        if "updated_at" not in self.metadata:
+            self.metadata["updated_at"] = datetime.now().astimezone().isoformat()
+
         # Add default KPI validation status if not already present
         if "kpi_validation_status" not in self.metadata:
             self.metadata["kpi_validation_status"] = "skipped"
@@ -70,6 +79,25 @@ class Result:
             "metadata": self.metadata,
             "kpis": self.kpis,
         }
+
+    def update_timestamps(self):
+        """
+        Update the updated_at timestamp and calculate total duration.
+
+        This should be called when the test completes to capture the final timestamp
+        and calculate total test duration in seconds.
+        """
+        self.metadata["updated_at"] = datetime.now().astimezone().isoformat()
+
+        # Calculate duration if both timestamps exist
+        if "created_at" in self.metadata and "updated_at" in self.metadata:
+            try:
+                created = datetime.fromisoformat(self.metadata["created_at"])
+                updated = datetime.fromisoformat(self.metadata["updated_at"])
+                duration_seconds = (updated - created).total_seconds()
+                self.metadata["total_duration_seconds"] = round(duration_seconds, 2)
+            except (ValueError, TypeError) as e:
+                logger.warning(f"Failed to calculate duration: {e}")
 
     def update_kpi_validation_status(self, validation_results: Dict[str, Any], mode: str = "all"):
         """
@@ -378,8 +406,24 @@ class Result:
 def get_metric_name_for_device(device_id, device_type=None, prefix="metric"):
     """
     Returns a metric name with the given prefix, customized for device_id and device_type.
+
+    Supports indexed dGPU metrics (dgpu1, dgpu2, etc.) and HETERO device metrics.
+
+    Args:
+        device_id: OpenVINO device ID (e.g., "CPU", "GPU.0", "GPU.1", "HETERO:GPU.0,GPU.1")
+        device_type: Device type string (optional, will be detected if not provided)
+        prefix: Metric name prefix (default: "metric")
+
+    Returns:
+        Metric name string (e.g., "throughput_cpu", "throughput_dgpu1", "throughput_hetero_dgpu")
     """
     device_id_lower = device_id.lower()
+
+    # Handle HETERO devices
+    if device_id.upper().startswith("HETERO:"):
+        return f"{prefix}_hetero_dgpu"
+
+    # Handle standard devices
     if device_id_lower == "cpu":
         return f"{prefix}_cpu"
     elif device_id_lower == "npu":
@@ -390,8 +434,19 @@ def get_metric_name_for_device(device_id, device_type=None, prefix="metric"):
             from sysagent.utils.system.ov_helper import get_openvino_device_type
 
             device_type = get_openvino_device_type(device_id)
+
+        # Handle integrated GPU
         if device_type == "Type.INTEGRATED":
             return f"{prefix}_igpu"
+
+        # Handle discrete GPU with indexing
         elif device_type == "Type.DISCRETE":
-            return f"{prefix}_dgpu"
+            # Extract GPU index from device_id (e.g., "GPU.0" -> "0", "GPU.1" -> "1")
+            if "." in device_id:
+                gpu_index = device_id.split(".")[1]
+                return f"{prefix}_dgpu{gpu_index}"
+            else:
+                # Fallback for GPU without index
+                return f"{prefix}_dgpu"
+
     return prefix

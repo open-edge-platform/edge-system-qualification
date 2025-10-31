@@ -34,12 +34,8 @@ def get_node_version():
 
 
 NODE_VERSION = get_node_version()
-NODE_LINUX_URL = (
-    f"https://nodejs.org/dist/{NODE_VERSION}/node-{NODE_VERSION}-linux-x64.tar.gz"
-)
-NODE_WINDOWS_URL = (
-    f"https://nodejs.org/dist/{NODE_VERSION}/node-{NODE_VERSION}-win-x64.zip"
-)
+NODE_LINUX_URL = f"https://nodejs.org/dist/{NODE_VERSION}/node-{NODE_VERSION}-linux-x64.tar.gz"
+NODE_WINDOWS_URL = f"https://nodejs.org/dist/{NODE_VERSION}/node-{NODE_VERSION}-win-x64.zip"
 
 
 def _validate_url_scheme(url: str) -> None:
@@ -56,9 +52,7 @@ def _validate_url_scheme(url: str) -> None:
 
     parsed = urlparse(url)
     if parsed.scheme.lower() not in ("http", "https"):
-        raise ValueError(
-            f"Unsafe URL scheme '{parsed.scheme}'. Only http/https are allowed."
-        )
+        raise ValueError(f"Unsafe URL scheme '{parsed.scheme}'. Only http/https are allowed.")
 
 
 def download_file(url: str, target_path: str) -> None:
@@ -101,14 +95,10 @@ def is_nodejs_installed(node_dir: str) -> bool:
     """
     # Check if node/npm executables exist
     node_exe = (
-        os.path.join(node_dir, "bin", "node")
-        if platform.system() != "Windows"
-        else os.path.join(node_dir, "node.exe")
+        os.path.join(node_dir, "bin", "node") if platform.system() != "Windows" else os.path.join(node_dir, "node.exe")
     )
     npm_exe = (
-        os.path.join(node_dir, "bin", "npm")
-        if platform.system() != "Windows"
-        else os.path.join(node_dir, "npm.cmd")
+        os.path.join(node_dir, "bin", "npm") if platform.system() != "Windows" else os.path.join(node_dir, "npm.cmd")
     )
 
     return os.path.exists(node_exe) and os.path.exists(npm_exe)

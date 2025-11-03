@@ -31,6 +31,44 @@ params:
     os_type:
       - "linux"
     docker_required: true
+  # Vision AI global params
+  videos:
+    - name: "1192116-hd_1920_1080_15fps_30s.mp4"
+      url: "https://videos.pexels.com/video-files/1192116/1192116-hd_1920_1080_30fps.mp4"
+      sha256: "65d836330fda9cfe6aa7a6bb4b2a81df4897325133da096b275e40b359e2d4ea"
+      fps: 15
+      duration: 30
+  models:
+    - id: "yolo11n"
+      source: "ultralytics"
+      precision: "fp16"
+      format: "pt"
+  pipeline: |
+    filesrc location=./videos/1192116-hd_1920_1080_15fps_30s.mp4
+      ! ${DECODE_ELEMENTS}
+      ! gvadetect model=./models/yolo11n/fp16/yolo11n.xml device=${DEVICE_ID} ${INFERENCE_ELEMENTS} batch-size=1
+      ! queue
+  pipeline_params:
+    DECODE_ELEMENTS:
+      cpu: "parsebin ! avdec_h264 ! 'video/x-raw'"
+      gpu_integrated: "parsebin ! vah264dec ! vapostproc ! 'video/x-raw(memory:VAMemory)'"
+      gpu_discrete: "parsebin ! varenderD{RENDER_DEVICE_NUM}h264dec ! {VIDEO_RAW_TYPE}"
+      npu: "parsebin ! vah264dec ! 'video/x-raw(memory:VAMemory)'"
+    INFERENCE_ELEMENTS:
+      cpu: "pre-process-backend={PRE_PROCESS_BACKEND}"
+      gpu_integrated: "pre-process-backend={PRE_PROCESS_BACKEND} model-instance-id=inst0"
+      gpu_discrete: "pre-process-backend={PRE_PROCESS_BACKEND}"
+      npu: "pre-process-backend={PRE_PROCESS_BACKEND}"
+    PRE_PROCESS_BACKEND:
+      cpu: "ie"
+      gpu_integrated: "va-surface-sharing"
+      gpu_discrete: "va-surface-sharing"
+      npu: "va"
+    VIDEO_RAW_TYPE:
+      default: "'video/x-raw(memory:VAMemory)'"
+      overrides:
+        FULL_DEVICE_NAME:
+          "Intel(R) Unsupported video type": "'video/x-raw'"
 
 suites:
   - name: "ai"
@@ -41,7 +79,7 @@ suites:
             params:
               # Entry
               - test_id: "AES-GEN-001"
-                display_name: "Gen AI - LLM Serving Benchmark - DeepSeek-R1-Distill-Qwen-1.5B INT4"
+                display_name: "Gen AI LLM Serving Benchmark - DeepSeek-R1-Distill-Qwen-1.5B INT4"
                 model_id: "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"
                 model_precision: "int4"
                 devices: [cpu, igpu]
@@ -63,7 +101,7 @@ suites:
 
               # Mainstream
               - test_id: "AES-GEN-001"
-                display_name: "Gen AI - LLM Serving Benchmark - Phi-4-mini-reasoning 3.8B INT4"
+                display_name: "Gen AI LLM Serving Benchmark - Phi-4-mini-reasoning 3.8B INT4"
                 model_id: "microsoft/Phi-4-mini-reasoning"
                 model_precision: "int4"
                 devices: [cpu, igpu]
@@ -85,7 +123,7 @@ suites:
 
               # Efficiency Optimized
               - test_id: "AES-GEN-001"
-                display_name: "Gen AI - LLM Serving Benchmark - DeepSeek-R1-Distill-Qwen-14B INT4"
+                display_name: "Gen AI LLM Serving Benchmark - DeepSeek-R1-Distill-Qwen-14B INT4"
                 model_id: "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B"
                 model_precision: "int4"
                 devices: [cpu, igpu, npu]
@@ -112,7 +150,7 @@ suites:
 
               # Scalable Performance
               - test_id: "AES-GEN-001"
-                display_name: "Gen AI - LLM Serving Benchmark - Qwen3-32B INT4 (CPU)"
+                display_name: "Gen AI LLM Serving Benchmark - Qwen3-32B INT4 (CPU)"
                 model_id: "Qwen/Qwen3-32B"
                 model_precision: "int4"
                 devices: [cpu]
@@ -128,7 +166,7 @@ suites:
 
               # Scalable AI Graphics Media
               - test_id: "AES-GEN-001"
-                display_name: "Gen AI - LLM Serving Benchmark - Phi-4-mini-reasoning 3.8B INT4 (dGPU)"
+                display_name: "Gen AI LLM Serving Benchmark - Phi-4-mini-reasoning 3.8B INT4 (dGPU)"
                 model_id: "microsoft/Phi-4-mini-reasoning"
                 model_precision: "int4"
                 devices: [dgpu]
@@ -143,7 +181,7 @@ suites:
                       enabled: true
 
               - test_id: "AES-GEN-001"
-                display_name: "Gen AI - LLM Serving Benchmark - Phi-4-mini-reasoning 3.8B INT4 (Hetero dGPU)"
+                display_name: "Gen AI LLM Serving Benchmark - Phi-4-mini-reasoning 3.8B INT4 (Hetero dGPU)"
                 model_id: "microsoft/Phi-4-mini-reasoning"
                 model_precision: "int4"
                 devices: [hetero-dgpu]
@@ -158,7 +196,7 @@ suites:
                       enabled: true
 
               - test_id: "AES-GEN-001"
-                display_name: "Gen AI - LLM Serving Benchmark - DeepSeek-R1-Distill-Qwen-14B INT4 (dGPU)"
+                display_name: "Gen AI LLM Serving Benchmark - DeepSeek-R1-Distill-Qwen-14B INT4 (dGPU)"
                 model_id: "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B"
                 model_precision: "int4"
                 devices: [dgpu]
@@ -173,7 +211,7 @@ suites:
                       enabled: true
 
               - test_id: "AES-GEN-001"
-                display_name: "Gen AI - LLM Serving Benchmark - DeepSeek-R1-Distill-Qwen-14B INT4 (Hetero dGPU)"
+                display_name: "Gen AI LLM Serving Benchmark - DeepSeek-R1-Distill-Qwen-14B INT4 (Hetero dGPU)"
                 model_id: "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B"
                 model_precision: "int4"
                 devices: [hetero-dgpu]
@@ -188,7 +226,7 @@ suites:
                       enabled: true
 
               - test_id: "AES-GEN-001"
-                display_name: "Gen AI - LLM Serving Benchmark - Qwen3-32B INT4 (dGPU)"
+                display_name: "Gen AI LLM Serving Benchmark - Qwen3-32B INT4 (dGPU)"
                 model_id: "Qwen/Qwen3-32B"
                 model_precision: "int4"
                 devices: [dgpu]
@@ -203,7 +241,7 @@ suites:
                       enabled: true
 
               - test_id: "AES-GEN-001"
-                display_name: "Gen AI - LLM Serving Benchmark - Qwen3-32B INT4 (Hetero dGPU)"
+                display_name: "Gen AI LLM Serving Benchmark - Qwen3-32B INT4 (Hetero dGPU)"
                 model_id: "Qwen/Qwen3-32B"
                 model_precision: "int4"
                 devices: [hetero-dgpu]
@@ -218,7 +256,7 @@ suites:
                       enabled: true
 
               - test_id: "AES-GEN-001"
-                display_name: "Gen AI - LLM Serving Benchmark - DeepSeek-R1-Distill-Llama-70B INT4 (dGPU)"
+                display_name: "Gen AI LLM Serving Benchmark - DeepSeek-R1-Distill-Llama-70B INT4 (dGPU)"
                 model_id: "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                 model_precision: "int4"
                 devices: [dgpu]
@@ -233,7 +271,7 @@ suites:
                       enabled: true
 
               - test_id: "AES-GEN-001"
-                display_name: "Gen AI - LLM Serving Benchmark - DeepSeek-R1-Distill-Llama-70B INT4 (Hetero dGPU)"
+                display_name: "Gen AI LLM Serving Benchmark - DeepSeek-R1-Distill-Llama-70B INT4 (Hetero dGPU)"
                 model_id: "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                 model_precision: "int4"
                 devices: [hetero-dgpu]
@@ -245,4 +283,87 @@ suites:
                   throughput_hetero_dgpu:
                     validation:
                       reference: 10.0
+                      enabled: true
+
+
+      - name: "vision"
+        tests:
+          test_dlstreamer:
+            params:
+              # Entry
+              - test_id: "AES-VSN-001"
+                display_name: "Vision AI Benchmark - multi-stream 1080p15 H.264 gvadetect YOLO11n FP16 15FPS"
+                devices: [cpu, igpu]
+                tiers:
+                  - entry
+                kpi_refs:
+                  - streams_max
+                kpi_override:
+                  streams_max:
+                    validation:
+                      reference: 2
+                      enabled: true
+
+              # Mainstream
+              - test_id: "AES-VSN-001"
+                display_name: "Vision AI Benchmark - multi-stream 1080p15 H.264 gvadetect YOLO11n FP16"
+                devices: [cpu, igpu]
+                tiers:
+                  - mainstream
+                kpi_refs:
+                  - streams_max
+                kpi_override:
+                  streams_max:
+                    validation:
+                      reference: 7
+                      enabled: true
+
+              # Efficiency Optimized
+              - test_id: "AES-VSN-001"
+                display_name: "Vision AI Benchmark - multi-stream 1080p15 H.264 gvadetect YOLO11n FP16 15FPS"
+                devices: [cpu, igpu, npu]
+                tiers:
+                  - efficiency_optimized
+                kpi_refs:
+                  - streams_max
+                kpi_override:
+                  streams_max:
+                    validation:
+                      reference: 15
+                      enabled: true
+
+              # Scalable Performance
+              - test_id: "AES-VSN-001"
+                display_name: "Vision AI Benchmark - multi-stream 1080p15 H.264 gvadetect YOLO11n FP16 15FPS"
+                devices: [cpu]
+                tiers:
+                  - scalable_performance
+                kpi_refs:
+                  - streams_max
+                kpi_override:
+                  streams_max:
+                    validation:
+                      reference: 60
+                      enabled: true
+
+              # Scalable AI Graphic Media
+              - test_id: "AES-VSN-001"
+                display_name: "Vision AI Benchmark - multi-stream 1080p15 H.264 gvadetect YOLO11n FP16 15FPS"
+                devices: [cpu, igpu, dgpu, npu]
+                tiers:
+                  # dGPU based specific tiers
+                  - scalable_ai_graphics_media
+                  - scalable_ai_graphics_media_10gb
+                  - scalable_ai_graphics_media_24gb
+                  - scalable_ai_graphics_media_52gb
+                  - scalable_ai_graphics_media_hetero
+                  - scalable_ai_graphics_media_hetero_10gb
+                  - scalable_ai_graphics_media_hetero_24gb
+                  - scalable_ai_graphics_media_hetero_52gb
+                kpi_refs:
+                  - streams_max
+                kpi_override:
+                  streams_max:
+                    validation:
+                      reference: 20
                       enabled: true

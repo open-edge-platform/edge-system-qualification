@@ -60,8 +60,8 @@ suites:
         tests:
           test_dlstreamer:
             params:
-              - test_id: "T0001"
-                display_name: "YOLO11n FP16 - 15 FPS"
+              - test_id: "VSN-DLS-001"
+                display_name: "DL Streamer Benchmark - multi-stream 1080p15 H.264 gvadetect YOLO11n FP16"
                 pipeline: |
                   filesrc location=./videos/1192116-hd_1920_1080_15fps_30s.mp4
                     ! ${DECODE_ELEMENTS}
@@ -69,8 +69,8 @@ suites:
                     ! queue
                 devices: [cpu, igpu, dgpu, npu]
 
-              - test_id: "T0100"
-                display_name: "YOLO11n FP16 - 15 FPS (CPU)"
+              - test_id: "VSN-DLS-002"
+                display_name: "DL Streamer Benchmark - multi-stream 1080p15 H.264 gvadetect YOLO11n FP16 (CPU)"
                 pipeline: |
                   filesrc location=./videos/1192116-hd_1920_1080_15fps_30s.mp4
                     ! ${DECODE_ELEMENTS}
@@ -78,8 +78,8 @@ suites:
                     ! queue
                 devices: [cpu]
 
-              - test_id: "T0101"
-                display_name: "YOLO11n FP16 - 15 FPS (iGPU)"
+              - test_id: "VSN-DLS-003"
+                display_name: "DL Streamer Benchmark - multi-stream 1080p15 H.264 gvadetect YOLO11n FP16 (iGPU)"
                 pipeline: |
                   filesrc location=./videos/1192116-hd_1920_1080_15fps_30s.mp4
                     ! ${DECODE_ELEMENTS}
@@ -89,8 +89,8 @@ suites:
                 requirements:
                   igpu_required: true
 
-              - test_id: "T0102"
-                display_name: "YOLO11n FP16 - 15 FPS (dGPU)"
+              - test_id: "VSN-DLS-004"
+                display_name: "DL Streamer Benchmark - multi-stream 1080p15 H.264 gvadetect YOLO11n FP16 (dGPU)"
                 pipeline: |
                   filesrc location=./videos/1192116-hd_1920_1080_15fps_30s.mp4
                     ! ${DECODE_ELEMENTS}
@@ -100,8 +100,8 @@ suites:
                 requirements:
                   dgpu_required: true
 
-              - test_id: "T0103"
-                display_name: "YOLO11n FP16 - 15 FPS (NPU)"
+              - test_id: "VSN-DLS-005"
+                display_name: "DL Streamer Benchmark - multi-stream 1080p15 H.264 gvadetect YOLO11n FP16 (NPU)"
                 pipeline: |
                   filesrc location=./videos/1192116-hd_1920_1080_15fps_30s.mp4
                     ! ${DECODE_ELEMENTS}

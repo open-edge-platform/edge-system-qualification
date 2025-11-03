@@ -170,6 +170,35 @@ class Result:
                 return name
         return None
 
+    def _is_device_specific_metric(self, metric_name: str) -> bool:
+        """
+        Check if a metric name represents a device-specific metric.
+
+        Supports all device naming patterns:
+        - CPU: metric_cpu
+        - iGPU: metric_igpu
+        - Single dGPU: metric_dgpu (no index)
+        - Indexed dGPUs: metric_dgpu0, metric_dgpu1, metric_dgpu2, etc.
+        - HETERO devices: metric_hetero_dgpu
+        - NPU: metric_npu
+
+        Args:
+            metric_name: Name of the metric to check
+
+        Returns:
+            True if the metric is device-specific, False if it's an aggregate metric
+        """
+        import re
+
+        # Pattern for device-specific suffixes:
+        # - _cpu, _igpu, _npu (simple suffixes)
+        # - _dgpu (single dGPU without index)
+        # - _dgpu0, _dgpu1, _dgpu2, etc. (indexed dGPUs)
+        # - _hetero_dgpu (HETERO devices)
+        device_pattern = r"_(cpu|igpu|npu|dgpu\d*|hetero_dgpu)$"
+
+        return bool(re.search(device_pattern, metric_name))
+
     def auto_set_key_metric(
         self,
         validation_results: Optional[Dict[str, Any]] = None,
@@ -179,6 +208,14 @@ class Result:
         """
         Automatically determine and set the key metric based on validation results and context.
         Enhanced to handle multi-device scenarios with aggregate and individual metrics.
+
+        Supports all device naming patterns:
+        - CPU: metric_cpu
+        - iGPU: metric_igpu
+        - Single dGPU: metric_dgpu (no index)
+        - Indexed dGPUs: metric_dgpu0, metric_dgpu1, etc.
+        - HETERO devices: metric_hetero_dgpu
+        - NPU: metric_npu
 
         Args:
             validation_results: KPI validation results
@@ -191,9 +228,6 @@ class Result:
 
         logger.debug(f"Auto-determining key metric from available metrics: {list(self.metrics.keys())}")
         logger.debug(f"KPI validation mode: {kpi_validation_mode}, Device count: {device_count}")
-
-        # Predefined device suffixes based on config device types
-        device_suffixes = ["_cpu", "_igpu", "_dgpu", "_npu"]
 
         # Strategy 1: KPI validation mode "any" - use the first passed metric (highest priority)
         if kpi_validation_mode == "any" and validation_results and validation_results.get("validations"):
@@ -210,8 +244,8 @@ class Result:
             device_specific_metrics = []
 
             for metric_name in self.metrics.keys():
-                # Check if it's an aggregate metric (doesn't end with device suffix)
-                is_device_specific = any(metric_name.endswith(suffix) for suffix in device_suffixes)
+                # Check if it's a device-specific metric using comprehensive pattern matching
+                is_device_specific = self._is_device_specific_metric(metric_name)
 
                 if is_device_specific:
                     device_specific_metrics.append(metric_name)
@@ -219,7 +253,7 @@ class Result:
                     aggregate_metrics.append(metric_name)
 
             logger.debug(
-                f"Multi-device test - Aggregate metrics: {aggregate_metrics}, Device-specific: {device_specific_metrics}"
+                f"Multi-device test - Aggregate: {aggregate_metrics}, Device-specific: {device_specific_metrics}"
             )
 
             # For multi-device tests, prefer aggregate metrics for KPI validation
@@ -261,7 +295,7 @@ class Result:
                     if priority_pattern in metric_name.lower():
                         self.set_key_metric(metric_name)
                         logger.debug(
-                            f"Set key metric to '{metric_name}' based on single-device priority pattern '{priority_pattern}'"
+                            f"Set key metric to '{metric_name}' based on single-device pattern '{priority_pattern}'"
                         )
                         return
 

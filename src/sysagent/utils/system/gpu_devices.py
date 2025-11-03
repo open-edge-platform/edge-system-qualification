@@ -24,6 +24,22 @@ GPU_DEVICE_LIST = [
     # ========================================
     # Battlemage Series
     {
+        "pci_id": "E212",
+        "name": "Intel® Arc™ B50 Graphics",
+        "architecture": "Xe2",
+        "codename": "Battlemage",
+        "kernel": "6.14",
+        "eu": "256",
+    },
+    {
+        "pci_id": "E211",
+        "name": "Intel® Arc™ B60 Graphics",
+        "architecture": "Xe2",
+        "codename": "Battlemage",
+        "kernel": "6.14",
+        "eu": "320",
+    },
+    {
         "pci_id": "E20B",
         "name": "Intel® Arc™ B580 Graphics",
         "architecture": "Xe2",

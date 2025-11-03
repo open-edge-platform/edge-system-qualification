@@ -336,6 +336,76 @@ class SystemValidator:
                 }
             )
 
+        # Discrete GPU minimum VRAM per device (each GPU must have minimum VRAM)
+        if "dgpu_min_vram_per_device_gb" in hw_requirements:
+            min_vram_per_device = hw_requirements["dgpu_min_vram_per_device_gb"]
+            gpu_info = hardware.get("gpu", {})
+            gpu_devices = gpu_info.get("devices", [])
+
+            # Check each discrete GPU individually
+            discrete_gpus = []
+            insufficient_gpus = []
+            for device in gpu_devices:
+                if device.get("is_discrete", False):
+                    openvino_info = device.get("openvino", {})
+                    if openvino_info and "memory_gb" in openvino_info:
+                        vram_gb = openvino_info["memory_gb"]
+                        device_name = device.get("name", "Unknown")
+                        discrete_gpus.append({"name": device_name, "vram_gb": vram_gb})
+                        if vram_gb < min_vram_per_device:
+                            insufficient_gpus.append(f"{device_name} ({vram_gb:.1f} GB)")
+                        logger.debug(f"Discrete GPU {device_name}: {vram_gb:.1f} GB VRAM")
+
+            passed = len(insufficient_gpus) == 0 and len(discrete_gpus) > 0
+            actual_info = ", ".join([f"{gpu['name']}: {gpu['vram_gb']:.1f} GB" for gpu in discrete_gpus])
+            if not actual_info:
+                actual_info = "No discrete GPUs found"
+
+            results.append(
+                {
+                    "name": f"Each discrete GPU VRAM >= {min_vram_per_device} GB",
+                    "passed": passed,
+                    "actual": actual_info,
+                    "required": f"Each GPU >= {min_vram_per_device} GB",
+                    "category": "hardware.gpu.vram_per_device_min",
+                }
+            )
+
+        # Discrete GPU maximum VRAM per device (each GPU must not exceed maximum VRAM)
+        if "dgpu_max_vram_per_device_gb" in hw_requirements:
+            max_vram_per_device = hw_requirements["dgpu_max_vram_per_device_gb"]
+            gpu_info = hardware.get("gpu", {})
+            gpu_devices = gpu_info.get("devices", [])
+
+            # Check each discrete GPU individually
+            discrete_gpus = []
+            excessive_gpus = []
+            for device in gpu_devices:
+                if device.get("is_discrete", False):
+                    openvino_info = device.get("openvino", {})
+                    if openvino_info and "memory_gb" in openvino_info:
+                        vram_gb = openvino_info["memory_gb"]
+                        device_name = device.get("name", "Unknown")
+                        discrete_gpus.append({"name": device_name, "vram_gb": vram_gb})
+                        if vram_gb > max_vram_per_device:
+                            excessive_gpus.append(f"{device_name} ({vram_gb:.1f} GB)")
+                        logger.debug(f"Discrete GPU {device_name}: {vram_gb:.1f} GB VRAM")
+
+            passed = len(excessive_gpus) == 0 and len(discrete_gpus) > 0
+            actual_info = ", ".join([f"{gpu['name']}: {gpu['vram_gb']:.1f} GB" for gpu in discrete_gpus])
+            if not actual_info:
+                actual_info = "No discrete GPUs found"
+
+            results.append(
+                {
+                    "name": f"Each discrete GPU VRAM <= {max_vram_per_device} GB",
+                    "passed": passed,
+                    "actual": actual_info,
+                    "required": f"Each GPU <= {max_vram_per_device} GB",
+                    "category": "hardware.gpu.vram_per_device_max",
+                }
+            )
+
         # NPU requirement
         if "npu_required" in hw_requirements and hw_requirements["npu_required"]:
             npu_info = hardware.get("npu", {})

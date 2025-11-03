@@ -784,10 +784,10 @@ def export_text_generation_model(
     if "HETERO" in task_parameters["target_device"]:
         if task_parameters["pipeline_type"] is None:
             raise ValueError(
-                "pipeline_type should be specified for HETERO target device. It should be set to either LM or VLM"
+                "pipeline_type should be specified for HETERO target device. It should be set to either LM_CB or VLM_CB"
             )
-        if task_parameters["pipeline_type"] not in ["LM", "VLM"]:
-            raise ValueError("pipeline_type should be either LM or VLM for HETERO target device")
+        if task_parameters["pipeline_type"] not in ["LM_CB", "VLM_CB"]:
+            raise ValueError("pipeline_type should be either LM_CB or VLM_CB for HETERO target device")
         plugin_config["MODEL_DISTRIBUTION_POLICY"] = "PIPELINE_PARALLEL"
 
     plugin_config_str = json.dumps(plugin_config)

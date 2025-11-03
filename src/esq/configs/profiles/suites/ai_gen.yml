@@ -52,7 +52,7 @@ suites:
                 devices: [dgpu]
                 requirements:
                   dgpu_required: true
-                  dgpu_min_vram_gb: 2.0
+                  dgpu_min_vram_per_device_gb: 2.0
 
               - test_id: "GEN-LLM-004"
                 display_name: "LLM Serving Benchmark - DeepSeek-R1-Distill-Qwen-1.5B INT4 (Hetero dGPU)"
@@ -96,7 +96,7 @@ suites:
                 devices: [dgpu]
                 requirements:
                   dgpu_required: true
-                  dgpu_min_vram_gb: 3.0
+                  dgpu_min_vram_per_device_gb: 3.0
 
               - test_id: "GEN-LLM-009"
                 display_name: "LLM Serving Benchmark - Phi-4-mini-reasoning 3.8B INT4 (Hetero dGPU)"
@@ -117,6 +117,50 @@ suites:
                   memory_min_gb: 9.0
 
               - test_id: "GEN-LLM-011"
+                display_name: "LLM Serving Benchmark - DeepSeek-R1-Distill-Qwen-7B INT4 (CPU)"
+                model_id: "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B"
+                model_precision: "int4"
+                devices: [cpu]
+                requirements:
+                  memory_min_gb: 12.0
+
+              - test_id: "GEN-LLM-012"
+                display_name: "LLM Serving Benchmark - DeepSeek-R1-Distill-Qwen-7B INT4 (iGPU)"
+                model_id: "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B"
+                model_precision: "int4"
+                devices: [igpu]
+                requirements:
+                  igpu_required: true
+                  memory_min_gb: 12.0
+
+              - test_id: "GEN-LLM-013"
+                display_name: "LLM Serving Benchmark - DeepSeek-R1-Distill-Qwen-7B INT4 (dGPU)"
+                model_id: "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B"
+                model_precision: "int4"
+                devices: [dgpu]
+                requirements:
+                  dgpu_required: true
+                  dgpu_min_vram_per_device_gb: 6.0
+
+              - test_id: "GEN-LLM-014"
+                display_name: "LLM Serving Benchmark - DeepSeek-R1-Distill-Qwen-7B INT4 (Hetero dGPU)"
+                model_id: "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B"
+                model_precision: "int4"
+                devices: [hetero-dgpu]
+                requirements:
+                  dgpu_min_devices: 2
+                  dgpu_min_vram_gb: 6.0
+
+              - test_id: "GEN-LLM-015"
+                display_name: "LLM Serving Benchmark - DeepSeek-R1-Distill-Qwen-7B INT4 (NPU)"
+                model_id: "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B"
+                model_precision: "int4"
+                devices: [npu]
+                requirements:
+                  npu_required: true
+                  memory_min_gb: 12.0
+
+              - test_id: "GEN-LLM-016"
                 display_name: "LLM Serving Benchmark - DeepSeek-R1-Distill-Qwen-14B INT4 (CPU)"
                 model_id: "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B"
                 model_precision: "int4"
@@ -124,7 +168,7 @@ suites:
                 requirements:
                   memory_min_gb: 16.0
 
-              - test_id: "GEN-LLM-012"
+              - test_id: "GEN-LLM-017"
                 display_name: "LLM Serving Benchmark - DeepSeek-R1-Distill-Qwen-14B INT4 (iGPU)"
                 model_id: "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B"
                 model_precision: "int4"
@@ -133,16 +177,16 @@ suites:
                   igpu_required: true
                   memory_min_gb: 16.0
 
-              - test_id: "GEN-LLM-013"
+              - test_id: "GEN-LLM-018"
                 display_name: "LLM Serving Benchmark - DeepSeek-R1-Distill-Qwen-14B INT4 (dGPU)"
                 model_id: "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B"
                 model_precision: "int4"
                 devices: [dgpu]
                 requirements:
                   dgpu_required: true
-                  dgpu_min_vram_gb: 10.0
+                  dgpu_min_vram_per_device_gb: 10.0
 
-              - test_id: "GEN-LLM-014"
+              - test_id: "GEN-LLM-019"
                 display_name: "LLM Serving Benchmark - DeepSeek-R1-Distill-Qwen-14B INT4 (Hetero dGPU)"
                 model_id: "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B"
                 model_precision: "int4"
@@ -151,7 +195,7 @@ suites:
                   dgpu_min_devices: 2
                   dgpu_min_vram_gb: 10.0
 
-              - test_id: "GEN-LLM-015"
+              - test_id: "GEN-LLM-020"
                 display_name: "LLM Serving Benchmark - DeepSeek-R1-Distill-Qwen-14B INT4 (NPU)"
                 model_id: "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B"
                 model_precision: "int4"
@@ -160,7 +204,7 @@ suites:
                   npu_required: true
                   memory_min_gb: 16.0
 
-              - test_id: "GEN-LLM-016"
+              - test_id: "GEN-LLM-021"
                 display_name: "LLM Serving Benchmark - Qwen3-32B INT4 (CPU)"
                 model_id: "Qwen/Qwen3-32B"
                 model_precision: "int4"
@@ -168,7 +212,7 @@ suites:
                 requirements:
                   memory_min_gb: 30.0
 
-              - test_id: "GEN-LLM-017"
+              - test_id: "GEN-LLM-022"
                 display_name: "LLM Serving Benchmark - Qwen3-32B INT4 (iGPU)"
                 model_id: "Qwen/Qwen3-32B"
                 model_precision: "int4"
@@ -177,16 +221,16 @@ suites:
                   igpu_required: true
                   memory_min_gb: 30.0
 
-              - test_id: "GEN-LLM-018"
+              - test_id: "GEN-LLM-023"
                 display_name: "LLM Serving Benchmark - Qwen3-32B INT4 (dGPU)"
                 model_id: "Qwen/Qwen3-32B"
                 model_precision: "int4"
                 devices: [dgpu]
                 requirements:
                   dgpu_required: true
-                  dgpu_min_vram_gb: 24.0
+                  dgpu_min_vram_per_device_gb: 24.0
 
-              - test_id: "GEN-LLM-019"
+              - test_id: "GEN-LLM-024"
                 display_name: "LLM Serving Benchmark - Qwen3-32B INT4 (Hetero dGPU)"
                 model_id: "Qwen/Qwen3-32B"
                 model_precision: "int4"
@@ -195,7 +239,7 @@ suites:
                   dgpu_min_devices: 2
                   dgpu_min_vram_gb: 24.0
 
-              - test_id: "GEN-LLM-020"
+              - test_id: "GEN-LLM-025"
                 display_name: "LLM Serving Benchmark - Qwen3-32B INT4 (NPU)"
                 model_id: "Qwen/Qwen3-32B"
                 model_precision: "int4"
@@ -204,7 +248,7 @@ suites:
                   npu_required: true
                   memory_min_gb: 30.0
 
-              - test_id: "GEN-LLM-021"
+              - test_id: "GEN-LLM-026"
                 display_name: "LLM Serving Benchmark - DeepSeek-R1-Distill-Llama-70B INT4 (CPU)"
                 model_id: "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                 model_precision: "int4"
@@ -212,7 +256,7 @@ suites:
                 requirements:
                   memory_min_gb: 58.0
 
-              - test_id: "GEN-LLM-022"
+              - test_id: "GEN-LLM-027"
                 display_name: "LLM Serving Benchmark - DeepSeek-R1-Distill-Llama-70B INT4 (iGPU)"
                 model_id: "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                 model_precision: "int4"
@@ -221,16 +265,16 @@ suites:
                   igpu_required: true
                   memory_min_gb: 58.0
 
-              - test_id: "GEN-LLM-023"
+              - test_id: "GEN-LLM-028"
                 display_name: "LLM Serving Benchmark - DeepSeek-R1-Distill-Llama-70B INT4 (dGPU)"
                 model_id: "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                 model_precision: "int4"
                 devices: [dgpu]
                 requirements:
                   dgpu_required: true
-                  dgpu_min_vram_gb: 52.5
+                  dgpu_min_vram_per_device_gb: 52.5
 
-              - test_id: "GEN-LLM-024"
+              - test_id: "GEN-LLM-029"
                 display_name: "LLM Serving Benchmark - DeepSeek-R1-Distill-Llama-70B INT4 (Hetero dGPU)"
                 model_id: "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                 model_precision: "int4"
@@ -239,7 +283,7 @@ suites:
                   dgpu_min_devices: 2
                   dgpu_min_vram_gb: 52.5
 
-              - test_id: "GEN-LLM-025"
+              - test_id: "GEN-LLM-030"
                 display_name: "LLM Serving Benchmark - DeepSeek-R1-Distill-Llama-70B INT4 (NPU)"
                 model_id: "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                 model_precision: "int4"

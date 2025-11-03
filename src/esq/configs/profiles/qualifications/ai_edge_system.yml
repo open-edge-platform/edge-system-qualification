@@ -123,8 +123,8 @@ suites:
 
               # Efficiency Optimized
               - test_id: "AES-GEN-001"
-                display_name: "Gen AI LLM Serving Benchmark - DeepSeek-R1-Distill-Qwen-14B INT4"
-                model_id: "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B"
+                display_name: "Gen AI LLM Serving Benchmark - DeepSeek-R1-Distill-Qwen-7B INT4"
+                model_id: "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B"
                 model_precision: "int4"
                 devices: [cpu, igpu, npu]
                 tiers:
@@ -329,7 +329,7 @@ suites:
                 kpi_override:
                   streams_max:
                     validation:
-                      reference: 15
+                      reference: 10
                       enabled: true
 
               # Scalable Performance
@@ -365,5 +365,5 @@ suites:
                 kpi_override:
                   streams_max:
                     validation:
-                      reference: 20
+                      reference: 30
                       enabled: true

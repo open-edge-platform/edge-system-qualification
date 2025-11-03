@@ -48,6 +48,7 @@ def run_tests(
     skip_system_check: bool = False,
     no_cache: bool = False,
     filters: List[str] = None,
+    run_all_profiles: bool = False,
     extra_args: List[str] = None,
 ) -> int:
     """
@@ -64,6 +65,8 @@ def run_tests(
         skip_system_check: Whether to skip system requirement validation
         no_cache: Whether to run tests without using cached results
         filters: List of filter expressions in format "key=value" to filter tests
+        run_all_profiles: Whether to run all profile types.
+                          If False, only qualification profiles are run by default.
         extra_args: Additional pytest arguments to pass
 
     Returns:
@@ -144,7 +147,7 @@ def run_tests(
 
         # Option 3: Run all profiles if no specific profile or suite is provided
         else:
-            result_code, tests_ran = _run_all_profiles(skip_system_check, data_dir, verbose, debug)
+            result_code, tests_ran = _run_all_profiles(skip_system_check, data_dir, verbose, debug, run_all_profiles)
 
     except KeyboardInterrupt:
         logger.warning("Main test execution interrupted by user. Proceeding to report generation.")
@@ -370,8 +373,18 @@ def _run_suite_tests(suite_name: str, sub_suite_name: str, test_name: str, pytes
         return 130, True
 
 
-def _run_all_profiles(skip_system_check: bool, data_dir: str, verbose: bool, debug: bool) -> tuple:
-    """Run all available profiles.
+def _run_all_profiles(
+    skip_system_check: bool, data_dir: str, verbose: bool, debug: bool, run_all_profiles: bool = False
+) -> tuple:
+    """Run all available profiles or only qualification profiles by default.
+
+    Args:
+        skip_system_check: Whether to skip system requirement validation
+        data_dir: Data directory path
+        verbose: Whether to enable verbose output
+        debug: Whether to enable debug output
+        run_all_profiles: If False (default), only run qualification profiles.
+                          If True, run all profile types (qualifications, suites, verticals).
 
     Returns:
         tuple: (exit_code, tests_ran) where tests_ran indicates if any pytest actually executed
@@ -390,12 +403,34 @@ def _run_all_profiles(skip_system_check: bool, data_dir: str, verbose: bool, deb
             if configs:
                 profile_name = configs.get("name")
                 if profile_name:
+                    # Filter by profile type if run_all_profiles is False
+                    if not run_all_profiles:
+                        # Check if this is a qualification profile
+                        params = configs.get("params", {})
+                        labels = params.get("labels", {})
+                        profile_label_type = labels.get("type", "")
+
+                        # Only include qualification profiles when run_all_profiles is False
+                        if profile_type != "qualifications" and profile_label_type != "qualification":
+                            logger.debug(f"Skipping non-qualification profile: {profile_name}")
+                            continue
+
                     all_profile_items.append((profile_type, profile))
                     all_profiles_dict[profile_name] = configs
 
     if not all_profile_items:
-        logger.error("No profiles found")
+        if run_all_profiles:
+            logger.error("No profiles found")
+        else:
+            logger.error("No qualification profiles found. Use --all to run all profile types.")
         return 1, False
+
+    # Log which profile types are being run
+    if run_all_profiles:
+        logger.info(f"Running all profile types: {len(all_profile_items)} profiles found")
+    else:
+        logger.info(f"Running qualification profiles only: {len(all_profile_items)} profiles found")
+        logger.info("Use --all flag to run all profile types (qualifications, suites, verticals)")
 
     # Validate profile dependencies
     dep_errors = validate_profile_dependencies(all_profiles_dict)
@@ -614,13 +649,13 @@ def _determine_final_exit_code(data_dir: str, pytest_exit_code: int) -> int:
         broken_count = summary_data.get("summary", {}).get("status_counts", {}).get("broken", 0)
 
         if broken_count > 0:
-            logger.error(f"Found {broken_count} broken test(s). Returning exit code 1.")
+            logger.debug(f"Found {broken_count} broken test(s). Returning exit code 1.")
             return 1
 
         # If no broken tests, return success even if there are failed tests
         failed_count = summary_data.get("summary", {}).get("status_counts", {}).get("failed", 0)
         if failed_count > 0:
-            logger.info(f"Found {failed_count} failed test(s), but no broken tests. Returning exit code 0.")
+            logger.debug(f"Found {failed_count} failed test(s), but no broken tests. Returning exit code 0.")
 
         return 0
 

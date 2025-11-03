@@ -254,8 +254,11 @@ command -v esq &> /dev/null && echo "[OK] esq installed: $(esq --version 2>&1)" 
 # ALWAYS list profiles first to verify correct profile names
 esq list
 
-# Run all profiles
+# Run qualification profiles only (default behavior)
 esq -v run
+
+# Run all profile types (qualifications, suites, verticals)
+esq -v run --all
 
 # Run specific profile (use exact name from 'esq list')
 esq -d run --profile profile.suite.ai.vision

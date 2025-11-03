@@ -53,8 +53,9 @@ dependencies:
       - os_type: "linux"
         install_method: "system_package"
         packages: 
+          - "curl"
           # Media and codec libraries
-          - "ffmpeg"    # Multimedia framework for audio/video processing
+          # - "ffmpeg"    # Multimedia framework for audio/video processing (pydub of Audio AI suite)
         validation:
           check_method: "dpkg"
         notes:

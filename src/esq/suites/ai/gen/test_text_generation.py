@@ -52,7 +52,7 @@ def test_text_generation(
     timeout = configs.get("timeout", 300)
     server_timeout = configs.get("server_timeout", 600)
     benchmark_timeout = configs.get("benchmark_timeout", 600)
-    export_timeout = configs.get("export_timeout", 600)
+    export_timeout = configs.get("export_timeout", 1800)
     hf_dataset_url = configs.get(
         "hf_dataset_url",
         "https://huggingface.co/datasets/anon8231489123/ShareGPT_Vicuna_unfiltered/resolve/main/ShareGPT_V3_unfiltered_cleaned_split.json",
@@ -60,7 +60,7 @@ def test_text_generation(
     hf_dataset_filename = hf_dataset_url.split("/")[-1]
     docker_image_tag = f"{configs.get('container_image_name', 'genai-ovms')}:{configs.get('container_tag', 'latest')}"
     benchmark_docker_base_image = f"{configs.get('benchmark_container_image', 'vllm/vllm-openai:v0.9.2')}"
-    ovms_docker_base_image = f"{configs.get('ovms_container_image', 'openvino/model_server:2025.2-gpu')}"
+    ovms_docker_base_image = f"{configs.get('ovms_container_image', 'openvino/model_server:2025.3-gpu')}"
 
     # Setup
     test_dir = os.path.dirname(os.path.abspath(__file__))
@@ -110,6 +110,10 @@ def test_text_generation(
     results = None
 
     try:
+        # Step 1.5: Clean up any stale containers from previous runs before starting
+        logger.info("Cleaning up any stale containers from previous test runs")
+        cleanup()
+
         # Step 2: Prepare test using modular functions
         # Run asset preparation using modular function
         prepare_test(
@@ -265,6 +269,18 @@ def test_text_generation(
             if "model_export_duration_seconds" in result.metadata:
                 results.metadata[f"Device {device_id} model_export_duration_seconds"] = result.metadata.get(
                     "model_export_duration_seconds", 0.0
+                )
+
+            # Track per-device server startup duration
+            if "server_startup_duration_seconds" in result.metadata:
+                results.metadata[f"Device {device_id} server_startup_duration_seconds"] = result.metadata.get(
+                    "server_startup_duration_seconds", 0.0
+                )
+
+            # Track per-device benchmark execution duration
+            if "benchmark_duration_seconds" in result.metadata:
+                results.metadata[f"Device {device_id} benchmark_duration_seconds"] = result.metadata.get(
+                    "benchmark_duration_seconds", 0.0
                 )
 
         # Process results using modular function

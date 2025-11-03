@@ -73,6 +73,12 @@ def run_device_test(
     container_info = None
     export_duration = 0.0  # Track model export duration
     quantization_config = {}  # Track quantization parameters used
+    server_startup_duration = 0.0  # Track server startup duration
+    benchmark_duration = 0.0  # Track benchmark execution duration
+
+    # Track device test start time for accurate duration calculation
+    import time
+    device_test_start_time = time.time()
 
     try:
         # Models directory is in data_dir/models as per test configuration
@@ -139,10 +145,14 @@ def run_device_test(
             port=ovms_port,
         )
 
+        # Extract server startup duration
+        server_startup_duration = container_info.get("server_startup_duration_seconds", 0.0)
+
         logger.info(f"OVMS server started on port {ovms_port} for device {device_id}")
+        logger.info(f"Server startup duration: {server_startup_duration:.2f} seconds")
 
         # Run benchmark using the original container approach
-        throughput = run_benchmark_performance_test(
+        throughput, benchmark_duration = run_benchmark_performance_test(
             docker_client=docker_client,
             docker_container_prefix=docker_container_prefix,
             port=ovms_port,
@@ -165,6 +175,7 @@ def run_device_test(
             metrics[metric_name].value = throughput
 
         logger.info(f"Device {device_id} throughput: {throughput:.2f} tokens/sec")
+        logger.info(f"Benchmark execution duration: {benchmark_duration:.2f} seconds")
 
         # Get detailed benchmark metadata
         benchmark_metadata = get_benchmark_metadata(
@@ -200,13 +211,33 @@ def run_device_test(
             result.metadata["model_export_duration_seconds"] = round(export_duration, 2)
             logger.info(f"Added model export duration to results: {export_duration:.2f} seconds")
 
-        # Add quantization configuration to metadata if quantization was performed
-        if quantization_config:
-            result.metadata["quantization_config"] = quantization_config
-            logger.info(f"Added quantization configuration to results: {quantization_config}")
+        # Add server startup duration to metadata
+        if server_startup_duration > 0:
+            result.metadata["server_startup_duration_seconds"] = round(server_startup_duration, 2)
+            logger.info(f"Added server startup duration to results: {server_startup_duration:.2f} seconds")
 
-        # Update timestamps to calculate total device test duration
+        # Add benchmark execution duration to metadata
+        if benchmark_duration > 0:
+            result.metadata["benchmark_duration_seconds"] = round(benchmark_duration, 2)
+            logger.info(f"Added benchmark execution duration to results: {benchmark_duration:.2f} seconds")
+
+        # Add quantization configuration to metadata if quantization was performed
+        # Flatten quantization_config into individual metadata fields for consistency
+        if quantization_config:
+            for key, value in quantization_config.items():
+                metadata_key = f"quantization_{key}"
+                result.metadata[metadata_key] = value
+            logger.info(f"Added quantization configuration to results (flattened): {quantization_config}")
+
+        # Update timestamps for consistency (sets created_at/updated_at)
+        # IMPORTANT: Call this BEFORE setting total_duration_seconds manually
         result.update_timestamps()
+
+        # Calculate and add total device test duration
+        # This overwrites the value set by update_timestamps() with our accurate measurement
+        device_test_end_time = time.time()
+        total_device_duration = device_test_end_time - device_test_start_time
+        result.metadata["total_duration_seconds"] = round(total_device_duration, 2)
         logger.info(f"Device {device_id} test duration: {result.metadata.get('total_duration_seconds', 0):.2f} seconds")
 
         return result
@@ -233,6 +264,17 @@ def run_device_test(
                 "error": str(e),
             },
         )
+
+        # Update timestamps for consistency
+        # IMPORTANT: Call this BEFORE setting total_duration_seconds manually
+        result.update_timestamps()
+
+        # Calculate and add total device test duration even for failures
+        # This overwrites the value set by update_timestamps() with our accurate measurement
+        device_test_end_time = time.time()
+        total_device_duration = device_test_end_time - device_test_start_time
+        result.metadata["total_duration_seconds"] = round(total_device_duration, 2)
+        logger.info(f"Device {device_id} test duration (failed): {result.metadata.get('total_duration_seconds', 0):.2f} seconds")
 
         return result
 
@@ -276,7 +318,7 @@ def run_benchmark_performance_test(
     test_max_concurrent_requests: int,
     benchmark_timeout: int,
     models_dir: str = None,  # Add models_dir parameter
-) -> float:
+) -> tuple[float, float]:
     """
     Run performance test using benchmark container (original approach).
 
@@ -297,7 +339,9 @@ def run_benchmark_performance_test(
         models_dir: Models directory path (for local tokenizer access)
 
     Returns:
-        Throughput in tokens per second
+        Tuple of (throughput, benchmark_duration_seconds)
+        - throughput: Throughput in tokens per second
+        - benchmark_duration_seconds: Duration of benchmark execution
     """
     logger.info(f"Running benchmark performance test on port {port}")
 
@@ -329,13 +373,16 @@ def run_benchmark_performance_test(
 
         if not benchmark_result.get("success", False):
             logger.error("Benchmark container execution failed")
-            return -1.0
+            return -1.0, 0.0
+
+        # Extract benchmark duration
+        benchmark_duration = benchmark_result.get("benchmark_duration_seconds", 0.0)
 
         # Process benchmark results (following original implementation)
         results_file = benchmark_result.get("results_file")
         if not results_file or not os.path.exists(results_file):
             logger.error(f"Benchmark results file not found: {results_file}")
-            return -1.0
+            return -1.0, benchmark_duration
 
         # Load and parse results JSON
         with open(results_file, "r") as file:
@@ -348,13 +395,14 @@ def run_benchmark_performance_test(
         rounded_throughput = round(output_throughput, 2) if output_throughput > 0 else 0.0
 
         logger.info(f"Benchmark results: Output Throughput: {rounded_throughput} tokens/sec")
+        logger.info(f"Benchmark execution duration: {benchmark_duration:.2f} seconds")
         logger.debug(f"Full benchmark results: {json.dumps(results_json, indent=2)}")
 
-        return rounded_throughput
+        return rounded_throughput, benchmark_duration
 
     except Exception as e:
         logger.error(f"Benchmark performance test failed: {e}")
-        return -1.0
+        return -1.0, 0.0
 
 
 def get_benchmark_metadata(
@@ -505,13 +553,17 @@ def process_device_results(results: list, device_list: list, final_results: Dict
         final_results["metrics"].update(result.metrics)
 
         # Merge device-specific metadata into final results
-        # Copy export duration and quantization config if present
+        # Copy export duration if present
         if "model_export_duration_seconds" in result.metadata:
             final_results["metadata"]["model_export_duration_seconds"] = result.metadata[
                 "model_export_duration_seconds"
             ]
-        if "quantization_config" in result.metadata:
-            final_results["metadata"]["quantization_config"] = result.metadata["quantization_config"]
+        
+        # Copy flattened quantization config fields if present
+        # Fields start with "quantization_" prefix (e.g., quantization_sym, quantization_group_size, etc.)
+        for key, value in result.metadata.items():
+            if key.startswith("quantization_"):
+                final_results["metadata"][key] = value
 
     # Add summary metrics
     if successful_devices > 0:

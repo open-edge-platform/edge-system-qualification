@@ -81,11 +81,31 @@ def run_ovms_server_container(
     # OVMS command - use original fixed ports and paths
     ovms_cmd = ["--port", "9000", "--rest_port", "8000", "--config_path", "/workspace/config_all.json"]
 
+    # Container labels for easy identification and cleanup
+    container_labels = {
+        "test_suite": "text_generation",
+        "test_type": "ovms_server",
+        "container_prefix": docker_container_prefix,
+        "device_id": device_id,
+        "model_id": model_basename,
+    }
+
     try:
+        # Clean up any existing container with the same name before starting
+        logger.debug(f"Checking for existing container: {container_name}")
+        if docker_client.container_exists(container_name):
+            logger.warning(f"Container {container_name} already exists, cleaning up...")
+            try:
+                docker_client.cleanup_container(container_name)
+            except Exception as cleanup_error:
+                logger.warning(f"Failed to cleanup existing container: {cleanup_error}")
+
         logger.info(f"Starting OVMS container: {container_name}")
         logger.debug(f"OVMS command: {' '.join(ovms_cmd)}")
 
         # Use docker_client.run_container method like original implementation
+        # Note: Docker SDK has internal timeouts - for large models, container creation might take time
+        # The timeout parameter in run_container is for the container execution, not API calls
         container = docker_client.run_container(
             name=container_name,
             image=docker_image_tag,
@@ -93,6 +113,7 @@ def run_ovms_server_container(
             ports=ports,
             volumes=volumes,
             devices=container_devices,
+            labels=container_labels,
             mode="server",
             command=ovms_cmd,
         )
@@ -106,7 +127,7 @@ def run_ovms_server_container(
         docker_client.start_log_streaming(container, container_name)
 
         # Wait for container to be ready using original model availability check
-        ready_status = wait_for_ovms_model_ready(model_id, 8000, server_timeout)
+        ready_status, server_startup_duration = wait_for_ovms_model_ready(model_id, 8000, server_timeout)
         if not ready_status:
             error_msg = (
                 f"OVMS server failed to serve the model: Model initialization timed out after {server_timeout} seconds"
@@ -117,6 +138,10 @@ def run_ovms_server_container(
             except Exception as cleanup_error:
                 logger.warning(f"Failed to cleanup container after timeout: {cleanup_error}")
             raise RuntimeError(error_msg)
+
+        # Add server startup duration to container config
+        container_config["server_startup_duration_seconds"] = round(server_startup_duration, 2)
+        logger.info(f"OVMS server startup duration: {server_startup_duration:.2f} seconds")
 
         return container_config
 
@@ -134,7 +159,7 @@ def run_ovms_server_container(
         raise
 
 
-def wait_for_ovms_model_ready(model_id: str, port: int, timeout: int = 300) -> bool:
+def wait_for_ovms_model_ready(model_id: str, port: int, timeout: int = 300) -> tuple[bool, float]:
     """
     Wait for OVMS model or MediaPipe graph to be ready.
 
@@ -144,7 +169,9 @@ def wait_for_ovms_model_ready(model_id: str, port: int, timeout: int = 300) -> b
         timeout: Maximum wait time in seconds
 
     Returns:
-        True if model/servable becomes ready, False otherwise
+        Tuple of (ready_status, duration_seconds)
+        - ready_status: True if model/servable becomes ready, False otherwise
+        - duration_seconds: Time taken for model to become ready
     """
     api_url = f"http://localhost:{port}/v1/config"
     start_time = time.time()
@@ -168,8 +195,9 @@ def wait_for_ovms_model_ready(model_id: str, port: int, timeout: int = 300) -> b
                     and "state" in server_results[model_id]["model_version_status"][0]
                     and server_results[model_id]["model_version_status"][0]["state"] == "AVAILABLE"
                 ):
-                    logger.info(f"OVMS model {model_id} is available and ready.")
-                    return True
+                    duration = time.time() - start_time
+                    logger.info(f"OVMS model {model_id} is available and ready. Duration: {duration:.2f} seconds")
+                    return True, duration
 
                 # Check if model is available in model_config_list using safe name (traditional models)
                 if (
@@ -181,8 +209,9 @@ def wait_for_ovms_model_ready(model_id: str, port: int, timeout: int = 300) -> b
                     and "state" in server_results[safe_model_id]["model_version_status"][0]
                     and server_results[safe_model_id]["model_version_status"][0]["state"] == "AVAILABLE"
                 ):
-                    logger.info(f"OVMS model {safe_model_id} is available and ready.")
-                    return True
+                    duration = time.time() - start_time
+                    logger.info(f"OVMS model {safe_model_id} is available and ready. Duration: {duration:.2f} seconds")
+                    return True, duration
 
                 # Check if MediaPipe graph is available (for LLM serving)
                 # MediaPipe servables don't show in the response keys like traditional models
@@ -193,8 +222,9 @@ def wait_for_ovms_model_ready(model_id: str, port: int, timeout: int = 300) -> b
                     # If the server is up and the config lists the mediapipe, it's ready
                     mediapipe_names = [mp["name"] for mp in server_results.get("mediapipe_config_list", [])]
                     if model_id in mediapipe_names or safe_model_id in mediapipe_names:
-                        logger.info(f"OVMS MediaPipe servable {safe_model_id} is available and ready.")
-                        return True
+                        duration = time.time() - start_time
+                        logger.info(f"OVMS MediaPipe servable {safe_model_id} is available and ready. Duration: {duration:.2f} seconds")
+                        return True, duration
                     logger.info(f"MediaPipe servables found: {mediapipe_names}, waiting for {safe_model_id}...")
                 else:
                     logger.info("OVMS service is up but model not ready, retrying ...")
@@ -206,8 +236,9 @@ def wait_for_ovms_model_ready(model_id: str, port: int, timeout: int = 300) -> b
             logger.error(f"Error checking OVMS service readiness: {e}")
         time.sleep(10)
 
-    logger.error(f"Model initialization timed out after {timeout} seconds")
-    return False
+    duration = time.time() - start_time
+    logger.error(f"Model initialization timed out after {timeout} seconds (waited {duration:.2f} seconds)")
+    return False, duration
 
 
 def run_benchmark_container(
@@ -330,7 +361,25 @@ def run_benchmark_container(
         ),
     ]
 
+    # Container labels for easy identification and cleanup
+    container_labels = {
+        "test_suite": "text_generation",
+        "test_type": "benchmark",
+        "container_prefix": docker_container_prefix,
+        "device_id": device_id,
+        "model_id": model_basename,
+    }
+
     try:
+        # Clean up any existing container with the same name before starting
+        logger.debug(f"Checking for existing container: {container_name}")
+        if docker_client.container_exists(container_name):
+            logger.warning(f"Container {container_name} already exists, cleaning up...")
+            try:
+                docker_client.cleanup_container(container_name)
+            except Exception as cleanup_error:
+                logger.warning(f"Failed to cleanup existing container: {cleanup_error}")
+
         logger.info(f"Starting benchmark container: {container_name}")
         logger.debug(f"Benchmark command: {' '.join(benchmark_cmd)}")
 
@@ -345,6 +394,9 @@ def run_benchmark_container(
         render_gid = os.getgid()  # Host group ID
         user_gid = os.getgid()  # Host user group ID
 
+        # Track benchmark execution time
+        benchmark_start_time = time.time()
+
         result = docker_client.run_container(
             image=benchmark_image_tag,
             name=container_name,
@@ -355,9 +407,13 @@ def run_benchmark_container(
             timeout=benchmark_timeout,
             group_add=[render_gid, user_gid],  # Use group_add for better security model
             network_mode="host",  # Use host networking to access localhost services
+            labels=container_labels,
         )
 
+        benchmark_duration = time.time() - benchmark_start_time
+
         logger.info(f"OVMS benchmark container {container_name} executed successfully")
+        logger.info(f"Benchmark execution duration: {benchmark_duration:.2f} seconds")
 
         # Return result information with container details
         # Use consistent filename generation with the benchmark command
@@ -369,6 +425,7 @@ def run_benchmark_container(
             "success": True,
             "container_info": result.get("container_info", {}),
             "results_file": os.path.join(results_dir, results_filename),
+            "benchmark_duration_seconds": round(benchmark_duration, 2),
         }
 
     except Exception as e:
@@ -378,21 +435,66 @@ def run_benchmark_container(
 
 def cleanup_containers(docker_client: DockerClient, container_prefix: str) -> None:
     """
-    Clean up containers with the given prefix.
+    Clean up containers with the given prefix or matching labels.
 
     Args:
         docker_client: Docker client instance
         container_prefix: Container name prefix to match
     """
     try:
-        containers = docker_client.client.containers.list(all=True)
-        for container in containers:
-            if container.name.startswith(container_prefix):
+        # First, try to cleanup by label (more reliable)
+        logger.info(f"Cleaning up containers with label test_suite=text_generation and container_prefix={container_prefix}")
+        containers = docker_client.client.containers.list(all=True, filters={
+            "label": [
+                "test_suite=text_generation",
+                f"container_prefix={container_prefix}",
+            ]
+        })
+        
+        if containers:
+            logger.info(f"Found {len(containers)} containers with matching labels")
+            for container in containers:
                 try:
-                    logger.info(f"Stopping container: {container.name}")
-                    container.stop(timeout=10)
-                    container.remove()
+                    container_name = container.name
+                    logger.info(f"Cleaning up container by label: {container_name}")
+                    docker_client.cleanup_container(container_name)
                 except Exception as e:
-                    logger.warning(f"Failed to clean up container {container.name}: {e}")
+                    logger.warning(f"Failed to cleanup container {container.name}: {e}")
+        else:
+            logger.debug("No containers found with matching labels")
+
+        # Also cleanup by name pattern as fallback
+        logger.debug(f"Cleaning up containers by name pattern: {container_prefix}*")
+        docker_client.cleanup_containers_by_name_pattern(container_prefix)
+
     except Exception as e:
         logger.error(f"Failed to cleanup containers: {e}")
+
+
+def cleanup_all_text_generation_containers(docker_client: DockerClient) -> None:
+    """
+    Clean up all text generation test containers using labels.
+
+    Args:
+        docker_client: Docker client instance
+    """
+    try:
+        logger.info("Cleaning up all text generation test containers")
+        containers = docker_client.client.containers.list(all=True, filters={
+            "label": "test_suite=text_generation"
+        })
+        
+        if containers:
+            logger.info(f"Found {len(containers)} text generation containers to clean up")
+            for container in containers:
+                try:
+                    container_name = container.name
+                    logger.info(f"Cleaning up container: {container_name}")
+                    docker_client.cleanup_container(container_name)
+                except Exception as e:
+                    logger.warning(f"Failed to cleanup container {container.name}: {e}")
+        else:
+            logger.debug("No text generation containers found")
+
+    except Exception as e:
+        logger.error(f"Failed to cleanup all text generation containers: {e}")

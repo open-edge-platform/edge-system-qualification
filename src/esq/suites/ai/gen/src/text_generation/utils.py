@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 def cleanup_stale_containers(docker_client: DockerClient, container_prefix: str) -> None:
     """
-    Clean up stale containers with the given prefix.
+    Clean up stale containers with the given prefix or matching labels.
     
     Args:
         docker_client: Docker client instance
@@ -21,29 +21,11 @@ def cleanup_stale_containers(docker_client: DockerClient, container_prefix: str)
     try:
         logger.info(f"Cleaning up stale containers with prefix: {container_prefix}")
         
-        containers = docker_client.client.containers.list(all=True)
-        cleaned_count = 0
+        # Import cleanup function from container module
+        from .container import cleanup_containers
         
-        for container in containers:
-            if container.name.startswith(container_prefix):
-                try:
-                    logger.debug(f"Removing stale container: {container.name}")
-                    
-                    # Stop container if it's running
-                    if container.status == "running":
-                        container.stop(timeout=10)
-                    
-                    # Remove container
-                    container.remove()
-                    cleaned_count += 1
-                    
-                except Exception as e:
-                    logger.warning(f"Failed to clean up container {container.name}: {e}")
-        
-        if cleaned_count > 0:
-            logger.info(f"Cleaned up {cleaned_count} stale containers")
-        else:
-            logger.debug("No stale containers found")
+        # Use the centralized cleanup function with label support
+        cleanup_containers(docker_client, container_prefix)
             
     except Exception as e:
         logger.error(f"Failed to cleanup stale containers: {e}")

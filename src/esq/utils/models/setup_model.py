@@ -829,8 +829,8 @@ def export_ovms_model(
         # HETERO requires pipeline_type to be set for MODEL_DISTRIBUTION_POLICY
         pipeline_type = None
         if device_id.upper().startswith("HETERO:"):
-            # For LLM text generation, use "LM" (Language Model) pipeline type
-            pipeline_type = "LM"
+            # For LLM text generation with HETERO, use "LM_CB" (Continuous Batching) pipeline type
+            pipeline_type = "LM_CB"
             logger.info(f"HETERO device detected, setting pipeline_type to: {pipeline_type}")
 
         task_parameters = {
@@ -841,8 +841,8 @@ def export_ovms_model(
             "enable_prefix_caching": True,
             "dynamic_split_fuse": True,
             "max_num_batched_tokens": None,
-            "max_num_seqs": "2048",  # use 256 if want to align with pre-quantized models
-            "cache_size": 2,
+            "max_num_seqs": "2048",  # Set 256 if want to align with pre-quantized models
+            "cache_size": 2,  # Reduced from 2GB to 1GB for HETERO stability if needed
             "draft_source_model": None,
             "draft_model_name": None,
             "max_prompt_len": None,

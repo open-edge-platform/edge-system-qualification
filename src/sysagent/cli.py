@@ -101,6 +101,7 @@ def main() -> int:
                 skip_system_check=args.skip_system_check,
                 no_cache=args.no_cache,
                 filters=args.filter,
+                run_all_profiles=args.all,
                 extra_args=[],  # No extra args from command line
             )
         elif args.command == "info":

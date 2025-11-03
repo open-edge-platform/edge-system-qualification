@@ -49,25 +49,29 @@ def create_argument_parser() -> argparse.ArgumentParser:
     # Run command
     run_parser = subparsers.add_parser(
         "run",
-        help="Run tests (all profiles, specific profile, or individual tests)",
+        help="Run tests (qualification profiles by default, specific profile, or individual tests)",
         description=f"""
-Run tests using one of three main patterns:
+Run tests using one of four main patterns:
 
 USAGE PATTERNS:
-  1. Run all available profiles:
+  1. Run all qualification profiles (default):
      {cli_name} run
 
-  2. Run a specific profile:
+  2. Run all available profiles:
+     {cli_name} run --all
+
+  3. Run a specific profile:
      {cli_name} run -p PROFILE_NAME
 
-  3. Run with filters:
+  4. Run with filters:
      {cli_name} run -p PROFILE_NAME --filter test_id=T0069
      {cli_name} run -p PROFILE_NAME --filter display_name="CPU Test"
      {cli_name} run -p PROFILE_NAME --filter test_id=T0069 --filter devices=cpu
 
 EXAMPLES:
-  {cli_name} run                                # Run all profiles
-  {cli_name} run -p profile.suite.ai.vision     # Run specific profile
+  {cli_name} run                                      # Run qualification profiles only (default)
+  {cli_name} run --all                                # Run all profile types
+  {cli_name} run -p profile.suite.ai.vision           # Run specific profile
 
 For available profiles, use: {cli_name} list
         """,
@@ -76,6 +80,15 @@ For available profiles, use: {cli_name} list
 
     # Main execution options (grouped for clarity)
     execution_group = run_parser.add_argument_group("EXECUTION OPTIONS")
+    execution_group.add_argument(
+        "--all",
+        "-a",
+        action="store_true",
+        help=(
+            "Run all profile types (qualifications, suites, verticals). "
+            "By default, only qualification profiles are run."
+        ),
+    )
     execution_group.add_argument(
         "--profile", "-p", metavar="PROFILE_NAME", help="Run a specific profile (e.g., profile.suite.ai-vision)"
     )

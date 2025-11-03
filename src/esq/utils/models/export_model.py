@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # source: https://github.com/openvinotoolkit/model_server/blob/main/demos/common/export_models/export_model.py
-# commit: 3127325
+# commit: 3127325 (Oct 22, 2025)
 
 import argparse
 import json
@@ -458,7 +458,7 @@ node: {
           {%- if pipeline_type %}
           pipeline_type: {{pipeline_type}},{% endif %}
           models_path: "{{model_path}}",
-          plugin_config: '{{plugin_config}}',
+          plugin_config: '{{plugin_config|safe}}',
           enable_prefix_caching: {% if not enable_prefix_caching %}false{% else %} true{% endif%},
           cache_size: {{cache_size|default("10", true)}},
           {%- if max_num_batched_tokens %}
@@ -541,7 +541,7 @@ node: {
     [type.googleapis.com / mediapipe.ImageGenCalculatorOptions]: {
       models_path: "{{model_path}}",
       {%- if plugin_config_str %}
-      plugin_config: '{{plugin_config_str}}',{% endif %}
+      plugin_config: '{{plugin_config_str|safe}}',{% endif %}
       device: "{{target_device|default("CPU", true)}}",
       {%- if resolution %}
       resolution: "{{resolution}}",{% endif %}

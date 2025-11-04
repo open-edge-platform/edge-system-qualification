@@ -1,0 +1,137 @@
+# Copyright (C) 2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+name: "profile.vertical.manufacturing"
+display_name: "Manufacturing"
+description: "Manufacturing Suites"
+version: "1.0.0"
+params:
+  labels:
+    profile_display_name: "Manufacturing"
+    group: "manufacturing"
+    type: "vertical"
+    display_status: false
+  requirements:
+    os_type:
+      - "linux"
+    docker_required: true
+  videos:
+    - name: "warehouse_30fps.avi"
+      url: "https://github.com/open-edge-platform/edge-ai-resources/raw/c13b8dbf23d514c2667d39b66615bd1400cb889d/videos/warehouse.avi"
+      sha256: "cec6414d5197c3974896bc8f5b15c4a6a683b654f6ec01e9706fcee1b034d748"
+    - name: "welding_30fps.avi"
+      url: "https://github.com/open-edge-platform/edge-ai-resources/raw/c13b8dbf23d514c2667d39b66615bd1400cb889d/videos/welding.avi"
+      sha256: "bd03e671f0cbf8bfc32dae80a11e08a3ff9c3ec5edf6871a26c861bfd6e6af7b"
+  models:
+    - id: "yoloxtiny_pallet_defect_detection"
+      source: "zip"
+      url: "https://github.com/open-edge-platform/edge-ai-resources/raw/c13b8dbf23d514c2667d39b66615bd1400cb889d/models/pallet_defect_detection.zip"
+      sha256: "05284de2f3a48c646cc341d0dc93e936e2afd0f37b751338b9b78b6fd3bf171c"
+      precision: "fp32" # exported model precision metadata
+      format: "openvino"
+    - id: "weld_porosity_classification"
+      source: "zip"
+      url: "https://github.com/open-edge-platform/edge-ai-resources/raw/c13b8dbf23d514c2667d39b66615bd1400cb889d/models/weld_porosity_classification.zip"
+      sha256: "67d40c09ed857f222b35f47dbf93f20aa3f4e70ff8fc4fd4741703a9d7b4c8e7"
+      precision: "fp32"  # supported precision to be exported: fp32, fp16, int8
+      format: "openvino"
+  pipeline_params:
+    DECODE_ELEMENTS:
+      cpu: "decodebin ! videoconvert"
+      gpu_integrated: "parsebin ! vah264dec ! vapostproc ! 'video/x-raw(memory:VAMemory)'"
+      gpu_discrete: "parsebin ! varenderD{RENDER_DEVICE_NUM}h264dec ! {VIDEO_RAW_TYPE}"
+      npu: "parsebin ! vah264dec ! 'video/x-raw(memory:VAMemory)'"
+    INFERENCE_ELEMENTS:
+      cpu: "pre-process-backend={PRE_PROCESS_BACKEND} model-instance-id=inst0"
+      gpu_integrated: "pre-process-backend={PRE_PROCESS_BACKEND} model-instance-id=inst0"
+      gpu_discrete: "pre-process-backend={PRE_PROCESS_BACKEND}"
+      npu: "pre-process-backend={PRE_PROCESS_BACKEND}"
+    PRE_PROCESS_BACKEND:
+      cpu: "opencv"
+      gpu_integrated: "va-surface-sharing"
+      gpu_discrete: "va-surface-sharing"
+      npu: "va"
+    VIDEO_RAW_TYPE:
+      default: "'video/x-raw(memory:VAMemory)'"
+      overrides:
+        FULL_DEVICE_NAME:
+          "Intel(R) Unsupported video type": "'video/x-raw'"
+
+suites:
+  - name: "ai"
+    sub_suites:
+      - name: "vision"
+        tests:
+          test_dlstreamer:
+            params:
+              - test_id: "MFG-PDD-001"
+                display_name: "Pallet Defect Detection - multi-stream 480p30 H.264 gvadetect YOLOX-TINY FP32 (CPU)"
+                target_fps: 29.5
+                pipeline: |
+                  filesrc location=./videos/warehouse_30fps.avi
+                    ! ${DECODE_ELEMENTS}
+                    ! gvadetect model=./models/yoloxtiny_pallet_defect_detection/deployment/Detection/model/model.xml device=CPU ${INFERENCE_ELEMENTS}
+                    ! queue
+                devices: [cpu]
+                requirements:
+                  cpu_required: true
+                kpi_refs:
+                  - streams_max_cpu
+              - test_id: "MFG-PDD-002"
+                display_name: "Pallet Defect Detection - multi-stream 480p30 H.264 gvadetect YOLOX-TINY FP32 (iGPU)"
+                target_fps: 29.5
+                pipeline: |
+                  filesrc location=./videos/warehouse_30fps.avi
+                    ! ${DECODE_ELEMENTS}
+                    ! gvadetect model=./models/yoloxtiny_pallet_defect_detection/deployment/Detection/model/model.xml device=GPU.0 ${INFERENCE_ELEMENTS}
+                    ! queue
+                devices: [igpu]
+                requirements:
+                  igpu_required: true
+
+              - test_id: "MFG-PDD-003"
+                display_name: "Pallet Defect Detection - multi-stream 480p30 H.264 gvadetect YOLOX-TINY FP32 (dGPU)"
+                target_fps: 29.5
+                pipeline: |
+                  filesrc location=./videos/warehouse_30fps.avi
+                    ! ${DECODE_ELEMENTS}
+                    ! gvadetect model=./models/yoloxtiny_pallet_defect_detection/deployment/Detection/model/model.xml device=${DEVICE_ID} ${INFERENCE_ELEMENTS}
+                    ! queue
+                devices: [dgpu]
+                requirements:
+                  dgpu_required: true
+
+              - test_id: "MFG-WPC-001"
+                display_name: "Weld Porosity Classification - multi-stream 1024p30 H.264 gvaclassify EfficientNet-B0 FP16 (CPU)"
+                target_fps: 29.5
+                pipeline: |
+                  filesrc location=./videos/welding_30fps.avi
+                    ! ${DECODE_ELEMENTS}
+                    ! gvaclassify inference-region=full-frame model=./models/weld_porosity_classification/deployment/Classification/model/model.xml device=CPU model-instance-id=inst0
+                    ! queue
+                devices: [cpu]
+
+              - test_id: "MFG-WPC-002"
+                display_name: "Weld Porosity Classification - multi-stream 1024p30 H.264 gvaclassify EfficientNet-B0 FP16 (iGPU)"
+                target_fps: 29.5
+                pipeline: |
+                  filesrc location=./videos/warehouse_30fps.avi
+                    ! ${DECODE_ELEMENTS}
+                    ! gvaclassify inference-region=full-frame model=./models/weld_porosity_classification/deployment/Classification/model/model.xml device=GPU.0 pre-process-backend=va-surface-sharing model-instance-id=inst0
+                    ! queue
+                devices: [igpu]
+                requirements:
+                  igpu_required: true
+
+              - test_id: "MFG-WPC-003"
+                display_name: "Weld Porosity Classification - multi-stream 1024p30 H.264 gvaclassify EfficientNet-B0 FP16 (dGPU)"
+                target_fps: 29.5
+                timeout: 300
+                pipeline: |
+                  filesrc location=./videos/welding_30fps.avi
+                    ! ${DECODE_ELEMENTS}
+                    ! gvaclassify model=./models/weld_porosity_classification/deployment/Classification/model/model.xml device=${DEVICE_ID} pre-process-backend=va-surface-sharing model-instance-id=inst0
+                    ! queue
+                devices: [dgpu]
+                requirements:
+                  dgpu_required: true

@@ -292,7 +292,7 @@ suites:
             params:
               # Entry
               - test_id: "AES-VSN-001"
-                display_name: "Vision AI Benchmark - multi-stream 1080p15 H.264 gvadetect YOLO11n FP16 15FPS"
+                display_name: "Vision AI Benchmark - multi-stream 1080p15 H.264 gvadetect YOLO11n FP16"
                 devices: [cpu, igpu]
                 tiers:
                   - entry
@@ -320,7 +320,7 @@ suites:
 
               # Efficiency Optimized
               - test_id: "AES-VSN-001"
-                display_name: "Vision AI Benchmark - multi-stream 1080p15 H.264 gvadetect YOLO11n FP16 15FPS"
+                display_name: "Vision AI Benchmark - multi-stream 1080p15 H.264 gvadetect YOLO11n FP16"
                 devices: [cpu, igpu, npu]
                 tiers:
                   - efficiency_optimized
@@ -334,7 +334,7 @@ suites:
 
               # Scalable Performance
               - test_id: "AES-VSN-001"
-                display_name: "Vision AI Benchmark - multi-stream 1080p15 H.264 gvadetect YOLO11n FP16 15FPS"
+                display_name: "Vision AI Benchmark - multi-stream 1080p15 H.264 gvadetect YOLO11n FP16"
                 devices: [cpu]
                 tiers:
                   - scalable_performance
@@ -348,7 +348,7 @@ suites:
 
               # Scalable AI Graphic Media
               - test_id: "AES-VSN-001"
-                display_name: "Vision AI Benchmark - multi-stream 1080p15 H.264 gvadetect YOLO11n FP16 15FPS"
+                display_name: "Vision AI Benchmark - multi-stream 1080p15 H.264 gvadetect YOLO11n FP16"
                 devices: [cpu, igpu, dgpu, npu]
                 tiers:
                   # dGPU based specific tiers

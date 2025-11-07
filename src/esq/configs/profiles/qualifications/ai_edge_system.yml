@@ -315,7 +315,7 @@ suites:
                 kpi_override:
                   streams_max:
                     validation:
-                      reference: 7
+                      reference: 5
                       enabled: true
 
               # Efficiency Optimized

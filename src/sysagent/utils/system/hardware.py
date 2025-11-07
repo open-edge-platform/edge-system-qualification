@@ -847,6 +847,16 @@ def collect_storage_info() -> Dict[str, Any]:
         disk_mapping = _get_disk_mapping()
         partitions = psutil.disk_partitions()
 
+        # Find the root partition to determine the primary storage device
+        root_partition = None
+        root_disk_device = None
+
+        for partition in partitions:
+            if partition.mountpoint == "/":
+                root_partition = partition
+                root_disk_device = _get_parent_disk(partition.device)
+                break
+
         # Group partitions by their parent disk device
         disk_partitions = {}
         for partition in partitions:
@@ -889,16 +899,34 @@ def collect_storage_info() -> Dict[str, Any]:
                         device_obj["total_partition_used"] += usage.used
                         device_obj["total_partition_free"] += usage.free
 
-                        # Add to global totals
-                        storage_info["total_size"] += usage.total
-                        storage_info["total_used"] += usage.used
-                        storage_info["total_free"] += usage.free
-
                     except PermissionError:
                         # Skip inaccessible partitions
                         continue
 
             storage_info["devices"].append(device_obj)
+
+        # Calculate global totals based on root disk only (for system validation)
+        if root_disk_device and root_partition:
+            try:
+                # Use total disk size for the device containing root partition
+                root_disk_size = _get_disk_size(root_disk_device)
+                root_usage = psutil.disk_usage(root_partition.mountpoint)
+
+                # Global totals should reflect the primary storage (root disk)
+                storage_info["total_size"] = root_disk_size
+                storage_info["total_used"] = root_usage.used
+                storage_info["total_free"] = root_usage.free
+            except Exception as e:
+                logger.warning(f"Failed to get root disk usage: {e}")
+                # Fallback: use root partition usage
+                if root_partition:
+                    try:
+                        root_usage = psutil.disk_usage(root_partition.mountpoint)
+                        storage_info["total_size"] = root_usage.total
+                        storage_info["total_used"] = root_usage.used
+                        storage_info["total_free"] = root_usage.free
+                    except Exception:
+                        pass
 
         # Sort devices with root mount disk first
         def sort_storage_devices(device):

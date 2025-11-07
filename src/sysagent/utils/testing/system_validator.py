@@ -198,7 +198,7 @@ class SystemValidator:
                 }
             )
 
-        # Storage minimum requirement
+        # Storage minimum free requirement
         if "storage_min_gb" in hw_requirements:
             min_storage = hw_requirements["storage_min_gb"]
             storage_info = hardware.get("storage", {})
@@ -212,6 +212,23 @@ class SystemValidator:
                     "actual": f"{actual_storage_gb:.0f} GB",
                     "required": f">= {min_storage} GB",
                     "category": "hardware.storage.free",
+                }
+            )
+
+        # Storage minimum total requirement
+        if "storage_total_min_gb" in hw_requirements:
+            min_total_storage = hw_requirements["storage_total_min_gb"]
+            storage_info = hardware.get("storage", {})
+            total_bytes = storage_info.get("total_size", 0)
+            actual_total_storage_gb = total_bytes / (1000**3)  # Use GB (1000^3) standard
+            passed = actual_total_storage_gb >= min_total_storage
+            results.append(
+                {
+                    "name": f"Total storage >= {min_total_storage} GB",
+                    "passed": passed,
+                    "actual": f"{actual_total_storage_gb:.0f} GB",
+                    "required": f">= {min_total_storage} GB",
+                    "category": "hardware.storage.total",
                 }
             )
 

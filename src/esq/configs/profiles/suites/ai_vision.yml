@@ -14,7 +14,8 @@ params:
     # Hardware requirements
     cpu_min_cores: 2
     memory_min_gb: 5.0
-    storage_min_gb: 10.0
+    storage_total_min_gb: 64.0
+    storage_min_gb: 10.0  # Free storage for test execution
     # Software requirements
     os_type:
       - "linux"

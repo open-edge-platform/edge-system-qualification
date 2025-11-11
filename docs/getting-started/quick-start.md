@@ -143,17 +143,17 @@ Run all tests and review the generated test report:
 
 ### 1. Run Intel® ESQ
 
-Run all tests to generate a test report:
+Run qualification and vertical (recommended) test profiles to generate a test report:
 
 ```bash
 esq run
 ```
 
-This command will:
+By default, this command will:
 
-1. Run all test suites
-2. Collect metrics
-3. Generate a test report
+1. Run qualification profiles (always included)
+2. Run vertical profiles (unless you choose to skip them at the prompt)
+3. Collect metrics and generate a test report
 
 !!! tip "Verbose Output"
     Use the `--verbose` option to see detailed information while running tests:
@@ -163,6 +163,13 @@ This command will:
     ```
     
     This provides real-time feedback on test progress, system information collection, and detailed execution logs.
+
+!!! tip "Run All Profile Types"
+    Use the `--all` option to run all available profile types (qualification, vertical, and suite):
+    
+    ```bash
+    esq --verbose run --all
+    ```
 
 !!! info "Driver Requirements"
     Intel® GPU and NPU tests require specific drivers. Ensure you have the latest Intel® drivers installed for your hardware configuration.

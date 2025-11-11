@@ -54,16 +54,18 @@ def main() -> int:
     parser = create_argument_parser()
     args = parser.parse_args()
 
-    # Handle verbose/debug flags - check both global and subcommand usage
+    # Handle verbose/debug/force flags - check both global and subcommand usage
     command_index = sys.argv.index(args.command) if args.command and args.command in sys.argv else len(sys.argv)
     global_args = sys.argv[:command_index]
 
     global_verbose = "-v" in global_args or "--verbose" in global_args
     global_debug = "-d" in global_args or "--debug" in global_args
+    global_force = "-f" in global_args or "--force" in global_args
 
     # Merge global and subcommand flags
     verbose = global_verbose or getattr(args, "verbose", False)
     debug = global_debug or getattr(args, "debug", False)
+    force = global_force or getattr(args, "force", False)
 
     # Configure logging based on command line options
     configure_logging(verbose=verbose, debug=debug)
@@ -102,6 +104,7 @@ def main() -> int:
                 no_cache=args.no_cache,
                 filters=args.filter,
                 run_all_profiles=args.all,
+                force=force,
                 extra_args=[],  # No extra args from command line
             )
         elif args.command == "info":

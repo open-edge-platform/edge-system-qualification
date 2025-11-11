@@ -37,6 +37,35 @@ from sysagent.utils.testing import (
 logger = logging.getLogger(__name__)
 
 
+def _prompt_skip_vertical_profiles(force: bool = False) -> bool:
+    """
+    Prompt user whether to skip vertical profiles, with 'N' as default.
+
+    Args:
+        force: If True, skip prompt and return False (don't skip vertical profiles)
+
+    Returns:
+        bool: True if user wants to skip vertical profiles, False otherwise
+    """
+    if force:
+        # In force mode, use default behavior (include vertical profiles)
+        return False
+
+    try:
+        response = input("Do you want to skip running vertical test case profiles? [N/y]: ").strip().lower()
+        if response == "y" or response == "yes":
+            return True
+        else:
+            # Default behavior (empty input or 'n') - don't skip vertical profiles
+            return False
+    except KeyboardInterrupt:
+        logger.info("Interrupted by user during prompt. Exiting.")
+        raise
+    except EOFError:
+        logger.info("EOF encountered, using default option (not skipping vertical profiles)")
+        return False
+
+
 def run_tests(
     profile_name: str = None,
     suite_name: str = None,
@@ -49,6 +78,7 @@ def run_tests(
     no_cache: bool = False,
     filters: List[str] = None,
     run_all_profiles: bool = False,
+    force: bool = False,
     extra_args: List[str] = None,
 ) -> int:
     """
@@ -66,7 +96,9 @@ def run_tests(
         no_cache: Whether to run tests without using cached results
         filters: List of filter expressions in format "key=value" to filter tests
         run_all_profiles: Whether to run all profile types.
-                          If False, only qualification profiles are run by default.
+                          If False, only qualification and vertical profiles are run by default
+                          with an opt-out prompt for vertical profiles.
+        force: Whether to skip interactive prompts and use default behavior
         extra_args: Additional pytest arguments to pass
 
     Returns:
@@ -147,7 +179,9 @@ def run_tests(
 
         # Option 3: Run all profiles if no specific profile or suite is provided
         else:
-            result_code, tests_ran = _run_all_profiles(skip_system_check, data_dir, verbose, debug, run_all_profiles)
+            result_code, tests_ran = _run_all_profiles(
+                skip_system_check, data_dir, verbose, debug, run_all_profiles, force
+            )
 
     except KeyboardInterrupt:
         logger.warning("Main test execution interrupted by user. Proceeding to report generation.")
@@ -163,7 +197,7 @@ def run_tests(
 
         # Check if any interrupt was detected
         if interrupt_occurred or shared_state.INTERRUPT_OCCURRED:
-            logger.warning("Test execution was interrupted by user. Generating report with partial results.")
+            logger.warning("Test execution was interrupted by user")
 
         if tests_ran:
             _generate_test_reports(data_dir, verbose, debug)
@@ -374,17 +408,23 @@ def _run_suite_tests(suite_name: str, sub_suite_name: str, test_name: str, pytes
 
 
 def _run_all_profiles(
-    skip_system_check: bool, data_dir: str, verbose: bool, debug: bool, run_all_profiles: bool = False
+    skip_system_check: bool,
+    data_dir: str,
+    verbose: bool,
+    debug: bool,
+    run_all_profiles: bool = False,
+    force: bool = False,
 ) -> tuple:
-    """Run all available profiles or only qualification profiles by default.
+    """Run all available profiles or qualification+vertical profiles by default with opt-out prompt.
 
     Args:
         skip_system_check: Whether to skip system requirement validation
         data_dir: Data directory path
         verbose: Whether to enable verbose output
         debug: Whether to enable debug output
-        run_all_profiles: If False (default), only run qualification profiles.
-                          If True, run all profile types (qualifications, suites, verticals).
+        run_all_profiles: If False (default), run qualification and vertical profiles with opt-out prompt.
+                          If True, run all profile types (qualifications, suites, verticals) without prompt.
+        force: Whether to skip interactive prompts and use default behavior
 
     Returns:
         tuple: (exit_code, tests_ran) where tests_ran indicates if any pytest actually executed
@@ -397,40 +437,66 @@ def _run_all_profiles(
     all_profile_items = []
     all_profiles_dict = {}
 
+    # Determine whether to skip vertical profiles
+    skip_vertical_profiles = False
+
+    if run_all_profiles:
+        # --all option: run all profiles without any prompts
+        include_all_types = True
+        skip_vertical_profiles = False
+        logger.info("Running all profile types (qualifications, suites, verticals)")
+    else:
+        # Default behavior: run qualification + vertical with opt-out prompt for vertical
+        include_all_types = False
+        try:
+            skip_vertical_profiles = _prompt_skip_vertical_profiles(force)
+        except KeyboardInterrupt:
+            sys.exit(1)
+
+        if skip_vertical_profiles:
+            logger.info("Running qualification profiles only (vertical profiles skipped by user)")
+        else:
+            logger.info("Running qualification and vertical profiles")
+            logger.info("Use --all flag to run all profile types including suites")
+
     for profile_type, profiles in all_profiles.items():
         for profile in profiles:
             configs = profile.get("configs")
             if configs:
                 profile_name = configs.get("name")
                 if profile_name:
-                    # Filter by profile type if run_all_profiles is False
-                    if not run_all_profiles:
-                        # Check if this is a qualification profile
+                    # Apply filtering logic based on run mode
+                    if include_all_types:
+                        # Include all profile types
+                        all_profile_items.append((profile_type, profile))
+                        all_profiles_dict[profile_name] = configs
+                    else:
+                        # Default mode: include qualification + vertical (unless user opted out)
                         params = configs.get("params", {})
                         labels = params.get("labels", {})
                         profile_label_type = labels.get("type", "")
 
-                        # Only include qualification profiles when run_all_profiles is False
-                        if profile_type != "qualifications" and profile_label_type != "qualification":
-                            logger.debug(f"Skipping non-qualification profile: {profile_name}")
-                            continue
+                        is_qualification = profile_type == "qualifications" or profile_label_type == "qualification"
+                        is_vertical = profile_type == "verticals" or profile_label_type == "vertical"
 
-                    all_profile_items.append((profile_type, profile))
-                    all_profiles_dict[profile_name] = configs
+                        if is_qualification:
+                            all_profile_items.append((profile_type, profile))
+                            all_profiles_dict[profile_name] = configs
+                        elif is_vertical and not skip_vertical_profiles:
+                            all_profile_items.append((profile_type, profile))
+                            all_profiles_dict[profile_name] = configs
+                        else:
+                            logger.debug(f"Skipping profile: {profile_name} (type: {profile_type})")
 
     if not all_profile_items:
         if run_all_profiles:
             logger.error("No profiles found")
         else:
-            logger.error("No qualification profiles found. Use --all to run all profile types.")
+            if skip_vertical_profiles:
+                logger.error("No qualification profiles found. Use --all to run all profile types.")
+            else:
+                logger.error("No qualification or vertical profiles found. Use --all to run all profile types.")
         return 1, False
-
-    # Log which profile types are being run
-    if run_all_profiles:
-        logger.info(f"Running all profile types: {len(all_profile_items)} profiles found")
-    else:
-        logger.info(f"Running qualification profiles only: {len(all_profile_items)} profiles found")
-        logger.info("Use --all flag to run all profile types (qualifications, suites, verticals)")
 
     # Validate profile dependencies
     dep_errors = validate_profile_dependencies(all_profiles_dict)

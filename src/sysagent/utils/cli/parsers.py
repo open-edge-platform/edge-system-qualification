@@ -54,7 +54,7 @@ def create_argument_parser() -> argparse.ArgumentParser:
 Run tests using one of four main patterns:
 
 USAGE PATTERNS:
-  1. Run all qualification profiles (default):
+  1. Run qualification and vertical profiles with opt-out prompt (default):
      {cli_name} run
 
   2. Run all available profiles:
@@ -69,7 +69,8 @@ USAGE PATTERNS:
      {cli_name} run -p PROFILE_NAME --filter test_id=T0069 --filter devices=cpu
 
 EXAMPLES:
-  {cli_name} run                                      # Run qualification profiles only (default)
+  {cli_name} run                                      # Run qualification + vertical profiles (with opt-out prompt)
+  {cli_name} run --force                              # Skip prompt, use default (include vertical profiles)
   {cli_name} run --all                                # Run all profile types
   {cli_name} run -p profile.suite.ai.vision           # Run specific profile
 
@@ -84,10 +85,7 @@ For available profiles, use: {cli_name} list
         "--all",
         "-a",
         action="store_true",
-        help=(
-            "Run all profile types (qualifications, suites, verticals). "
-            "By default, only qualification profiles are run."
-        ),
+        help=("Run all profile types. By default, qualification and vertical profiles are run with an opt-out prompt."),
     )
     execution_group.add_argument(
         "--profile", "-p", metavar="PROFILE_NAME", help="Run a specific profile (e.g., profile.suite.ai-vision)"
@@ -124,6 +122,9 @@ For available profiles, use: {cli_name} list
         "--verbose", "-v", action="store_true", help="Display more detailed output with medium traceback"
     )
     run_parser.add_argument("--debug", "-d", action="store_true", help="Display debug output with full traceback")
+    run_parser.add_argument(
+        "--force", "-f", action="store_true", help="Skip interactive prompts and use default behavior"
+    )
 
     # System Info command
     info_parser = subparsers.add_parser("info", help="Show system information with hardware and software details")

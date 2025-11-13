@@ -107,33 +107,6 @@ def test_dlstreamer(
     if not device_dict:
         pytest.fail(f"No available devices found for device categories: {devices}")
 
-    # TEMPORARY: Skip additional discrete GPUs until multi-dGPU support is fully enabled
-    # Only run on the first discrete GPU if system has more than one
-    discrete_gpus = [
-        dev_id
-        for dev_id, dev_info in device_dict.items()
-        if "discrete" in dev_info.get("device_type", "").lower() and "GPU." in dev_id
-    ]
-
-    if len(discrete_gpus) > 1:
-        # Keep only the first discrete GPU
-        first_dgpu = discrete_gpus[0]
-        skipped_dgpus = discrete_gpus[1:]
-
-        logger.warning(
-            f"TEMPORARY LIMITATION: System has {len(discrete_gpus)} discrete GPUs. "
-            f"Only testing on {first_dgpu}. Skipping: {', '.join(skipped_dgpus)}. "
-            "This limitation will be removed once multi-dGPU support is fully enabled."
-        )
-
-        # Remove additional discrete GPUs from device_dict and device_list
-        for dgpu in skipped_dgpus:
-            device_dict.pop(dgpu, None)
-            if dgpu in device_list:
-                device_list.remove(dgpu)
-
-        logger.info(f"Updated device list after dGPU filtering: {device_list}")
-
     # Log detailed device information
     for device_id, device_info in device_dict.items():
         logger.debug(f"Device {device_id}: Type={device_info['device_type']}, Name={device_info['full_name']}")
@@ -161,7 +134,7 @@ def test_dlstreamer(
     try:
         # Step 2: Prepare test using modular functions
         # Run asset preparation using modular function
-        prepare_test(
+        asset_result = prepare_test(
             test_name=test_name,
             prepare_func=lambda: prepare_assets(
                 videos=videos,
@@ -177,6 +150,9 @@ def test_dlstreamer(
             configs=configs,
             name="Assets",
         )
+
+        # Extract container config for device-specific image selection
+        container_config = asset_result.metadata.get("container_config", {})
 
         # Run baseline streams analysis each device
         baseline_streams_results = []
@@ -208,6 +184,7 @@ def test_dlstreamer(
                     results_dir=results_dir,
                     docker_container_prefix=docker_container_prefix,
                     pipeline_timeout=pipeline_timeout,
+                    container_config=container_config,
                 ),
                 cached_result=cached_result,
                 cache_result=cache_result,
@@ -345,6 +322,7 @@ def test_dlstreamer(
                     metrics=default_metrics,
                     baseline_streams=baseline_streams.get(device_id, {}),
                     visualize_stream=visualize_stream,
+                    container_config=container_config,
                 ),
                 test_name=test_name,
                 configs=configs,

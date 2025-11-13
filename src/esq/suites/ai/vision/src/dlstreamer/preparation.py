@@ -21,6 +21,45 @@ from .pipeline import build_baseline_pipeline, resolve_pipeline_placeholders
 logger = logging.getLogger(__name__)
 
 
+def get_device_specific_docker_image(
+    device_id: str, container_config: dict, fallback_image: str, device_dict: dict = None
+) -> str:
+    """
+    Get the appropriate Docker image for a specific device.
+
+    Args:
+        device_id: The device ID to check (e.g., 'dgpu', 'GPU.1', 'CPU')
+        container_config: Container configuration with available images
+        fallback_image: Default image to use if device-specific image not available
+        device_dict: Dictionary containing device information (optional)
+
+    Returns:
+        Docker image tag appropriate for the device
+    """
+    # Check if the device is a dGPU device
+    is_dgpu_device = False
+
+    if device_dict and device_id in device_dict:
+        # Check device type from device_dict for discrete GPUs
+        device_type = device_dict[device_id].get("device_type", "")
+        is_dgpu_device = "discrete" in device_type.lower()
+    else:
+        # Fallback to device_id pattern matching
+        is_dgpu_device = device_id == "dgpu" or device_id.lower().startswith("dgpu") or "dgpu" in device_id.lower()
+
+    if is_dgpu_device and "dgpu_analyzer_image" in container_config:
+        image_name = container_config["dgpu_analyzer_image"]
+        logger.debug(f"Using dGPU-specific Docker image for device {device_id}: {image_name}")
+        return image_name
+    elif "analyzer_image" in container_config:
+        image_name = container_config["analyzer_image"]
+        logger.debug(f"Using standard Docker image for device {device_id}: {image_name}")
+        return image_name
+    else:
+        logger.warning(f"No device-specific image found for {device_id}, using fallback: {fallback_image}")
+        return fallback_image
+
+
 def prepare_assets(
     videos: list,
     configs: Dict[str, Any],
@@ -60,30 +99,54 @@ def prepare_assets(
     ensure_dir_permissions(models_dir, uid=os.getuid(), gid=os.getgid())
     ensure_dir_permissions(videos_dir, uid=os.getuid(), gid=os.getgid())
 
-    # Prepare Docker image for DL Streamer analyzer
+    # Prepare Docker images for DL Streamer analyzer
+    container_config = {}
+
+    # Build standard Docker image
+    logger.info(f"Building standard Docker image: {docker_image_tag_analyzer}")
     build_analyzer_result = docker_client.build_image(
-        path=f"{src_dir}/containers/dlstreamer_analyzer", tag=docker_image_tag_analyzer
+        path=f"{src_dir}/containers/dlstreamer_analyzer", tag=docker_image_tag_analyzer, extract_packages=True
     )
     if not build_analyzer_result.get("image_id"):
         pytest.fail(f"Failed to build Docker image: {docker_image_tag_analyzer}")
     else:
-        logger.info(f"Docker image built successfully: {docker_image_tag_analyzer}")
+        logger.info(f"Standard Docker image built successfully: {docker_image_tag_analyzer}")
+
+    container_config["analyzer_image"] = docker_image_tag_analyzer
+    container_config["analyzer_image_id"] = build_analyzer_result.get("image_id", "")
+
+    # Build dGPU-specific Docker image
+    dgpu_image_tag = f"{docker_image_tag_analyzer.split(':')[0]}-dgpu:latest"
+    logger.info(f"Building dGPU-specific Docker image with enhanced system packages: {dgpu_image_tag}")
+    build_dgpu_result = docker_client.build_image(
+        path=f"{src_dir}/containers/dlstreamer_analyzer",
+        tag=dgpu_image_tag,
+        dockerfile="Dockerfile.dgpu",
+        extract_packages=True,
+    )
+    if not build_dgpu_result.get("image_id"):
+        pytest.fail(f"Failed to build dGPU Docker image: {dgpu_image_tag}")
+    else:
+        logger.info(f"dGPU Docker image built successfully: {dgpu_image_tag}")
+
+    container_config["dgpu_analyzer_image"] = dgpu_image_tag
+    container_config["dgpu_analyzer_image_id"] = build_dgpu_result.get("image_id", "")
 
     # Prepare Docker image for DL Streamer utils
     build_utils_result = docker_client.build_image(
-        path=f"{src_dir}/containers/dlstreamer_utils", tag=docker_image_tag_utils
+        path=f"{src_dir}/containers/dlstreamer_utils", tag=docker_image_tag_utils, extract_packages=True
     )
     if not build_utils_result.get("image_id"):
         pytest.fail(f"Failed to build Docker image: {docker_image_tag_utils}")
     else:
         logger.info(f"Docker image built successfully: {docker_image_tag_utils}")
 
-    container_config = {
-        "analyzer_image": docker_image_tag_analyzer,
-        "analyzer_image_id": build_analyzer_result.get("image_id", ""),
-        "utils_image": docker_image_tag_utils,
-        "utils_image_id": build_utils_result.get("image_id", ""),
-    }
+    container_config.update(
+        {
+            "utils_image": docker_image_tag_utils,
+            "utils_image_id": build_utils_result.get("image_id", ""),
+        }
+    )
 
     # Prepare all videos
     videos_config = []
@@ -268,6 +331,7 @@ def prepare_baseline(
     results_dir: str,
     docker_container_prefix: str,
     pipeline_timeout: int = 180,
+    container_config: Dict[str, Any] = None,
 ) -> Result:
     """
     Prepare baseline streams analysis for a specific device.
@@ -285,6 +349,7 @@ def prepare_baseline(
         results_dir: Directory for results
         docker_container_prefix: Prefix for container names
         pipeline_timeout: Timeout for pipeline execution
+        container_config: Container configuration with available images (optional)
 
     Returns:
         Result object with baseline analysis results
@@ -295,6 +360,12 @@ def prepare_baseline(
         pytest.fail("Pipeline is not provided for baseline streams analysis")
 
     try:
+        # Select device-specific Docker image
+        if container_config:
+            docker_image_tag_analyzer = get_device_specific_docker_image(
+                device_id, container_config, docker_image_tag_analyzer, device_dict
+            )
+
         baseline_streams = prepare_estimate_num_streams_for_device(
             device_id=device_id,
             pipeline=pipeline,
@@ -395,10 +466,6 @@ def prepare_estimate_num_streams_for_device(
     """
     try:
         logger.debug(f"Using pipeline: {pipeline}")
-        # Get the device type from the device dictionary
-        device_type = device_dict[device_id]["device_type"]
-        device_type_key = device_type.lower() if device_type else ""
-        device_id_key = device_id.lower()
 
         # Use modular resolve_pipeline_placeholders from the imported module
         resolved_pipeline = resolve_pipeline_placeholders(pipeline, pipeline_params, device_id, device_dict)

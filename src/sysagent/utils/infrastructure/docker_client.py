@@ -14,6 +14,7 @@ import os
 import shutil
 import tempfile
 import threading
+from datetime import datetime
 
 # Conditional imports for optional dependencies
 try:
@@ -116,10 +117,25 @@ class DockerClient:
         logger.info(f"Successfully pulled Docker image: {image}")
 
     def build_image(
-        self, path: str = None, tag: str = None, nocache: bool = False, dockerfile: str = None, buildargs: dict = None
+        self,
+        path: str = None,
+        tag: str = None,
+        nocache: bool = False,
+        dockerfile: str = None,
+        buildargs: dict = None,
+        extract_packages: bool = False,
     ):
         """
         Build a Docker image with streaming logs and Allure attachments.
+
+        Args:
+            path: Build context path
+            tag: Docker image tag
+            nocache: Disable Docker build cache
+            dockerfile: Dockerfile name (default: Dockerfile)
+            buildargs: Build arguments dictionary
+            extract_packages: If True, extract and attach package list as Allure attachment
+
         Returns:
             dict: {"docker_image": tag, "image_id": image.id, "build_log_text": ..., "image_obj": image}
         """
@@ -303,11 +319,267 @@ class DockerClient:
             logger.error(f"Image {tag} was not found after build")
             raise
 
+        # Construct dockerfile path for base image extraction
+        dockerfile_path = None
+        if path:
+            dockerfile_name = dockerfile if dockerfile else "Dockerfile"
+            dockerfile_path = os.path.join(path, dockerfile_name)
+
+        # Extract and attach package list if requested, otherwise just extract base image info
+        if extract_packages:
+            self._extract_package_list(tag, dockerfile_path)
+        else:
+            # Always extract base image information even when package list is disabled
+            logger.info(f"Extracting base image information from Docker image: {tag}")
+            base_image_info = self._extract_base_image_info(tag, dockerfile_path)
+            self._create_base_image_attachment(tag, base_image_info)
+
         result = {"docker_image": tag, "image_id": image.id, "build_log_text": build_log_text, "image_obj": image}
         # Cache the result for this CLI session
         built_tags.add(tag)
         os.environ["CORE_BUILT_DOCKER_TAGS"] = ";".join(built_tags)
         return result
+
+    def _extract_package_list(self, tag: str, dockerfile_path: str = None) -> None:
+        """
+        Extract package list from a Docker image and attach it to Allure report.
+
+        Args:
+            tag: Docker image tag
+            dockerfile_path: Path to Dockerfile used for build (optional)
+        """
+        try:
+            logger.info(f"Extracting package list from Docker image: {tag}")
+
+            # Use run_container's built-in file extraction to avoid stdout logging
+            # Create results directory first, then run package extraction
+            package_cmd = (
+                "mkdir -p /mnt/results && "
+                "dpkg -l | grep '^ii' | awk '{print $2\" \"$3}' | sort > /mnt/results/packages.txt && "
+                "echo 'Package extraction completed'"
+            )
+
+            container_result = self.run_container(
+                image=tag,
+                entrypoint=["sh", "-c", package_cmd],
+                name=f"package-list-{hash(tag) % 10000}",
+                user="root",  # Run as root for dpkg access and directory creation
+                remove=True,
+                timeout=30,
+                mode="batch",
+                attach_logs=False,  # Don't attach container logs
+                result_file="packages.txt",  # Extract this file from container
+                container_result_file_dir="/mnt/results",  # Container directory containing the file
+            )
+
+            if container_result.get("container_info", {}).get("exit_code") == 0:
+                # Get the package list from the extracted file (not from stdout)
+                package_list_raw = container_result.get("result_text", "")
+                if package_list_raw:
+                    # Process package list and add line numbers
+                    package_lines = package_list_raw.strip().split("\n")
+                    package_count = len([line for line in package_lines if line.strip()])
+
+                    # Create numbered package list
+                    numbered_packages = []
+                    line_num = 1
+                    for line in package_lines:
+                        if line.strip():
+                            numbered_packages.append(f"{line_num:4d}. {line}")
+                            line_num += 1
+
+                    # Get base image hash information with Dockerfile parsing
+                    base_image_info = self._extract_base_image_info(tag, dockerfile_path)
+
+                    # Create comprehensive attachment content
+                    attachment_content = "Docker Image Information Report\n"
+                    attachment_content += f"Image: {tag}\n"
+                    attachment_content += "Generated by: DockerClient.build_image()\n"
+                    attachment_content += f"Generated at: {datetime.now().isoformat()}\n"
+                    attachment_content += "=" * 60 + "\n\n"
+
+                    # Add base image information using shared formatter
+                    if base_image_info:
+                        attachment_content += self._format_base_image_section(base_image_info)
+
+                    # Add package list with count and line numbers
+                    attachment_content += f"INSTALLED PACKAGES ({package_count} total)\n"
+                    attachment_content += "-" * 30 + "\n"
+                    attachment_content += "Line  Package Name                     Version\n"
+                    attachment_content += "-" * 60 + "\n"
+                    attachment_content += "\n".join(numbered_packages)
+
+                    # Attach to Allure report
+                    allure.attach(
+                        attachment_content,
+                        name=f"Docker Image Info & Packages - {tag}",
+                        attachment_type=allure.attachment_type.TEXT,
+                    )
+                    logger.info(f"✓ Package list attached for Docker image: {tag} ({package_count} packages)")
+                else:
+                    logger.warning(f"No package list output for Docker image: {tag}")
+
+        except Exception as e:
+            logger.warning(f"Error extracting package list for {tag}: {str(e)}")
+
+    def _parse_dockerfile_base_image(self, dockerfile_path: str) -> str:
+        """
+        Parse Dockerfile to extract the base image from FROM instruction.
+
+        Args:
+            dockerfile_path: Path to the Dockerfile
+
+        Returns:
+            Base image name from FROM instruction, or "Unknown" if not found
+        """
+        try:
+            with open(dockerfile_path, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            # Look for FROM instruction (case insensitive)
+            # Handle multi-stage builds by getting the first FROM
+            import re
+
+            # Pattern to match FROM instruction, handling comments and multi-line
+            # This matches: FROM <image> or FROM <image>:<tag> or FROM <image>@<digest>
+            pattern = r"^\s*FROM\s+([^\s#]+(?::[^\s#]+|@[^\s#]+)?)"
+
+            for line in content.split("\n"):
+                line = line.strip()
+                if line and not line.startswith("#"):  # Skip comments and empty lines
+                    match = re.match(pattern, line, re.IGNORECASE)
+                    if match:
+                        base_image = match.group(1)
+                        logger.debug(f"Extracted base image from Dockerfile: {base_image}")
+                        return base_image
+
+            logger.warning(f"No FROM instruction found in Dockerfile: {dockerfile_path}")
+            return "Unknown"
+
+        except Exception as e:
+            logger.warning(f"Error parsing Dockerfile {dockerfile_path}: {str(e)}")
+            return "Unknown"
+
+    def _extract_repository_digest(self, image_name: str) -> str:
+        """
+        Extract repository digest (RepoDigests) from Docker image.
+
+        Args:
+            image_name: Name/tag of the Docker image
+
+        Returns:
+            Repository digest string or "Unknown" if not available
+        """
+        try:
+            image = self.client.images.get(image_name)
+
+            # Get RepoDigests from image attributes
+            if hasattr(image, "attrs") and image.attrs:
+                repo_digests = image.attrs.get("RepoDigests", [])
+                if repo_digests:
+                    # Return the first repo digest
+                    repo_digest = repo_digests[0]
+                    logger.debug(f"Repository digest for {image_name}: {repo_digest}")
+                    return repo_digest
+
+            logger.debug(f"No repository digest found for {image_name}")
+            return "Unknown"
+
+        except Exception as e:
+            logger.warning(f"Failed to extract repository digest for {image_name}: {e}")
+            return "Unknown"
+
+    def _extract_base_image_info(self, tag: str, dockerfile_path: str = None) -> dict:
+        """
+        Extract base image information from Dockerfile and repository digests.
+
+        Args:
+            tag: Docker image tag
+            dockerfile_path: Path to Dockerfile used for build (optional)
+
+        Returns:
+            Dictionary containing base image information
+        """
+        try:
+            # Get image object for built image info
+            image = self.client.images.get(tag)
+
+            # Extract base image name from Dockerfile
+            base_image = "Unknown"
+            if dockerfile_path and os.path.exists(dockerfile_path):
+                base_image = self._parse_dockerfile_base_image(dockerfile_path)
+                logger.debug(f"Base image from Dockerfile: {base_image}")
+
+            # Get repository digests
+            built_image_digest = self._extract_repository_digest(tag)
+            base_image_digest = "Unknown"
+
+            if base_image != "Unknown":
+                base_image_digest = self._extract_repository_digest(base_image)
+
+            return {
+                "base_image": base_image,
+                "image_id": image.id,
+                "digest": built_image_digest,
+                "base_image_digest": base_image_digest,
+            }
+
+        except Exception as e:
+            logger.warning(f"Error extracting base image info for {tag}: {str(e)}")
+            return {"base_image": "Unknown", "image_id": "Unknown", "digest": "Unknown", "base_image_digest": "Unknown"}
+
+    def _format_base_image_section(self, base_image_info: dict) -> str:
+        """
+        Format base image information as a text section.
+
+        Args:
+            base_image_info: Dictionary containing base image information
+
+        Returns:
+            Formatted string with base image information
+        """
+        section = "BASE IMAGE INFORMATION\n"
+        section += "-" * 30 + "\n"
+        section += f"Base Image (FROM): {base_image_info.get('base_image', 'Unknown')}\n"
+        section += f"Built Image ID: {base_image_info.get('image_id', 'Unknown')}\n"
+        section += f"Built Image Digest: {base_image_info.get('digest', 'Unknown')}\n"
+
+        # Add base image repository digest if available
+        base_image_digest = base_image_info.get("base_image_digest")
+        if base_image_digest and base_image_digest != "Unknown":
+            section += f"FROM Image Digest: {base_image_digest}\n"
+        section += "\n"
+
+        return section
+
+    def _create_base_image_attachment(self, tag: str, base_image_info: dict) -> None:
+        """
+        Create Allure attachment for base image information only.
+
+        Args:
+            tag: Docker image tag
+            base_image_info: Dictionary containing base image information
+        """
+        try:
+            attachment_content = "Docker Image Base Information\n"
+            attachment_content += f"Image: {tag}\n"
+            attachment_content += "Generated by: DockerClient.build_image()\n"
+            attachment_content += f"Generated at: {datetime.now().isoformat()}\n"
+            attachment_content += "=" * 50 + "\n\n"
+
+            # Add base image information using shared formatter
+            attachment_content += self._format_base_image_section(base_image_info)
+
+            # Attach to Allure report
+            allure.attach(
+                attachment_content,
+                name=f"Docker Base Image Info - {tag}",
+                attachment_type=allure.attachment_type.TEXT,
+            )
+            logger.info(f"✓ Base image info attached for Docker image: {tag}")
+
+        except Exception as e:
+            logger.warning(f"Error creating base image attachment for {tag}: {str(e)}")
 
     def create_container(self, image, command=None, volumes=None, environment=None, detach=True, name=None, **kwargs):
         """
@@ -353,6 +625,7 @@ class DockerClient:
         container_result_file_dir: str = None,
         ports: Mapping[str, int | list[int] | tuple[str, int] | None] | None = None,
         mode: str = "batch",  # "batch" or "server"
+        attach_logs: bool = True,  # Whether to attach container logs to Allure report
     ):
         """
         mode="batch": Run, wait for completion, collect logs/results (default).
@@ -517,15 +790,15 @@ class DockerClient:
             }
 
             # attach container log with attachment that show container name and exit code
-            # Only attach if not suppressed by environment flag for consolidation
-            if not os.environ.get("CORE_SUPPRESS_CONTAINER_LOG_ATTACHMENTS"):
+            # Only attach if enabled and not suppressed by environment flag for consolidation
+            if attach_logs and not os.environ.get("CORE_SUPPRESS_CONTAINER_LOG_ATTACHMENTS"):
                 allure.attach(
                     container_logs_text,
                     name=f"Container Logs - {name} (Exit Code: {exit_code})",
                     attachment_type=allure.attachment_type.TEXT,
                 )
-            else:
-                # Add to global collector for later consolidation
+            elif attach_logs:
+                # Add to global collector for later consolidation (only if attach_logs is True)
                 try:
                     from sysagent.utils.plugins.pytest_execution import add_container_log_for_consolidation
 
@@ -1025,32 +1298,30 @@ class DockerClient:
     def extract_docker_image_digest(self, image_name: str) -> str:
         """
         Extract SHA256 digest from Docker image for supply chain security tracking.
-        
+
         Args:
             image_name: Name/tag of the Docker image
-            
+
         Returns:
             SHA256 digest string, empty string if extraction fails
         """
         try:
             # Get image object
             image = self.client.images.get(image_name)
-            
+
             # Extract SHA256 digest from image ID (remove 'sha256:' prefix if present)
             image_id = image.id
-            if image_id.startswith('sha256:'):
+            if image_id.startswith("sha256:"):
                 digest = image_id[7:]  # Remove 'sha256:' prefix
             else:
                 digest = image_id
-                
+
             logger.info(f"Extracted digest for image {image_name}: {digest[:12]}...")
             return digest
-            
+
         except Exception as e:
             logger.warning(f"Failed to extract digest for image {image_name}: {e}")
             return ""
-
-
 
     def __del__(self):
         """

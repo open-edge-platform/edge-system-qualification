@@ -15,6 +15,7 @@ import numa
 
 from .container import run_dlstreamer_analyzer_container
 from .pipeline import build_multi_pipeline_with_devices, resolve_pipeline_placeholders
+from .preparation import get_device_specific_docker_image
 from .utils import update_device_metrics
 
 logger = logging.getLogger(__name__)
@@ -81,6 +82,7 @@ def run_benchmark_container(
     cpuset_mems: str = "",
     num_streams: int = None,
     visualize_stream: bool = False,
+    container_config: Dict[str, Any] = None,
 ) -> docker.models.containers.Container:
     """
     Helper to run a Docker container for benchmarking.
@@ -88,6 +90,13 @@ def run_benchmark_container(
     """
     user_gid = os.getuid()
     render_gid = grp.getgrnam("render").gr_gid
+
+    # Select device-specific Docker image
+    if container_config:
+        docker_image_tag_analyzer = get_device_specific_docker_image(
+            device_id, container_config, docker_image_tag_analyzer, device_dict
+        )
+        logger.debug(f"Selected Docker image for device {device_id}: {docker_image_tag_analyzer}")
 
     # Set up container name
     container_name = f"{docker_container_prefix}-analyzer-total-{run_id}-{device_id}"
@@ -175,6 +184,7 @@ def run_concurrent_analysis(
     target_fps: float,
     num_sockets: int = 1,
     visualize_stream: bool = False,
+    container_config: Dict[str, Any] = None,
 ) -> None:
     """
     Run analysis on multiple devices/configurations simultaneously.
@@ -216,6 +226,7 @@ def run_concurrent_analysis(
                     cpuset_mems=mems,
                     num_streams=data.get("num_streams", None),
                     visualize_stream=visualize_stream,
+                    container_config=container_config,
                 )
                 containers.append(container)
         else:
@@ -235,6 +246,7 @@ def run_concurrent_analysis(
                 combined_analysis=analysis_tasks,
                 num_streams=data.get("num_streams", None),
                 visualize_stream=visualize_stream,
+                container_config=container_config,
             )
             containers.append(container)
 
@@ -259,6 +271,7 @@ def qualify_device(
     num_sockets: int = 1,
     max_plateau_iterations: int = 3,
     visualize_stream: bool = False,
+    container_config: Dict[str, Any] = None,
 ) -> bool:
     """
     Iteratively find the max streams for a single device while others are active.
@@ -305,6 +318,7 @@ def qualify_device(
             target_fps=target_fps,
             num_sockets=num_sockets,
             visualize_stream=visualize_stream,
+            container_config=container_config,
         )
 
         # --- Read and aggregate results ---

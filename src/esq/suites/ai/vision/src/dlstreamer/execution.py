@@ -11,6 +11,7 @@ from typing import Any, Dict
 from sysagent.utils.core import Metrics, Result, get_metric_name_for_device
 from sysagent.utils.system.ov_helper import get_openvino_device_type
 
+from .preparation import get_device_specific_docker_image
 from .qualification import qualify_device
 
 logger = logging.getLogger(__name__)
@@ -35,6 +36,7 @@ def run_device_test(
     metrics=None,
     baseline_streams=None,
     visualize_stream: bool = False,
+    container_config: Dict[str, Any] = None,
 ) -> Result:
     """
     Execute DL Streamer test for a single device.
@@ -46,11 +48,18 @@ def run_device_test(
         metrics: Default metrics for the device
         baseline_streams: Baseline stream information
         visualize_stream: Whether to visualize the stream
+        container_config: Container configuration with available images (optional)
 
     Returns:
         Result object with test outcomes
     """
     logger.info(f"Executing DL Streamer test for device: {device_id}")
+
+    # Select device-specific Docker image
+    if container_config:
+        docker_image_tag_analyzer = get_device_specific_docker_image(
+            device_id, container_config, docker_image_tag_analyzer, device_dict
+        )
 
     result = Result(
         parameters={
@@ -97,6 +106,7 @@ def run_device_test(
             num_sockets=num_sockets,
             max_plateau_iterations=max_plateau_iterations,
             visualize_stream=visualize_stream,
+            container_config=container_config,
         )
         final_results[device_id] = device_result
 

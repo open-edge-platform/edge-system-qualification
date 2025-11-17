@@ -70,15 +70,22 @@ logger = logging.getLogger(__name__)
 
 
 class DockerClient:
-    def __init__(self):
+    def __init__(self, timeout: int = 300):
+        """
+        Args:
+            timeout: Default timeout for Docker API calls in seconds (default: 300)
+        """
         if docker is None:
             raise ImportError("Docker package not available. Install with: pip install docker")
 
-        self.client = docker.from_env()
+        self.client = docker.from_env(timeout=timeout)
         self._log_threads = {}  # container_name -> (thread, stop_event, logs)
+        self._client_timeout = timeout
+        
         try:
             logger.info("Verifying Docker client connection")
             self.client.ping()
+            logger.debug(f"Docker client initialized with {timeout}s timeout")
         except Exception as e:
             logger.error(f"Failed to connect to Docker: {e}")
             raise RuntimeError(f"Docker is not available: {e}")
@@ -764,14 +771,15 @@ class DockerClient:
                 result = container.wait(timeout=10)
                 killer_thread.join(0)
                 if timeout_triggered.is_set():
-                    logger.error(f"Container {container.name} stopped due to timeout ({timeout}s)")
+                    container_name = container.name if container and hasattr(container, 'name') else "unknown"
+                    logger.error(f"Container {container_name} stopped due to timeout ({timeout}s)")
                     if container_logs_text:
                         allure.attach(
                             container_logs_text,
                             name="Container Execution Logs",
                             attachment_type=allure.attachment_type.TEXT,
                         )
-                    pytest.fail(f"Container execution stopped due to timeout ({timeout}s)")
+                    pytest.fail(f"Container {container_name} execution stopped due to timeout ({timeout}s)")
 
                 logger.info(f"Waiting for container {container.name} to finish processing...")
                 time.sleep(5)
@@ -934,31 +942,43 @@ class DockerClient:
 
     def cleanup_container(self, container_name, timeout=10):
         """
-        Stop log streaming, stop and remove a container.
+        Stop log streaming, stop and remove a container in any state.
+        This method handles containers that may be created, running, stopped, or failed.
         """
         logger.info(f"Cleaning up container: {container_name}")
 
-        # Check if container exists before attempting cleanup
-        if not self.container_exists(container_name):
-            logger.debug(f"Container {container_name} does not exist, skipping cleanup operations")
-            # Still stop log streaming in case it was started
-            self.stop_log_streaming(container_name)
-            logger.info(f"Cleanup completed for container: {container_name}")
-            return
-
-        # Stop log streaming
+        # Always stop log streaming first, regardless of container existence
         self.stop_log_streaming(container_name)
 
-        # Stop and remove container - these methods now handle non-existent containers gracefully
-        try:
-            self.stop_container(container_name, timeout=timeout)
-        except Exception as e:
-            logger.warning(f"Error during container stop: {e}")
+        # Check if container exists before attempting cleanup
+        if not self.container_exists(container_name):
+            logger.debug(f"Container {container_name} does not exist, cleanup completed")
+            return
 
         try:
-            self.remove_container(container_name, force=True)
+            # Get container to check its status
+            container = self.client.containers.get(container_name)
+            container_status = container.status
+            logger.debug(f"Container {container_name} status: {container_status}")
+
+            # Force remove the container regardless of its state
+            # This handles containers in created, running, stopped, exited, or failed states
+            logger.info(f"Forcefully removing container: {container_name} (status: {container_status})")
+            container.remove(force=True)
+            logger.debug(f"Successfully removed container: {container_name}")
+
+        except docker.errors.NotFound:
+            logger.debug(f"Container {container_name} not found during cleanup (already removed)")
         except Exception as e:
-            logger.warning(f"Error during container removal: {e}")
+            logger.warning(f"Error during container cleanup: {e}")
+            # Try alternative cleanup approach
+            try:
+                logger.debug(f"Attempting alternative cleanup for container: {container_name}")
+                # Use low-level API for forced removal
+                self.client.api.remove_container(container_name, force=True)
+                logger.debug(f"Successfully removed container using API: {container_name}")
+            except Exception as api_error:
+                logger.warning(f"Alternative cleanup also failed for {container_name}: {api_error}")
 
         logger.info(f"Cleanup completed for container: {container_name}")
 
@@ -978,10 +998,11 @@ class DockerClient:
     def cleanup_containers_by_name_pattern(self, name_pattern: str, timeout=10):
         """
         Cleanup containers that match a specific name pattern.
+        Handles containers in any state (created, running, stopped, exited, failed).
 
         Args:
             name_pattern (str): Pattern to match in container names
-            timeout (int): Timeout for stopping containers
+            timeout (int): Timeout for stopping containers (unused, kept for compatibility)
         """
         try:
             logger.info(f"Cleaning up containers matching pattern: '{name_pattern}'")
@@ -1000,11 +1021,24 @@ class DockerClient:
 
             for container in matching_containers:
                 try:
-                    logger.info(f"Removing container: {container.name} ({container.id})")
+                    container_status = container.status
+                    logger.info(f"Removing container: {container.name} ({container.id[:12]}, status: {container_status})")
+                    
+                    # Force remove regardless of state - this handles created, running, stopped, exited states
                     container.remove(force=True)
                     logger.debug(f"Successfully removed container: {container.name}")
+                    
+                except docker.errors.NotFound:
+                    logger.debug(f"Container {container.name} not found (already removed)")
                 except Exception as cleanup_error:
                     logger.warning(f"Failed to remove container {container.name}: {cleanup_error}")
+                    # Try alternative approach with API
+                    try:
+                        logger.debug(f"Attempting API removal for container: {container.name}")
+                        self.client.api.remove_container(container.id, force=True)
+                        logger.debug(f"Successfully removed container via API: {container.name}")
+                    except Exception as api_error:
+                        logger.warning(f"API removal also failed for {container.name}: {api_error}")
 
         except Exception as e:
             logger.warning(f"Failed to cleanup containers by pattern '{name_pattern}': {e}")

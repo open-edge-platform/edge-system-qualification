@@ -11,6 +11,14 @@ from typing import Any, Dict
 import requests
 from sysagent.utils.infrastructure import DockerClient
 
+# Import Docker and requests exceptions for specific error handling
+try:
+    import docker
+    from requests.exceptions import ReadTimeout as RequestsReadTimeout
+except ImportError:
+    docker = None
+    RequestsReadTimeout = Exception
+
 logger = logging.getLogger(__name__)
 
 
@@ -105,7 +113,7 @@ def run_ovms_server_container(
 
         # Use docker_client.run_container method like original implementation
         # Note: Docker SDK has internal timeouts - for large models, container creation might take time
-        # The timeout parameter in run_container is for the container execution, not API calls
+        # The timeout parameter in run_container is for the container execution, not API calls. Use DockerClient timeout instead.
         container = docker_client.run_container(
             name=container_name,
             image=docker_image_tag,
@@ -148,15 +156,45 @@ def run_ovms_server_container(
     except RuntimeError:
         # Re-raise RuntimeError to preserve the original error message
         raise
-    except Exception as e:
-        # For other exceptions, cleanup and re-raise
-        logger.error(f"Failed to start OVMS container: {e}")
+    except RequestsReadTimeout as e:
+        # Handle Docker SDK read timeout errors (e.g., UnixHTTPConnectionPool read timeout)
+        error_msg = str(e)
+        enhanced_msg = f"Docker client read timeout during container creation: {error_msg}"
+        enhanced_msg = (
+            f"Docker client read timeout during container creation: {error_msg}. "
+            f"This typically happens when Docker daemon takes longer than expected to create the container."
+        )
+        logger.error(f"Failed to start OVMS container - Docker SDK Read Timeout: {enhanced_msg}")
         if container_name:
             try:
                 docker_client.cleanup_container(container_name)
             except Exception as cleanup_error:
-                logger.warning(f"Failed to cleanup container after error: {cleanup_error}")
-        raise
+                logger.debug(f"Failed to cleanup container after timeout: {cleanup_error}")
+        raise RuntimeError(enhanced_msg) from e
+    except Exception as e:
+        error_type = type(e).__name__
+        error_msg = str(e)
+
+        # Check if this is a Docker API error
+        if docker and isinstance(e, docker.errors.APIError):
+            enhanced_msg = f"Docker API error during container creation: {error_msg}"
+            logger.error(f"Failed to start OVMS container - Docker API Error: {enhanced_msg}")
+        else:
+            # Handle all other exceptions with generic enhanced messaging
+            enhanced_msg = f"Unexpected error during OVMS container creation - {error_type}: {error_msg}"
+            logger.error(enhanced_msg)
+            
+        if container_name:
+            try:
+                docker_client.cleanup_container(container_name)
+            except Exception as cleanup_error:
+                logger.debug(f"Failed to cleanup container after error: {cleanup_error}")
+        
+        # Re-raise with enhanced error information for Docker API errors
+        if docker and isinstance(e, docker.errors.APIError):
+            raise RuntimeError(enhanced_msg) from e
+        else:
+            raise
 
 
 def wait_for_ovms_model_ready(model_id: str, port: int, timeout: int = 300) -> tuple[bool, float]:

@@ -53,6 +53,7 @@ def test_text_generation(
     server_timeout = configs.get("server_timeout", 600)
     benchmark_timeout = configs.get("benchmark_timeout", 600)
     export_timeout = configs.get("export_timeout", 1800)
+    docker_client_timeout = configs.get("docker_client_timeout", 180)
     hf_dataset_url = configs.get(
         "hf_dataset_url",
         "https://huggingface.co/datasets/anon8231489123/ShareGPT_Vicuna_unfiltered/resolve/main/ShareGPT_V3_unfiltered_cleaned_split.json",
@@ -77,7 +78,7 @@ def test_text_generation(
     validate_system_requirements_from_configs(configs)
 
     # Verify docker client connection
-    docker_client = DockerClient()
+    docker_client = DockerClient(timeout=docker_client_timeout)
 
     # Get available devices based on device categories
     logger.info(f"Configured device categories: {devices}")

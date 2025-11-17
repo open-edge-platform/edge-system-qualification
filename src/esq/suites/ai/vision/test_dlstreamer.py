@@ -56,8 +56,6 @@ def test_dlstreamer(
     # Parameters
     test_display_name = configs.get("display_name", test_name)
     kpi_validation_mode = configs.get("kpi_validation_mode", "all")
-    videos = configs.get("videos", [])
-    model_precision = configs.get("model_precision", "fp16")
     target_fps = configs.get("target_fps", 14.5)
     pipeline = configs.get("pipeline", None)
     pipeline_params = configs.get("pipeline_params", {})
@@ -137,7 +135,6 @@ def test_dlstreamer(
         asset_result = prepare_test(
             test_name=test_name,
             prepare_func=lambda: prepare_assets(
-                videos=videos,
                 configs=configs,
                 models_dir=models_dir,
                 videos_dir=videos_dir,
@@ -245,7 +242,6 @@ def test_dlstreamer(
             parameters={
                 "Devices": devices,
                 "Device List": device_list,
-                "Detection Model Precision": model_precision,
                 "Target FPS": target_fps,
                 "Max Plateau Iterations": max_plateau_iterations,
                 "Timeout (s)": timeout,
@@ -436,7 +432,6 @@ def test_dlstreamer(
                 parameters={
                     "Devices": devices,
                     "Device List": device_list,
-                    "Detection Model Precision": model_precision,
                     "Target FPS": target_fps,
                     "Display Name": test_display_name,
                 },

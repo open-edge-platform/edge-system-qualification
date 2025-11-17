@@ -66,27 +66,48 @@ tests:
   test_dlstreamer:
     params:
       - display_name: "DL Streamer - Default"
-        videos:
-          - name: "1192116-hd_1920_1080_15fps_30s.mp4"
+        assets:
+          # Video assets
+          # Video asset with H.264 codec, resolution downscale, and duration trim
+          - id: "video_1192116"
+            type: "video"
+            name: "1192116-hd_1920_1080_15fps_30s.mp4"
             url: "https://videos.pexels.com/video-files/1192116/1192116-hd_1920_1080_30fps.mp4"
             sha256: "65d836330fda9cfe6aa7a6bb4b2a81df4897325133da096b275e40b359e2d4ea"
-            fps: 15
-            duration: 30
-          - name: "warehouse.avi"
+            fps: 15         # Convert from 30 FPS to 15 FPS
+            duration: 30    # Trim to 30 seconds
+            # codec: "h264" is default, no need to specify
+          # Video asset with H.265 codec conversion from 4K 60fps source to 1080p 30fps
+          # Output: Raw H.265 elementary stream with .h265 extension (no container)
+          - id: "video_18856748_h265"
+            type: "video"
+            name: "18856748-fhd_1920_1080_30fps.h265"
+            url: "https://videos.pexels.com/video-files/18856748/18856748-uhd_3840_2160_60fps.mp4"
+            sha256: "2bcbd55f8ab8f34cbce33af0a7f372c2d4648b4386249728ba4c6cd51e8d7985"
+            width: 1920   # Convert from 3840 (4K) to 1920 (1080p)
+            height: 1080  # Convert from 2160 (4K) to 1080 (1080p)
+            fps: 30       # Convert from 60 FPS to 30 FPS
+            codec: "h265" # Convert to H.265/HEVC codec (default is H.264)
+          - id: "video_warehouse"
+            type: "video"
+            name: "warehouse.avi"
             url: "https://github.com/open-edge-platform/edge-ai-resources/raw/c13b8dbf23d514c2667d39b66615bd1400cb889d/videos/warehouse.avi"
             sha256: "cec6414d5197c3974896bc8f5b15c4a6a683b654f6ec01e9706fcee1b034d748"
-        models:
+          # Model assets
           - id: "yolo11n"
+            type: "model"
             source: "ultralytics"
             precision: "fp16"  # supported precision to be exported: fp32, fp16, int8
             format: "pt"
           - id: "yoloxtiny_pallet_defect_detection"
+            type: "model"
             source: "zip"
             url: "https://github.com/open-edge-platform/edge-ai-resources/raw/c13b8dbf23d514c2667d39b66615bd1400cb889d/models/pallet_defect_detection.zip"
             sha256: "05284de2f3a48c646cc341d0dc93e936e2afd0f37b751338b9b78b6fd3bf171c"
-            precision: "fp32" # exported model precision metadata
+            precision: "fp32"  # exported model precision metadata
             format: "openvino"
           - id: "efficientnet_b0"
+            type: "model"
             source: "files"
             url: 
               - xml: "https://raw.githubusercontent.com/dlstreamer/pipeline-zoo-models/refs/heads/main/storage/efficientnet-b0_INT8/FP16-INT8/efficientnet-b0.xml"
@@ -94,10 +115,11 @@ tests:
             sha256:
               - xml: "e9f959bb05ea1dc4d4735acc62e3d959fa2982b82e9608325157ba3598b5b999"
               - bin: "2ee5a5ad5a9a1a00d057e50af5da56e3bf09f633f66e9f77b9a1915ab862c536"
-            precision: "fp16" # exported model precision metadata
+            precision: "fp16"  # exported model precision metadata
             format: "openvino"
-        assets:
+          # File assets
           - id: "imagenet_2012.txt"
+            type: "file"
             url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-libraries/main/libraries/dl-streamer/samples/labels/imagenet_2012.txt"
             sha256: "acf75ef0abe89694b19056e0796401068b459c457baa30335f240c7692857355"
             path: "./labels/imagenet_2012.txt"
@@ -128,9 +150,12 @@ tests:
               FULL_DEVICE_NAME:
                 "Intel(R) Unsupported video type": "'video/x-raw'"
         # devices: [cpu, igpu, dgpu, npu] # options: [cpu, igpu, dgpu, npu]
-        devices: [dgpu] # options: [cpu, igpu, dgpu, npu]
-        # Set visualize_stream as true to enable visualization of the stream for debugging
+        devices: [igpu] # options: [cpu, igpu, dgpu, npu]
+        # Optional: Set visualize_stream as true to enable visualization of the stream for debugging
         # Run command 'xhost +local:root' on terminal before running the test
         visualize_stream: false 
+        # Optional: Set to true to keep original videos in debug/ subfolder for debugging
+        # Default: false (delete originals to optimize storage)
+        keep_original_videos: false
         kpi_refs:
-          - streams_max_dgpu
+          - streams_max_igpu

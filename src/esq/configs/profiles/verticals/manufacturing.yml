@@ -15,25 +15,32 @@ params:
     os_type:
       - "linux"
     docker_required: true
-  videos:
-    - name: "warehouse_30fps.avi"
+  assets:
+    # Video assets
+    - id: "video_warehouse"
+      type: "video"
+      name: "warehouse_30fps.avi"
       url: "https://github.com/open-edge-platform/edge-ai-resources/raw/c13b8dbf23d514c2667d39b66615bd1400cb889d/videos/warehouse.avi"
       sha256: "cec6414d5197c3974896bc8f5b15c4a6a683b654f6ec01e9706fcee1b034d748"
-    - name: "welding_30fps.avi"
+    - id: "video_welding"
+      type: "video"
+      name: "welding_30fps.avi"
       url: "https://github.com/open-edge-platform/edge-ai-resources/raw/c13b8dbf23d514c2667d39b66615bd1400cb889d/videos/welding.avi"
       sha256: "bd03e671f0cbf8bfc32dae80a11e08a3ff9c3ec5edf6871a26c861bfd6e6af7b"
-  models:
+    # Model assets
     - id: "yoloxtiny_pallet_defect_detection"
+      type: "model"
       source: "zip"
       url: "https://github.com/open-edge-platform/edge-ai-resources/raw/c13b8dbf23d514c2667d39b66615bd1400cb889d/models/pallet_defect_detection.zip"
       sha256: "05284de2f3a48c646cc341d0dc93e936e2afd0f37b751338b9b78b6fd3bf171c"
-      precision: "fp32" # exported model precision metadata
+      precision: "fp32"
       format: "openvino"
     - id: "weld_porosity_classification"
+      type: "model"
       source: "zip"
       url: "https://github.com/open-edge-platform/edge-ai-resources/raw/c13b8dbf23d514c2667d39b66615bd1400cb889d/models/weld_porosity_classification.zip"
       sha256: "67d40c09ed857f222b35f47dbf93f20aa3f4e70ff8fc4fd4741703a9d7b4c8e7"
-      precision: "fp32"  # supported precision to be exported: fp32, fp16, int8
+      precision: "fp32"
       format: "openvino"
   pipeline_params:
     DECODE_ELEMENTS:

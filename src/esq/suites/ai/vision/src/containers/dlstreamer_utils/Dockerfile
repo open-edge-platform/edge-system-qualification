@@ -17,9 +17,11 @@ RUN apt-get update \
         gstreamer1.0-libav \
     && rm -rf /var/lib/apt/lists/*
 
-# Create a non-root user
-RUN groupadd -r user && \
-    useradd -r -g user -m -s /bin/bash user && \
+# Create a non-root user with configurable UID/GID (default 1000)
+ARG USER_UID=1000
+ARG USER_GID=1000
+RUN groupadd -g ${USER_GID} user && \
+    useradd -u ${USER_UID} -g user -m -s /bin/bash user && \
     mkdir -p /home/user && \
     chown -R user:user /home/user
 

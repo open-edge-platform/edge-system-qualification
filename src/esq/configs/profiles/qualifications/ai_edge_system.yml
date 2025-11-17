@@ -32,14 +32,16 @@ params:
       - "linux"
     docker_required: true
   # Vision AI global params
-  videos:
-    - name: "1192116-hd_1920_1080_15fps_30s.mp4"
+  assets:
+    - id: "video_1192116"
+      type: "video"
+      name: "1192116-hd_1920_1080_15fps_30s.mp4"
       url: "https://videos.pexels.com/video-files/1192116/1192116-hd_1920_1080_30fps.mp4"
       sha256: "65d836330fda9cfe6aa7a6bb4b2a81df4897325133da096b275e40b359e2d4ea"
       fps: 15
       duration: 30
-  models:
     - id: "yolo11n"
+      type: "model"
       source: "ultralytics"
       precision: "fp16"
       format: "pt"

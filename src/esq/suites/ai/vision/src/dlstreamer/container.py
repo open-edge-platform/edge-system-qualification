@@ -42,7 +42,7 @@ def run_video_utils_container(
     Returns:
         Container execution result
     """
-    user_gid = os.getuid()
+    user_gid = os.getgid()
     container_volumes = {
         data_dir: {"bind": container_mnt_dir, "mode": "rw"},
     }

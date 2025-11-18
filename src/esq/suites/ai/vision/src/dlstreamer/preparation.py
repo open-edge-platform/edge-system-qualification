@@ -322,6 +322,11 @@ def prepare_assets(
                 "format": asset.get("format", "openvino"),
                 "url": asset.get("url", ""),
                 "sha256": asset.get("sha256", ""),
+                "export_args": asset.get("export_args", None),
+                # KaggleHub-specific parameters
+                "kaggle_handle": asset.get("kaggle_handle", None),
+                "convert_args": asset.get("convert_args", None),
+                "quantize_args": asset.get("quantize_args", None),
             }
 
             model_assets.append(model_config)
@@ -369,9 +374,9 @@ def prepare_assets(
 
     # Batch process model assets using prepare_models_batch
     if model_assets:
-        from esq.utils.models.setup_model import prepare_models_batch
+        from esq.utils.models import prepare_models_batch
 
-        logger.info(f"Batch preparing {len(model_assets)} model assets...")
+        logger.info(f"Batch processing {len(model_assets)} model assets")
         batch_result = prepare_models_batch(model_assets, models_dir)
 
         if not batch_result["success"]:

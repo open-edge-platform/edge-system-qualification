@@ -575,7 +575,11 @@ def extend_video(name: str, target_duration: int, keep_original=False) -> Dict[s
     logger.info(f"Extending video '{validated_name}' to {validated_target_duration} seconds")
 
     # Get original video duration using ffprobe
+    # Try format duration first, then stream duration (for raw streams like .h265)
+    original_duration = None
+
     try:
+        # First try format duration (works for container formats like mp4, mkv)
         ffprobe_result = subprocess.run(
             [
                 "ffprobe",
@@ -592,10 +596,102 @@ def extend_video(name: str, target_duration: int, keep_original=False) -> Dict[s
             check=True,
             text=True,
         )
-        original_duration = float(ffprobe_result.stdout.strip())
-        logger.debug(f"Original video duration: {original_duration}s")
+        duration_str = ffprobe_result.stdout.strip()
+        if duration_str and duration_str != "N/A":
+            original_duration = float(duration_str)
+            logger.debug(f"Original video duration from format: {original_duration}s")
     except (subprocess.CalledProcessError, ValueError) as e:
-        error_message = f"Failed to get video duration: {e}"
+        logger.debug(f"Could not get format duration: {e}")
+
+    # If format duration failed, try stream duration (for raw streams)
+    if original_duration is None:
+        try:
+            ffprobe_result = subprocess.run(
+                [
+                    "ffprobe",
+                    "-v",
+                    "error",
+                    "-select_streams",
+                    "v:0",
+                    "-show_entries",
+                    "stream=duration",
+                    "-of",
+                    "default=noprint_wrappers=1:nokey=1",
+                    source_video_path,
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True,
+                text=True,
+            )
+            duration_str = ffprobe_result.stdout.strip()
+            if duration_str and duration_str != "N/A":
+                original_duration = float(duration_str)
+                logger.debug(f"Original video duration from stream: {original_duration}s")
+        except (subprocess.CalledProcessError, ValueError) as e:
+            logger.debug(f"Could not get stream duration: {e}")
+
+    # If both methods failed, calculate from frame count and fps
+    if original_duration is None:
+        try:
+            # Get frame count
+            frame_result = subprocess.run(
+                [
+                    "ffprobe",
+                    "-v",
+                    "error",
+                    "-select_streams",
+                    "v:0",
+                    "-count_frames",
+                    "-show_entries",
+                    "stream=nb_read_frames",
+                    "-of",
+                    "default=noprint_wrappers=1:nokey=1",
+                    source_video_path,
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True,
+                text=True,
+            )
+            frame_count = int(frame_result.stdout.strip())
+
+            # Get frame rate
+            fps_result = subprocess.run(
+                [
+                    "ffprobe",
+                    "-v",
+                    "error",
+                    "-select_streams",
+                    "v:0",
+                    "-show_entries",
+                    "stream=r_frame_rate",
+                    "-of",
+                    "default=noprint_wrappers=1:nokey=1",
+                    source_video_path,
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True,
+                text=True,
+            )
+            fps_str = fps_result.stdout.strip()
+            # Parse frame rate (e.g., "30/1" or "30")
+            if "/" in fps_str:
+                num, denom = fps_str.split("/")
+                fps = float(num) / float(denom)
+            else:
+                fps = float(fps_str)
+
+            original_duration = frame_count / fps
+            logger.debug(f"Calculated video duration from {frame_count} frames at {fps} fps: {original_duration}s")
+        except (subprocess.CalledProcessError, ValueError, ZeroDivisionError) as e:
+            error_message = f"Failed to get video duration using all methods: {e}"
+            logger.error(error_message)
+            raise RuntimeError(error_message)
+
+    if original_duration is None or original_duration <= 0:
+        error_message = "Failed to determine video duration: invalid or zero duration"
         logger.error(error_message)
         raise RuntimeError(error_message)
 
@@ -611,8 +707,16 @@ def extend_video(name: str, target_duration: int, keep_original=False) -> Dict[s
     num_loops = int(validated_target_duration / original_duration) + 1
     logger.info(f"Will loop video {num_loops} times to reach target duration")
 
-    # Create output filename
-    video_path = os.path.join(VIDEOS_DIR, f"{file_basename}_extended{file_extension}")
+    # Backup original if keep_original is True
+    if keep_original:
+        debug_dir = os.path.join(VIDEOS_DIR, "debug")
+        Path(debug_dir).mkdir(parents=True, exist_ok=True, mode=0o750)
+        backup_video_path = os.path.join(debug_dir, f"{file_basename}_before_extend{file_extension}")
+        shutil.copy2(source_video_path, backup_video_path)
+        logger.info(f"Backed up original video to debug folder: {backup_video_path}")
+
+    # Create temporary output file (will replace original after processing)
+    output_video_path = os.path.join(VIDEOS_DIR, f"{file_basename}_extended_temp{file_extension}")
 
     # Build FFmpeg pipeline to loop video
     # concat demuxer requires creating a file list
@@ -641,7 +745,7 @@ def extend_video(name: str, target_duration: int, keep_original=False) -> Dict[s
             "-c",
             "copy",  # Copy codec without re-encoding when possible
             "-y",  # Overwrite output file
-            video_path,
+            output_video_path,
         ]
 
         logger.debug(f"FFmpeg pipeline: {' '.join(ffmpeg_pipeline)}")
@@ -649,6 +753,10 @@ def extend_video(name: str, target_duration: int, keep_original=False) -> Dict[s
         # Execute FFmpeg pipeline
         subprocess.run(ffmpeg_pipeline, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, text=True)
         logger.debug("FFmpeg extension completed successfully.")
+
+        # Replace original file with extended version
+        shutil.move(output_video_path, source_video_path)
+        logger.debug(f"Replaced original video with extended version: {source_video_path}")
 
     except subprocess.CalledProcessError as e:
         error_message = (
@@ -665,30 +773,16 @@ def extend_video(name: str, target_duration: int, keep_original=False) -> Dict[s
             os.remove(concat_file_path)
             logger.debug(f"Removed concat file: {concat_file_path}")
 
-    # Build return config
+    # Build return config - use original filename since we replaced it
     config = {
-        "name": f"{file_basename}_extended{file_extension}",
-        "path": video_path,
+        "name": validated_name,  # Return original name (file was replaced in-place)
+        "path": source_video_path,
         "target_duration": validated_target_duration,
         "original_duration": original_duration,
         "num_loops": num_loops,
     }
 
-    # Handle original video cleanup based on keep_original flag
-    if keep_original:
-        # Move to debug subfolder for debugging
-        debug_dir = os.path.join(VIDEOS_DIR, "debug")
-        Path(debug_dir).mkdir(parents=True, exist_ok=True, mode=0o750)
-        debug_video_path = os.path.join(debug_dir, f"{file_basename}_before_extend{file_extension}")
-        shutil.move(source_video_path, debug_video_path)
-        logger.debug(f"Moved original video to debug folder: {debug_video_path}")
-    else:
-        # Delete to optimize storage
-        os.remove(source_video_path)
-        logger.debug(f"Deleted original video to optimize storage: {source_video_path}")
-
-    video_path = Path(video_path).resolve()
-
+    logger.info(f"Successfully extended video: {validated_name}")
     return config
 
 

@@ -6,9 +6,17 @@ Models utilities package.
 
 Provides utilities for model management including export, setup, and conversion
 for various model formats including OpenVINO, PyTorch, and ONNX.
+
+Package structure:
+- common: Shared utilities for model management
+- ultralytics: YOLO model handling (detection models)
+- huggingface: HuggingFace LLM model handling (text generation)
+- batch: Batch processing for multiple models
+- export_model: Model export utilities for OVMS format
 """
 
-# Import from export_model
+from .batch import download_and_prepare_model, prepare_models_batch
+from .common import download_model
 from .export_model import (
     add_common_arguments,
     add_servable_to_config,
@@ -22,22 +30,23 @@ from .export_model import (
     get_models_max_context,
     set_rt_info,
 )
-from .setup_model import (
-    YOLO_MODELS,
-    cleanup_model,
-    convert_yolo_to_openvino,
-    download_and_setup_prequantized_ovms_model,
-    download_model,
-    download_yolo_model,
-    export_ovms_model,
-    list_available_models,
-    quantize_model,
-    setup_model,
-    verify_model,
-)
+from .huggingface import download_and_setup_prequantized_ovms_model, export_ovms_model
+from .ultralytics import YOLO_MODELS, download_yolo_model, export_yolo_model
 
 # Re-export all functions and classes
 __all__ = [
+    # From common
+    "download_model",
+    # From ultralytics
+    "YOLO_MODELS",
+    "download_yolo_model",
+    "export_yolo_model",
+    # From huggingface
+    "export_ovms_model",
+    "download_and_setup_prequantized_ovms_model",
+    # From batch
+    "download_and_prepare_model",
+    "prepare_models_batch",
     # From export_model
     "export_rerank_tokenizer",
     "set_rt_info",
@@ -50,16 +59,4 @@ __all__ = [
     "export_rerank_model_ov",
     "export_image_generation_model",
     "add_common_arguments",
-    # From setup_model
-    "download_model",
-    "download_yolo_model",
-    "convert_yolo_to_openvino",
-    "quantize_model",
-    "verify_model",
-    "setup_model",
-    "cleanup_model",
-    "list_available_models",
-    "export_ovms_model",
-    "download_and_setup_prequantized_ovms_model",
-    "YOLO_MODELS",
 ]

@@ -346,7 +346,12 @@ def finalize_device_metrics(results: Result, qualified_devices: Dict[str, Any], 
     logger.debug(f"Finalized metrics for {len(qualified_devices)} qualified devices")
 
 
-def update_final_results_metadata(results: Result, qualified_devices: Dict[str, Any], device_list: list) -> None:
+def update_final_results_metadata(
+    results: Result,
+    qualified_devices: Dict[str, Any],
+    device_list: list,
+    baseline_streams_results: list = None,
+) -> None:
     """
     Update final results with device metadata and summary information.
     Uses the enhanced auto_set_key_metric function instead of hardcoded logic.
@@ -355,7 +360,21 @@ def update_final_results_metadata(results: Result, qualified_devices: Dict[str, 
         results: Main results object to update
         qualified_devices: Dictionary of qualified device results
         device_list: List of all device IDs tested
+        baseline_streams_results: List of baseline preparation results (optional)
     """
+    if baseline_streams_results:
+        baseline_fps_count = 0
+        for baseline_result in baseline_streams_results:
+            device_id = baseline_result.metadata.get("device_id")
+            per_stream_fps = baseline_result.metadata.get("per_stream_fps", 0.0)
+            if device_id:
+                results.metadata[f"Baseline Pipeline Throughput (FPS) - {device_id}"] = f"{per_stream_fps:.2f}"
+                baseline_fps_count += 1
+                logger.debug(f"Adding baseline pipeline throughput FPS for {device_id}: {per_stream_fps:.2f}")
+
+        if baseline_fps_count > 0:
+            logger.info(f"Baseline per-stream FPS captured for {baseline_fps_count} device(s)")
+
     # Update overall test status
     if qualified_devices:
         results.metadata["status"] = True

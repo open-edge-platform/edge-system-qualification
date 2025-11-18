@@ -81,7 +81,7 @@ class DockerClient:
         self.client = docker.from_env(timeout=timeout)
         self._log_threads = {}  # container_name -> (thread, stop_event, logs)
         self._client_timeout = timeout
-        
+
         try:
             logger.info("Verifying Docker client connection")
             self.client.ping()
@@ -734,7 +734,7 @@ class DockerClient:
 
                 def timeout_killer():
                     if timeout:
-                        logger.info(f"Starting container {container.name} timeout killer thread for {timeout} seconds")
+                        logger.debug(f"Starting container {container.name} timeout killer thread for {timeout} seconds")
                         time.sleep(timeout)
                         try:
                             try:
@@ -771,7 +771,7 @@ class DockerClient:
                 result = container.wait(timeout=10)
                 killer_thread.join(0)
                 if timeout_triggered.is_set():
-                    container_name = container.name if container and hasattr(container, 'name') else "unknown"
+                    container_name = container.name if container and hasattr(container, "name") else "unknown"
                     logger.error(f"Container {container_name} stopped due to timeout ({timeout}s)")
                     if container_logs_text:
                         allure.attach(
@@ -781,7 +781,7 @@ class DockerClient:
                         )
                     pytest.fail(f"Container {container_name} execution stopped due to timeout ({timeout}s)")
 
-                logger.info(f"Waiting for container {container.name} to finish processing...")
+                logger.debug(f"Waiting for container {container.name} to finish processing...")
                 time.sleep(5)
 
             elif mode == "server":
@@ -887,12 +887,12 @@ class DockerClient:
         """
         try:
             container = self.client.containers.get(container_name)
-            logger.info(f"Waiting for container {container_name} to finish...")
+            logger.debug(f"Waiting for container {container_name} to finish...")
 
             result = container.wait(timeout=timeout)
             exit_code = result["StatusCode"]
 
-            logger.info(f"Container {container_name} finished with exit code: {exit_code}")
+            logger.debug(f"Container {container_name} finished with exit code: {exit_code}")
             return exit_code
 
         except Exception as e:
@@ -1022,12 +1022,14 @@ class DockerClient:
             for container in matching_containers:
                 try:
                     container_status = container.status
-                    logger.info(f"Removing container: {container.name} ({container.id[:12]}, status: {container_status})")
-                    
+                    logger.debug(
+                        f"Removing container: {container.name} ({container.id[:12]}, status: {container_status})"
+                    )
+
                     # Force remove regardless of state - this handles created, running, stopped, exited states
                     container.remove(force=True)
                     logger.debug(f"Successfully removed container: {container.name}")
-                    
+
                 except docker.errors.NotFound:
                     logger.debug(f"Container {container.name} not found (already removed)")
                 except Exception as cleanup_error:

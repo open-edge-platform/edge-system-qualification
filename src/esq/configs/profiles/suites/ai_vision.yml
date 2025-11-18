@@ -1,3 +1,4 @@
+
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
@@ -21,39 +22,92 @@ params:
       - "linux"
     docker_required: true
   assets:
-    - id: "video_1192116"
+    - id: "video_18856748"
       type: "video"
-      name: "1192116-hd_1920_1080_15fps_30s.mp4"
-      url: "https://videos.pexels.com/video-files/1192116/1192116-hd_1920_1080_30fps.mp4"
-      sha256: "65d836330fda9cfe6aa7a6bb4b2a81df4897325133da096b275e40b359e2d4ea"
-      fps: 15
-      duration: 30
+      name: "18856748-bears_1920_1080_30fps_30s.h265"
+      url: "https://videos.pexels.com/video-files/18856748/18856748-uhd_3840_2160_60fps.mp4"
+      sha256: "2bcbd55f8ab8f34cbce33af0a7f372c2d4648b4386249728ba4c6cd51e8d7985"
+      width: 1920
+      height: 1080
+      fps: 30
+      codec: "h265"
+      loop: 30 # Loop to achieve ~30s duration
     - id: "yolo11n"
       type: "model"
       source: "ultralytics"
-      precision: "fp16"
+      precision: "int8"
       format: "pt"
+      export_args:
+        dynamic: true
+        half: true
+    - id: "resnet-50"
+      type: "model"
+      source: "kagglehub"
+      precision: "int8"
+      format: "openvino"
+      kaggle_handle: "google/resnet-v1/tensorFlow2/50-classification"
+      convert_args:
+        input_shape: [1, 224, 224, 3]
+        input_layout: "NHWC"
+        tensor_layout: "NCHW"
+      quantize_args:
+        calibration_samples: 512
+        calibration_dataset: "cifar100"
+    - id: "resnet-50-optimized-model-proc"
+      type: "file"
+      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-libraries/14bc74481d4535ee45848a7e5ad54f85754e0576/libraries/dl-streamer/samples/gstreamer/model_proc/public/classification-optimized.json"
+      sha256: "27195581b907f35669ff7a127a7a6c3d0779e2c8240c889e0e7441c1c6f4a5ce"
+      path: "./models/resnet-50/resnet-50-optimized.json"
+  target_fps: 28.5
+  pipeline: |
+    filesrc location=./videos/18856748-bears_1920_1080_30fps_30s.h265
+      ! ${DECODE_ELEMENTS}
+      ! queue
+      ! gvadetect model=./models/yolo11n/int8/dynamic_half/yolo11n.xml 
+          device=${DEVICE_ID}
+          ${INFERENCE_ELEMENTS}
+          batch-size=${BATCH_SIZE}
+          inference-interval=3 
+          threshold=0.5
+          model-instance-id=yolov11n
+      ! queue
+      ! gvatrack tracking-type=1 config=tracking_per_class=false
+      ! queue 
+      ! gvaclassify model=./models/resnet-50/int8/resnet-50.xml
+          model-proc=./models/resnet-50/resnet-50-optimized.json
+          device=${DEVICE_ID}
+          ${INFERENCE_ELEMENTS}
+          batch-size=${BATCH_SIZE}
+          inference-interval=3 
+          inference-region=1
+          model-instance-id=resnet50 
+      ! queue
   pipeline_params:
     DECODE_ELEMENTS:
-      cpu: "parsebin ! avdec_h264 ! 'video/x-raw'"
-      gpu_integrated: "parsebin ! vah264dec ! vapostproc ! 'video/x-raw(memory:VAMemory)'"
-      gpu_discrete: "parsebin ! varenderD{RENDER_DEVICE_NUM}h264dec ! {VIDEO_RAW_TYPE}"
-      npu: "parsebin ! vah264dec ! 'video/x-raw(memory:VAMemory)'"
+      cpu: "h265parse ! vah265dec ! capsfilter caps='video/x-raw(memory:VAMemory)'"
+      gpu_integrated: "h265parse ! vah265dec ! capsfilter caps='video/x-raw(memory:VAMemory)'"
+      gpu_discrete: "h265parse ! varenderD{RENDER_DEVICE_NUM}h265dec ! capsfilter caps='video/x-raw(memory:VAMemory)'"
+      npu: "h265parse ! vah265dec ! capsfilter caps='video/x-raw(memory:VAMemory)'"
     INFERENCE_ELEMENTS:
-      cpu: "pre-process-backend={PRE_PROCESS_BACKEND}"
-      gpu_integrated: "pre-process-backend={PRE_PROCESS_BACKEND} model-instance-id=inst0"
-      gpu_discrete: "pre-process-backend={PRE_PROCESS_BACKEND}"
-      npu: "pre-process-backend={PRE_PROCESS_BACKEND}"
+      cpu: "pre-process-backend={PRE_PROCESS_BACKEND} nireq=2 ie-config=NUM_STREAMS=2"
+      gpu_integrated: "pre-process-backend={PRE_PROCESS_BACKEND} nireq=2 ie-config=NUM_STREAMS=2"
+      gpu_discrete: "pre-process-backend={PRE_PROCESS_BACKEND} nireq=2 ie-config=NUM_STREAMS=2"
+      npu: "pre-process-backend={PRE_PROCESS_BACKEND} nireq=4"
     PRE_PROCESS_BACKEND:
-      cpu: "ie"
+      cpu: "opencv"
       gpu_integrated: "va-surface-sharing"
       gpu_discrete: "va-surface-sharing"
-      npu: "va"
+      npu: "opencv"
     VIDEO_RAW_TYPE:
       default: "'video/x-raw(memory:VAMemory)'"
       overrides:
         FULL_DEVICE_NAME:
           "Intel(R) Unsupported video type": "'video/x-raw'"
+    BATCH_SIZE:
+      cpu: "1"
+      gpu_integrated: "8"
+      gpu_discrete: "8"
+      npu: "1"
 
 suites:
   - name: "ai"
@@ -64,52 +118,27 @@ suites:
           test_dlstreamer:
             params:
               - test_id: "VSN-DLS-001"
-                display_name: "DL Streamer Benchmark - multi-stream 1080p15 H.264 gvadetect YOLO11n FP16"
-                pipeline: |
-                  filesrc location=./videos/1192116-hd_1920_1080_15fps_30s.mp4
-                    ! ${DECODE_ELEMENTS}
-                    ! gvadetect model=./models/yolo11n/fp16/yolo11n.xml device=${DEVICE_ID} ${INFERENCE_ELEMENTS} batch-size=1
-                    ! queue
+                display_name: "DL Streamer Benchmark - multi-stream 1080p30 H.265 gvadetect YOLO11n INT8 gvatrack gvaclassify ResNet50 INT8"
                 devices: [cpu, igpu, dgpu, npu]
 
               - test_id: "VSN-DLS-002"
-                display_name: "DL Streamer Benchmark - multi-stream 1080p15 H.264 gvadetect YOLO11n FP16 (CPU)"
-                pipeline: |
-                  filesrc location=./videos/1192116-hd_1920_1080_15fps_30s.mp4
-                    ! ${DECODE_ELEMENTS}
-                    ! gvadetect model=./models/yolo11n/fp16/yolo11n.xml device=${DEVICE_ID} ${INFERENCE_ELEMENTS} batch-size=1
-                    ! queue
+                display_name: "DL Streamer Benchmark - multi-stream 1080p30 H.265 gvadetect YOLO11n INT8 gvatrack gvaclassify ResNet50 INT8 (CPU)"
                 devices: [cpu]
 
               - test_id: "VSN-DLS-003"
-                display_name: "DL Streamer Benchmark - multi-stream 1080p15 H.264 gvadetect YOLO11n FP16 (iGPU)"
-                pipeline: |
-                  filesrc location=./videos/1192116-hd_1920_1080_15fps_30s.mp4
-                    ! ${DECODE_ELEMENTS}
-                    ! gvadetect model=./models/yolo11n/fp16/yolo11n.xml device=${DEVICE_ID} ${INFERENCE_ELEMENTS} batch-size=1
-                    ! queue
+                display_name: "DL Streamer Benchmark - multi-stream 1080p30 H.265 gvadetect YOLO11n INT8 gvatrack gvaclassify ResNet50 INT8 (iGPU)"
                 devices: [igpu]
                 requirements:
                   igpu_required: true
 
               - test_id: "VSN-DLS-004"
-                display_name: "DL Streamer Benchmark - multi-stream 1080p15 H.264 gvadetect YOLO11n FP16 (dGPU)"
-                pipeline: |
-                  filesrc location=./videos/1192116-hd_1920_1080_15fps_30s.mp4
-                    ! ${DECODE_ELEMENTS}
-                    ! gvadetect model=./models/yolo11n/fp16/yolo11n.xml device=${DEVICE_ID} ${INFERENCE_ELEMENTS} batch-size=1
-                    ! queue
+                display_name: "DL Streamer Benchmark - multi-stream 1080p30 H.265 gvadetect YOLO11n INT8 gvatrack gvaclassify ResNet50 INT8 (dGPU)"
                 devices: [dgpu]
                 requirements:
                   dgpu_required: true
 
               - test_id: "VSN-DLS-005"
-                display_name: "DL Streamer Benchmark - multi-stream 1080p15 H.264 gvadetect YOLO11n FP16 (NPU)"
-                pipeline: |
-                  filesrc location=./videos/1192116-hd_1920_1080_15fps_30s.mp4
-                    ! ${DECODE_ELEMENTS}
-                    ! gvadetect model=./models/yolo11n/fp16/yolo11n.xml device=${DEVICE_ID} ${INFERENCE_ELEMENTS} batch-size=1
-                    ! queue
+                display_name: "DL Streamer Benchmark - multi-stream 1080p30 H.265 gvadetect YOLO11n INT8 gvatrack gvaclassify ResNet50 INT8 (NPU)"
                 devices: [npu]
                 requirements:
                   npu_required: true

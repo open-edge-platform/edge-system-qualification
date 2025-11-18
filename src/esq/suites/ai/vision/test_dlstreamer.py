@@ -361,7 +361,7 @@ def test_dlstreamer(
         update_device_pipeline_info(results, qualified_devices, pipeline, pipeline_params, device_dict)
 
         # Update final results metadata using modular function
-        update_final_results_metadata(results, qualified_devices, device_list)
+        update_final_results_metadata(results, qualified_devices, device_list, baseline_streams_results)
 
         logger.debug(f"DL Streamer Test results: {json.dumps(results.to_dict(), indent=2)}")
 
@@ -403,6 +403,12 @@ def test_dlstreamer(
         test_interrupted = True
         logger.error(failure_message)
 
+        if results is not None and baseline_streams_results:
+            try:
+                update_final_results_metadata(results, qualified_devices, device_list, baseline_streams_results)
+            except Exception as metadata_error:
+                logger.warning(f"Failed to capture baseline metadata on interrupt: {metadata_error}")
+
     except Exception as e:
         # Catch any unhandled exceptions and ensure they don't prevent summarization
         test_failed = True
@@ -441,6 +447,12 @@ def test_dlstreamer(
         else:
             results.metadata["status"] = False
             results.metadata["error"] = str(e)
+
+        if results is not None and baseline_streams_results:
+            try:
+                update_final_results_metadata(results, qualified_devices, device_list, baseline_streams_results)
+            except Exception as metadata_error:
+                logger.warning(f"Failed to capture baseline metadata on error: {metadata_error}")
 
         # Try to run validation even if test failed
         try:

@@ -1,0 +1,54 @@
+# Copyright (C) 2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+name: "profile.suite.system.memory-stream"
+description: "System Memory Performance suite using STREAM benchmark"
+version: "1.0.0"
+params:
+  labels:
+    profile_display_name: "System Memory"
+    group: "system.memory"
+    type: "suite"
+    display_status: false
+  requirements:
+    # Hardware requirements
+    cpu_min_cores: 2
+    memory_min_gb: 5.0
+    storage_total_min_gb: 64.0
+    storage_min_gb: 10.0  # Free storage for test execution
+    # Software requirements
+    os_type:
+      - "linux"
+    docker_required: true
+  container_image: "stream_memory_benchmark"
+  image_tag: "1.0"
+  dockerfile_name: "Dockerfile"
+  stream_git_url: "https://github.com/jeffhammond/STREAM.git"
+  base_image: "intel/dlstreamer:2025.1.2-dev-ubuntu24"
+
+suites:
+  - name: "system"
+    sub_suites:
+      - name: "memory"
+        tests:
+          test_memory_stream:
+            params:
+              - test_id: "MEM-STR-001"
+                display_name: "STREAM Memory Benchmark - Copy"
+                operation: "Copy"
+                timeout: "200"
+
+              - test_id: "MEM-STR-002"
+                display_name: "STREAM Memory Benchmark - Scale"
+                operation: "Scale"
+                timeout: "200"
+
+              - test_id: "MEM-STR-003"
+                display_name: "STREAM Memory Benchmark - Add"
+                operation: "Add"
+                timeout: "200"
+
+              - test_id: "MEM-STR-004"
+                display_name: "STREAM Memory Benchmark - Triad"
+                operation: "Triad"
+                timeout: "200"

@@ -1,0 +1,43 @@
+# Copyright (C) 2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+name: "profile.vertical.metro"
+display_name: "Metro"
+description: "Metro Suites"
+version: "1.0.0"
+params:
+  labels:
+    profile_display_name: "Metro"
+    group: "metro"
+    type: "vertical"
+    display_status: false
+  depends_on:
+    - "profile.suite.system.memory-stream"
+  requirements:
+    # Hardware requirements
+    cpu_min_cores: 4
+    memory_min_gb: 5.0
+    storage_total_min_gb: 64.0
+    storage_min_gb: 10.0  # Free storage for test execution
+    # Software requirements
+    os_type:
+      - "linux"
+    docker_required: true
+suites:
+  - name: "summary"
+    sub_suites:
+      - name: "vertical"
+        tests:
+          test_summary_metro:
+            params:
+              # 1. System Memory STREAM Benchmark
+              - test_id: "METRO-MEM-001"
+                display_name: "System Memory STREAM Benchmark "
+                benchmark_category: "memory_stream"
+                timeout: 180
+                target_test_ids:
+                  - "MEM-STR-001"
+                  - "MEM-STR-002"
+                  - "MEM-STR-003"
+                  - "MEM-STR-004"
+

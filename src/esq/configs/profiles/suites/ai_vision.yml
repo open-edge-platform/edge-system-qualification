@@ -84,7 +84,7 @@ params:
       ! queue
   pipeline_params:
     DECODE_ELEMENTS:
-      cpu: "h265parse ! vah265dec ! capsfilter caps='video/x-raw(memory:VAMemory)'"
+      cpu: "h265parse ! avdec_h265 ! capsfilter caps='video/x-raw'"
       gpu_integrated: "h265parse ! vah265dec ! capsfilter caps='video/x-raw(memory:VAMemory)'"
       gpu_discrete: "h265parse ! varenderD{RENDER_DEVICE_NUM}h265dec ! capsfilter caps='video/x-raw(memory:VAMemory)'"
       npu: "h265parse ! vah265dec ! capsfilter caps='video/x-raw(memory:VAMemory)'"

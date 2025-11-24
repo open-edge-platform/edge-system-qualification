@@ -363,9 +363,55 @@ def collect_gpu_info(pci_devices, openvino_gpu=None) -> dict:
             ov_device_type = gpu["openvino"].get("device_type")
             is_discrete = determine_gpu_type_from_openvino(ov_device_type)
 
-        # Default to integrated if still unknown
+        # If OpenVINO didn't classify, infer from physical characteristics
         if is_discrete is None:
-            is_discrete = False
+            pci_slot = gpu.get("pci_slot", "")
+            driver = gpu.get("driver", "")
+            class_name = gpu.get("class_name", "").lower()
+
+            # Extract bus and device numbers from PCI slot
+            bus_num = None
+            dev_num = None
+            if pci_slot:
+                try:
+                    # PCI slot format: "domain:bus:device.function" or "bus:device.function"
+                    parts = pci_slot.split(":")
+                    if len(parts) >= 2:
+                        bus_str = parts[-2]  # Second to last part is bus
+                        dev_str = parts[-1].split(".")[0]  # Last part before '.' is device
+                        bus_num = int(bus_str, 16)
+                        dev_num = int(dev_str, 16)
+                except (ValueError, IndexError):
+                    pass
+
+            # 1. Known BMC/server management graphics drivers → Integrated
+            bmc_drivers = ["ast", "mgag200", "bochs", "cirrus"]
+            if driver and driver.lower() in bmc_drivers:
+                is_discrete = False
+                logger.debug(f"GPU classified as integrated: BMC driver '{driver}'")
+
+            # 2. PCI slot pattern suggests discrete card
+            # Discrete GPUs typically use higher bus numbers or device numbers
+            elif bus_num is not None and dev_num is not None:
+                # Integrated GPUs are typically on bus 0 with low device numbers (0-7)
+                # Discrete GPUs usually have bus > 0 or device >= 16
+                if bus_num > 0 or dev_num >= 16:
+                    is_discrete = True
+                    logger.debug(f"GPU classified as discrete: PCI slot pattern (bus={bus_num}, dev={dev_num})")
+                else:
+                    # Low bus and device numbers suggest integrated
+                    is_discrete = False
+                    logger.debug(f"GPU classified as integrated: PCI slot pattern (bus={bus_num}, dev={dev_num})")
+
+            # 3. Class name "3D controller" typically indicates discrete GPU
+            elif "3d" in class_name and "controller" in class_name:
+                is_discrete = True
+                logger.debug(f"GPU classified as discrete: Class name '{class_name}'")
+
+            # 4. Default to integrated if still unclear
+            else:
+                is_discrete = False
+                logger.debug("GPU classified as integrated: Default")
 
         gpu["is_discrete"] = is_discrete
         if is_discrete:
@@ -451,16 +497,20 @@ def collect_npu_info(pci_devices, openvino_npu=None) -> dict:
     for dev in pci_devices:
         class_name = dev.get("class_name", "").lower()
         device_name = dev.get("device_name", "").lower()
+        vendor_id = dev.get("vendor_id", "").lower()
 
-        # Look for processing accelerators or NPU-related keywords
-        if (
-            "processing accelerator" in class_name
-            or "accelerator" in class_name
-            or "npu" in device_name
-            or "neural" in device_name
-            or "ai" in device_name
-        ):
+        # NPU devices must meet ALL criteria:
+        # 1. PCI class is "Processing accelerators" (class_id 12)
+        # 2. Device name contains "npu" keyword
+        # 3. Vendor is Intel (8086)
+        if "processing accelerator" in class_name and "npu" in device_name and vendor_id == "8086":
             pci_npus.append(normalize_pci_device(dev))
+            logger.debug(f"Found NPU device: {device_name} (vendor: {vendor_id}, slot: {dev.get('pci_slot')})")
+        elif "processing accelerator" in class_name:
+            logger.debug(
+                f"Skipping non-NPU processing accelerator: {device_name} "
+                f"(vendor: {vendor_id}, npu_in_name: {'npu' in device_name}, slot: {dev.get('pci_slot')})"
+            )
 
     # Get NPU devices from OpenVINO
     openvino_npus = []

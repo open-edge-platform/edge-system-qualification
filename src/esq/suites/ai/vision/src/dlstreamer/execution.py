@@ -327,21 +327,19 @@ def finalize_device_metrics(results: Result, qualified_devices: Dict[str, Any], 
                 results.metrics[device_metric_name].value = device_streams
                 logger.debug(f"Updated individual device metric {device_metric_name} = {device_streams}")
 
-    # For multiple devices, also update aggregate streams_max if it exists or create it
-    if len(device_list) > 1:
+    # Update aggregate streams_max if it exists (for both single and multi-device scenarios)
+    if "streams_max" in results.metrics:
         total_streams = sum(
             dev_data.get("num_streams", 0)
             for dev_id, dev_data in qualified_devices.items()
             if dev_data.get("pass", False)
         )
 
-        if "streams_max" in results.metrics:
-            results.metrics["streams_max"].value = total_streams
+        results.metrics["streams_max"].value = total_streams
+        if len(device_list) > 1:
             logger.info(f"Updated aggregate streams_max for multi-device scenario: {total_streams}")
         else:
-            # Create aggregate streams_max metric if it doesn't exist but we have multiple devices
-            results.metrics["streams_max"] = Metrics(unit="streams", value=total_streams)
-            logger.info(f"Created aggregate streams_max for multi-device scenario: {total_streams}")
+            logger.info(f"Updated aggregate streams_max for single-device scenario: {total_streams}")
 
     logger.debug(f"Finalized metrics for {len(qualified_devices)} qualified devices")
 
@@ -351,6 +349,7 @@ def update_final_results_metadata(
     qualified_devices: Dict[str, Any],
     device_list: list,
     baseline_streams_results: list = None,
+    requested_device_categories: list = None,
 ) -> None:
     """
     Update final results with device metadata and summary information.
@@ -361,6 +360,7 @@ def update_final_results_metadata(
         qualified_devices: Dictionary of qualified device results
         device_list: List of all device IDs tested
         baseline_streams_results: List of baseline preparation results (optional)
+        requested_device_categories: List of device categories requested in config (optional)
     """
     if baseline_streams_results:
         baseline_fps_count = 0
@@ -391,8 +391,20 @@ def update_final_results_metadata(
 
         results.metadata["total_qualified_streams"] = total_streams
 
+        # Determine effective device count for key metric selection
+        # Treat as multi-device if:
+        # 1. Multiple devices detected, OR
+        # 2. Multiple device categories requested in config, OR
+        # 3. Multiple dGPU devices detected (GPU.0, GPU.1, etc.)
+        dgpu_count = sum(1 for dev_id in device_list if dev_id.upper().startswith("GPU."))
+        effective_device_count = max(
+            len(device_list),
+            len(requested_device_categories) if requested_device_categories else 0,
+            dgpu_count if dgpu_count > 1 else 0,
+        )
+
         # Use the enhanced auto_set_key_metric function instead of hardcoded logic
-        results.auto_set_key_metric(device_count=len(device_list))
+        results.auto_set_key_metric(device_count=effective_device_count)
 
         logger.info(f"Test completed successfully: {len(qualified_devices)}/{len(device_list)} devices qualified")
         logger.info(f"Total qualified streams: {total_streams}")

@@ -154,11 +154,11 @@ def get_test_configs_for_test(test_func: Callable) -> List[Dict[str, Any]]:
 
     test_file = module.__file__
     test_dir = os.path.dirname(os.path.abspath(test_file))
-    logger.info(f"Test file: {test_file}")
+    logger.debug(f"Test file: {test_file}")
 
     # Look for config.yml in the test directory
     config_path = os.path.join(test_dir, "config.yml")
-    logger.info(f"Using config path: {config_path}")
+    logger.debug(f"Using config path: {config_path}")
 
     # Use the load_test_configurations function with the determined config path
     try:

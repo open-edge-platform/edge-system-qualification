@@ -692,7 +692,7 @@ def get_active_profile_configs() -> Optional[Dict[str, Any]]:
 
         return profile_configs
     except ValueError:
-        logger.warning(f"Active profile '{active_profile}' not found")
+        logger.debug(f"Active profile '{active_profile}' not found")
         return None
 
 
@@ -980,16 +980,16 @@ def load_test_configurations(test_name: str, config_path: str = None) -> List[Di
         caller_file = caller_frame.filename
         caller_dir = os.path.dirname(os.path.abspath(caller_file))
         config_path = os.path.join(caller_dir, "config.yml")
-        logger.info(f"Looking for config at {config_path} relative to caller: {caller_file}")
+        logger.debug(f"Looking for config at {config_path} relative to caller: {caller_file}")
     else:
-        logger.info(f"Using provided config path: {config_path}")
+        logger.debug(f"Using provided config path: {config_path}")
 
     suite_configs = {}
     config_exists = os.path.exists(config_path)
     if config_exists:
         try:
             suite_configs = load_yaml_file(config_path)
-            logger.info(f"Loaded configuration from {config_path}")
+            logger.debug(f"Loaded configuration from {config_path}")
         except Exception as e:
             logger.warning(f"Failed to load or parse config.yml: {e}")
             suite_configs = {}
@@ -1000,7 +1000,7 @@ def load_test_configurations(test_name: str, config_path: str = None) -> List[Di
         test_configs = suite_configs["tests"][test_name]
         if "params" in test_configs and test_configs["params"]:
             base_configs = copy.deepcopy(test_configs["params"])
-            logger.info(f"Loaded {len(base_configs)} base configurations for {test_name} from config.yml")
+            logger.debug(f"Loaded {len(base_configs)} base configurations for {test_name} from config.yml")
         else:
             base_configs = []
     else:
@@ -1012,7 +1012,7 @@ def load_test_configurations(test_name: str, config_path: str = None) -> List[Di
         suites_index = path_parts.index("suites")
         suite_name = path_parts[suites_index + 1] if suites_index + 1 < len(path_parts) else ""
         sub_suite_name = path_parts[suites_index + 2] if suites_index + 2 < len(path_parts) else ""
-        logger.info(f"Determined suite={suite_name}, sub_suite={sub_suite_name} for test {test_name}")
+        logger.debug(f"Determined suite={suite_name}, sub_suite={sub_suite_name} for test {test_name}")
     except ValueError:
         logger.warning(f"Could not determine suite/sub-suite from path: {config_path}")
         suite_name = ""
@@ -1079,13 +1079,13 @@ def load_test_configurations(test_name: str, config_path: str = None) -> List[Di
                     if k != "requirements" and k not in param_copy:
                         param_copy[k] = copy.deepcopy(v)
                 merged_base_configs.append(param_copy)
-            logger.info(
+            logger.debug(
                 f"Final configuration has {len(merged_base_configs)} parameter sets for {test_name} "
                 f"with profile param merging"
             )
             return merged_base_configs
         else:
-            logger.info(
+            logger.debug(
                 f"Final configuration has {len(base_configs)} parameter sets for {test_name} "
                 f"without profile param merging"
             )

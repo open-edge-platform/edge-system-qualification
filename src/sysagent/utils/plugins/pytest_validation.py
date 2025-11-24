@@ -536,7 +536,9 @@ def validate_system_requirements_from_configs():
         validation_results = validator.validate_requirements(final_requirements)
 
         def format_check_details(check):
-            return f"Required {check['required']}, Found {check['actual']}"
+            required = check["required"]
+            actual = check["actual"]
+            return f"Required: {required} | Actual: {actual}"
 
         # Determine if we should fail or skip based on profile name
         profile_name = os.environ.get("ACTIVE_PROFILE", "none")

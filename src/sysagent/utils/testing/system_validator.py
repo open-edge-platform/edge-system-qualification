@@ -64,6 +64,176 @@ class SystemValidator:
         logger.debug(f"System validation completed: {results['passed']}")
         return results
 
+    def _get_intel_devices_with_openvino(
+        self, devices: List[Dict[str, Any]], device_filter: Optional[callable] = None
+    ) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+        """
+        Get Intel devices and filter for those detected by OpenVINO.
+
+        Args:
+            devices: List of device dictionaries
+            device_filter: Optional filter function to apply before vendor check
+
+        Returns:
+            Tuple of (intel_devices, intel_devices_with_openvino)
+        """
+        # Apply custom filter if provided (e.g., discrete/integrated GPU check)
+        filtered_devices = [dev for dev in devices if device_filter(dev)] if device_filter else devices
+
+        # Find Intel devices (vendor_id 8086)
+        intel_devices = [dev for dev in filtered_devices if dev.get("vendor_id", "").lower() == "8086"]
+
+        # Find Intel devices detected by OpenVINO
+        intel_devices_with_ov = [dev for dev in intel_devices if "openvino" in dev]
+
+        return intel_devices, intel_devices_with_ov
+
+    def _build_device_error_message(
+        self,
+        intel_devices: List[Dict[str, Any]],
+        intel_devices_with_ov: List[Dict[str, Any]],
+        all_devices: List[Dict[str, Any]],
+        device_type: str,
+        non_intel_check: Optional[callable] = None,
+    ) -> str:
+        """
+        Build meaningful error message for device validation.
+
+        Args:
+            intel_devices: List of Intel devices found
+            intel_devices_with_ov: List of Intel devices detected by OpenVINO
+            all_devices: All devices for non-Intel check
+            device_type: Type of device (e.g., "iGPU", "dGPU", "NPU")
+            non_intel_check: Optional function to check for non-Intel devices
+
+        Returns:
+            Error message string
+        """
+        if len(intel_devices_with_ov) > 0:
+            return f"{len(intel_devices_with_ov)} Intel {device_type}(s) detected by OpenVINO"
+
+        # No Intel devices detected by OpenVINO
+        if len(intel_devices) > 0:
+            return (
+                f"{len(intel_devices)} Intel {device_type}(s) found but not detected by OpenVINO "
+                "(driver may not be installed/configured)"
+            )
+
+        # Check if non-Intel devices exist
+        if non_intel_check and any(non_intel_check(dev) for dev in all_devices):
+            return f"Non-Intel {device_type.lower()} found (Intel {device_type} required)"
+
+        return f"No {device_type.lower()} found"
+
+    def _validate_device_required(
+        self,
+        devices: List[Dict[str, Any]],
+        device_type: str,
+        category: str,
+        device_filter: Optional[callable] = None,
+        non_intel_check: Optional[callable] = None,
+    ) -> Dict[str, Any]:
+        """
+        Validate that at least one Intel device detected by OpenVINO exists.
+
+        Args:
+            devices: List of device dictionaries
+            device_type: Human-readable device type (e.g., "iGPU", "dGPU", "NPU")
+            category: Category string for validation result
+            device_filter: Optional filter to apply before vendor check
+            non_intel_check: Optional check for non-Intel devices
+
+        Returns:
+            Validation result dictionary
+        """
+        intel_devices, intel_devices_with_ov = self._get_intel_devices_with_openvino(devices, device_filter)
+        passed = len(intel_devices_with_ov) > 0
+        actual_msg = self._build_device_error_message(
+            intel_devices, intel_devices_with_ov, devices, device_type, non_intel_check
+        )
+
+        return {
+            "name": f"{device_type} required",
+            "passed": passed,
+            "actual": actual_msg,
+            "required": f"At least 1 Intel {device_type} detected by OpenVINO",
+            "category": category,
+        }
+
+    def _validate_device_min_count(
+        self,
+        devices: List[Dict[str, Any]],
+        min_count: int,
+        device_type: str,
+        category: str,
+        device_filter: Optional[callable] = None,
+        non_intel_check: Optional[callable] = None,
+    ) -> Dict[str, Any]:
+        """
+        Validate minimum device count for Intel devices detected by OpenVINO.
+
+        Args:
+            devices: List of device dictionaries
+            min_count: Minimum required device count
+            device_type: Human-readable device type
+            category: Category string for validation result
+            device_filter: Optional filter to apply before vendor check
+            non_intel_check: Optional check for non-Intel devices
+
+        Returns:
+            Validation result dictionary
+        """
+        intel_devices, intel_devices_with_ov = self._get_intel_devices_with_openvino(devices, device_filter)
+        passed = len(intel_devices_with_ov) >= min_count
+
+        if not passed:
+            actual_msg = self._build_device_error_message(
+                intel_devices, intel_devices_with_ov, devices, device_type, non_intel_check
+            )
+        else:
+            actual_msg = f"{len(intel_devices_with_ov)} Intel {device_type}(s) detected by OpenVINO"
+
+        return {
+            "name": f"{device_type}s >= {min_count}",
+            "passed": passed,
+            "actual": actual_msg,
+            "required": f">= {min_count} Intel {device_type}(s) detected by OpenVINO",
+            "category": category,
+        }
+
+    def _validate_device_max_count(
+        self,
+        devices: List[Dict[str, Any]],
+        max_count: int,
+        device_type: str,
+        category: str,
+        device_filter: Optional[callable] = None,
+    ) -> Dict[str, Any]:
+        """
+        Validate maximum device count for Intel devices detected by OpenVINO.
+
+        Args:
+            devices: List of device dictionaries
+            max_count: Maximum allowed device count
+            device_type: Human-readable device type
+            category: Category string for validation result
+            device_filter: Optional filter to apply before vendor check
+
+        Returns:
+            Validation result dictionary
+        """
+        intel_devices, intel_devices_with_ov = self._get_intel_devices_with_openvino(devices, device_filter)
+        passed = len(intel_devices_with_ov) <= max_count
+        actual_msg = f"{len(intel_devices_with_ov)} Intel {device_type}(s) detected by OpenVINO"
+
+        return {
+            "name": f"{device_type}s <= {max_count}",
+            "passed": passed,
+            "actual": actual_msg,
+            "required": f"<= {max_count} Intel {device_type}(s) detected by OpenVINO",
+            "category": category,
+        }
+
     def _validate_hardware(self, hw_requirements: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Validate hardware requirements using latest system info structure."""
         results = []
@@ -235,66 +405,60 @@ class SystemValidator:
         # Integrated GPU requirement
         if "igpu_required" in hw_requirements and hw_requirements["igpu_required"]:
             gpu_info = hardware.get("gpu", {})
-            integrated_count = gpu_info.get("integrated_count", 0)
-            has_igpu = integrated_count > 0
+            devices = gpu_info.get("devices", [])
             results.append(
-                {
-                    "name": "Integrated GPU required",
-                    "passed": has_igpu,
-                    "actual": f"{integrated_count} integrated GPU(s)",
-                    "required": "At least 1 integrated GPU",
-                    "category": "hardware.gpu.integrated",
-                }
+                self._validate_device_required(
+                    devices=devices,
+                    device_type="iGPU",
+                    category="hardware.gpu.integrated",
+                    device_filter=lambda dev: not dev.get("is_discrete", True),
+                    non_intel_check=lambda dev: not dev.get("is_discrete", True),
+                )
             )
 
         # Discrete GPU requirement
         if "dgpu_required" in hw_requirements and hw_requirements["dgpu_required"]:
             gpu_info = hardware.get("gpu", {})
-        # Discrete GPU requirement
-        if "dgpu_required" in hw_requirements and hw_requirements["dgpu_required"]:
-            gpu_info = hardware.get("gpu", {})
-            discrete_count = gpu_info.get("discrete_count", 0)
-            has_dgpu = discrete_count > 0
+            devices = gpu_info.get("devices", [])
             results.append(
-                {
-                    "name": "Discrete GPU required",
-                    "passed": has_dgpu,
-                    "actual": f"{discrete_count} discrete GPU(s)",
-                    "required": "At least 1 discrete GPU",
-                    "category": "hardware.gpu.discrete",
-                }
+                self._validate_device_required(
+                    devices=devices,
+                    device_type="dGPU",
+                    category="hardware.gpu.discrete",
+                    device_filter=lambda dev: dev.get("is_discrete", False),
+                    non_intel_check=lambda dev: dev.get("is_discrete", False),
+                )
             )
 
         # Discrete GPU minimum devices
         if "dgpu_min_devices" in hw_requirements:
             min_devices = hw_requirements["dgpu_min_devices"]
             gpu_info = hardware.get("gpu", {})
-            discrete_count = gpu_info.get("discrete_count", 0)
-            passed = discrete_count >= min_devices
+            devices = gpu_info.get("devices", [])
             results.append(
-                {
-                    "name": f"Discrete GPUs >= {min_devices}",
-                    "passed": passed,
-                    "actual": f"{discrete_count} discrete GPU(s)",
-                    "required": f">= {min_devices} discrete GPUs",
-                    "category": "hardware.gpu.discrete_count_min",
-                }
+                self._validate_device_min_count(
+                    devices=devices,
+                    min_count=min_devices,
+                    device_type="dGPU",
+                    category="hardware.gpu.discrete_count_min",
+                    device_filter=lambda dev: dev.get("is_discrete", False),
+                    non_intel_check=lambda dev: dev.get("is_discrete", False),
+                )
             )
 
         # Discrete GPU maximum devices
         if "dgpu_max_devices" in hw_requirements:
             max_devices = hw_requirements["dgpu_max_devices"]
             gpu_info = hardware.get("gpu", {})
-            discrete_count = gpu_info.get("discrete_count", 0)
-            passed = discrete_count <= max_devices
+            devices = gpu_info.get("devices", [])
             results.append(
-                {
-                    "name": f"Discrete GPUs <= {max_devices}",
-                    "passed": passed,
-                    "actual": f"{discrete_count} discrete GPU(s)",
-                    "required": f"<= {max_devices} discrete GPUs",
-                    "category": "hardware.gpu.discrete_count_max",
-                }
+                self._validate_device_max_count(
+                    devices=devices,
+                    max_count=max_devices,
+                    device_type="dGPU",
+                    category="hardware.gpu.discrete_count_max",
+                    device_filter=lambda dev: dev.get("is_discrete", False),
+                )
             )
 
         # Discrete GPU minimum VRAM
@@ -426,32 +590,74 @@ class SystemValidator:
         # NPU requirement
         if "npu_required" in hw_requirements and hw_requirements["npu_required"]:
             npu_info = hardware.get("npu", {})
-            npu_count = npu_info.get("count", 0)
-            has_npu = npu_count > 0
+            devices = npu_info.get("devices", [])
             results.append(
-                {
-                    "name": "NPU required",
-                    "passed": has_npu,
-                    "actual": f"{npu_count} NPU(s)",
-                    "required": "At least 1 NPU",
-                    "category": "hardware.npu.required",
-                }
+                self._validate_device_required(
+                    devices=devices,
+                    device_type="NPU",
+                    category="hardware.npu.required",
+                    non_intel_check=lambda dev: dev.get("class_name", "").lower() == "processing accelerators",
+                )
             )
 
         # NPU minimum devices
         if "npu_min_devices" in hw_requirements:
             min_devices = hw_requirements["npu_min_devices"]
             npu_info = hardware.get("npu", {})
-            npu_count = npu_info.get("count", 0)
-            passed = npu_count >= min_devices
+            devices = npu_info.get("devices", [])
             results.append(
-                {
-                    "name": f"NPUs >= {min_devices}",
-                    "passed": passed,
-                    "actual": f"{npu_count} NPU(s)",
-                    "required": f">= {min_devices} NPUs",
-                    "category": "hardware.npu.count",
-                }
+                self._validate_device_min_count(
+                    devices=devices,
+                    min_count=min_devices,
+                    device_type="NPU",
+                    category="hardware.npu.count",
+                    non_intel_check=lambda dev: dev.get("class_name", "").lower() == "processing accelerators",
+                )
+            )
+
+        # NPU maximum devices
+        if "npu_max_devices" in hw_requirements:
+            max_devices = hw_requirements["npu_max_devices"]
+            npu_info = hardware.get("npu", {})
+            devices = npu_info.get("devices", [])
+            results.append(
+                self._validate_device_max_count(
+                    devices=devices,
+                    max_count=max_devices,
+                    device_type="NPU",
+                    category="hardware.npu.count_max",
+                )
+            )
+
+        # Integrated GPU minimum devices
+        if "igpu_min_devices" in hw_requirements:
+            min_devices = hw_requirements["igpu_min_devices"]
+            gpu_info = hardware.get("gpu", {})
+            devices = gpu_info.get("devices", [])
+            results.append(
+                self._validate_device_min_count(
+                    devices=devices,
+                    min_count=min_devices,
+                    device_type="iGPU",
+                    category="hardware.gpu.integrated_count_min",
+                    device_filter=lambda dev: not dev.get("is_discrete", True),
+                    non_intel_check=lambda dev: not dev.get("is_discrete", True),
+                )
+            )
+
+        # Integrated GPU maximum devices
+        if "igpu_max_devices" in hw_requirements:
+            max_devices = hw_requirements["igpu_max_devices"]
+            gpu_info = hardware.get("gpu", {})
+            devices = gpu_info.get("devices", [])
+            results.append(
+                self._validate_device_max_count(
+                    devices=devices,
+                    max_count=max_devices,
+                    device_type="iGPU",
+                    category="hardware.gpu.integrated_count_max",
+                    device_filter=lambda dev: not dev.get("is_discrete", True),
+                )
             )
 
         return results

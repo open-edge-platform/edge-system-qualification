@@ -217,11 +217,42 @@ def test_dlstreamer(
             if metric_name.startswith("streams_max") and metric_name != "streams_max":
                 streams_max_devices.append(metric_name)
 
-        # Automatically add aggregate streams_max metric for multi-device scenarios
-        if len(streams_max_devices) > 1:
-            logger.info(
-                f"Multi-device scenario detected with {len(streams_max_devices)} devices. Adding aggregate streams_max metric."
-            )
+        # Count dGPU devices detected (GPU.0, GPU.1, etc.)
+        dgpu_device_count = sum(1 for dev_id in device_list if dev_id.upper().startswith("GPU."))
+
+        # Determine if aggregate streams_max metric is needed:
+        # 1. Multiple devices detected (multi-device scenario)
+        # 2. KPI validation requires streams_max
+        # 3. Multiple device categories requested in config (even if only 1 detected)
+        # 4. Multiple dGPU devices detected (even if config only specifies "dgpu")
+        needs_aggregate_metric = (
+            len(streams_max_devices) > 1
+            or "streams_max" in current_kpi_refs
+            or len(devices) > 1
+            or dgpu_device_count > 1
+        )
+
+        if needs_aggregate_metric:
+            if len(streams_max_devices) > 1:
+                logger.debug(
+                    f"Multi-device scenario detected with {len(streams_max_devices)} devices. "
+                    "Adding aggregate streams_max metric."
+                )
+            elif dgpu_device_count > 1:
+                logger.debug(
+                    f"Multiple dGPU devices detected ({dgpu_device_count} dGPUs). Adding aggregate streams_max metric."
+                )
+            elif len(devices) > 1:
+                logger.debug(
+                    f"Multiple device categories requested in config ({len(devices)} categories). "
+                    "Adding aggregate streams_max metric."
+                )
+            elif "streams_max" in current_kpi_refs:
+                logger.debug(
+                    "KPI validation requires streams_max metric. "
+                    "Adding aggregate streams_max metric for single device scenario."
+                )
+
             # Add individual device metrics first
             for metric_name, unit in default_metrics:
                 if metric_name not in all_metrics:
@@ -229,7 +260,7 @@ def test_dlstreamer(
             # Add aggregate streams_max metric
             if "streams_max" not in all_metrics:
                 all_metrics["streams_max"] = "streams"
-                logger.debug("Added aggregate streams_max metric for multi-device total")
+                logger.debug("Added aggregate streams_max metric")
 
         metrics = {
             kpi: Metrics(unit=unit, value=0.0 if kpi == "streams_max" else -1.0) for kpi, unit in all_metrics.items()
@@ -361,7 +392,9 @@ def test_dlstreamer(
         update_device_pipeline_info(results, qualified_devices, pipeline, pipeline_params, device_dict)
 
         # Update final results metadata using modular function
-        update_final_results_metadata(results, qualified_devices, device_list, baseline_streams_results)
+        update_final_results_metadata(
+            results, qualified_devices, device_list, baseline_streams_results, requested_device_categories=devices
+        )
 
         logger.debug(f"DL Streamer Test results: {json.dumps(results.to_dict(), indent=2)}")
 
@@ -405,7 +438,13 @@ def test_dlstreamer(
 
         if results is not None and baseline_streams_results:
             try:
-                update_final_results_metadata(results, qualified_devices, device_list, baseline_streams_results)
+                update_final_results_metadata(
+                    results,
+                    qualified_devices,
+                    device_list,
+                    baseline_streams_results,
+                    requested_device_categories=devices,
+                )
             except Exception as metadata_error:
                 logger.warning(f"Failed to capture baseline metadata on interrupt: {metadata_error}")
 
@@ -450,7 +489,13 @@ def test_dlstreamer(
 
         if results is not None and baseline_streams_results:
             try:
-                update_final_results_metadata(results, qualified_devices, device_list, baseline_streams_results)
+                update_final_results_metadata(
+                    results,
+                    qualified_devices,
+                    device_list,
+                    baseline_streams_results,
+                    requested_device_categories=devices,
+                )
             except Exception as metadata_error:
                 logger.warning(f"Failed to capture baseline metadata on error: {metadata_error}")
 

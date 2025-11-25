@@ -155,6 +155,7 @@ def resolve_pipeline_placeholders(pipeline, pipeline_params=None, device_id="CPU
         Reserved placeholders handled internally:
         - ${DEVICE_ID}: Replaced with the device_id parameter
         - ${RENDER_DEVICE_NUM}: For discrete GPUs, calculated from device ID
+        - ${HAS_IGPU}: Boolean indicating if integrated GPU is present in system
 
         Note that ${PIPELINE_ID} is handled separately in build_multi_pipeline_with_devices
         and build_baseline_pipeline functions, not here.
@@ -193,27 +194,59 @@ def resolve_pipeline_placeholders(pipeline, pipeline_params=None, device_id="CPU
     device_properties = get_openvino_device_properties(device_id)
     all_properties = device_properties.get("all_properties", {})
 
+    # Detect if integrated GPU is present in the system
+    has_igpu = False
+    if device_dict:
+        for dev_id, dev_info in device_dict.items():
+            dev_type = dev_info.get("device_type", "").lower()
+            if "integrated" in dev_type and dev_id.upper().startswith("GPU"):
+                has_igpu = True
+                logger.debug(f"Integrated GPU detected: {dev_id}")
+                break
+
     # Compute RENDER_DEVICE_NUM for discrete GPUs
+    # Special handling: if this is the first dGPU (GPU.0) and no iGPU exists,
+    # it uses renderD128 but should use vah265dec (not varenderD128h265dec)
     render_device_num = ""
+    use_default_va_decoder = False
+
     if type_key == "gpu_discrete":
         base_render_num = int(128)
         # Extract device number from device_id (e.g. GPU.1 -> 1)
         try:
             device_num = int(device_id.split(".")[-1])
             render_device_num = str(base_render_num + device_num)
+
+            # Special case: first dGPU without iGPU uses renderD128
+            # In this case, use default VA decoder instead of numbered one
+            if device_num == 0 and not has_igpu:
+                use_default_va_decoder = True
+                logger.debug("First dGPU without iGPU detected - will use default VA decoder")
         except Exception:
             render_device_num = str(base_render_num)
 
     # Note: PIPELINE_ID is now handled in build_multi_pipeline_with_devices and build_baseline_pipeline
-    replacements = {"RENDER_DEVICE_NUM": render_device_num}
+    replacements = {
+        "RENDER_DEVICE_NUM": render_device_num,
+        "HAS_IGPU": "true" if has_igpu else "false",
+    }
 
     # First pass: resolve all top-level placeholders
     for placeholder, mapping in pipeline_params.items():
-        if placeholder in ("DEVICE_ID", "RENDER_DEVICE_NUM"):
+        if placeholder in ("DEVICE_ID", "RENDER_DEVICE_NUM", "HAS_IGPU"):
             continue  # handled separately
 
         value = None
         if isinstance(mapping, dict):
+            # Special handling for discrete GPU when it's the first GPU without iGPU
+            # In this case, we need to use gpu_discrete_primary instead of gpu_discrete
+            effective_type_key = type_key
+            if use_default_va_decoder and type_key == "gpu_discrete":
+                # Check if mapping has a gpu_discrete_primary key
+                if "gpu_discrete_primary" in mapping:
+                    effective_type_key = "gpu_discrete_primary"
+                    logger.debug("Using gpu_discrete_primary mapping for first dGPU without iGPU")
+
             # Check for property-based overrides
             overrides = mapping.get("overrides", {})
             if overrides and all_properties:
@@ -222,9 +255,9 @@ def resolve_pipeline_placeholders(pipeline, pipeline_params=None, device_id="CPU
                     if device_value and device_value in override_map:
                         value = override_map[device_value]
                         break
-            # If no override, use type_key or default
+            # If no override, use effective_type_key or default
             if not value:
-                value = mapping.get(type_key) or mapping.get("default")
+                value = mapping.get(effective_type_key) or mapping.get("default")
         if value:
             replacements[placeholder] = value
 

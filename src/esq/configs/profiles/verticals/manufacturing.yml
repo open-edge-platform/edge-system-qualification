@@ -47,16 +47,19 @@ params:
       cpu: "decodebin ! videoconvert"
       gpu_integrated: "parsebin ! vah264dec ! vapostproc ! 'video/x-raw(memory:VAMemory)'"
       gpu_discrete: "parsebin ! varenderD{RENDER_DEVICE_NUM}h264dec ! {VIDEO_RAW_TYPE}"
+      gpu_discrete_primary: "parsebin ! vah264dec ! {VIDEO_RAW_TYPE}"
       npu: "parsebin ! vah264dec ! 'video/x-raw(memory:VAMemory)'"
     INFERENCE_ELEMENTS:
       cpu: "pre-process-backend={PRE_PROCESS_BACKEND} model-instance-id=inst0"
       gpu_integrated: "pre-process-backend={PRE_PROCESS_BACKEND} model-instance-id=inst0"
       gpu_discrete: "pre-process-backend={PRE_PROCESS_BACKEND}"
+      gpu_discrete_primary: "pre-process-backend={PRE_PROCESS_BACKEND}"
       npu: "pre-process-backend={PRE_PROCESS_BACKEND}"
     PRE_PROCESS_BACKEND:
       cpu: "opencv"
       gpu_integrated: "va-surface-sharing"
       gpu_discrete: "va-surface-sharing"
+      gpu_discrete_primary: "va-surface-sharing"
       npu: "va"
     VIDEO_RAW_TYPE:
       default: "'video/x-raw(memory:VAMemory)'"

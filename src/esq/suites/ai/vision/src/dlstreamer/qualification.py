@@ -103,7 +103,7 @@ def run_benchmark_container(
     if num_streams is not None:
         container_name += f"-{num_streams}-streams"
 
-    logger.info(f"Using pipeline: {pipeline}")
+    logger.debug(f"Using pipeline: {pipeline}")
 
     # Use modular pipeline utilities
     resolved_pipeline = resolve_pipeline_placeholders(pipeline, pipeline_params, device_id, device_dict)
@@ -197,7 +197,6 @@ def run_concurrent_analysis(
     """
     logger.debug(f"Running concurrent analysis with tasks: {analysis_tasks}")
     containers = []
-    logger.info(f"Starting concurrent analysis for devices: {list(analysis_tasks.keys())}")
 
     for device_id, data in analysis_tasks.items():
         logger.info(f"[{device_id}] - Running with {data['num_streams']} streams")
@@ -269,39 +268,69 @@ def qualify_device(
     pipeline_timeout: int,
     results_dir: str,
     num_sockets: int = 1,
-    max_plateau_iterations: int = 3,
+    consecutive_success_threshold: int = 1,
+    consecutive_failure_threshold: int = 1,
+    max_streams_above_baseline: int = 10,
     visualize_stream: bool = False,
     container_config: Dict[str, Any] = None,
 ) -> bool:
     """
     Iteratively find the max streams for a single device while others are active.
+    Uses intelligent binary search strategy to quickly find optimal stream count.
     Handles multi-socket CPUs by running them concurrently and aggregating results.
+
+    Args:
+        consecutive_success_threshold: Number of consecutive successes before trying higher streams
+        consecutive_failure_threshold: Number of consecutive failures before trying lower streams
+        max_streams_above_baseline: Maximum streams to explore above baseline (limits +1 increment)
     """
     logger.debug(f"Active devices for qualification: {active_devices}")
     device_result_path = os.path.join(results_dir, f"total_streams_result_0_{device_id}.json")
 
     is_multisocket = device_id == "CPU" and num_sockets > 1
 
-    current_num_streams = device_data["num_streams"]
-    plateau_count = 0
-    max_tested_streams = current_num_streams
+    # Initialize binary search bounds
+    initial_streams = device_data["num_streams"]
+    min_streams = 1
+    max_streams = initial_streams * 3  # Upper bound estimate
+    current_num_streams = initial_streams
+
+    # Track search state
     last_successful_streams = 0
     last_successful_fps = 0.0
     current_fps = 0.0
     current_analysis_status = "unknown"
+    consecutive_successes = 0
+    consecutive_failures = 0
 
     logger.debug(f"[{device_id}] Current FPS: {current_fps}")
-    logger.info(f"[{device_id}] Starting qualification with {current_num_streams} streams, target FPS: {target_fps}")
+    logger.info(
+        f"[{device_id}] Starting intelligent qualification with {current_num_streams} streams "
+        f"(search range: {min_streams}-{max_streams}), target FPS: {target_fps}"
+    )
+    logger.info(
+        f"[{device_id}] Thresholds: {consecutive_success_threshold} consecutive successes to go higher, "
+        f"{consecutive_failure_threshold} consecutive failures to go lower"
+    )
+    logger.info(
+        f"[{device_id}] Conservative limit: max {max_streams_above_baseline} streams above baseline "
+        f"({initial_streams + max_streams_above_baseline} total)"
+    )
     logger.info(f"[{device_id}] Active devices: {list(active_devices.keys())}")
 
-    while plateau_count < max_plateau_iterations:
+    # Maximum iterations to prevent infinite loops
+    max_iterations = 20
+    iteration = 0
+
+    while iteration < max_iterations:
+        iteration += 1
         previous_fps = device_data.get("per_stream_fps", 0)
         device_data["num_streams"] = current_num_streams
         combined_analysis = {**active_devices, device_id: device_data}
 
         logger.info(
-            f"[{device_id}] Testing with {current_num_streams} total streams "
-            f"alongside {len(active_devices)} other devices."
+            f"[{device_id}] Iteration {iteration}/{max_iterations}: Testing with {current_num_streams} streams "
+            f"(range: {min_streams}-{max_streams}), alongside {len(active_devices)} other devices."
         )
 
         run_concurrent_analysis(
@@ -352,10 +381,42 @@ def qualify_device(
 
             current_analysis_status = latest_result[device_id].get("analysis_status", "unknown")
             if current_analysis_status != "success":
-                logger.error(
-                    f"[{device_id}] Failed to qualify device due to analysis status '{current_analysis_status}'"
-                )
-                return False
+                # Check if this is a timeout above baseline (overcommitment) or below baseline (genuine failure)
+                if current_num_streams > initial_streams and last_successful_streams > 0:
+                    # Timeout above baseline with previous success - likely overcommitment
+                    logger.warning(
+                        f"[{device_id}] Timeout/failure at {current_num_streams} streams (above baseline "
+                        f"{initial_streams}). Using last successful: {last_successful_streams} streams."
+                    )
+                    # Treat as convergence - use last successful configuration
+                    device_data["pass"] = True
+                    device_data["per_stream_fps"] = last_successful_fps
+                    device_data["num_streams"] = last_successful_streams
+
+                    # Restore last successful FPS to all active devices
+                    for other_dev_id in active_devices:
+                        if other_dev_id != device_id and "last_successful_fps" in active_devices[other_dev_id]:
+                            active_devices[other_dev_id]["per_stream_fps"] = active_devices[other_dev_id][
+                                "last_successful_fps"
+                            ]
+
+                    _save_device_result(device_result_path, device_id, device_data)
+                    update_device_metrics(
+                        active_devices=active_devices,
+                        device_id=device_id,
+                        results_dir=results_dir,
+                        num_sockets=num_sockets,
+                        target_fps=target_fps,
+                    )
+                    return True
+                else:
+                    # Timeout at or below baseline - genuine failure
+                    logger.error(
+                        f"[{device_id}] Failed at {current_num_streams} streams (baseline: {initial_streams}) "
+                        f"due to analysis status '{current_analysis_status}'. Device disqualified."
+                    )
+                    return False
+
             current_fps = latest_result[device_id].get("per_stream_fps", 0)
             device_data.update(latest_result[device_id])
 
@@ -418,19 +479,15 @@ def qualify_device(
             f"[{device_id}] Aggregated/Current FPS: {current_fps:.2f} "
             f"(Previous: {previous_fps:.2f}, Target: {target_fps})"
         )
-        if failed_devices:
-            logger.info(f"Devices below target FPS: {failed_devices}. Reducing streams for {device_id}.")
 
-        if abs(previous_fps - current_fps) < 0.5:
-            plateau_count += 1
-            logger.info(f"[{device_id}] Plateau detected ({plateau_count}/{max_plateau_iterations})")
-        else:
-            plateau_count = 0
-
+        # Binary search strategy with consecutive thresholds
         if all_devices_pass and current_fps >= target_fps:
+            # Success - update lower bound
             last_successful_streams = current_num_streams
             last_successful_fps = current_fps
             device_data["last_successful_fps"] = last_successful_fps
+            consecutive_successes += 1
+            consecutive_failures = 0  # Reset failure counter on success
 
             # Track last successful FPS for all other active devices
             for other_dev_id, other_dev_data in combined_analysis.items():
@@ -440,9 +497,14 @@ def qualify_device(
                         logger.debug(f"Saving last successful FPS for {other_dev_id}: {other_fps:.2f}")
                         active_devices[other_dev_id]["last_successful_fps"] = other_fps
 
-            if plateau_count >= max_plateau_iterations:
+            # Update lower bound
+            min_streams = current_num_streams
+
+            # Check if we can continue searching or should stop
+            if max_streams - min_streams <= 1:
+                # Converged - we found the maximum
                 logger.info(
-                    f"[{device_id}] Target met and plateau reached. Qualified with {current_num_streams} "
+                    f"[{device_id}] Binary search converged. Qualified with {current_num_streams} "
                     f"streams at {current_fps:.2f} FPS."
                 )
                 device_data["pass"] = True
@@ -462,91 +524,165 @@ def qualify_device(
 
                 return True
 
-            if current_num_streams >= max_tested_streams:
-                current_num_streams += 1
-                max_tested_streams = current_num_streams
-                logger.info(f"[{device_id}] Target met, increasing to {current_num_streams} streams.")
-            else:
+            # Check if we should try higher based on consecutive success threshold
+            if consecutive_successes >= consecutive_success_threshold:
+                # Determine increment strategy based on position relative to initial baseline
+                if current_num_streams >= initial_streams:
+                    # At or above baseline: increment by 1 to avoid overcommitment/timeout
+                    # But check if we've reached the maximum exploration limit
+                    max_allowed_streams = initial_streams + max_streams_above_baseline
+                    if current_num_streams >= max_allowed_streams:
+                        # Reached exploration limit - converge here
+                        logger.info(
+                            f"[{device_id}] Reached exploration limit ({max_allowed_streams} streams, "
+                            f"{max_streams_above_baseline} above baseline). Converging."
+                        )
+                        device_data["pass"] = True
+                        device_data["per_stream_fps"] = current_fps
+                        _save_device_result(device_result_path, device_id, device_data)
+                        update_device_metrics(
+                            active_devices=active_devices,
+                            device_id=device_id,
+                            results_dir=results_dir,
+                            num_sockets=num_sockets,
+                            target_fps=target_fps,
+                        )
+                        return True
+
+                    next_streams = current_num_streams + 1
+                    logger.debug(
+                        f"[{device_id}] At/above baseline ({initial_streams}), using conservative +1 increment "
+                        f"(limit: {max_allowed_streams})"
+                    )
+                else:
+                    # Below baseline: use binary search within safe range
+                    next_streams = (current_num_streams + max_streams) // 2
+                    if next_streams == current_num_streams:
+                        next_streams = current_num_streams + 1
+                    # Cap at initial baseline to avoid jumping beyond safe estimate
+                    if next_streams > initial_streams:
+                        next_streams = initial_streams
+                    logger.debug(
+                        f"[{device_id}] Below baseline ({initial_streams}), using binary search to {next_streams}"
+                    )
+
+                current_num_streams = next_streams
                 logger.info(
-                    f"[{device_id}] Target met with {current_num_streams} at {current_fps:.2f} FPS, "
-                    f"but higher counts failed. Qualifying."
+                    f"[{device_id}] Target met ({consecutive_successes}/{consecutive_success_threshold} "
+                    f"consecutive successes), trying higher: {current_num_streams} streams "
+                    f"(range: {min_streams}-{max_streams})."
                 )
-                device_data["pass"] = True
-                device_data["per_stream_fps"] = current_fps
-
-                # Update the last_successful_fps in all active devices for consistency
-                for other_dev_id, other_dev_data in combined_analysis.items():
-                    if other_dev_id != device_id and other_dev_id in active_devices:
-                        other_fps = other_dev_data.get("per_stream_fps", 0)
-                        if other_fps >= target_fps:
-                            active_devices[other_dev_id]["last_successful_fps"] = other_fps
-
-                # Save the current device's successful result
-                _save_device_result(device_result_path, device_id, device_data)
-
-                # Update metrics for all active devices
-                update_device_metrics(
-                    active_devices=active_devices,
-                    device_id=device_id,
-                    results_dir=results_dir,
-                    num_sockets=num_sockets,
-                    target_fps=target_fps,
+            else:
+                # Not enough consecutive successes yet, stay at current level
+                logger.info(
+                    f"[{device_id}] Target met ({consecutive_successes}/{consecutive_success_threshold} "
+                    f"consecutive successes), retesting with {current_num_streams} streams to confirm stability."
                 )
-
-                return True
         else:
-            # If any device failed, reduce streams for current device and retry
-            if current_num_streams <= 1:
-                logger.warning(f"[{device_id}] Cannot reduce streams below 1. Qualification failed.")
-                device_data["pass"] = False
-                device_data["num_streams"] = 0
-                _save_device_result(device_result_path, device_id, device_data)
-                return False
+            # Failed to meet target - update failure counter
+            consecutive_successes = 0  # Reset success counter on failure
+            consecutive_failures += 1
 
-            if last_successful_streams > 0 and last_successful_streams < current_num_streams:
+            # Check if we should try lower based on consecutive failure threshold
+            if consecutive_failures >= consecutive_failure_threshold:
+                # Update upper bound
+                max_streams = current_num_streams
+
+                # Calculate next stream count to try
+                next_streams = (min_streams + current_num_streams) // 2
+                if next_streams == current_num_streams:
+                    next_streams = current_num_streams - 1
+
+                # Make sure we don't go below minimum
+                if next_streams < 1:
+                    next_streams = 1
+
+                # Check if we should converge AFTER calculating next stream
+                # Only converge if next_streams equals current (nowhere left to search)
+                if next_streams == current_num_streams:
+                    # Converged - use the last successful configuration
+                    if last_successful_streams is not None and last_successful_streams > 0:
+                        logger.info(
+                            f"[{device_id}] Binary search converged. Using last successful: "
+                            f"{last_successful_streams} streams with {last_successful_fps:.2f} FPS."
+                        )
+                        device_data["pass"] = True
+                        device_data["per_stream_fps"] = last_successful_fps
+                        device_data["num_streams"] = last_successful_streams
+
+                        # Restore last successful FPS to all active devices
+                        for other_dev_id in active_devices:
+                            if other_dev_id != device_id and "last_successful_fps" in active_devices[other_dev_id]:
+                                active_devices[other_dev_id]["per_stream_fps"] = active_devices[other_dev_id][
+                                    "last_successful_fps"
+                                ]
+
+                        # Save the device result
+                        _save_device_result(device_result_path, device_id, device_data)
+
+                        # Update metrics for all active devices
+                        update_device_metrics(
+                            active_devices=active_devices,
+                            device_id=device_id,
+                            results_dir=results_dir,
+                            num_sockets=num_sockets,
+                            target_fps=target_fps,
+                        )
+
+                        return True
+                    else:
+                        # No successful configuration found
+                        logger.warning(
+                            f"[{device_id}] Cannot meet target FPS. "
+                            f"Current FPS: {current_fps:.2f}, Target: {target_fps:.2f}"
+                        )
+                        for dev_id, dev_data in combined_analysis.items():
+                            logger.warning(f"  - {dev_id}: {dev_data.get('per_stream_fps', 0):.2f} FPS")
+
+                        device_data["pass"] = False
+                        device_data["per_stream_fps"] = current_fps
+                        device_data["num_streams"] = 0
+                        logger.error(
+                            f"[{device_id}] Disqualified after {iteration} iterations (max: {max_iterations})."
+                        )
+
+                        # Save the failed device result
+                        _save_device_result(device_result_path, device_id, device_data)
+
+                        # Update metrics for all active devices
+                        update_device_metrics(
+                            active_devices=active_devices,
+                            device_id=device_id,
+                            results_dir=results_dir,
+                            num_sockets=num_sockets,
+                            target_fps=target_fps,
+                        )
+
+                        return False
+
+                # Continue searching with next_streams
+                current_num_streams = next_streams
+                consecutive_failures = 0  # Reset after taking action
                 logger.info(
-                    f"[{device_id}] Below target, reverting to last successful count: "
-                    f"{last_successful_streams} at {last_successful_fps:.2f} FPS."
+                    f"[{device_id}] Below target at {current_fps:.2f} FPS "
+                    f"({consecutive_failure_threshold} consecutive failures), trying lower: {current_num_streams} "
+                    f"streams (range: {min_streams}-{max_streams})."
                 )
-                current_num_streams = last_successful_streams
-                device_data["num_streams"] = current_num_streams
-                device_data["per_stream_fps"] = last_successful_fps
-                device_data["pass"] = True
-
-                # Revert other active devices to their last successful FPS values
-                logger.info("Reverting other active devices to their last successful FPS values")
-                for other_dev_id, other_dev_data in active_devices.items():
-                    if other_dev_id != device_id and "last_successful_fps" in other_dev_data:
-                        other_last_fps = other_dev_data["last_successful_fps"]
-                        logger.info(f"  - Reverting {other_dev_id} to last successful FPS: {other_last_fps:.2f}")
-                        other_dev_data["per_stream_fps"] = other_last_fps
-
-                # Save the current device's last successful result
-                _save_device_result(device_result_path, device_id, device_data)
-
-                # Update metrics for all active devices
-                update_device_metrics(
-                    active_devices=active_devices,
-                    device_id=device_id,
-                    results_dir=results_dir,
-                    num_sockets=num_sockets,
-                    target_fps=target_fps,
-                )
-
-                return True
             else:
-                current_num_streams -= 1
-                plateau_count = 0
-                logger.info(f"[{device_id}] Below target, reducing to {current_num_streams} streams.")
+                # Not enough consecutive failures yet, stay at current level
+                logger.info(
+                    f"[{device_id}] Below target at {current_fps:.2f} FPS ({consecutive_failures}/"
+                    f"{consecutive_failure_threshold} consecutive failures), retesting with {current_num_streams} "
+                    f"streams to confirm."
+                )
 
         time.sleep(2)
 
-    logger.warning(f"[{device_id}] Exited qualification loop without success. Qualification failed.")
-    device_data["pass"] = False
+    # If we've reached max iterations without converging
+    logger.warning(f"[{device_id}] Reached maximum iterations ({max_iterations}) without full convergence.")
 
-    # If we have a last successful configuration but couldn't find a stable point,
-    # revert to that before returning failure
-    if last_successful_streams > 0:
+    # If we have a last successful configuration, use it
+    if last_successful_streams is not None and last_successful_streams > 0:
         logger.info(
             f"[{device_id}] Using last successful configuration: "
             f"{last_successful_streams} streams at {last_successful_fps:.2f} FPS"
@@ -563,10 +699,11 @@ def qualify_device(
                 logger.info(f"  - Reverting {other_dev_id} to last successful FPS: {other_last_fps:.2f}")
                 other_dev_data["per_stream_fps"] = other_last_fps
 
-    # If there's absolutely no successful configuration, set streams to 0
+    # If there's absolutely no successful configuration, device failed
     else:
+        logger.error(f"[{device_id}] No successful configuration found. Qualification failed.")
         device_data["num_streams"] = 0
-        # Keep the latest per_stream_fps for debugging, but don't let it influence the pass/fail status
+        device_data["pass"] = False
 
     _save_device_result(device_result_path, device_id, device_data)
     return device_data["pass"]

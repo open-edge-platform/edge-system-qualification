@@ -74,7 +74,9 @@ def test_dlstreamer(
         f"{configs.get('docker_image_tag_utils', 'latest')}",
     )
     docker_container_prefix = configs.get("docker_container_prefix", "test-dlstreamer")
-    max_plateau_iterations = configs.get("max_plateau_iterations", 3)
+    consecutive_success_threshold = configs.get("consecutive_success_threshold", 1)
+    consecutive_failure_threshold = configs.get("consecutive_failure_threshold", 2)
+    max_streams_above_baseline = configs.get("max_streams_above_baseline", 3)
 
     # Setup
     test_dir = os.path.dirname(os.path.abspath(__file__))
@@ -160,7 +162,9 @@ def test_dlstreamer(
                 "target_fps": target_fps,
                 "pipeline": pipeline,
                 "pipeline_params": pipeline_params,
-                "max_plateau_iterations": max_plateau_iterations,
+                "consecutive_success_threshold": consecutive_success_threshold,
+                "consecutive_failure_threshold": consecutive_failure_threshold,
+                "max_streams_above_baseline": max_streams_above_baseline,
                 "visualize_stream": visualize_stream,
                 "type": "baseline_streams",
             }
@@ -274,7 +278,9 @@ def test_dlstreamer(
                 "Devices": devices,
                 "Device List": device_list,
                 "Target FPS": target_fps,
-                "Max Plateau Iterations": max_plateau_iterations,
+                "Consecutive Success Threshold": consecutive_success_threshold,
+                "Consecutive Failure Threshold": consecutive_failure_threshold,
+                "Max Streams Above Baseline": max_streams_above_baseline,
                 "Timeout (s)": timeout,
                 "Display Name": test_display_name,
                 "Pipeline": pipeline,
@@ -321,7 +327,9 @@ def test_dlstreamer(
                 "target_fps": target_fps,
                 "pipeline": pipeline,
                 "pipeline_params": pipeline_params,
-                "max_plateau_iterations": max_plateau_iterations,
+                "consecutive_success_threshold": consecutive_success_threshold,
+                "consecutive_failure_threshold": consecutive_failure_threshold,
+                "max_streams_above_baseline": max_streams_above_baseline,
                 "visualize_stream": visualize_stream,
                 "devices": devices,
             }
@@ -344,7 +352,9 @@ def test_dlstreamer(
                     results_dir=results_dir,
                     target_fps=target_fps,
                     num_sockets=num_sockets,
-                    max_plateau_iterations=max_plateau_iterations,
+                    consecutive_success_threshold=consecutive_success_threshold,
+                    consecutive_failure_threshold=consecutive_failure_threshold,
+                    max_streams_above_baseline=max_streams_above_baseline,
                     qualified_devices=qualified_devices,
                     metrics=default_metrics,
                     baseline_streams=baseline_streams.get(device_id, {}),

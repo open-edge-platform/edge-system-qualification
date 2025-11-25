@@ -98,16 +98,19 @@ params:
       cpu: "h265parse ! avdec_h265 ! capsfilter caps='video/x-raw'"
       gpu_integrated: "h265parse ! vah265dec ! capsfilter caps='video/x-raw(memory:VAMemory)'"
       gpu_discrete: "h265parse ! varenderD{RENDER_DEVICE_NUM}h265dec ! capsfilter caps='video/x-raw(memory:VAMemory)'"
+      gpu_discrete_primary: "h265parse ! vah265dec ! capsfilter caps='video/x-raw(memory:VAMemory)'"
       npu: "h265parse ! vah265dec ! capsfilter caps='video/x-raw(memory:VAMemory)'"
     INFERENCE_ELEMENTS:
       cpu: "pre-process-backend={PRE_PROCESS_BACKEND} nireq=2 ie-config=NUM_STREAMS=2"
       gpu_integrated: "pre-process-backend={PRE_PROCESS_BACKEND} nireq=2 ie-config=NUM_STREAMS=2"
       gpu_discrete: "pre-process-backend={PRE_PROCESS_BACKEND} nireq=2 ie-config=NUM_STREAMS=2"
+      gpu_discrete_primary: "pre-process-backend={PRE_PROCESS_BACKEND} nireq=2 ie-config=NUM_STREAMS=2"
       npu: "pre-process-backend={PRE_PROCESS_BACKEND} nireq=4"
     PRE_PROCESS_BACKEND:
       cpu: "opencv"
       gpu_integrated: "va-surface-sharing"
       gpu_discrete: "va-surface-sharing"
+      gpu_discrete_primary: "va-surface-sharing"
       npu: "opencv"
     VIDEO_RAW_TYPE:
       default: "'video/x-raw(memory:VAMemory)'"
@@ -118,6 +121,7 @@ params:
       cpu: "1"
       gpu_integrated: "8"
       gpu_discrete: "8"
+      gpu_discrete_primary: "8"
       npu: "1"
 
 suites:

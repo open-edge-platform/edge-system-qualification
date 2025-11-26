@@ -553,11 +553,10 @@ def prepare_estimate_num_streams_for_device(
     try:
         logger.debug(f"Using pipeline: {pipeline}")
 
-        # Use modular resolve_pipeline_placeholders from the imported module
         resolved_pipeline = resolve_pipeline_placeholders(pipeline, pipeline_params, device_id, device_dict)
-
-        # Use modular build_baseline_pipeline from the imported module
-        baseline_pipeline, result_pipeline = build_baseline_pipeline(pipeline=resolved_pipeline, sync_model=False)
+        baseline_pipeline, result_pipeline = build_baseline_pipeline(
+            pipeline=resolved_pipeline,
+        )
 
         command = [
             "baseline",

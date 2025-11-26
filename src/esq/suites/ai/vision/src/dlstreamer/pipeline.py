@@ -9,7 +9,7 @@ from uuid import uuid4
 logger = logging.getLogger(__name__)
 
 
-def build_multi_pipeline_with_devices(pipeline, device_id, num_streams, visualize_stream=False, sync_model=True):
+def build_multi_pipeline_with_devices(pipeline, device_id, num_streams, visualize_stream=False, pipeline_sync=None):
     """
     Build a multi-stream pipeline for a specific device.
 
@@ -18,16 +18,14 @@ def build_multi_pipeline_with_devices(pipeline, device_id, num_streams, visualiz
         device_id: Device ID to use for the pipeline
         num_streams: Number of streams to include in the multi-pipeline
         visualize_stream: Whether to visualize the pipeline output
-        sync_model: Whether to synchronize the model execution
+        pipeline_sync: Sync value for both pipeline and result fakesink ("true" or "false"), defaults to "true"
 
     Returns:
         Tuple of (multi_pipeline, result_pipeline)
     """
-    sync_str = "true" if sync_model else "false"
+    sync_str = pipeline_sync if pipeline_sync is not None else "true"
 
     if visualize_stream:
-        # sync_elements = f"videoconvert ! autovideosink sync={sync_str}"
-        # sync_elements = f"gvawatermark device=CPU ! videoconvert ! ximagesink sync={sync_str}"
         sync_elements = f"gvawatermark device=CPU ! videoconvert ! autovideosink sync={sync_str}"
     else:
         sync_elements = f"fakesink sync={sync_str}"
@@ -47,7 +45,7 @@ def build_multi_pipeline_with_devices(pipeline, device_id, num_streams, visualiz
 
     pipeline_branches = " ".join(inputs)
     multi_pipeline = f"gst-launch-1.0 -q {pipeline_branches}"
-    result_pipeline = f"gst-launch-1.0 -q gvafpscounter read-pipe=/tmp/{pipe_id} ! fakesink sync=true"
+    result_pipeline = f"gst-launch-1.0 -q gvafpscounter read-pipe=/tmp/{pipe_id} ! fakesink sync={sync_str}"
 
     # Log the pipeline with better truncation handling to show both start and end
     if len(multi_pipeline) > 1500:
@@ -60,20 +58,20 @@ def build_multi_pipeline_with_devices(pipeline, device_id, num_streams, visualiz
     return multi_pipeline, result_pipeline
 
 
-def build_baseline_pipeline(pipeline, sync_model=False):
+def build_baseline_pipeline(pipeline):
     """
     Build a baseline pipeline for single stream analysis.
+    Always uses sync=false for maximum throughput measurement.
 
     Args:
         pipeline: The resolved pipeline string
-        sync_model: Whether to use sync=true or sync=false for the fakesink
 
     Returns:
         Tuple of (baseline_pipeline, result_pipeline)
     """
     pipe_id = str(uuid4())[:8]
     placeholder_pipeline_id = str(uuid4())[:8]
-    sync_str = "true" if sync_model else "false"
+    sync_str = "false"
 
     # Replace ${PIPELINE_ID} placeholder in the pipeline string
     pipeline = pipeline.replace("${PIPELINE_ID}", placeholder_pipeline_id)
@@ -81,12 +79,62 @@ def build_baseline_pipeline(pipeline, sync_model=False):
     baseline_pipeline = (
         f"gst-launch-1.0 -q {pipeline} ! gvafpscounter write-pipe=/tmp/{pipe_id} ! fakesink sync={sync_str}"
     )
-    result_pipeline = f"gst-launch-1.0 -q gvafpscounter read-pipe=/tmp/{pipe_id} ! fakesink sync=false"
+    result_pipeline = f"gst-launch-1.0 -q gvafpscounter read-pipe=/tmp/{pipe_id} ! fakesink sync={sync_str}"
 
     logger.debug(f"Generated baseline_pipeline: {baseline_pipeline}")
     logger.debug(f"Generated result_pipeline: {result_pipeline}")
 
     return baseline_pipeline, result_pipeline
+
+
+def get_sync_config(pipeline_params, device_id, device_dict=None):
+    """
+    Get sync configuration for multi-stream pipeline from pipeline_params.
+    Baseline analysis always uses sync=false (hardcoded) for maximum throughput measurement.
+
+    Args:
+        pipeline_params: Dictionary of pipeline parameters
+        device_id: Device ID to use for parameter lookup
+        device_dict: Dictionary containing device information (optional)
+
+    Returns:
+        String sync value ("true" or "false") for multi-stream pipeline
+    """
+    if not pipeline_params:
+        # Return default if no params provided
+        return "true"
+
+    # Get device type from device_dict if available
+    device_type = None
+    if device_dict and device_id in device_dict:
+        device_type = device_dict[device_id]["device_type"]
+
+    device_type_key = device_type.lower() if device_type else ""
+    device_id_key = device_id.lower()
+
+    # Determine type_key for mapping (same logic as resolve_pipeline_placeholders)
+    if "gpu" in device_id_key:
+        if "integrated" in device_type_key:
+            type_key = "gpu_integrated"
+        elif "discrete" in device_type_key:
+            type_key = "gpu_discrete"
+        else:
+            type_key = "gpu"
+    elif "cpu" in device_id_key:
+        type_key = "cpu"
+    elif "npu" in device_id_key:
+        type_key = "npu"
+    else:
+        type_key = device_type_key
+
+    # Get sync configuration
+    sync_params = pipeline_params.get("SYNC", {})
+
+    # Try to get device-specific value, fall back to default
+    sync_value = sync_params.get(type_key, sync_params.get("default", "true"))
+
+    logger.debug(f"Sync config for {device_id}: {sync_value}")
+    return sync_value
 
 
 def get_pipeline_info(
@@ -116,17 +164,21 @@ def get_pipeline_info(
         resolved_pipeline = resolve_pipeline_placeholders(pipeline, pipeline_params, device_id, device_dict)
 
         if is_baseline or num_streams is None:
-            # Build baseline pipeline
-            base, result = build_baseline_pipeline(pipeline=resolved_pipeline, sync_model=False)
+            base, result = build_baseline_pipeline(
+                pipeline=resolved_pipeline,
+            )
             if len(base) > 1500:
                 truncated = f"{base[:1000]} ... \n[middle content truncated] ... {base[-500:]}"
             else:
                 truncated = base
             return {"baseline_pipeline": truncated, "result_pipeline": result}
         else:
-            # Build multi-stream pipeline
+            sync_value = get_sync_config(pipeline_params, device_id, device_dict)
             multi, result = build_multi_pipeline_with_devices(
-                pipeline=resolved_pipeline, device_id=device_id, num_streams=num_streams, sync_model=True
+                pipeline=resolved_pipeline,
+                device_id=device_id,
+                num_streams=num_streams,
+                pipeline_sync=sync_value,
             )
             if len(multi) > 1500:
                 truncated = f"{multi[:1000]} ... \n[middle content truncated] ... {multi[-500:]}"

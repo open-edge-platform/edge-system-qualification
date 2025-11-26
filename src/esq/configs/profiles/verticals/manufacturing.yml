@@ -66,6 +66,8 @@ params:
       overrides:
         FULL_DEVICE_NAME:
           "Intel(R) Unsupported video type": "'video/x-raw'"
+    SYNC:
+      default: "true"
 
 suites:
   - name: "ai"

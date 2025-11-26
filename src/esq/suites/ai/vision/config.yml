@@ -149,6 +149,11 @@ tests:
             overrides:
               FULL_DEVICE_NAME:
                 "Intel(R) Unsupported video type": "'video/x-raw'"
+          # Sync configuration for multi-stream analysis
+          # sync=false: Maximum throughput (process as fast as possible, no clock sync)
+          # sync=true: Real-time streaming (respects video timestamps, synced to clock)
+          SYNC:
+            default: "true"
         # devices: [cpu, igpu, dgpu, npu] # options: [cpu, igpu, dgpu, npu]
         devices: [igpu] # options: [cpu, igpu, dgpu, npu]
         # Optional: Set visualize_stream as true to enable visualization of the stream for debugging

@@ -25,6 +25,7 @@ from sysagent.utils.reporting.summary import TestResultsExtractor
 
 logger = logging.getLogger(__name__)
 
+
 @allure.title("Metro Benchmark Summary")
 def test_summary_metro(
     request,
@@ -345,17 +346,23 @@ def _generate_benchmark_csv(test_results: Dict[str, Dict[str, Any]], target_test
                     # Skip internal metadata fields that are not useful for CSV output
                     if field_name not in ["status", "error", "error_message", "kpi_validation_status"]:
                         all_metadata_fields.add(field_name)
-    all_metrics = {
-        key.replace("_", " ").title(): value
-        for key, value in all_metrics.items()
-    }
+
+    # Transform all_metrics keys to Title Case
+    all_metrics = {key.replace("_", " ").title(): value for key, value in all_metrics.items()}
+
+    # Transform key_metric_name to Title Case to match all_metrics keys
+    if key_metric_name:
+        key_metric_name_transformed = key_metric_name.replace("_", " ").title()
+    else:
+        key_metric_name_transformed = None
+
     # Write header
     # Use the actual key metric name with unit instead of generic "Reference Metric"
-    if key_metric_name:
+    if key_metric_name_transformed:
         if key_metric_unit:
-            key_metric_header = f"{key_metric_name} ({key_metric_unit})"
+            key_metric_header = f"{key_metric_name_transformed} ({key_metric_unit})"
         else:
-            key_metric_header = key_metric_name
+            key_metric_header = key_metric_name_transformed
     else:
         key_metric_header = "Reference Metric"
 
@@ -373,7 +380,7 @@ def _generate_benchmark_csv(test_results: Dict[str, Dict[str, Any]], target_test
     sorted_metrics = sorted(all_metrics.keys())
     for metric_name in sorted_metrics:
         # Skip the key metric since it's already in the second column
-        if metric_name == key_metric_name:
+        if metric_name == key_metric_name_transformed:
             continue
 
         unit = all_metrics[metric_name]
@@ -426,13 +433,10 @@ def _generate_benchmark_csv(test_results: Dict[str, Dict[str, Any]], target_test
             # Add all metric values (excluding the key metric)
             if core_metrics:
                 metrics_dict = core_metrics.get("metrics", {})
-                metrics_dict = {
-                    key.replace("_", " ").title(): value
-                    for key, value in metrics_dict.items()
-                }
+                metrics_dict = {key.replace("_", " ").title(): value for key, value in metrics_dict.items()}
                 for metric_name in sorted_metrics:
                     # Skip the key metric since it's already in the second column
-                    if metric_name == key_metric_name:
+                    if metric_name == key_metric_name_transformed:
                         continue
 
                     if metric_name in metrics_dict:
@@ -458,7 +462,7 @@ def _generate_benchmark_csv(test_results: Dict[str, Dict[str, Any]], target_test
 
             # Add empty metric columns
             for metric_name in sorted_metrics:
-                if metric_name != key_metric_name:
+                if metric_name != key_metric_name_transformed:
                     row.append("")
             writer.writerow(row)
 

@@ -14,7 +14,7 @@ import docker
 import numa
 
 from .container import run_dlstreamer_analyzer_container
-from .pipeline import build_multi_pipeline_with_devices, resolve_pipeline_placeholders
+from .pipeline import build_multi_pipeline_with_devices, get_sync_config, resolve_pipeline_placeholders
 from .preparation import get_device_specific_docker_image
 from .utils import update_device_metrics
 
@@ -107,16 +107,14 @@ def run_benchmark_container(
 
     # Use modular pipeline utilities
     resolved_pipeline = resolve_pipeline_placeholders(pipeline, pipeline_params, device_id, device_dict)
-
-    # Build pipelines using modular utilities
     if num_streams is not None:
-        # Build multi-stream pipeline using the modular function
+        sync_value = get_sync_config(pipeline_params, device_id, device_dict)
         multi_pipeline, result_pipeline = build_multi_pipeline_with_devices(
             pipeline=resolved_pipeline,
             device_id=device_id,
             num_streams=num_streams,
             visualize_stream=visualize_stream,
-            sync_model=True,
+            pipeline_sync=sync_value,
         )
     else:
         multi_pipeline = ""
@@ -292,7 +290,7 @@ def qualify_device(
     # Initialize binary search bounds
     initial_streams = device_data["num_streams"]
     min_streams = 1
-    max_streams = initial_streams * 3  # Upper bound estimate
+    max_streams = initial_streams + max_streams_above_baseline
     current_num_streams = initial_streams
 
     # Track search state

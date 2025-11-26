@@ -118,11 +118,13 @@ params:
         FULL_DEVICE_NAME:
           "Intel(R) Unsupported video type": "'video/x-raw'"
     BATCH_SIZE:
-      cpu: "1"
+      cpu: "8"
       gpu_integrated: "8"
       gpu_discrete: "8"
       gpu_discrete_primary: "8"
       npu: "1"
+    SYNC:
+      default: "false"
 
 suites:
   - name: "ai"

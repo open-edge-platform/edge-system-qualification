@@ -740,9 +740,6 @@ class DockerClient:
                             try:
                                 refreshed = self.client.containers.get(container.id)
                             except docker.errors.NotFound:
-                                logger.debug(
-                                    f"Container {container.name} no longer exists after {timeout} secs, skipping stop"
-                                )
                                 return
 
                             logger.info(f"Checking container {container.name} status after {timeout} secs")
@@ -945,14 +942,13 @@ class DockerClient:
         Stop log streaming, stop and remove a container in any state.
         This method handles containers that may be created, running, stopped, or failed.
         """
-        logger.info(f"Cleaning up container: {container_name}")
+        logger.debug(f"Cleaning up container: {container_name}")
 
         # Always stop log streaming first, regardless of container existence
         self.stop_log_streaming(container_name)
 
         # Check if container exists before attempting cleanup
         if not self.container_exists(container_name):
-            logger.debug(f"Container {container_name} does not exist, cleanup completed")
             return
 
         try:
@@ -963,7 +959,7 @@ class DockerClient:
 
             # Force remove the container regardless of its state
             # This handles containers in created, running, stopped, exited, or failed states
-            logger.info(f"Forcefully removing container: {container_name} (status: {container_status})")
+            logger.debug(f"Forcefully removing container: {container_name} (status: {container_status})")
             container.remove(force=True)
             logger.debug(f"Successfully removed container: {container_name}")
 

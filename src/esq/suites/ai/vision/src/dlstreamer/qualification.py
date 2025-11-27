@@ -197,10 +197,17 @@ def run_concurrent_analysis(
     containers = []
 
     for device_id, data in analysis_tasks.items():
-        logger.info(f"[{device_id}] - Running with {data['num_streams']} streams")
+        logger.info(f"[{device_id}] Running with {data['num_streams']} streams")
         # Handle special case for multi-socket CPU
         if device_id == "CPU" and num_sockets > 1:
             numa_info = get_cpu_socket_numa_info(num_sockets=num_sockets)
+            # Divide streams evenly across sockets
+            total_streams = data.get("num_streams", None)
+            streams_per_socket = total_streams // num_sockets if total_streams is not None else None
+            logger.info(
+                f"[{device_id}] Multi-socket CPU: Dividing {total_streams} total streams "
+                f"across {num_sockets} sockets ({streams_per_socket} streams per socket)"
+            )
             for i, numa_node in enumerate(numa_info):
                 # The container uses the run-id to create its unique result file, e.g., total_streams_result_0_CPU.json
                 cpus = ",".join(map(str, numa_node["cpu_ids"]))
@@ -221,7 +228,7 @@ def run_concurrent_analysis(
                     target_fps=target_fps,
                     cpuset_cpus=cpus,
                     cpuset_mems=mems,
-                    num_streams=data.get("num_streams", None),
+                    num_streams=streams_per_socket,
                     visualize_stream=visualize_stream,
                     container_config=container_config,
                 )
@@ -290,7 +297,13 @@ def qualify_device(
     # Initialize binary search bounds
     initial_streams = device_data["num_streams"]
     min_streams = 1
-    max_streams = initial_streams + max_streams_above_baseline
+
+    # For multi-socket, apply max_streams_above_baseline per socket
+    if is_multisocket:
+        max_streams = initial_streams + (max_streams_above_baseline * num_sockets)
+    else:
+        max_streams = initial_streams + max_streams_above_baseline
+
     current_num_streams = initial_streams
 
     # Track search state
@@ -310,10 +323,18 @@ def qualify_device(
         f"[{device_id}] Thresholds: {consecutive_success_threshold} consecutive successes to go higher, "
         f"{consecutive_failure_threshold} consecutive failures to go lower"
     )
-    logger.info(
-        f"[{device_id}] Conservative limit: max {max_streams_above_baseline} streams above baseline "
-        f"({initial_streams + max_streams_above_baseline} total)"
-    )
+
+    if is_multisocket:
+        logger.debug(
+            f"[{device_id}] Conservative limit: max {max_streams_above_baseline} streams above baseline per socket "
+            f"({initial_streams} baseline + {max_streams_above_baseline * num_sockets} = {max_streams} max total)"
+        )
+    else:
+        logger.debug(
+            f"[{device_id}] Conservative limit: max {max_streams_above_baseline} streams above baseline "
+            f"({initial_streams + max_streams_above_baseline} total)"
+        )
+
     logger.info(f"[{device_id}] Active devices: {list(active_devices.keys())}")
 
     # Maximum iterations to prevent infinite loops
@@ -547,10 +568,13 @@ def qualify_device(
                         )
                         return True
 
-                    next_streams = current_num_streams + 1
+                    # For multi-socket CPU, increment by num_sockets to avoid redundant analysis
+                    # (e.g., 12→13 both result in 6 per socket with 2 sockets)
+                    increment = num_sockets if is_multisocket else 1
+                    next_streams = current_num_streams + increment
                     logger.debug(
-                        f"[{device_id}] At/above baseline ({initial_streams}), using conservative +1 increment "
-                        f"(limit: {max_allowed_streams})"
+                        f"[{device_id}] At/above baseline ({initial_streams}), using +{increment} increment "
+                        f"(limit: {max_allowed_streams}){' for multi-socket' if is_multisocket else ''}"
                     )
                 else:
                     # Below baseline: use binary search within safe range
@@ -703,6 +727,7 @@ def qualify_device(
         device_data["num_streams"] = 0
         device_data["pass"] = False
 
+    # Save final result
     _save_device_result(device_result_path, device_id, device_data)
     return device_data["pass"]
 

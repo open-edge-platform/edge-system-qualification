@@ -242,6 +242,38 @@ def sanitize_device_id(user_input: str) -> str:
     return sanitized_device
 
 
+def sanitize_run_id(user_input: str) -> str:
+    if not user_input or not isinstance(user_input, str):
+        raise ValueError("Invalid run_id: must be a non-empty string")
+
+    if not user_input.isdigit():
+        raise ValueError(f"Invalid run_id: must contain only digits, got '{user_input}'")
+
+    try:
+        run_id_int = int(user_input)
+    except ValueError:
+        raise ValueError(f"Invalid run_id: cannot convert to integer, got '{user_input}'")
+
+    if run_id_int < 0:
+        raise ValueError(f"Invalid run_id: must be non-negative, got {run_id_int}")
+
+    if run_id_int > 999999:
+        raise ValueError(f"Invalid run_id: exceeds maximum value of 999999, got {run_id_int}")
+
+    sanitized_chars = []
+    for char in user_input:
+        if char.isdigit():
+            sanitized_chars.append(char)
+        else:
+            raise ValueError(f"Invalid character in run_id: {char}")
+
+    sanitized_run_id = "".join(sanitized_chars)
+    if not sanitized_run_id or len(sanitized_run_id) == 0:
+        raise ValueError("Sanitized run_id is empty")
+
+    return sanitized_run_id
+
+
 def cleanup_previous_analysis_files(device_id=None, analysis_type="all"):
     """
     Clean up previous analysis files to ensure fresh start for new analysis runs.
@@ -274,14 +306,24 @@ def cleanup_previous_analysis_files(device_id=None, analysis_type="all"):
         if analysis_type in ["total", "all"]:
             # Device-specific total streams analysis files
             if device_id:
-                files_to_remove.extend(
-                    [
-                        os.path.join(RESULTS_DIR, f"stdout-streams-pipeline_{str(device_id).lower()}.txt"),
-                        os.path.join(RESULTS_DIR, f"stdout-streams-result_{str(device_id).lower()}.txt"),
-                        os.path.join(LOGS_DIR, f"gst_debug_streams_pipeline_{str(device_id).lower()}.log"),
-                        os.path.join(LOGS_DIR, f"gst_debug_streams_result_{str(device_id).lower()}.log"),
-                    ]
+                # Stdout files with run_id pattern (pattern matching for multi-socket)
+                stdout_pipeline_pattern = os.path.join(
+                    RESULTS_DIR, f"stdout-streams-pipeline_*_{str(device_id).lower()}.txt"
                 )
+                stdout_result_pattern = os.path.join(
+                    RESULTS_DIR, f"stdout-streams-result_*_{str(device_id).lower()}.txt"
+                )
+                gst_debug_pipeline_pattern = os.path.join(
+                    LOGS_DIR, f"gst_debug_streams_pipeline_*_{str(device_id).lower()}.log"
+                )
+                gst_debug_result_pattern = os.path.join(
+                    LOGS_DIR, f"gst_debug_streams_result_*_{str(device_id).lower()}.log"
+                )
+
+                files_to_remove.extend(glob.glob(stdout_pipeline_pattern))
+                files_to_remove.extend(glob.glob(stdout_result_pattern))
+                files_to_remove.extend(glob.glob(gst_debug_pipeline_pattern))
+                files_to_remove.extend(glob.glob(gst_debug_result_pattern))
 
                 # Total streams result files (pattern matching for different run_ids)
                 result_pattern = os.path.join(RESULTS_DIR, f"total_streams_result_*_{device_id}.json")
@@ -555,13 +597,13 @@ def get_baseline_stream_analysis(baseline_pipeline=None, result_pipeline=None, p
 
         if main_process.returncode is not None and main_process.returncode not in [0, -15]:  # -15 is SIGTERM
             stderr_output = main_process.stderr.read().decode() if main_process.stderr else "No stderr"
-            
+
             # Check for non-critical GStreamer cleanup issues (exit code -9 with GStreamer warnings)
             if main_process.returncode == -9 and "GStreamer-WARNING" in stderr_output:
-                logger.warning("Detected GStreamer cleanup issue (SIGKILL -9 with GStreamer-WARNING) - non-critical if results already collected")
+                logger.warning("Detected GStreamer issue (SIGKILL -9) - non-critical if results collected")
             # Check for segmentation fault or longjmp errors
             elif "Segmentation fault" in stderr_output or "longjmp causes uninitialized stack frame" in stderr_output:
-                logger.warning("Detected GStreamer cleanup crash (segfault/longjmp) - non-critical if results already collected")
+                logger.warning("Detected GStreamer issue (segfault/longjmp) - non-critical if results collected")
             else:
                 logger.warning(f"Baseline main pipeline exited with code {main_process.returncode}: {stderr_output}")
 
@@ -598,7 +640,9 @@ def get_baseline_stream_analysis(baseline_pipeline=None, result_pipeline=None, p
         return result_info
 
 
-def get_n_stream_analysis_per_device(pipeline_timeout=300, device_id=None, multi_pipeline=None, result_pipeline=None):
+def get_n_stream_analysis_per_device(
+    pipeline_timeout=300, device_id=None, multi_pipeline=None, result_pipeline=None, run_id=0
+):
     """
     Run multi-stream analysis using provided pipeline strings.
 
@@ -607,6 +651,7 @@ def get_n_stream_analysis_per_device(pipeline_timeout=300, device_id=None, multi
         device_id: Device ID (for result path naming)
         multi_pipeline: Pre-built multi-stream pipeline command (required)
         result_pipeline: Pre-built result pipeline command (required)
+        run_id: Run ID for multi-socket execution (default: 0)
 
     Returns:
         dict: {
@@ -623,14 +668,16 @@ def get_n_stream_analysis_per_device(pipeline_timeout=300, device_id=None, multi
 
     os.environ["LIBVA_MESSAGING_LEVEL"] = "1"
 
-    # Use device-specific file names to prevent conflicts during concurrent analysis
-    streams_pipeline_path = os.path.join(RESULTS_DIR, f"stdout-streams-pipeline_{str(device_id).lower()}.txt")
-    streams_result_path = os.path.join(RESULTS_DIR, f"stdout-streams-result_{str(device_id).lower()}.txt")
+    # Use device-specific file names with run_id to prevent conflicts during concurrent multi-socket analysis
+    streams_pipeline_path = os.path.join(RESULTS_DIR, f"stdout-streams-pipeline_{run_id}_{str(device_id).lower()}.txt")
+    streams_result_path = os.path.join(RESULTS_DIR, f"stdout-streams-result_{run_id}_{str(device_id).lower()}.txt")
     # streams_pipeline_path = (Path(pipeline_stdout_path)).resolve()
     # streams_result_path = (Path(result_stdout_path)).resolve()
 
-    gst_debug_pipeline_path = os.path.join(LOGS_DIR, f"gst_debug_streams_pipeline_{str(device_id).lower()}.log")
-    gst_debug_result_path = os.path.join(LOGS_DIR, f"gst_debug_streams_result_{str(device_id).lower()}.log")
+    gst_debug_pipeline_path = os.path.join(
+        LOGS_DIR, f"gst_debug_streams_pipeline_{run_id}_{str(device_id).lower()}.log"
+    )
+    gst_debug_result_path = os.path.join(LOGS_DIR, f"gst_debug_streams_result_{run_id}_{str(device_id).lower()}.log")
 
     env_pipeline = os.environ.copy()
     env_result = os.environ.copy()
@@ -662,6 +709,12 @@ def get_n_stream_analysis_per_device(pipeline_timeout=300, device_id=None, multi
 
     try:
         # Start the main pipeline process with new session for proper cleanup
+        # Create and immediately flush the pipeline stdout file to ensure it exists
+        with open(streams_pipeline_path, "w") as fp:
+            fp.flush()  # Ensure file is created on disk
+            os.fsync(fp.fileno())  # Force write to disk
+
+        # Reopen for actual pipeline output
         with open(streams_pipeline_path, "w") as fp:
             pipeline_cmd = shlex.split(multi_pipeline)
             main_process = subprocess.Popen(
@@ -723,13 +776,13 @@ def get_n_stream_analysis_per_device(pipeline_timeout=300, device_id=None, multi
 
         if main_process.returncode is not None and main_process.returncode not in [0, -15]:  # -15 is SIGTERM
             stderr_output = main_process.stderr.read().decode() if main_process.stderr else "No stderr"
-            
+
             # Check for non-critical GStreamer cleanup issues (exit code -9 with GStreamer warnings)
             if main_process.returncode == -9 and "GStreamer-WARNING" in stderr_output:
-                logger.warning("Detected GStreamer cleanup issue (SIGKILL -9 with GStreamer-WARNING) - non-critical if results already collected")
+                logger.warning("Detected GStreamer issue (SIGKILL -9) - non-critical if results collected")
             # Check for segmentation fault or longjmp errors
             elif "Segmentation fault" in stderr_output or "longjmp causes uninitialized stack frame" in stderr_output:
-                logger.warning("Detected GStreamer cleanup crash (segfault/longjmp) - non-critical if results already collected")
+                logger.warning("Detected GStreamer issue (segfault/longjmp) - non-critical if results collected")
             else:
                 logger.warning(f"Main pipeline exited with code {main_process.returncode}: {stderr_output}")
 
@@ -862,10 +915,14 @@ def total_streams_analysis(
     target_fps=14.5,
     combined_analysis=None,
 ):
-    """Run total streams analysis for a specific device."""
-    # Clean up previous total streams analysis files before starting new analysis
-    cleanup_previous_analysis_files(device_id=device_id, analysis_type="total")
+    """Run total streams analysis for a specific device.
 
+    Note: Cleanup is NOT performed here because:
+    1. For multi-socket CPU: Multiple containers run concurrently with different run_ids.
+       Each must preserve its own output files without interfering with others.
+    2. For sequential iterations: Files are naturally overwritten or handled by the
+       qualification loop. Cleanup within concurrent containers causes race conditions.
+    """
     analysis_start_time = time.time()
 
     filename = f"total_streams_result_{run_id}_{device_id}.json"
@@ -894,6 +951,7 @@ def total_streams_analysis(
             device_id=device_id,
             multi_pipeline=multi_pipeline,
             result_pipeline=result_pipeline,
+            run_id=run_id,
         )
 
         # Extract values from the analysis result
@@ -1007,18 +1065,14 @@ def main():
                 pipeline_timeout=args.pipeline_timeout,
             )
         elif args.command == "total":
-            # Validate run_id
-            if not args.run_id.isdigit() or int(args.run_id) < 0:
-                logger.error(f"Invalid run_id: {args.run_id}. It should be a non-negative integer.")
-                exit(1)
-
             # Sanitize all user inputs to break taint chain
+            sanitized_run_id = sanitize_run_id(args.run_id)
             sanitized_multi_pipeline = sanitize_pipeline_command(args.multi_pipeline)
             sanitized_result_pipeline = sanitize_pipeline_command(args.result_pipeline)
             sanitized_device_id = sanitize_device_id(args.target_device)
 
             total_streams_analysis(
-                run_id=args.run_id,
+                run_id=sanitized_run_id,
                 multi_pipeline=sanitized_multi_pipeline,
                 result_pipeline=sanitized_result_pipeline,
                 device_id=sanitized_device_id,

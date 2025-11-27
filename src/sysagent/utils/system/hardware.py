@@ -11,7 +11,7 @@ including CPU, GPU, NPU, memory, storage, and network interfaces.
 import logging
 import os
 import platform
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import cpuinfo
 import psutil
@@ -74,6 +74,7 @@ def collect_cpu_info(openvino_cpu=None) -> Dict[str, Any]:
     """
     try:
         cpu_info_data = cpuinfo.get_cpu_info()
+        socket_count = _get_cpu_socket_count()
 
         cpu_info = {
             "brand": cpu_info_data.get("brand_raw", "Unknown"),
@@ -81,6 +82,7 @@ def collect_cpu_info(openvino_cpu=None) -> Dict[str, Any]:
             "bits": cpu_info_data.get("bits", 64),
             "count": psutil.cpu_count(logical=False),  # Physical cores
             "logical_count": psutil.cpu_count(logical=True),  # Logical cores (including hyperthreading)
+            "sockets": socket_count,  # Physical CPU sockets
             "frequency": {
                 "current": psutil.cpu_freq().current if psutil.cpu_freq() else None,
                 "min": psutil.cpu_freq().min if psutil.cpu_freq() else None,
@@ -1105,6 +1107,56 @@ def collect_dmi_info() -> Dict[str, Any]:
         dmi_info["error"] = str(e)
 
     return dmi_info
+
+
+def _get_cpu_socket_count() -> Optional[int]:
+    """
+    Extract the number of physical CPU sockets from /proc/cpuinfo.
+
+    This function reads /proc/cpuinfo and counts unique physical IDs to determine
+    the number of CPU sockets installed in the system.
+
+    Returns:
+        Optional[int]: Number of physical CPU sockets, or None if cannot be determined.
+                      Returns None instead of making assumptions about socket count,
+                      allowing consumers to handle unknown values appropriately.
+    """
+    try:
+        cpuinfo_path = "/proc/cpuinfo"
+        if not os.path.exists(cpuinfo_path):
+            logger.debug("'/proc/cpuinfo' not found, cannot determine socket count")
+            return None
+
+        physical_ids = set()
+
+        with open(cpuinfo_path, "r") as f:
+            for line in f:
+                # Look for the "physical id" field in /proc/cpuinfo
+                # Format: "physical id\t: 0"
+                if line.startswith("physical id"):
+                    try:
+                        # Extract the physical ID after the colon
+                        parts = line.split(":")
+                        if len(parts) >= 2:
+                            physical_id = parts[1].strip()
+                            physical_ids.add(physical_id)
+                    except (ValueError, IndexError) as e:
+                        logger.debug(f"Failed to parse physical id from line: {line.strip()} - {e}")
+                        continue
+
+        # If no physical IDs found, return None (cannot determine)
+        # This handles single-socket systems that may not have "physical id" field
+        if not physical_ids:
+            logger.debug("No 'physical id' entries found in /proc/cpuinfo, cannot determine socket count")
+            return None
+
+        socket_count = len(physical_ids)
+        logger.debug(f"Detected {socket_count} CPU socket(s) from /proc/cpuinfo")
+        return socket_count
+
+    except Exception as e:
+        logger.warning(f"Failed to read CPU socket count from /proc/cpuinfo: {e}")
+        return None
 
 
 def _detect_cpu_features(cpu_info_data: Dict[str, Any]) -> Dict[str, Any]:

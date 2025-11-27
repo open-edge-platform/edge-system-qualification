@@ -354,6 +354,7 @@ def update_final_results_metadata(
     device_list: list,
     baseline_streams_results: list = None,
     requested_device_categories: list = None,
+    target_fps: float = None,
 ) -> None:
     """
     Update final results with device metadata and summary information.
@@ -365,6 +366,7 @@ def update_final_results_metadata(
         device_list: List of all device IDs tested
         baseline_streams_results: List of baseline preparation results (optional)
         requested_device_categories: List of device categories requested in config (optional)
+        target_fps: Target FPS for stream qualification (optional)
     """
     if baseline_streams_results:
         baseline_fps_count = 0
@@ -375,6 +377,17 @@ def update_final_results_metadata(
                 results.metadata[f"Baseline Pipeline Throughput (FPS) - {device_id}"] = f"{per_stream_fps:.2f}"
                 baseline_fps_count += 1
                 logger.debug(f"Adding baseline pipeline throughput FPS for {device_id}: {per_stream_fps:.2f}")
+
+                # Calculate estimated max streams based on baseline FPS / target FPS
+                if target_fps and target_fps > 0 and per_stream_fps > 0:
+                    estimated_max_streams = int(per_stream_fps / target_fps)
+                    results.metadata[f"Estimated Max Streams (Baseline / Target FPS) - {device_id}"] = (
+                        estimated_max_streams
+                    )
+                    logger.debug(
+                        f"Estimated max streams for {device_id}: {estimated_max_streams} "
+                        f"(baseline {per_stream_fps:.2f} FPS / target {target_fps:.2f} FPS)"
+                    )
 
         if baseline_fps_count > 0:
             logger.info(f"Baseline per-stream FPS captured for {baseline_fps_count} device(s)")

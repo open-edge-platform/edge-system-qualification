@@ -114,7 +114,7 @@ def test_dlstreamer(
     # Get current system info
     system_info = SystemInfoCache()
     hardware_info = system_info.get_hardware_info()
-    num_sockets = hardware_info.get("cpu", {}).get("socket_count", 1)
+    num_sockets = hardware_info.get("cpu", {}).get("sockets") or 1
 
     # Use modularized cleanup functions
     def cleanup() -> None:
@@ -403,7 +403,12 @@ def test_dlstreamer(
 
         # Update final results metadata using modular function
         update_final_results_metadata(
-            results, qualified_devices, device_list, baseline_streams_results, requested_device_categories=devices
+            results,
+            qualified_devices,
+            device_list,
+            baseline_streams_results,
+            requested_device_categories=devices,
+            target_fps=target_fps,
         )
 
         logger.debug(f"DL Streamer Test results: {json.dumps(results.to_dict(), indent=2)}")
@@ -454,6 +459,7 @@ def test_dlstreamer(
                     device_list,
                     baseline_streams_results,
                     requested_device_categories=devices,
+                    target_fps=target_fps,
                 )
             except Exception as metadata_error:
                 logger.warning(f"Failed to capture baseline metadata on interrupt: {metadata_error}")
@@ -505,6 +511,7 @@ def test_dlstreamer(
                     device_list,
                     baseline_streams_results,
                     requested_device_categories=devices,
+                    target_fps=target_fps,
                 )
             except Exception as metadata_error:
                 logger.warning(f"Failed to capture baseline metadata on error: {metadata_error}")

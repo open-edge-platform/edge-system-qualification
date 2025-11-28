@@ -1,0 +1,113 @@
+# Copyright (C) 2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+name: "profile.vertical.retail"
+display_name: "Retail"
+description: "Retail Suites"
+version: "1.0.0"
+params:
+  visualize_stream: false
+  labels:
+    profile_display_name: "Retail"
+    group: "retail"
+    type: "vertical"
+    display_status: false
+  requirements:
+    os_type:
+      - "linux"
+    docker_required: true
+  assets:
+    - id: "obj_classification_video"
+      type: "video"
+      name: "obj_classification-1920-15-bench.mp4"
+      url: "https://www.pexels.com/download/video/6891009"
+      sha256: "b30010389562c03a15dad0d5eaa34334bb58b28214f280815e22abddcb1dffb4"
+      width: 1920
+      height: 1080
+      fps: 15
+      codec: "h264"
+      duration: 30
+    - id: "yolo11n"
+      type: "model"
+      source: "ultralytics"
+      precision: "int8"
+      format: "pt"
+  pipeline_params:
+    DECODE_ELEMENTS:
+      cpu: "qtdemux ! h264parse ! avdec_h264 ! 'video/x-raw'"
+      gpu_integrated: "qtdemux ! h264parse ! vah264dec ! vapostproc ! 'video/x-raw(memory:VAMemory)'"
+      gpu_discrete: "qtdemux ! h264parse ! varenderD{RENDER_DEVICE_NUM}h264dec ! varenderD{RENDER_DEVICE_NUM}postproc ! video/x-raw(memory:VAMemory)"
+      gpu_discrete_primary: "qtdemux ! h264parse ! vah264dec ! vapostproc ! 'video/x-raw(memory:VAMemory)'"
+      npu: "qtdemux ! h264parse ! vah264dec ! vapostproc ! 'video/x-raw(memory:VAMemory)'"
+    INFERENCE_ELEMENTS:
+      cpu: "pre-process-backend={PRE_PROCESS_BACKEND} model-instance-id=odmode ie-config=CPU_THROUGHPUT_STREAMS=2 nireq=2"
+      gpu_integrated: "pre-process-backend={PRE_PROCESS_BACKEND} model-instance-id=odmode ie-config=GPU_THROUGHPUT_STREAMS=2 nireq=2"
+      gpu_discrete: "pre-process-backend={PRE_PROCESS_BACKEND} model-instance-id=odmode"
+      gpu_discrete_primary: "pre-process-backend={PRE_PROCESS_BACKEND} model-instance-id=odmode"
+      npu: "pre-process-backend={PRE_PROCESS_BACKEND} model-instance-id=odmode nireq=4"
+    PRE_PROCESS_BACKEND:
+      cpu: "opencv"
+      gpu_integrated: "va-surface-sharing"
+      gpu_discrete: "va-surface-sharing"
+      gpu_discrete_primary: "va-surface-sharing"
+      npu: "va-surface-sharing"
+    VIDEO_RAW_TYPE:
+      default: "'video/x-raw(memory:VAMemory)'"
+      overrides:
+        FULL_DEVICE_NAME:
+          "Intel(R) Unsupported video type": "'video/x-raw'"
+    SYNC:
+      default: "false"
+
+suites:
+  - name: "ai"
+    sub_suites:
+      - name: "vision"
+        tests:
+          test_dlstreamer:
+            params:
+              - test_id: "RTL-ASC-001"
+                display_name: "Automated Self Checkout - multi-stream 1920p15 H.264 gvadetect YOLO11n INT8 (CPU)"
+                pipeline: |
+                  filesrc location=./videos/obj_classification-1920-15-bench.mp4
+                    ! ${DECODE_ELEMENTS} 
+                    ! queue
+                    ! gvadetect model=./models/yolo11n/int8/yolo11n.xml threshold=0.2 device=${DEVICE_ID} ${INFERENCE_ELEMENTS} batch-size=1 
+                    ! queue
+                devices: [cpu]
+
+              - test_id: "RTL-ASC-002"
+                display_name: "Automated Self Checkout - multi-stream 1920p15 H.264 gvadetect YOLO11n INT8 (iGPU)"
+                pipeline: |
+                  filesrc location=./videos/obj_classification-1920-15-bench.mp4
+                    ! ${DECODE_ELEMENTS} 
+                    ! queue
+                    ! gvadetect model=./models/yolo11n/int8/yolo11n.xml threshold=0.2 device=${DEVICE_ID} ${INFERENCE_ELEMENTS} batch-size=1 
+                    ! queue
+                devices: [igpu]
+                requirements:
+                  igpu_required: true
+                
+              - test_id: "RTL-ASC-003"
+                display_name: "Automated Self Checkout - multi-stream 1920p15 H.264 gvadetect YOLO11n INT8 (dGPU)"
+                pipeline: |
+                  filesrc location=./videos/obj_classification-1920-15-bench.mp4
+                    ! ${DECODE_ELEMENTS} 
+                    ! queue
+                    ! gvadetect model=./models/yolo11n/int8/yolo11n.xml threshold=0.2 device=${DEVICE_ID} ${INFERENCE_ELEMENTS} batch-size=1
+                    ! queue
+                devices: [dgpu]
+                requirements:
+                  dgpu_required: true
+
+              - test_id: "RTL-ASC-004"
+                display_name: "Automated Self Checkout - multi-stream 1920p15 H.264 gvadetect YOLO11n INT8 (NPU)"
+                pipeline: |
+                  filesrc location=./videos/obj_classification-1920-15-bench.mp4
+                    ! ${DECODE_ELEMENTS} 
+                    ! queue
+                    ! gvadetect model=./models/yolo11n/int8/yolo11n.xml threshold=0.2 device=${DEVICE_ID} ${INFERENCE_ELEMENTS} batch-size=1 
+                    ! queue
+                devices: [npu]
+                requirements:
+                  npu_required: true

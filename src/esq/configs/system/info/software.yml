@@ -6,6 +6,7 @@
 # This file defines which packages to track for system information collection
 
 system_packages:
+  - docker-ce
   - ffmpeg
 
 python_packages:

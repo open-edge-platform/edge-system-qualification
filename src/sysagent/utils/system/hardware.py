@@ -8,6 +8,7 @@ Provides functions to collect detailed hardware information about the system,
 including CPU, GPU, NPU, memory, storage, and network interfaces.
 """
 
+import ipaddress
 import logging
 import os
 import platform
@@ -20,6 +21,113 @@ from .ov_helper import collect_openvino_devices
 from .pci_helper import get_pci_devices
 
 logger = logging.getLogger(__name__)
+
+
+def _get_mask_setting() -> bool:
+    """
+    Get the current masking configuration from environment variable.
+
+    This function reads the environment variable at runtime to allow
+    dynamic configuration via CLI flags.
+
+    Returns:
+        bool: True if masking is enabled, False otherwise (default: True)
+    """
+    return os.environ.get("CORE_MASK_DATA", "true").lower() == "true"
+
+
+def _is_loopback_ip(ip_address_str: str) -> bool:
+    """
+    Check if an IP address is loopback.
+
+    Loopback addresses:
+    - IPv4: 127.0.0.0/8
+    - IPv6: ::1
+
+    Args:
+        ip_address_str: IP address string to check
+
+    Returns:
+        True if the address is loopback, False otherwise
+    """
+    try:
+        ip = ipaddress.ip_address(ip_address_str)
+        return ip.is_loopback
+    except ValueError:
+        # Invalid IP address format
+        return False
+
+
+def _mask_address(address_str: str, family: str, enable_masking: bool = None) -> str:
+    """
+    Mask an address (IP or MAC) while preserving useful context.
+
+    Masking behavior:
+    - For IP addresses:
+      - Loopback IPs: Keep original (127.0.0.0/8, ::1)
+      - All other IPs: Mask to preserve only network portion
+    - For MAC addresses (AF_PACKET, AF_LINK):
+      - Mask last 3 bytes to preserve OUI (manufacturer info)
+
+    Args:
+        address_str: Address string to mask (IP or MAC)
+        family: Address family name (e.g., 'AF_INET', 'AF_INET6', 'AF_PACKET')
+        enable_masking: Override global masking setting
+
+    Returns:
+        Masked or original address string based on configuration
+    """
+    if not address_str:
+        return address_str
+
+    # Check if masking is enabled
+    should_mask = _get_mask_setting() if enable_masking is None else enable_masking
+    if not should_mask:
+        return address_str
+
+    # Handle MAC addresses (AF_PACKET on Linux, AF_LINK on BSD/Mac)
+    if family in ("AF_PACKET", "AF_LINK"):
+        # MAC address format: xx:xx:xx:xx:xx:xx or xx-xx-xx-xx-xx-xx
+        # Keep first 3 bytes (OUI - manufacturer), mask last 3 bytes
+        delimiter = ":" if ":" in address_str else "-"
+        parts = address_str.split(delimiter)
+        if len(parts) == 6:
+            # Keep OUI (first 3 bytes), mask device-specific portion
+            return f"{delimiter.join(parts[:3])}{delimiter}**{delimiter}**{delimiter}**"
+        # Invalid MAC format - mask completely
+        return "***MASKED***"
+
+    # Handle IP addresses (IPv4 and IPv6)
+    try:
+        # Handle IPv6 with zone identifier (e.g., fe80::1%eth0)
+        zone_id = ""
+        ip_str = address_str
+        if "%" in address_str:
+            ip_str, zone_id = address_str.split("%", 1)
+            zone_id = f"%{zone_id}"
+
+        # Only keep loopback IPs unmasked, mask everything else
+        if _is_loopback_ip(ip_str):
+            return address_str
+
+        # Mask all non-loopback IPs
+        ip = ipaddress.ip_address(ip_str)
+
+        if isinstance(ip, ipaddress.IPv4Address):
+            # Mask last two octets: x.x.*.*
+            parts = ip_str.split(".")
+            return f"{parts[0]}.{parts[1]}.*.*"
+        elif isinstance(ip, ipaddress.IPv6Address):
+            # Mask last 64 bits: xxxx:xxxx:xxxx:xxxx::*
+            # Keep first 4 groups (64 bits), mask the rest
+            parts = ip.exploded.split(":")
+            return f"{':'.join(parts[:4])}::*{zone_id}"
+
+    except (ValueError, IndexError):
+        # Invalid IP address format - mask completely
+        return "***MASKED***"
+
+    return address_str
 
 
 def collect_hardware_info() -> Dict[str, Any]:
@@ -1032,12 +1140,14 @@ def collect_network_info() -> Dict[str, Any]:
             }
 
             for addr in addresses:
+                masked_address = _mask_address(addr.address, addr.family.name)
+
                 addr_info = {
                     "family": addr.family.name,
-                    "address": addr.address,
+                    "address": masked_address,
                     "netmask": addr.netmask,
-                    "broadcast": addr.broadcast,
-                    "ptp": addr.ptp,
+                    "broadcast": _mask_address(addr.broadcast, addr.family.name) if addr.broadcast else None,
+                    "ptp": _mask_address(addr.ptp, addr.family.name) if addr.ptp else None,
                 }
                 interface_info["addresses"].append(addr_info)
 
@@ -1060,6 +1170,8 @@ def collect_dmi_info() -> Dict[str, Any]:
     dmi_info = {"system": {}, "bios": {}, "motherboard": {}, "chassis": {}}
 
     try:
+        maskable_fields = {"product_serial", "serial", "asset_tag"}
+
         # Try to read DMI information from various sources
         dmi_files = {
             "system": {
@@ -1098,7 +1210,14 @@ def collect_dmi_info() -> Dict[str, Any]:
                         with open(filepath, "r") as f:
                             value = f.read().strip()
                             if value and value != "Unknown" and value != "Not Specified":
-                                dmi_info[category][key] = value
+                                if _get_mask_setting() and key in maskable_fields:
+                                    # Keep first 4 chars, mask the rest
+                                    if len(value) > 4:
+                                        dmi_info[category][key] = f"{value[:4]}***MASKED***"
+                                    else:
+                                        dmi_info[category][key] = "***MASKED***"
+                                else:
+                                    dmi_info[category][key] = value
                 except Exception:
                     continue
 

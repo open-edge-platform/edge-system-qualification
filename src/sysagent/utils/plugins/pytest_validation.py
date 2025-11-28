@@ -495,8 +495,6 @@ def validate_system_requirements_from_configs():
         else:
             logger.debug("No requirements found in configs")
 
-        logger.info(f"Validating system requirements for test: {test_name}")
-
         if not has_requirements:
             logger.debug("No requirements found to validate")
             with allure.step("Validate system requirements ⚪"):

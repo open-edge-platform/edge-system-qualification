@@ -125,9 +125,6 @@ def _consolidate_direct_parameters(
                         for param_config in test_config["params"]:
                             # Apply filters early if provided
                             if filters and not _match_param_filters(param_config, filters):
-                                logger.debug(
-                                    f"Parameter filtered out for test {test_name}: {param_config.get('test_id', 'unknown')}"
-                                )
                                 continue
 
                             # Merge profile-level parameters

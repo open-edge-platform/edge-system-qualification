@@ -37,22 +37,34 @@ from sysagent.utils.testing import (
 logger = logging.getLogger(__name__)
 
 
-def _prompt_skip_vertical_profiles(force: bool = False) -> bool:
+def _prompt_skip_vertical_profiles(force: bool = False, vertical_profile_names: list = None) -> bool:
     """
     Prompt user whether to skip vertical profiles, with 'N' as default.
 
     Args:
         force: If True, skip prompt and return False (don't skip vertical profiles)
+        vertical_profile_names: List of vertical profile names that would be skipped
 
     Returns:
         bool: True if user wants to skip vertical profiles, False otherwise
     """
     if force:
-        # In force mode, use default behavior (include vertical profiles)
         return False
 
+    if vertical_profile_names:
+        print("═" * 70)
+        print("Default: Run qualification and vertical profiles")
+        print("Option:  Run qualification profiles only (skip vertical profiles)")
+        print("Tip: Use --all flag to perform full system performance benchmarking")
+        print()
+        print("Vertical profiles:")
+        for profile_name in sorted(vertical_profile_names):
+            print(f"  - {profile_name}")
+        print("═" * 70)
+        print()
+
     try:
-        response = input("Do you want to skip running vertical test case profiles? [N/y]: ").strip().lower()
+        response = input("Skip vertical profiles? [N/y or press Enter for default]: ").strip().lower()
         if response == "y" or response == "yes":
             return True
         else:
@@ -79,6 +91,7 @@ def run_tests(
     filters: List[str] = None,
     run_all_profiles: bool = False,
     force: bool = False,
+    no_mask: bool = False,
     extra_args: List[str] = None,
 ) -> int:
     """
@@ -99,11 +112,15 @@ def run_tests(
                           If False, only qualification and vertical profiles are run by default
                           with an opt-out prompt for vertical profiles.
         force: Whether to skip interactive prompts and use default behavior
+        no_mask: Whether to disable masking of data in system information
         extra_args: Additional pytest arguments to pass
 
     Returns:
         int: Exit code (0 for success, non-zero for failure)
     """
+    if no_mask:
+        os.environ["CORE_MASK_DATA"] = "false"
+
     # Reset the interrupt flags at the start using the shared_state module
     shared_state.INTERRUPT_OCCURRED = False
     shared_state.INTERRUPT_SIGNAL = None
@@ -300,7 +317,7 @@ def _run_single_profile(
         import json
 
         os.environ["CORE_TEST_FILTERS"] = json.dumps(filters)
-        logger.info(f"Applied test filters: {filters}")
+        logger.debug(f"Applied test filters: {filters}")
 
     # Use the profile name to find the profile configuration
     all_profiles = list_profiles(include_examples=True)
@@ -321,11 +338,19 @@ def _run_single_profile(
 
     # Validate profile requirements if not explicitly skipped
     if not skip_system_check:
-        from sysagent.utils.testing.profile_validator import validate_profile_requirements
+        from sysagent.utils.testing.profile_validator import (
+            validate_filtered_profile_requirements,
+            validate_profile_requirements,
+        )
 
-        validation_result = validate_profile_requirements(profile_configs)
+        if filters:
+            validation_result = validate_filtered_profile_requirements(
+                profile_configs, filters, profile_name=profile_name
+            )
+        else:
+            validation_result = validate_profile_requirements(profile_configs, profile_name=profile_name)
+
         if not validation_result.get("passed", False):
-            logger.error(f"Profile validation failed for {profile_name}")
             return 1, False
 
     # Get the profile tier and filter configuration
@@ -429,13 +454,28 @@ def _run_all_profiles(
     Returns:
         tuple: (exit_code, tests_ran) where tests_ran indicates if any pytest actually executed
     """
-    from sysagent.utils.config import resolve_profile_dependencies, validate_profile_dependencies
+    from sysagent.utils.config import (
+        expand_profile_with_dependencies,
+        get_profile_dependencies,
+        resolve_profile_dependencies,
+        validate_profile_dependencies,
+    )
 
     all_profiles = list_profiles(include_examples=False)
     logger.debug(f"Found {sum(len(profiles) for profiles in all_profiles.values())} profiles")
 
-    all_profile_items = []
-    all_profiles_dict = {}
+    # Build complete profiles dictionary (all available profiles)
+    complete_profiles_dict = {}
+    complete_profile_items_map = {}  # Map profile_name -> (profile_type, profile)
+
+    for profile_type, profiles in all_profiles.items():
+        for profile in profiles:
+            configs = profile.get("configs")
+            if configs:
+                profile_name = configs.get("name")
+                if profile_name:
+                    complete_profiles_dict[profile_name] = configs
+                    complete_profile_items_map[profile_name] = (profile_type, profile)
 
     # Determine whether to skip vertical profiles
     skip_vertical_profiles = False
@@ -444,12 +484,28 @@ def _run_all_profiles(
         # --all option: run all profiles without any prompts
         include_all_types = True
         skip_vertical_profiles = False
-        logger.info("Running all profile types (qualifications, suites, verticals)")
+        logger.info("Running all profile types (qualifications, verticals, suites)")
     else:
         # Default behavior: run qualification + vertical with opt-out prompt for vertical
         include_all_types = False
+
+        # Collect vertical profile names before prompting
+        vertical_profile_names = []
+        for profile_type, profiles in all_profiles.items():
+            for profile in profiles:
+                configs = profile.get("configs")
+                if configs:
+                    profile_name = configs.get("name")
+                    if profile_name:
+                        params = configs.get("params", {})
+                        labels = params.get("labels", {})
+                        profile_label_type = labels.get("type", "")
+                        is_vertical = profile_type == "verticals" or profile_label_type == "vertical"
+                        if is_vertical:
+                            vertical_profile_names.append(profile_name)
+
         try:
-            skip_vertical_profiles = _prompt_skip_vertical_profiles(force)
+            skip_vertical_profiles = _prompt_skip_vertical_profiles(force, vertical_profile_names)
         except KeyboardInterrupt:
             sys.exit(1)
 
@@ -457,7 +513,9 @@ def _run_all_profiles(
             logger.info("Running qualification profiles only (vertical profiles skipped by user)")
         else:
             logger.info("Running qualification and vertical profiles")
-            logger.info("Use --all flag to run all profile types including suites")
+
+    # First pass: collect requested profiles based on filter
+    requested_profile_names = []
 
     for profile_type, profiles in all_profiles.items():
         for profile in profiles:
@@ -468,8 +526,7 @@ def _run_all_profiles(
                     # Apply filtering logic based on run mode
                     if include_all_types:
                         # Include all profile types
-                        all_profile_items.append((profile_type, profile))
-                        all_profiles_dict[profile_name] = configs
+                        requested_profile_names.append(profile_name)
                     else:
                         # Default mode: include qualification + vertical (unless user opted out)
                         params = configs.get("params", {})
@@ -480,15 +537,13 @@ def _run_all_profiles(
                         is_vertical = profile_type == "verticals" or profile_label_type == "vertical"
 
                         if is_qualification:
-                            all_profile_items.append((profile_type, profile))
-                            all_profiles_dict[profile_name] = configs
+                            requested_profile_names.append(profile_name)
                         elif is_vertical and not skip_vertical_profiles:
-                            all_profile_items.append((profile_type, profile))
-                            all_profiles_dict[profile_name] = configs
+                            requested_profile_names.append(profile_name)
                         else:
                             logger.debug(f"Skipping profile: {profile_name} (type: {profile_type})")
 
-    if not all_profile_items:
+    if not requested_profile_names:
         if run_all_profiles:
             logger.error("No profiles found")
         else:
@@ -496,6 +551,41 @@ def _run_all_profiles(
                 logger.error("No qualification profiles found. Use --all to run all profile types.")
             else:
                 logger.error("No qualification or vertical profiles found. Use --all to run all profile types.")
+        return 1, False
+
+    # Second pass: expand each requested profile with its dependencies
+    all_profiles_to_run = set()
+
+    for profile_name in requested_profile_names:
+        try:
+            # Expand profile with dependencies (returns list in execution order)
+            expanded_profiles = expand_profile_with_dependencies(profile_name, complete_profiles_dict)
+
+            # Log dependencies if they exist
+            dependencies = get_profile_dependencies(complete_profiles_dict[profile_name])
+            if dependencies:
+                logger.debug(f"Profile '{profile_name}' depends on: {', '.join(dependencies)}")
+
+            # Add all profiles (dependencies + requested) to the set
+            all_profiles_to_run.update(expanded_profiles)
+
+        except Exception as e:
+            logger.error(f"Failed to resolve dependencies for profile '{profile_name}': {e}")
+            # Still add the profile itself even if dependency resolution fails
+            all_profiles_to_run.add(profile_name)
+
+    # Build final profile items and dict from the complete set
+    all_profile_items = []
+    all_profiles_dict = {}
+
+    for profile_name in all_profiles_to_run:
+        if profile_name in complete_profile_items_map:
+            profile_type, profile = complete_profile_items_map[profile_name]
+            all_profile_items.append((profile_type, profile))
+            all_profiles_dict[profile_name] = complete_profiles_dict[profile_name]
+
+    if not all_profile_items:
+        logger.error("No valid profiles to run after dependency resolution")
         return 1, False
 
     # Validate profile dependencies
@@ -521,10 +611,14 @@ def _run_all_profiles(
     valid_profiles, failed_profiles = _validate_all_profiles(all_profile_items, skip_system_check)
 
     if failed_profiles:
+        logger.info("")
+        logger.info("═" * 70)
         logger.info("Profile Validation Summary")
+        logger.info("═" * 70)
         logger.info(f"Failed profiles ({len(failed_profiles)}):")
         for name in failed_profiles:
             logger.info(f"  ✗ {name}")
+        logger.info("")
         logger.error("Some profiles failed validation. Aborting test run.")
         return 1, False
 
@@ -579,9 +673,9 @@ def _validate_all_profiles(all_profile_items, skip_system_check: bool):
             continue
 
         if not skip_system_check:
-            validation_result = validate_profile_requirements(profile_configs)
+            # Pass profile name for better context in validation messages
+            validation_result = validate_profile_requirements(profile_configs, profile_name=profile_name)
             if not validation_result.get("passed", False):
-                logger.error(f"Profile validation failed for {profile_name}")
                 failed_profiles.append(profile_name)
                 continue
 

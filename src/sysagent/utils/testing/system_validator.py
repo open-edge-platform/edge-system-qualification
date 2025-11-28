@@ -9,6 +9,7 @@ against the collected system information.
 """
 
 import logging
+import re
 from typing import Any, Dict, List, Optional
 
 from sysagent.utils.core.process import run_command
@@ -34,12 +35,16 @@ class SystemValidator:
         self.system_info = SystemInfoCache(cache_dir).get_info()
         logger.debug("SystemValidator initialized with system info")
 
-    def validate_requirements(self, requirements: Dict[str, Any]) -> Dict[str, Any]:
+    def validate_requirements(
+        self, requirements: Dict[str, Any], log_suggestions: bool = True, context: str = "system validator"
+    ) -> Dict[str, Any]:
         """
         Validate system requirements against system info.
 
         Args:
             requirements: Dictionary of requirements to check
+            log_suggestions: Whether to log fix suggestions for failed checks
+            context: Context string for validation messages (e.g., "profile: my-profile")
 
         Returns:
             Dictionary with validation results
@@ -51,17 +56,27 @@ class SystemValidator:
         if "hardware" in requirements:
             hw_results = self._validate_hardware(requirements["hardware"])
             results["checks"].extend(hw_results)
-            if not all(check["passed"] for check in hw_results):
+
+            failed_hw_checks = [check for check in hw_results if not check["passed"]]
+            if failed_hw_checks:
                 results["passed"] = False
 
         # Check software requirements
         if "software" in requirements:
             sw_results = self._validate_software(requirements["software"])
             results["checks"].extend(sw_results)
-            if not all(check["passed"] for check in sw_results):
+
+            failed_sw_checks = [check for check in sw_results if not check["passed"]]
+            if failed_sw_checks:
                 results["passed"] = False
 
-        logger.debug(f"System validation completed: {results['passed']}")
+        # Summary logging
+        failed_checks = [check for check in results["checks"] if not check["passed"]]
+
+        # Provide user-friendly suggestions (only if requested)
+        if not results["passed"] and log_suggestions:
+            self._log_fix_suggestions(failed_checks, context)
+
         return results
 
     def _get_intel_devices_with_openvino(
@@ -351,20 +366,40 @@ class SystemValidator:
                 }
             )
 
-        # Memory minimum requirement
+        # Memory minimum free requirement
         if "memory_min_gb" in hw_requirements:
             min_memory = hw_requirements["memory_min_gb"]
             memory_info = hardware.get("memory", {})
             total_bytes = memory_info.get("total", 0)
+            available_bytes = memory_info.get("available", 0)
             actual_memory_gb = total_bytes / (1000**3)  # Use GB (1000^3) standard
-            passed = actual_memory_gb >= min_memory
+            available_memory_gb = available_bytes / (1000**3)
+            passed = available_memory_gb >= min_memory
             results.append(
                 {
-                    "name": f"Memory >= {min_memory} GB",
+                    "name": f"Available memory >= {min_memory} GB",
+                    "passed": passed,
+                    "actual": f"{available_memory_gb:.0f} GB",
+                    "required": f">= {min_memory} GB",
+                    "category": "hardware.memory.available",
+                }
+            )
+
+        # Memory minimum total requirement
+        if "memory_total_min_gb" in hw_requirements:
+            min_total_memory = hw_requirements["memory_total_min_gb"]
+            memory_info = hardware.get("memory", {})
+            total_bytes = memory_info.get("total", 0)
+            available_bytes = memory_info.get("available", 0)
+            actual_memory_gb = total_bytes / (1000**3)  # Use GB (1000^3) standard
+            passed = actual_memory_gb >= min_total_memory
+            results.append(
+                {
+                    "name": f"Total memory >= {min_total_memory} GB",
                     "passed": passed,
                     "actual": f"{actual_memory_gb:.0f} GB",
-                    "required": f">= {min_memory} GB",
-                    "category": "hardware.memory.size",
+                    "required": f">= {min_total_memory} GB",
+                    "category": "hardware.memory.total",
                 }
             )
 
@@ -726,12 +761,9 @@ class SystemValidator:
             # Check system packages first for docker
             system_packages = software.get("system_packages", {})
             packages = system_packages.get("packages", {})
-            has_docker_package = ("docker" in packages and packages["docker"]) or (
-                "docker.io" in packages and packages["docker.io"]
-            )
-
-            # Also check if docker is available via command
-            docker_available = has_docker_package or self._check_docker_available()
+            has_docker_package = "docker-ce" in packages and packages["docker-ce"]
+            docker_command_available = self._check_docker_available()
+            docker_available = has_docker_package or docker_command_available
 
             results.append(
                 {
@@ -810,7 +842,6 @@ class SystemValidator:
         # Check for mobile suffixes: H, U, V, HX, P
         # Mobile suffixes have priority - if ANY mobile suffix present, it's mobile
         # Pattern: number followed by mobile suffix (e.g., "165H", "288V", "125U", "285HX")
-        import re
 
         mobile_pattern = r"\d+(HX|H|U|V|P)\b"
         return bool(re.search(mobile_pattern, cpu_brand, re.IGNORECASE))
@@ -843,8 +874,6 @@ class SystemValidator:
         # First check: if it has ANY mobile suffix, it's NOT desktop
         if self._is_ultra_mobile_cpu(cpu_brand):
             return False
-
-        import re
 
         # Check for desktop suffixes: K, F, KF, T
         # Pattern: number followed by desktop suffix (e.g., "285K", "265KF")
@@ -890,7 +919,6 @@ class SystemValidator:
         brand_lower = cpu_brand.lower()
 
         # Check for N-series patterns
-        import re
 
         # Pattern 1: "Processor N" followed by numbers
         if re.search(r"processor\s+n\d+", brand_lower):
@@ -922,6 +950,12 @@ class SystemValidator:
             return result.success
         except (FileNotFoundError, OSError):
             return False
+
+    def _log_fix_suggestions(self, failed_checks: List[Dict[str, Any]], context: str = "system validator") -> None:
+        """Log user-friendly suggestions for fixing failed system requirements."""
+        from sysagent.utils.testing.validation_suggestions import log_validation_fix_suggestions
+
+        log_validation_fix_suggestions(failed_checks, context=context)
 
 
 def validate_system_requirements(requirements: Dict[str, Any], cache_dir: Optional[str] = None) -> Dict[str, Any]:

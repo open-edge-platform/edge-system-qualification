@@ -125,6 +125,12 @@ For available profiles, use: {cli_name} list
     run_parser.add_argument(
         "--force", "-f", action="store_true", help="Skip interactive prompts and use default behavior"
     )
+    run_parser.add_argument(
+        "--no-mask",
+        "-nm",
+        action="store_true",
+        help="Disable masking of data (IP addresses, MAC addresses, serial numbers)",
+    )
 
     # System Info command
     info_parser = subparsers.add_parser("info", help="Show system information with hardware and software details")
@@ -132,6 +138,12 @@ For available profiles, use: {cli_name} list
         "--verbose", "-v", action="store_true", help="Display more detailed output with medium traceback"
     )
     info_parser.add_argument("--debug", "-d", action="store_true", help="Display debug output with full traceback")
+    info_parser.add_argument(
+        "--no-mask",
+        "-nm",
+        action="store_true",
+        help="Disable masking of data (IP addresses, MAC addresses, serial numbers)",
+    )
 
     # List command
     list_parser = subparsers.add_parser("list", help="List available profiles and tests")

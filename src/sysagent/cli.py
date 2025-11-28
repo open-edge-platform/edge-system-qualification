@@ -105,11 +105,12 @@ def main() -> int:
                 filters=args.filter,
                 run_all_profiles=args.all,
                 force=force,
+                no_mask=args.no_mask,
                 extra_args=[],  # No extra args from command line
             )
         elif args.command == "info":
             run_system_info = get_command_function("run_system_info")
-            return run_system_info(verbose=verbose, debug=debug)
+            return run_system_info(verbose=verbose, debug=debug, no_mask=args.no_mask)
         elif args.command == "list":
             list_available_items = get_command_function("list_available_items")
             return list_available_items(verbose=verbose, debug=debug)

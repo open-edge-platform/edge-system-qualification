@@ -5,7 +5,6 @@
 General utility functions for ESQ test suite.
 
 This module provides reusable utility functions for:
-- Shell script execution
 - Archive creation
 - CSV data extraction and visualization
 - Allure report attachments
@@ -13,11 +12,9 @@ This module provides reusable utility functions for:
 
 import io
 import logging
-import subprocess  # nosec B404
-import tarfile
 import warnings
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union
 
 import allure
 import matplotlib
@@ -28,61 +25,6 @@ import pandas as pd
 matplotlib.use("Agg")
 
 logger = logging.getLogger(__name__)
-
-
-def execute_shell_script(script_path: Union[str, Path], *args: Any) -> Optional[subprocess.CompletedProcess]:
-    """
-    Safely execute a shell script using subprocess with validation.
-
-    This function validates the script path, builds a safe command list, and executes
-    the script with proper error handling and logging.
-
-    Args:
-        script_path: Path to the shell script file to execute.
-        *args: Variable length argument list to pass to the script. Each argument
-               will be converted to a string.
-
-    Returns:
-        CompletedProcess object if execution succeeds, None if execution fails.
-        The CompletedProcess contains stdout, stderr, and return code.
-
-    Raises:
-        FileNotFoundError: If the script file does not exist at the specified path.
-        ValueError: If the script_path is not a regular file.
-
-    Example:
-        >>> result = execute_shell_script("/path/to/script.sh", "arg1", "arg2")
-        >>> if result:
-        ...     print(result.stdout)
-    """
-    script = Path(script_path)
-
-    # Validate script path before executing
-    if not script.exists():
-        raise FileNotFoundError(f"Script not found: {script}")
-
-    if not script.is_file():
-        raise ValueError(f"Invalid script type (not a file): {script}")
-
-    # Build safe command list
-    cmd = ["bash", str(script)] + [str(arg) for arg in args]
-
-    try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        logger.info(f"Script executed successfully: {script}")
-        logger.debug(f"stdout: {result.stdout}")
-        logger.debug(f"stderr: {result.stderr}")
-        return result
-
-    except subprocess.CalledProcessError as e:
-        logger.error(f"Script execution failed: {script}, rc={e.returncode}")
-        logger.debug(f"stderr: {e.stderr}")
-        return None
 
 
 def attach_csv_table_to_allure(csv_path: Union[str, Path], image_path: Optional[Union[str, Path]] = None) -> None:

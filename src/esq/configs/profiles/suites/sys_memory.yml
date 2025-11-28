@@ -36,19 +36,19 @@ suites:
               - test_id: "MEM-STR-001"
                 display_name: "STREAM Memory Benchmark - Copy"
                 operation: "Copy"
-                timeout: "200"
+                timeout: 200
 
               - test_id: "MEM-STR-002"
                 display_name: "STREAM Memory Benchmark - Scale"
                 operation: "Scale"
-                timeout: "200"
+                timeout: 200
 
               - test_id: "MEM-STR-003"
                 display_name: "STREAM Memory Benchmark - Add"
                 operation: "Add"
-                timeout: "200"
+                timeout: 200
 
               - test_id: "MEM-STR-004"
                 display_name: "STREAM Memory Benchmark - Triad"
                 operation: "Triad"
-                timeout: "200"
+                timeout: 200

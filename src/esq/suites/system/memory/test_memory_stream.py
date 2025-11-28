@@ -8,13 +8,13 @@ System Memory Performance Test using STREAM benchmark.
 import logging
 import os
 import shutil
+from dataclasses import is_dataclass
+from pathlib import Path
 
 import allure
 import pandas as pd
 import pytest
-from dataclasses import is_dataclass
-from pathlib import Path
-from esq.utils.genutils import execute_shell_script
+from esq.suites.system.memory.memory_utils import init_csv_file, update_csv_from_result
 from sysagent.utils.config import ensure_dir_permissions
 from sysagent.utils.core import Metrics, Result
 from sysagent.utils.infrastructure import DockerClient
@@ -67,14 +67,18 @@ def test_memory_stream(
 
     operation = configs.get("operation", "Copy")
     dockerfile_name = configs.get("dockerfile_name", "Dockerfile")
-    docker_image_tag = f"{configs.get('container_image', 'stream_memory_benchmark')}:{configs.get('image_tag', '3.0')}"
+    container_image = configs.get("container_image", "stream_memory_benchmark")
+    image_tag = configs.get("image_tag", "1.0")
+    docker_image_tag = f"{container_image}:{image_tag}"
+    container_name = f"{container_image}_{operation.lower()}"
 
     stream_url = configs.get(
         "stream_git_url",
         "https://github.com/jeffhammond/STREAM.git",
     )
 
-    timeout = configs.get("timeout", 300)
+    # Ensure timeout is an integer (Converting in case YAML has string)
+    timeout = int(configs.get("timeout", 300))
     base_image = configs.get("base_image", "intel/dlstreamer:2025.1.2-dev-ubuntu24")
 
     # Step 1: Validate system requirements (CPU, memory, storage, Docker, etc.)
@@ -84,7 +88,8 @@ def test_memory_stream(
     test_dir = os.path.dirname(os.path.abspath(__file__))
     docker_dir = os.path.join(test_dir, test_container_path)
 
-    mem_results = f"{docker_dir}/mem_results"
+    # Use test suite directory for results instead of container directory
+    mem_results = os.path.join(test_dir, "results", test_id)
     os.makedirs(mem_results, exist_ok=True)
 
     # Ensure directories have correct permissions
@@ -207,6 +212,12 @@ def test_memory_stream(
     try:
 
         def run_test():
+            # Access outer scope variables
+            nonlocal docker_client, mem_results, docker_image_tag, container_name, timeout, operation
+
+            # Get test case name from config for consistent use in CSV
+            tc_name = configs.get("test_case_name", test_display_name)
+
             # Define metrics with N/A as initial values (unit will be set when value is populated)
             metrics = _create_mem_metrics(value="N/A", unit=None)
 
@@ -233,22 +244,74 @@ def test_memory_stream(
 
             try:
                 logger.info(f"Executing STREAM benchmark with operation: {operation}")
-                script_result = execute_shell_script(f"{test_dir}/src/run_mem_container.sh", mem_results)
 
-                # Check if script execution failed
-                if script_result is None:
-                    error_msg = (
-                        f"Container execution script failed for operation '{operation}'. "
-                        f"Script: run_mem_container.sh, Results dir: {mem_results}. "
-                        f"Check script output in logs for return code and error details."
+                # Initialize CSV file
+                csv_file_path = Path(f"{mem_results}/memory_benchmark_runner.csv")
+                init_csv_file(csv_file_path, tc_name=tc_name, force=True)
+
+                # Setup container parameters
+                container_home = "/home/dlstreamer"
+                result_file_path = Path(f"{mem_results}/memory_benchmark_runner.result")
+                volumes = {mem_results: {"bind": f"{container_home}/output", "mode": "rw"}}
+
+                # Run container using docker_client
+                try:
+                    # Run container with automatic log attachment to Allure
+                    docker_client.run_container(
+                        name=container_name,
+                        image=docker_image_tag,
+                        volumes=volumes,
+                        remove=True,
+                        timeout=timeout,
+                        mode="batch",
+                        attach_logs=True,
                     )
-                    logger.error(error_msg)
-                    logger.debug(f"Script parameters - Test dir: {test_dir}, Operation: {operation}")
+
+                    # Update CSV from result file
+                    test_passed = update_csv_from_result(
+                        result_file_path=result_file_path,
+                        csv_file_path=csv_file_path,
+                        tc_name=tc_name,
+                    )
+
+                    if not test_passed:
+                        error_msg = (
+                            f"Container execution completed but test validation failed for operation '{operation}'. "
+                            f"Container: {container_name}, Image: {docker_image_tag}. "
+                            f"Check result file for error details: {result_file_path}"
+                        )
+                        logger.error(error_msg)
+
+                        # Attach result file if available
+                        if result_file_path.exists():
+                            try:
+                                with open(result_file_path, "r") as f:
+                                    result_content = f.read()
+                                allure.attach(
+                                    result_content,
+                                    name=f"Result File - {operation}",
+                                    attachment_type=allure.attachment_type.TEXT,
+                                )
+                            except Exception as attach_err:
+                                logger.warning(f"Failed to attach result file: {attach_err}")
+
+                        result.metadata["failure_reason"] = error_msg
+                        result.metadata["status"] = "N/A"
+                        return result
+
+                except Exception as container_error:
+                    error_msg = (
+                        f"Container execution failed for operation '{operation}': "
+                        f"{type(container_error).__name__}: {str(container_error)}. "
+                        f"Container: {container_name}, Image: {docker_image_tag}. "
+                        f"Check logs for detailed error information."
+                    )
+                    logger.error(error_msg, exc_info=True)
+
                     result.metadata["failure_reason"] = error_msg
                     result.metadata["status"] = "N/A"
                     return result
 
-                csv_file_path = Path(f"{mem_results}/memory_benchmark_runner.csv")
                 csv_res_path = Path(f"{mem_results}/memory_bm_{operation}.csv")
 
                 if csv_file_path.exists():
@@ -356,7 +419,7 @@ def test_memory_stream(
                     f"Check logs for stack trace and detailed error information."
                 )
                 logger.error(error_msg, exc_info=True)
-                logger.debug(f"Execution context - Script: run_mem_container.sh, Results dir: {mem_results}")
+                logger.debug(f"Execution context - Container: {container_name}, Results dir: {mem_results}")
                 result.metadata["failure_reason"] = error_msg
                 # Metrics remain as N/A
                 return result
@@ -433,9 +496,11 @@ def test_memory_stream(
         logger.error(error_msg, exc_info=True)
         logger.debug(f"Summary context - Results dir: {mem_results}, Operation: {operation}")
 
-    # Clean up results directory
+    # Clean up test-specific results directory
     try:
-        shutil.rmtree(mem_results, ignore_errors=True)
+        if os.path.exists(mem_results):
+            shutil.rmtree(mem_results, ignore_errors=True)
+            logger.debug(f"Cleaned up results directory: {mem_results}")
     except Exception as cleanup_error:
         logger.warning(f"Failed to cleanup results directory: {cleanup_error}")
 

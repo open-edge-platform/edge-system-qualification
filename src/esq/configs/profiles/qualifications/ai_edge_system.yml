@@ -349,7 +349,7 @@ suites:
               # Entry
               - test_id: "AES-VSN-001"
                 display_name: "Vision AI Benchmark - multi-stream 1080p30 H.265 gvadetect YOLO11n INT8 gvatrack gvaclassify ResNet50 INT8"
-                devices: [cpu, igpu]
+                devices: [cpu, igpu, dgpu, npu]
                 tiers:
                   - entry
                 kpi_refs:
@@ -363,7 +363,7 @@ suites:
               # Mainstream
               - test_id: "AES-VSN-001"
                 display_name: "Vision AI Benchmark - multi-stream 1080p30 H.265 gvadetect YOLO11n INT8 gvatrack gvaclassify ResNet50 INT8"
-                devices: [cpu, igpu]
+                devices: [cpu, igpu, dgpu, npu]
                 tiers:
                   - mainstream
                 kpi_refs:
@@ -377,7 +377,7 @@ suites:
               # Efficiency Optimized
               - test_id: "AES-VSN-001"
                 display_name: "Vision AI Benchmark - multi-stream 1080p30 H.265 gvadetect YOLO11n INT8 gvatrack gvaclassify ResNet50 INT8"
-                devices: [cpu, igpu, npu]
+                devices: [cpu, igpu, dgpu, npu]
                 tiers:
                   - efficiency_optimized
                 kpi_refs:
@@ -391,7 +391,7 @@ suites:
               # Scalable Performance
               - test_id: "AES-VSN-001"
                 display_name: "Vision AI Benchmark - multi-stream 1080p30 H.265 gvadetect YOLO11n INT8 gvatrack gvaclassify ResNet50 INT8"
-                devices: [cpu]
+                devices: [cpu, igpu, dgpu, npu]
                 tiers:
                   - scalable_performance
                 kpi_refs:

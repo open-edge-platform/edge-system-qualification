@@ -4,38 +4,104 @@
 """DLStreamer pipeline utilities and helpers."""
 
 import logging
+import re
 from uuid import uuid4
 
 logger = logging.getLogger(__name__)
 
 
-def build_multi_pipeline_with_devices(
-    pipeline, device_id, num_streams, visualize_stream=False, pipeline_sync=None, fpscounter_elements=None
-):
+def get_device_type_key(device_id: str, device_dict=None):
     """
-    Build a multi-stream pipeline for a specific device.
+    Centralized function to determine device type key for parameter mapping.
+
+    Args:
+        device_id: Device ID to use for parameter lookup
+        device_dict: Dictionary containing device information (optional)
+
+    Returns:
+        String type key for parameter mapping (e.g., "cpu", "gpu_integrated", "npu")
+    """
+    # Get device type from device_dict if available
+    device_type = None
+    if device_dict and device_id in device_dict:
+        device_type = device_dict[device_id]["device_type"]
+
+    device_type_key = device_type.lower() if device_type else ""
+    device_id_key = device_id.lower()
+
+    # Determine type_key for mapping
+    if "gpu" in device_id_key:
+        if "integrated" in device_type_key:
+            return "gpu_integrated"
+        elif "discrete" in device_type_key:
+            return "gpu_discrete"
+        else:
+            return "gpu"
+    elif "cpu" in device_id_key:
+        return "cpu"
+    elif "npu" in device_id_key:
+        return "npu"
+    else:
+        return device_type_key
+
+
+def build_multi_pipeline_with_devices(pipeline, device_id, num_streams, sink_element=None, fpscounter_elements=None):
+    """
+    Build a multi-stream pipeline for a specific device with FPS measurement aggregation.
+
+    Architecture:
+    - Multi-stream pipeline: Runs the actual workload with user-configured sink element
+    - Result pipeline: Separate aggregator that reads FPS data via named pipe
+
+    The result pipeline always uses fakesink (not configurable) because it only aggregates
+    FPS measurements from the named pipe, not video processing. However, the sync and async
+    properties are extracted from the workload sink element to ensure timing and state change
+    consistency between the workload and aggregator pipelines.
 
     Args:
         pipeline: The base pipeline template string
         device_id: Device ID to use for the pipeline
         num_streams: Number of streams to include in the multi-pipeline
-        visualize_stream: Whether to visualize the pipeline output
-        pipeline_sync: Sync value for both pipeline and result fakesink ("true" or "false"), defaults to "true"
+        sink_element: Full GStreamer sink element specification with properties for the WORKLOAD pipeline
+                     (e.g., "fakesink sync=true", "fakesink sync=false async=false",
+                           "filesink location=/tmp/out.mp4", "ximagesink",
+                           "gvawatermark device=CPU ! videoconvert ! autovideosink" for visualization)
+                     Both sync and async properties (if present) are extracted and applied to result pipeline.
+                     If None, defaults to "fakesink sync=true"
         fpscounter_elements: Additional properties for gvafpscounter element (e.g., "starting-frame=2000")
 
     Returns:
         Tuple of (multi_pipeline, result_pipeline)
+        - multi_pipeline: Workload pipeline with user-configured sink element
+        - result_pipeline: FPS aggregator pipeline (always uses fakesink with matching sync property)
     """
-    sync_str = pipeline_sync if pipeline_sync is not None else "true"
+    # Set default sink element if not provided
+    if sink_element is None:
+        sink_element = "fakesink sync=true"
+
     fpscounter_props = f" {fpscounter_elements}" if fpscounter_elements else ""
 
-    if visualize_stream:
-        sync_elements = f"gvawatermark device=CPU ! videoconvert ! autovideosink sync={sync_str}"
-    else:
-        sync_elements = f"fakesink sync={sync_str}"
+    # Extract sync and async properties from sink_element to ensure result pipeline matches
+    # These properties must match between workload and result pipelines for timing consistency
+    sync_value = "false"
+    async_value = None  # None means property not specified (use GStreamer default)
+
+    if "sync=" in sink_element:
+        # Extract sync value from sink_element (handles "sync=true" or "sync=false")
+        sync_match = re.search(r"sync=(true|false)", sink_element)
+        if sync_match:
+            sync_value = sync_match.group(1)
+
+    if "async=" in sink_element:
+        # Extract async value from sink_element (handles "async=true" or "async=false")
+        async_match = re.search(r"async=(true|false)", sink_element)
+        if async_match:
+            async_value = async_match.group(1)
 
     inputs = []
-    logger.debug(f"Building multi-pipeline for device {device_id} with {num_streams} streams.")
+    logger.debug(
+        f"Building multi-pipeline for device {device_id} with {num_streams} streams using sink: {sink_element}"
+    )
     for i in range(num_streams):
         # Generate unique pipeline ID for each stream
         placeholder_pipeline_id = str(uuid4())[:8]
@@ -44,13 +110,23 @@ def build_multi_pipeline_with_devices(
         # Replace ${PIPELINE_ID} placeholder in the pipeline string
         current_pipeline = pipeline.replace("${PIPELINE_ID}", placeholder_pipeline_id)
 
-        additional_elements = f"! gvafpscounter{fpscounter_props} write-pipe=/tmp/{pipe_id} ! {sync_elements}"
+        additional_elements = f"! gvafpscounter{fpscounter_props} write-pipe=/tmp/{pipe_id} ! {sink_element}"
         inputs.append(f"{current_pipeline} {additional_elements}")
 
     pipeline_branches = " ".join(inputs)
     multi_pipeline = f"gst-launch-1.0 -q {pipeline_branches}"
+
+    # Result pipeline is a separate aggregator process that only reads FPS data from named pipe.
+    # It MUST use fakesink because it's not processing video frames, only aggregating measurements.
+    # However, the sync and async properties MUST match the workload pipeline's sink to ensure:
+    # - sync: Timing consistency between write-pipe (workload) and read-pipe (aggregator) for accurate FPS measurements
+    # - async: State change behavior consistency to avoid potential pipeline stalls or preroll issues
+    fakesink_props = f"sync={sync_value}"
+    if async_value is not None:
+        fakesink_props += f" async={async_value}"
+
     result_pipeline = (
-        f"gst-launch-1.0 -q gvafpscounter{fpscounter_props} read-pipe=/tmp/{pipe_id} ! fakesink sync={sync_str}"
+        f"gst-launch-1.0 -q gvafpscounter{fpscounter_props} read-pipe=/tmp/{pipe_id} ! fakesink {fakesink_props}"
     )
 
     # Log the pipeline with better truncation handling to show both start and end
@@ -60,7 +136,13 @@ def build_multi_pipeline_with_devices(
     else:
         truncated_pipeline = multi_pipeline
         logger.debug(f"Generated multi_pipeline: {multi_pipeline}")
-    logger.debug(f"Generated result_pipeline: {result_pipeline}")
+
+    # Log result pipeline with extracted properties
+    props_info = f"sync={sync_value}"
+    if async_value is not None:
+        props_info += f", async={async_value}"
+    logger.debug(f"Generated result_pipeline ({props_info}): {result_pipeline}")
+
     return multi_pipeline, result_pipeline
 
 
@@ -95,10 +177,11 @@ def build_baseline_pipeline(pipeline):
     return baseline_pipeline, result_pipeline
 
 
-def get_sync_config(pipeline_params, device_id, device_dict=None):
+def get_sink_element_config(pipeline_params, device_id, device_dict=None):
     """
-    Get sync configuration for multi-stream pipeline from pipeline_params.
-    Baseline analysis always uses sync=false (hardcoded) for maximum throughput measurement.
+    Get sink element configuration for multi-stream pipeline from pipeline_params.
+    Supports full GStreamer sink element specification with properties.
+    Baseline analysis always uses "fakesink sync=false" (hardcoded) for maximum throughput measurement.
 
     Args:
         pipeline_params: Dictionary of pipeline parameters
@@ -106,43 +189,23 @@ def get_sync_config(pipeline_params, device_id, device_dict=None):
         device_dict: Dictionary containing device information (optional)
 
     Returns:
-        String sync value ("true" or "false") for multi-stream pipeline
+        String sink element configuration (e.g., "fakesink sync=true", "filesink location=/tmp/out.mp4", "ximagesink")
     """
     if not pipeline_params:
         # Return default if no params provided
-        return "true"
+        return "fakesink sync=true"
 
-    # Get device type from device_dict if available
-    device_type = None
-    if device_dict and device_id in device_dict:
-        device_type = device_dict[device_id]["device_type"]
+    # Use centralized type_key determination
+    type_key = get_device_type_key(device_id, device_dict)
 
-    device_type_key = device_type.lower() if device_type else ""
-    device_id_key = device_id.lower()
+    # Get sink element configuration
+    sink_params = pipeline_params.get("SINK_ELEMENT", {})
 
-    # Determine type_key for mapping (same logic as resolve_pipeline_placeholders)
-    if "gpu" in device_id_key:
-        if "integrated" in device_type_key:
-            type_key = "gpu_integrated"
-        elif "discrete" in device_type_key:
-            type_key = "gpu_discrete"
-        else:
-            type_key = "gpu"
-    elif "cpu" in device_id_key:
-        type_key = "cpu"
-    elif "npu" in device_id_key:
-        type_key = "npu"
-    else:
-        type_key = device_type_key
+    # Get device-specific sink element or use default
+    sink_element = sink_params.get(type_key, sink_params.get("default", "fakesink sync=true"))
+    logger.debug(f"Sink element for {device_id}: {sink_element}")
 
-    # Get sync configuration
-    sync_params = pipeline_params.get("SYNC", {})
-
-    # Try to get device-specific value, fall back to default
-    sync_value = sync_params.get(type_key, sync_params.get("default", "true"))
-
-    logger.debug(f"Sync config for {device_id}: {sync_value}")
-    return sync_value
+    return sink_element
 
 
 def get_fpscounter_config(pipeline_params, device_id, device_dict=None):
@@ -162,28 +225,8 @@ def get_fpscounter_config(pipeline_params, device_id, device_dict=None):
         # Return empty if no params provided
         return ""
 
-    # Get device type from device_dict if available
-    device_type = None
-    if device_dict and device_id in device_dict:
-        device_type = device_dict[device_id]["device_type"]
-
-    device_type_key = device_type.lower() if device_type else ""
-    device_id_key = device_id.lower()
-
-    # Determine type_key for mapping (same logic as resolve_pipeline_placeholders)
-    if "gpu" in device_id_key:
-        if "integrated" in device_type_key:
-            type_key = "gpu_integrated"
-        elif "discrete" in device_type_key:
-            type_key = "gpu_discrete"
-        else:
-            type_key = "gpu"
-    elif "cpu" in device_id_key:
-        type_key = "cpu"
-    elif "npu" in device_id_key:
-        type_key = "npu"
-    else:
-        type_key = device_type_key
+    # Use centralized type_key determination
+    type_key = get_device_type_key(device_id, device_dict)
 
     # Get fpscounter properties configuration
     fpscounter_params = pipeline_params.get("FPSCOUNTER_PROPS", {})
@@ -232,12 +275,12 @@ def get_pipeline_info(
             return {"baseline_pipeline": truncated, "result_pipeline": result}
         else:
             fpscounter_config = get_fpscounter_config(pipeline_params, device_id, device_dict)
-            sync_value = get_sync_config(pipeline_params, device_id, device_dict)
+            sink_element = get_sink_element_config(pipeline_params, device_id, device_dict)
             multi, result = build_multi_pipeline_with_devices(
                 pipeline=resolved_pipeline,
                 device_id=device_id,
                 num_streams=num_streams,
-                pipeline_sync=sync_value,
+                sink_element=sink_element,
                 fpscounter_elements=fpscounter_config,
             )
             if len(multi) > 1500:
@@ -280,25 +323,10 @@ def resolve_pipeline_placeholders(pipeline, pipeline_params=None, device_id="CPU
     if device_dict and device_id in device_dict:
         device_type = device_dict[device_id]["device_type"]
 
-    device_type_key = device_type.lower() if device_type else ""
-    device_id_key = device_id.lower()
-
     logger.debug(f"Resolving pipeline placeholders for device_id: {device_id}, device_type: {device_type}")
 
-    # Determine type_key for mapping
-    if "gpu" in device_id_key:
-        if "integrated" in device_type_key:
-            type_key = "gpu_integrated"
-        elif "discrete" in device_type_key:
-            type_key = "gpu_discrete"
-        else:
-            type_key = "gpu"
-    elif "cpu" in device_id_key:
-        type_key = "cpu"
-    elif "npu" in device_id_key:
-        type_key = "npu"
-    else:
-        type_key = device_type_key
+    # Use centralized type_key determination
+    type_key = get_device_type_key(device_id, device_dict)
 
     # Get device properties using OpenVINO
     from sysagent.utils.system.ov_helper import get_openvino_device_properties

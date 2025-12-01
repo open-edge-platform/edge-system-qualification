@@ -17,7 +17,7 @@ from .container import run_dlstreamer_analyzer_container
 from .pipeline import (
     build_multi_pipeline_with_devices,
     get_fpscounter_config,
-    get_sync_config,
+    get_sink_element_config,
     resolve_pipeline_placeholders,
 )
 from .preparation import get_device_specific_docker_image
@@ -86,7 +86,6 @@ def run_benchmark_container(
     cpuset_cpus: str = "",
     cpuset_mems: str = "",
     num_streams: int = None,
-    visualize_stream: bool = False,
     container_config: Dict[str, Any] = None,
 ) -> docker.models.containers.Container:
     """
@@ -113,14 +112,13 @@ def run_benchmark_container(
     # Use modular pipeline utilities
     resolved_pipeline = resolve_pipeline_placeholders(pipeline, pipeline_params, device_id, device_dict)
     if num_streams is not None:
-        sync_value = get_sync_config(pipeline_params, device_id, device_dict)
+        sink_element = get_sink_element_config(pipeline_params, device_id, device_dict)
         fpscounter_config = get_fpscounter_config(pipeline_params, device_id, device_dict)
         multi_pipeline, result_pipeline = build_multi_pipeline_with_devices(
             pipeline=resolved_pipeline,
             device_id=device_id,
             num_streams=num_streams,
-            visualize_stream=visualize_stream,
-            pipeline_sync=sync_value,
+            sink_element=sink_element,
             fpscounter_elements=fpscounter_config,
         )
     else:
@@ -188,7 +186,6 @@ def run_concurrent_analysis(
     pipeline_timeout: int,
     target_fps: float,
     num_sockets: int = 1,
-    visualize_stream: bool = False,
     container_config: Dict[str, Any] = None,
 ) -> None:
     """
@@ -236,7 +233,6 @@ def run_concurrent_analysis(
                     cpuset_cpus=cpus,
                     cpuset_mems=mems,
                     num_streams=streams_per_socket,
-                    visualize_stream=visualize_stream,
                     container_config=container_config,
                 )
                 containers.append(container)
@@ -256,7 +252,6 @@ def run_concurrent_analysis(
                 target_fps=target_fps,
                 combined_analysis=analysis_tasks,
                 num_streams=data.get("num_streams", None),
-                visualize_stream=visualize_stream,
                 container_config=container_config,
             )
             containers.append(container)
@@ -283,7 +278,6 @@ def qualify_device(
     consecutive_success_threshold: int = 1,
     consecutive_failure_threshold: int = 1,
     max_streams_above_baseline: int = 10,
-    visualize_stream: bool = False,
     container_config: Dict[str, Any] = None,
 ) -> bool:
     """
@@ -372,7 +366,6 @@ def qualify_device(
             pipeline_timeout=pipeline_timeout,
             target_fps=target_fps,
             num_sockets=num_sockets,
-            visualize_stream=visualize_stream,
             container_config=container_config,
         )
 

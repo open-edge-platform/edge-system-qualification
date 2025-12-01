@@ -123,8 +123,8 @@ params:
       gpu_discrete: "8"
       gpu_discrete_primary: "8"
       npu: "1"
-    SYNC:
-      default: "true"
+    SINK_ELEMENT:
+      default: "fakesink sync=true"
     FPSCOUNTER_PROPS:
       default: "starting-frame=2000"
 

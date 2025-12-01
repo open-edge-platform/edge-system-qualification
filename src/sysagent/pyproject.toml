@@ -50,9 +50,9 @@ where = ["../../src"]
 include = ["sysagent"]
 
 [tool.setuptools_scm]
-version_scheme = "post-release"    # e.g., 1.0.0.post0.dev4+gabcdef
-local_scheme = "node-and-date"     # include commit hash and date
-root = "../.."                         # root of the git repo
+version_scheme = "release-branch-semver"  # e.g., tag 1.0.0: on main -> 1.1.0.devN+gabcdef
+local_scheme = "node-and-date"            # include commit hash and date
+root = "../.."                            # root of the git repo
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

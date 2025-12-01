@@ -118,13 +118,15 @@ params:
         FULL_DEVICE_NAME:
           "Intel(R) Unsupported video type": "'video/x-raw'"
     BATCH_SIZE:
-      cpu: "8"
+      cpu: "1"
       gpu_integrated: "8"
       gpu_discrete: "8"
       gpu_discrete_primary: "8"
       npu: "1"
     SYNC:
-      default: "false"
+      default: "true"
+    FPSCOUNTER_PROPS:
+      default: "starting-frame=2000"
 
 suites:
   - name: "ai"

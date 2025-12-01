@@ -418,7 +418,21 @@ def terminate_process_safely(process, process_name="process", timeout=5):
 
 
 def parse_result(use_average=False, result_output_path=None):
-    """Parse GStreamer pipeline results from output file."""
+    """
+    Parse GStreamer pipeline results from output file.
+
+    Returns:
+        Tuple of (total_fps, num_streams, per_stream_fps)
+        Returns (0.0, 0.0, 0.0) if parsing fails
+
+    Note:
+        Looks for FpsCounter(average) or FpsCounter(overall) patterns.
+        If these are missing, it indicates the pipeline terminated early before
+        gvafpscounter could output summary statistics. This may be due to:
+        - starting-frame configuration too high
+        - Pipeline freeze/timeout
+        - Insufficient frames processed
+    """
 
     if not result_output_path:
         logger.error("Result output path is not provided.")
@@ -445,7 +459,15 @@ def parse_result(use_average=False, result_output_path=None):
             search_pattern = "FpsCounter(overall"
 
         if not indices:
-            logger.warning(f"No {search_pattern} pattern found in result file {result_output_path}")
+            # Check if there are any FpsCounter entries at all
+            last_indices = [i for i, val in enumerate(result_output) if "FpsCounter(last" in val]
+            if last_indices:
+                logger.warning(
+                    f"No {search_pattern} pattern found in result file. "
+                    f"Found {len(last_indices)} FpsCounter(last) entries but no summary statistics."
+                )
+            else:
+                logger.warning(f"No FpsCounter patterns found in result file {result_output_path}")
             return 0.0, 0.0, 0.0
 
         fps_str = result_output[indices[-1]]
@@ -611,9 +633,32 @@ def get_baseline_stream_analysis(baseline_pipeline=None, result_pipeline=None, p
             use_average=False, result_output_path=baseline_result_path
         )
 
-        result_info.update(
-            {"total_fps": total_fps, "num_streams": num_streams, "per_stream_fps": per_stream_fps, "status": "success"}
-        )
+        # Check if parsing was successful
+        if per_stream_fps == 0.0 and num_streams == 0:
+            error_msg = (
+                "Failed to parse FPS results. No FpsCounter(overall) entries found in output. "
+                "Pipeline may have terminated before gvafpscounter output summary statistics. "
+                "Check: starting-frame configuration, pipeline timeout, or processing freeze."
+            )
+            logger.error(error_msg)
+            result_info.update(
+                {
+                    "total_fps": total_fps,
+                    "num_streams": num_streams,
+                    "per_stream_fps": per_stream_fps,
+                    "status": "parse_failed",
+                    "error_reason": error_msg,
+                }
+            )
+        else:
+            result_info.update(
+                {
+                    "total_fps": total_fps,
+                    "num_streams": num_streams,
+                    "per_stream_fps": per_stream_fps,
+                    "status": "success",
+                }
+            )
 
         logger.debug(
             f"Baseline Stream Analysis Completed: Total FPS: {total_fps}, "
@@ -788,9 +833,32 @@ def get_n_stream_analysis_per_device(
 
         total_fps, num_streams, per_stream_fps = parse_result(use_average=True, result_output_path=streams_result_path)
 
-        result_info.update(
-            {"total_fps": total_fps, "num_streams": num_streams, "per_stream_fps": per_stream_fps, "status": "success"}
-        )
+        # Check if parsing was successful
+        if per_stream_fps == 0.0 and num_streams == 0:
+            error_msg = (
+                "Failed to parse FPS results. No FpsCounter(average) entries found in output. "
+                "Pipeline may have terminated before gvafpscounter output summary statistics. "
+                "Check: starting-frame configuration, pipeline timeout, or processing freeze."
+            )
+            logger.error(error_msg)
+            result_info.update(
+                {
+                    "total_fps": total_fps,
+                    "num_streams": num_streams,
+                    "per_stream_fps": per_stream_fps,
+                    "status": "parse_failed",
+                    "error_reason": error_msg,
+                }
+            )
+        else:
+            result_info.update(
+                {
+                    "total_fps": total_fps,
+                    "num_streams": num_streams,
+                    "per_stream_fps": per_stream_fps,
+                    "status": "success",
+                }
+            )
 
         return result_info
 
@@ -880,8 +948,8 @@ def baseline_streams_analysis(
             analysis_duration = time.time() - analysis_start_time
             logger.warning(f"Baseline analysis failed for {device_id}: invalid per_stream_fps={per_stream_fps}")
             baseline_num_streams[device_id] = {
-                "per_stream_fps": -1.0,
-                "num_streams": -1.0,
+                "per_stream_fps": 0.0,
+                "num_streams": 0.0,
                 "total_fps": analysis_result.get("total_fps", 0.0),
                 "main_process_exit_code": analysis_result.get("main_process_exit_code"),
                 "result_process_exit_code": analysis_result.get("result_process_exit_code"),
@@ -892,8 +960,8 @@ def baseline_streams_analysis(
         analysis_duration = time.time() - analysis_start_time
         logger.warning(f"Error during baseline stream analysis for {device_id}: {e}")
         baseline_num_streams[device_id] = {
-            "per_stream_fps": -1.0,
-            "num_streams": -1.0,
+            "per_stream_fps": 0.0,
+            "num_streams": 0.0,
             "total_fps": 0.0,
             "main_process_exit_code": None,
             "result_process_exit_code": None,
@@ -983,18 +1051,22 @@ def total_streams_analysis(
     analysis_duration = time.time() - analysis_start_time
 
     # Update the current device's results with comprehensive information
-    results[device_id].update(
-        {
-            "per_stream_fps": calculated_per_stream_fps,
-            "pass": is_kpi_achieved,
-            "num_streams": num_streams,
-            "total_fps": analysis_result.get("total_fps", 0.0),
-            "main_process_exit_code": analysis_result.get("main_process_exit_code"),
-            "result_process_exit_code": analysis_result.get("result_process_exit_code"),
-            "analysis_status": analysis_result.get("status", "unknown"),
-            "analysis_duration": analysis_duration,
-        }
-    )
+    update_data = {
+        "per_stream_fps": calculated_per_stream_fps,
+        "pass": is_kpi_achieved,
+        "num_streams": num_streams,
+        "total_fps": analysis_result.get("total_fps", 0.0),
+        "main_process_exit_code": analysis_result.get("main_process_exit_code"),
+        "result_process_exit_code": analysis_result.get("result_process_exit_code"),
+        "analysis_status": analysis_result.get("status", "unknown"),
+        "analysis_duration": analysis_duration,
+    }
+
+    # Include error_reason if present (from parse failures)
+    if "error_reason" in analysis_result:
+        update_data["error_reason"] = analysis_result["error_reason"]
+
+    results[device_id].update(update_data)
 
     # When only one device is being tested, this will contain just the current device.
     # When multiple devices are running concurrently, we want to keep all device info.

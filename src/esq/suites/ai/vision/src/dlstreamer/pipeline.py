@@ -9,7 +9,9 @@ from uuid import uuid4
 logger = logging.getLogger(__name__)
 
 
-def build_multi_pipeline_with_devices(pipeline, device_id, num_streams, visualize_stream=False, pipeline_sync=None):
+def build_multi_pipeline_with_devices(
+    pipeline, device_id, num_streams, visualize_stream=False, pipeline_sync=None, fpscounter_elements=None
+):
     """
     Build a multi-stream pipeline for a specific device.
 
@@ -19,11 +21,13 @@ def build_multi_pipeline_with_devices(pipeline, device_id, num_streams, visualiz
         num_streams: Number of streams to include in the multi-pipeline
         visualize_stream: Whether to visualize the pipeline output
         pipeline_sync: Sync value for both pipeline and result fakesink ("true" or "false"), defaults to "true"
+        fpscounter_elements: Additional properties for gvafpscounter element (e.g., "starting-frame=2000")
 
     Returns:
         Tuple of (multi_pipeline, result_pipeline)
     """
     sync_str = pipeline_sync if pipeline_sync is not None else "true"
+    fpscounter_props = f" {fpscounter_elements}" if fpscounter_elements else ""
 
     if visualize_stream:
         sync_elements = f"gvawatermark device=CPU ! videoconvert ! autovideosink sync={sync_str}"
@@ -40,12 +44,14 @@ def build_multi_pipeline_with_devices(pipeline, device_id, num_streams, visualiz
         # Replace ${PIPELINE_ID} placeholder in the pipeline string
         current_pipeline = pipeline.replace("${PIPELINE_ID}", placeholder_pipeline_id)
 
-        additional_elements = f"! gvafpscounter write-pipe=/tmp/{pipe_id} ! {sync_elements}"
+        additional_elements = f"! gvafpscounter{fpscounter_props} write-pipe=/tmp/{pipe_id} ! {sync_elements}"
         inputs.append(f"{current_pipeline} {additional_elements}")
 
     pipeline_branches = " ".join(inputs)
     multi_pipeline = f"gst-launch-1.0 -q {pipeline_branches}"
-    result_pipeline = f"gst-launch-1.0 -q gvafpscounter read-pipe=/tmp/{pipe_id} ! fakesink sync={sync_str}"
+    result_pipeline = (
+        f"gst-launch-1.0 -q gvafpscounter{fpscounter_props} read-pipe=/tmp/{pipe_id} ! fakesink sync={sync_str}"
+    )
 
     # Log the pipeline with better truncation handling to show both start and end
     if len(multi_pipeline) > 1500:
@@ -62,6 +68,8 @@ def build_baseline_pipeline(pipeline):
     """
     Build a baseline pipeline for single stream analysis.
     Always uses sync=false for maximum throughput measurement.
+    Note: Baseline analysis uses default gvafpscounter (no custom properties)
+          to measure raw pipeline performance.
 
     Args:
         pipeline: The resolved pipeline string
@@ -137,6 +145,56 @@ def get_sync_config(pipeline_params, device_id, device_dict=None):
     return sync_value
 
 
+def get_fpscounter_config(pipeline_params, device_id, device_dict=None):
+    """
+    Get FPS counter element properties configuration from pipeline_params.
+    This allows configuring gvafpscounter properties like starting-frame.
+
+    Args:
+        pipeline_params: Dictionary of pipeline parameters
+        device_id: Device ID to use for parameter lookup
+        device_dict: Dictionary containing device information (optional)
+
+    Returns:
+        String with fpscounter element properties (e.g., "starting-frame=2000")
+    """
+    if not pipeline_params:
+        # Return empty if no params provided
+        return ""
+
+    # Get device type from device_dict if available
+    device_type = None
+    if device_dict and device_id in device_dict:
+        device_type = device_dict[device_id]["device_type"]
+
+    device_type_key = device_type.lower() if device_type else ""
+    device_id_key = device_id.lower()
+
+    # Determine type_key for mapping (same logic as resolve_pipeline_placeholders)
+    if "gpu" in device_id_key:
+        if "integrated" in device_type_key:
+            type_key = "gpu_integrated"
+        elif "discrete" in device_type_key:
+            type_key = "gpu_discrete"
+        else:
+            type_key = "gpu"
+    elif "cpu" in device_id_key:
+        type_key = "cpu"
+    elif "npu" in device_id_key:
+        type_key = "npu"
+    else:
+        type_key = device_type_key
+
+    # Get fpscounter properties configuration
+    fpscounter_params = pipeline_params.get("FPSCOUNTER_PROPS", {})
+
+    # Try to get device-specific value, fall back to default
+    fpscounter_value = fpscounter_params.get(type_key, fpscounter_params.get("default", ""))
+
+    logger.debug(f"FPS counter properties for {device_id}: {fpscounter_value}")
+    return fpscounter_value
+
+
 def get_pipeline_info(
     device_id: str,
     pipeline: str,
@@ -173,12 +231,14 @@ def get_pipeline_info(
                 truncated = base
             return {"baseline_pipeline": truncated, "result_pipeline": result}
         else:
+            fpscounter_config = get_fpscounter_config(pipeline_params, device_id, device_dict)
             sync_value = get_sync_config(pipeline_params, device_id, device_dict)
             multi, result = build_multi_pipeline_with_devices(
                 pipeline=resolved_pipeline,
                 device_id=device_id,
                 num_streams=num_streams,
                 pipeline_sync=sync_value,
+                fpscounter_elements=fpscounter_config,
             )
             if len(multi) > 1500:
                 truncated = f"{multi[:1000]} ... \n[middle content truncated] ... {multi[-500:]}"

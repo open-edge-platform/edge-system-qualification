@@ -124,12 +124,15 @@ def run_device_test(
         # Update metrics and metadata if pass and per stream FPS is available
         if is_qualified and device_result.get("per_stream_fps", 0) > 0:
             status = True
-            num_streams = device_result.get("num_streams", -1)
-            per_stream_fps = device_result.get("per_stream_fps", -1)
+            num_streams = device_result.get("num_streams", 0)
+            per_stream_fps = device_result.get("per_stream_fps", 0)
         else:
             status = False
-            num_streams = -1
-            per_stream_fps = -1
+            num_streams = 0
+            per_stream_fps = 0
+            # Propagate error reason if available
+            if "error_reason" in device_result:
+                result.metadata["error"] = device_result["error_reason"]
 
         result.metrics.update(
             {get_metric_name_for_device(device_id, prefix="streams_max"): Metrics(unit="streams", value=num_streams)}
@@ -185,8 +188,8 @@ def process_device_results(device_list: list, qualified_devices: Dict[str, Any],
         # Only update with devices that have passed qualification
         if dev_data.get("pass", False):
             # Update the results metadata with the latest qualified device metrics
-            latest_streams = dev_data.get("num_streams", -1)
-            latest_fps = dev_data.get("per_stream_fps", -1)
+            latest_streams = dev_data.get("num_streams", 0)
+            latest_fps = dev_data.get("per_stream_fps", 0)
 
             # Update metadata
             results.metadata[f"Maximum Streams {dev_id}"] = latest_streams
@@ -259,7 +262,12 @@ def update_device_pipeline_info(
             continue
 
 
-def validate_final_streams_results(results: Result, qualified_devices: Dict[str, Any], device_list: list) -> bool:
+def validate_final_streams_results(
+    results: Result,
+    qualified_devices: Dict[str, Any],
+    device_list: list,
+    failed_devices: Dict[str, Any] = None,
+) -> bool:
     """
     Validate final streams results and update error status if needed.
 
@@ -267,6 +275,7 @@ def validate_final_streams_results(results: Result, qualified_devices: Dict[str,
         results: Main results object to update
         qualified_devices: Dictionary of qualified device results
         device_list: List of all device IDs tested
+        failed_devices: Dictionary of failed device results with error_reason (optional)
 
     Returns:
         True if validation passed, False if failed
@@ -288,13 +297,28 @@ def validate_final_streams_results(results: Result, qualified_devices: Dict[str,
         ]
         failed_device_names = [dev_id for dev_id in device_list if dev_id not in qualified_device_names]
 
+        # Build detailed error message with device-specific error reasons
+        error_details = []
+        if failed_devices:
+            for dev_id in failed_device_names:
+                if dev_id in failed_devices and "error_reason" in failed_devices[dev_id]:
+                    error_details.append(f"{dev_id}: {failed_devices[dev_id]['error_reason']}")
+                else:
+                    error_details.append(f"{dev_id}: Unknown error")
+
         if len(device_list) > 1:
-            error_message = (
+            base_message = (
                 f"No devices qualified for multi-device testing. "
                 f"All devices failed qualification: {failed_device_names}"
             )
         else:
-            error_message = f"Device failed qualification. No streams achieved: {failed_device_names}"
+            base_message = f"Device failed qualification. No streams achieved: {failed_device_names}"
+
+        # Append detailed error reasons if available
+        if error_details:
+            error_message = base_message + ". Details: " + "; ".join(error_details)
+        else:
+            error_message = base_message
 
         logger.error(error_message)
         results.metadata["status"] = False
@@ -427,5 +451,7 @@ def update_final_results_metadata(
         logger.info(f"Total qualified streams: {total_streams}")
     else:
         results.metadata["status"] = False
-        results.metadata["error"] = "No devices passed qualification"
+        # Only set generic error if no specific error already exists (from validate_final_streams_results)
+        if "error" not in results.metadata or not results.metadata["error"]:
+            results.metadata["error"] = "No devices passed qualification"
         logger.warning("Test failed: No devices passed qualification")

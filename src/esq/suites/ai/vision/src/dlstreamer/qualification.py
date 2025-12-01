@@ -14,7 +14,12 @@ import docker
 import numa
 
 from .container import run_dlstreamer_analyzer_container
-from .pipeline import build_multi_pipeline_with_devices, get_sync_config, resolve_pipeline_placeholders
+from .pipeline import (
+    build_multi_pipeline_with_devices,
+    get_fpscounter_config,
+    get_sync_config,
+    resolve_pipeline_placeholders,
+)
 from .preparation import get_device_specific_docker_image
 from .utils import update_device_metrics
 
@@ -109,12 +114,14 @@ def run_benchmark_container(
     resolved_pipeline = resolve_pipeline_placeholders(pipeline, pipeline_params, device_id, device_dict)
     if num_streams is not None:
         sync_value = get_sync_config(pipeline_params, device_id, device_dict)
+        fpscounter_config = get_fpscounter_config(pipeline_params, device_id, device_dict)
         multi_pipeline, result_pipeline = build_multi_pipeline_with_devices(
             pipeline=resolved_pipeline,
             device_id=device_id,
             num_streams=num_streams,
             visualize_stream=visualize_stream,
             pipeline_sync=sync_value,
+            fpscounter_elements=fpscounter_config,
         )
     else:
         multi_pipeline = ""
@@ -430,10 +437,16 @@ def qualify_device(
                     return True
                 else:
                     # Timeout at or below baseline - genuine failure
-                    logger.error(
-                        f"[{device_id}] Failed at {current_num_streams} streams (baseline: {initial_streams}) "
-                        f"due to analysis status '{current_analysis_status}'. Device disqualified."
+                    current_fps = latest_result.get(device_id, {}).get("per_stream_fps", 0.0)
+                    error_reason = (
+                        f"Analysis failed at {current_num_streams} streams (baseline: {initial_streams}) "
+                        f"with {current_fps:.2f} FPS due to '{current_analysis_status}'"
                     )
+                    logger.error(f"[{device_id}] {error_reason}. Device disqualified.")
+                    device_data["pass"] = False
+                    device_data["num_streams"] = 0
+                    device_data["error_reason"] = error_reason
+                    _save_device_result(device_result_path, device_id, device_data)
                     return False
 
             current_fps = latest_result[device_id].get("per_stream_fps", 0)
@@ -654,18 +667,22 @@ def qualify_device(
                         return True
                     else:
                         # No successful configuration found
-                        logger.warning(
-                            f"[{device_id}] Cannot meet target FPS. "
-                            f"Current FPS: {current_fps:.2f}, Target: {target_fps:.2f}"
+                        error_reason = (
+                            f"Cannot meet target FPS of {target_fps:.2f}. "
+                            f"Current FPS: {current_fps:.2f} at {current_num_streams} streams "
+                            f"after {iteration} iterations"
                         )
+                        logger.warning(f"[{device_id}] {error_reason}")
                         for dev_id, dev_data in combined_analysis.items():
                             logger.warning(f"  - {dev_id}: {dev_data.get('per_stream_fps', 0):.2f} FPS")
 
                         device_data["pass"] = False
                         device_data["per_stream_fps"] = current_fps
                         device_data["num_streams"] = 0
+                        device_data["error_reason"] = error_reason
                         logger.error(
-                            f"[{device_id}] Disqualified after {iteration} iterations (max: {max_iterations})."
+                            f"[{device_id}] Disqualified after {iteration} iterations "
+                            f"(max: {max_iterations}). {error_reason}"
                         )
 
                         # Save the failed device result
@@ -723,9 +740,14 @@ def qualify_device(
 
     # If there's absolutely no successful configuration, device failed
     else:
-        logger.error(f"[{device_id}] No successful configuration found. Qualification failed.")
+        error_reason = (
+            f"No successful configuration found after {max_iterations} iterations. "
+            f"Unable to meet target FPS of {target_fps:.2f}"
+        )
+        logger.error(f"[{device_id}] {error_reason}. Qualification failed.")
         device_data["num_streams"] = 0
         device_data["pass"] = False
+        device_data["error_reason"] = error_reason
 
     # Save final result
     _save_device_result(device_result_path, device_id, device_data)

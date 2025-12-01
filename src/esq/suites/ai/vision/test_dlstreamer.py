@@ -198,14 +198,15 @@ def test_dlstreamer(
         for result in baseline_streams_results:
             if result.metadata.get("status", False):
                 logger.info(
-                    f"Device {result.metadata['device_id']} - Per Stream FPS: {result.metadata.get('per_stream_fps', 'N/A')}, Num Streams: {result.metadata.get('num_streams', 'N/A')}"
+                    f"Device {result.metadata['device_id']} - Per Stream FPS: "
+                    f"{result.metadata.get('per_stream_fps', 'N/A')}, "
+                    f"Num Streams: {result.metadata.get('num_streams', 'N/A')}"
                 )
             else:
                 logger.error(f"Baseline streams analysis failed for device {result.metadata['device_id']}")
 
         # Step 3: Execute test
         qualified_devices: Dict[str, Any] = {}
-        final_results: Dict[str, Any] = {}  # Prepare result template
         default_metrics = [(get_metric_name_for_device(dev, prefix="streams_max"), "streams") for dev in device_list]
         current_kpi_refs = configs.get("kpi_refs", [])
         if not current_kpi_refs:
@@ -266,9 +267,7 @@ def test_dlstreamer(
                 all_metrics["streams_max"] = "streams"
                 logger.debug("Added aggregate streams_max metric")
 
-        metrics = {
-            kpi: Metrics(unit=unit, value=0.0 if kpi == "streams_max" else -1.0) for kpi, unit in all_metrics.items()
-        }
+        metrics = {kpi: Metrics(unit=unit, value=0.0) for kpi, unit in all_metrics.items()}
 
         # Initialize results template using from_test_config for automatic metadata application
         results = Result.from_test_config(
@@ -312,6 +311,9 @@ def test_dlstreamer(
         # Cleanup before starting the test
         cleanup()
 
+        # Track failed devices with error details
+        failed_devices = {}
+
         # Run total streams analysis for all devices in device_list
         for device_id in sorted_devices:
             logger.info(f"\n{'=' * 60}\nProcessing device: {device_id}\n{'=' * 60}")
@@ -319,7 +321,7 @@ def test_dlstreamer(
 
             # Prepare device-specific configurations
             metric_name = get_metric_name_for_device(device_id, prefix="streams_max")
-            default_metrics = {metric_name: Metrics(unit="streams", value=-1.0)}
+            default_metrics = {metric_name: Metrics(unit="streams", value=0.0)}
 
             # Specific cache configurations for each device
             cache_configs = {
@@ -386,7 +388,10 @@ def test_dlstreamer(
                 logger.debug(f"[before update] DL Streamer Test results: {json.dumps(results.to_dict(), indent=2)}")
                 logger.info(f"Device {device_id} qualified with {device_streams} streams at {stream_fps:.2f} FPS")
             else:
-                logger.error(f"Test failed for device {device_id}: {result.metadata.get('error', 'Unknown error')}")
+                error_reason = result.metadata.get("error", "Unknown error")
+                logger.error(f"Test failed for device {device_id}: {error_reason}")
+                # Store failed device information for error reporting
+                failed_devices[device_id] = {"error_reason": error_reason, "num_streams": 0, "pass": False}
                 continue
 
         # Process device results using modular function
@@ -396,7 +401,7 @@ def test_dlstreamer(
         finalize_device_metrics(results, qualified_devices, device_list)
 
         # Validate final streams results using modular function
-        validate_final_streams_results(results, qualified_devices, device_list)
+        validate_final_streams_results(results, qualified_devices, device_list, failed_devices)
 
         # Update pipeline information for qualified devices using modular function
         update_device_pipeline_info(results, qualified_devices, pipeline, pipeline_params, device_dict)
@@ -482,10 +487,7 @@ def test_dlstreamer(
                 all_metrics = {}
                 for kpi in current_kpi_refs:
                     all_metrics[kpi] = get_kpi_config(kpi).get("unit", "")
-            metrics = {
-                kpi: Metrics(unit=unit, value=0.0 if kpi == "streams_max" else -1.0)
-                for kpi, unit in all_metrics.items()
-            }
+            metrics = {kpi: Metrics(unit=unit, value=0.0) for kpi, unit in all_metrics.items()}
 
             results = Result.from_test_config(
                 configs=configs,

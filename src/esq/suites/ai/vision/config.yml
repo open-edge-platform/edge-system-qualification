@@ -12,7 +12,7 @@ kpi:
     unit: "streams"
     severity: "normal"
     description: "Maximum number of concurrent video streams"
-    default_value: -1.0
+    default_value: 0.0
 
   streams_max_cpu:
     name: "Maximum Streams CPU"
@@ -24,7 +24,7 @@ kpi:
     unit: "streams"
     severity: "normal"
     description: "Maximum number of concurrent video streams on CPU"
-    default_value: -1.0
+    default_value: 0.0
 
   streams_max_igpu:
     name: "Maximum Streams iGPU"
@@ -36,7 +36,7 @@ kpi:
     unit: "streams"
     severity: "normal"
     description: "Maximum number of concurrent video streams on iGPU"
-    default_value: -1.0
+    default_value: 0.0
 
   streams_max_dgpu:
     name: "Maximum Streams dGPU"
@@ -48,7 +48,7 @@ kpi:
     unit: "streams"
     severity: "normal"
     description: "Maximum number of concurrent video streams on dGPU"
-    default_value: -1.0
+    default_value: 0.0
 
   streams_max_npu:
     name: "Maximum Streams NPU"
@@ -60,7 +60,7 @@ kpi:
     unit: "streams"
     severity: "normal"
     description: "Maximum number of concurrent video streams on NPU"
-    default_value: -1.0
+    default_value: 0.0
 
 tests:
   test_dlstreamer:

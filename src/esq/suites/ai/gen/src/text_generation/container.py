@@ -32,6 +32,7 @@ def run_ovms_server_container(
     server_timeout: int = 300,
     model_id: str = "text_generation",
     port: int = 8000,
+    rest_workers: int = None,
 ) -> Dict[str, Any]:
     """
     Run OVMS server container for text generation.
@@ -46,6 +47,7 @@ def run_ovms_server_container(
         server_timeout: Server startup timeout
         model_id: Model identifier
         port: HTTP port for server
+        rest_workers: Number of REST workers (None/0 = auto, >0 = explicit count)
 
     Returns:
         Dict with container information and configuration
@@ -88,6 +90,9 @@ def run_ovms_server_container(
 
     # OVMS command - use original fixed ports and paths
     ovms_cmd = ["--port", "9000", "--rest_port", "8000", "--config_path", "/workspace/config_all.json"]
+
+    if rest_workers is not None and rest_workers > 0:
+        ovms_cmd.extend(["--rest_workers", str(rest_workers)])
 
     # Container labels for easy identification and cleanup
     container_labels = {
@@ -183,13 +188,13 @@ def run_ovms_server_container(
             # Handle all other exceptions with generic enhanced messaging
             enhanced_msg = f"Unexpected error during OVMS container creation - {error_type}: {error_msg}"
             logger.error(enhanced_msg)
-            
+
         if container_name:
             try:
                 docker_client.cleanup_container(container_name)
             except Exception as cleanup_error:
                 logger.debug(f"Failed to cleanup container after error: {cleanup_error}")
-        
+
         # Re-raise with enhanced error information for Docker API errors
         if docker and isinstance(e, docker.errors.APIError):
             raise RuntimeError(enhanced_msg) from e
@@ -261,7 +266,10 @@ def wait_for_ovms_model_ready(model_id: str, port: int, timeout: int = 300) -> t
                     mediapipe_names = [mp["name"] for mp in server_results.get("mediapipe_config_list", [])]
                     if model_id in mediapipe_names or safe_model_id in mediapipe_names:
                         duration = time.time() - start_time
-                        logger.info(f"OVMS MediaPipe servable {safe_model_id} is available and ready. Duration: {duration:.2f} seconds")
+                        logger.info(
+                            f"OVMS MediaPipe servable {safe_model_id} is available and ready. "
+                            f"Duration: {duration:.2f} seconds"
+                        )
                         return True, duration
                     logger.info(f"MediaPipe servables found: {mediapipe_names}, waiting for {safe_model_id}...")
                 else:
@@ -481,16 +489,21 @@ def cleanup_containers(docker_client: DockerClient, container_prefix: str) -> No
     """
     try:
         # First, try to cleanup by label (more reliable)
-        logger.info(f"Cleaning up containers with label test_suite=text_generation and container_prefix={container_prefix}")
-        containers = docker_client.client.containers.list(all=True, filters={
-            "label": [
-                "test_suite=text_generation",
-                f"container_prefix={container_prefix}",
-            ]
-        })
-        
+        logger.info(
+            f"Cleaning up containers with label test_suite=text_generation and container_prefix={container_prefix}"
+        )
+        containers = docker_client.client.containers.list(
+            all=True,
+            filters={
+                "label": [
+                    "test_suite=text_generation",
+                    f"container_prefix={container_prefix}",
+                ]
+            },
+        )
+
         if containers:
-            logger.info(f"Found {len(containers)} containers with matching labels")
+            logger.debug(f"Found {len(containers)} containers with matching labels")
             for container in containers:
                 try:
                     container_name = container.name
@@ -518,10 +531,8 @@ def cleanup_all_text_generation_containers(docker_client: DockerClient) -> None:
     """
     try:
         logger.info("Cleaning up all text generation test containers")
-        containers = docker_client.client.containers.list(all=True, filters={
-            "label": "test_suite=text_generation"
-        })
-        
+        containers = docker_client.client.containers.list(all=True, filters={"label": "test_suite=text_generation"})
+
         if containers:
             logger.info(f"Found {len(containers)} text generation containers to clean up")
             for container in containers:

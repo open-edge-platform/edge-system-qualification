@@ -34,6 +34,7 @@ def run_device_test(
     dataset_path: str,
     metrics: Optional[Dict[str, Metrics]] = None,
     configs: Optional[Dict] = None,
+    rest_workers: int = None,
 ) -> Result:
     """
     Execute Text Generation test for a single device.
@@ -56,6 +57,7 @@ def run_device_test(
         dataset_path: Path to dataset file
         metrics: Default metrics for the device
         configs: Test configuration dict (for quantization parameters)
+        rest_workers: Number of REST workers (None/0 = auto, >0 = explicit count)
 
     Returns:
         Result object with test outcomes
@@ -78,6 +80,7 @@ def run_device_test(
 
     # Track device test start time for accurate duration calculation
     import time
+
     device_test_start_time = time.time()
 
     try:
@@ -143,6 +146,7 @@ def run_device_test(
             server_timeout=server_timeout,
             model_id=ovms_model_name,  # Use actual model name with quantization suffix
             port=ovms_port,
+            rest_workers=rest_workers,
         )
 
         # Extract server startup duration
@@ -274,7 +278,9 @@ def run_device_test(
         device_test_end_time = time.time()
         total_device_duration = device_test_end_time - device_test_start_time
         result.metadata["total_duration_seconds"] = round(total_device_duration, 2)
-        logger.info(f"Device {device_id} test duration (failed): {result.metadata.get('total_duration_seconds', 0):.2f} seconds")
+        logger.info(
+            f"Device {device_id} test duration (failed): {result.metadata.get('total_duration_seconds', 0):.2f} seconds"
+        )
 
         return result
 
@@ -558,7 +564,7 @@ def process_device_results(results: list, device_list: list, final_results: Dict
             final_results["metadata"]["model_export_duration_seconds"] = result.metadata[
                 "model_export_duration_seconds"
             ]
-        
+
         # Copy flattened quantization config fields if present
         # Fields start with "quantization_" prefix (e.g., quantization_sym, quantization_group_size, etc.)
         for key, value in result.metadata.items():

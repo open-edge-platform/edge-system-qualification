@@ -48,6 +48,7 @@ def test_text_generation(
     test_num_prompts = configs.get("test_num_prompts", 5)
     test_request_rate = configs.get("test_request_rate", 1)
     test_max_concurrent_requests = configs.get("test_max_concurrent_requests", 1)
+    rest_workers = configs.get("rest_workers", 2)
     devices = configs.get("devices", [])
     timeout = configs.get("timeout", 300)
     server_timeout = configs.get("server_timeout", 600)
@@ -235,6 +236,7 @@ def test_text_generation(
                     dataset_path=dataset_path,
                     metrics=default_metrics,
                     configs=configs,
+                    rest_workers=rest_workers,
                 ),
                 test_name=test_name,
                 configs=configs,

@@ -75,6 +75,7 @@ def test_dlstreamer(
     docker_container_prefix = configs.get("docker_container_prefix", "test-dlstreamer")
     consecutive_success_threshold = configs.get("consecutive_success_threshold", 1)
     consecutive_failure_threshold = configs.get("consecutive_failure_threshold", 2)
+    consecutive_timeout_threshold = configs.get("consecutive_timeout_threshold", 2)
     max_streams_above_baseline = configs.get("max_streams_above_baseline", 3)
 
     # Setup
@@ -353,6 +354,7 @@ def test_dlstreamer(
                     num_sockets=num_sockets,
                     consecutive_success_threshold=consecutive_success_threshold,
                     consecutive_failure_threshold=consecutive_failure_threshold,
+                    consecutive_timeout_threshold=consecutive_timeout_threshold,
                     max_streams_above_baseline=max_streams_above_baseline,
                     qualified_devices=qualified_devices,
                     metrics=default_metrics,

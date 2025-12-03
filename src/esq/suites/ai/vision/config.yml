@@ -123,6 +123,10 @@ tests:
             url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-libraries/main/libraries/dl-streamer/samples/labels/imagenet_2012.txt"
             sha256: "acf75ef0abe89694b19056e0796401068b459c457baa30335f240c7692857355"
             path: "./labels/imagenet_2012.txt"
+        # Consecutive threshold parameters for intelligent binary search qualification
+        # consecutive_success_threshold: 1  # Number of consecutive successes before trying higher streams
+        # consecutive_failure_threshold: 2  # Number of consecutive FPS-based failures (>0 FPS but below target) before trying lower streams
+        # consecutive_timeout_threshold: 2  # Number of consecutive timeout failures (below baseline only) before trying lower streams
         pipeline: |
           filesrc location=./videos/1192116-hd_1920_1080_15fps_30s.mp4
             ! ${DECODE_ELEMENTS}

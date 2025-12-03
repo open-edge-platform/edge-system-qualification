@@ -33,6 +33,7 @@ def run_device_test(
     num_sockets: int,
     consecutive_success_threshold: int,
     consecutive_failure_threshold: int,
+    consecutive_timeout_threshold: int,
     max_streams_above_baseline: int,
     qualified_devices: Dict[str, Any],
     metrics=None,
@@ -106,6 +107,7 @@ def run_device_test(
             num_sockets=num_sockets,
             consecutive_success_threshold=consecutive_success_threshold,
             consecutive_failure_threshold=consecutive_failure_threshold,
+            consecutive_timeout_threshold=consecutive_timeout_threshold,
             max_streams_above_baseline=max_streams_above_baseline,
             container_config=container_config,
         )

@@ -503,10 +503,10 @@ index 000000000..2722f1005
 +}
 diff --git a/packages/web-awesome/src/components/Summary/index.tsx b/packages/web-awesome/src/components/Summary/index.tsx
 new file mode 100644
-index 000000000..036ee119d
+index 000000000..5dfc6673b
 --- /dev/null
 +++ b/packages/web-awesome/src/components/Summary/index.tsx
-@@ -0,0 +1,3313 @@
+@@ -0,0 +1,3326 @@
 +import { useEffect, useState } from "preact/hooks";
 +import { fetchAttachment } from "@allurereport/web-commons";
 +import * as styles from "./styles.scss";
@@ -2598,11 +2598,20 @@ index 000000000..036ee119d
 +    return (bytes / 1000000000).toFixed(2); // Convert to GB (decimal, not binary)
 +  };
 +
++  // Helper function to map internal tier names to display tier names
++  const mapTierDisplayName = (tierName: string | undefined): string | undefined => {
++    if (!tierName) return undefined;
++    if (tierName === "Scalable AI Graphics Media") {
++      return "Scalable Performance Graphics Media";
++    }
++    return tierName;
++  };
++
 +  // Helper function to get tier display name from any test in a section
 +  const getSectionTierDisplayName = (profilesData: any[]): string | undefined => {
 +    for (const profile of profilesData) {
 +      if (profile.tierDisplayName) {
-+        return profile.tierDisplayName;
++        return mapTierDisplayName(profile.tierDisplayName);
 +      }
 +    }
 +    return undefined;
@@ -2639,7 +2648,11 @@ index 000000000..036ee119d
 +      cpuDetails.push(`${cpu.brand}`);
 +      
 +      // Combine core counts and frequency information in one line
-+      let coreFreqLine = `${cpu.count} cores, ${cpu.logical_count} threads`;
++      let coreFreqLine = '';
++      if (cpu.sockets && cpu.sockets > 1) {
++        coreFreqLine = `${cpu.sockets} sockets • `;
++      }
++      coreFreqLine += `${cpu.count} cores • ${cpu.logical_count} threads`;
 +      if (cpu.frequency) {
 +        coreFreqLine += ` • Current: ${cpu.frequency.current.toFixed(0)} MHz • Range: ${cpu.frequency.min}-${cpu.frequency.max} MHz`;
 +      }
@@ -2949,7 +2962,7 @@ index 000000000..036ee119d
 +              // Tiers ordered from highest to lowest (top to bottom display)
 +              // This creates a bottom-to-top visual hierarchy where Entry is at the bottom
 +              const tiers = [
-+                "Scalable AI Graphics Media",
++                "Scalable Performance Graphics Media",
 +                "Scalable Performance",
 +                "Efficiency Optimized",
 +                "Mainstream",

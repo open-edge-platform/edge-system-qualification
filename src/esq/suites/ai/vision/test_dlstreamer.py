@@ -290,17 +290,8 @@ def test_dlstreamer(
             },
         )
 
-        # Optimize CPU baseline streams when running multiple devices
+        # Prepare baseline streams dictionary
         baseline_streams = {res.metadata["device_id"]: res.metadata for res in baseline_streams_results}
-        if len(device_list) > 1 and "CPU" in baseline_streams:
-            original_cpu_streams = baseline_streams["CPU"].get("num_streams", 1)
-            optimized_cpu_streams = max(1, original_cpu_streams // 3)  # Scale down by ratio of 3
-
-            if optimized_cpu_streams != original_cpu_streams:
-                logger.info("Optimizing CPU baseline streams for multi-device analysis:")
-                logger.info(f"  Original CPU baseline: {original_cpu_streams} streams")
-                logger.info(f"  Optimized CPU baseline: {optimized_cpu_streams} streams (scaled by 1/3)")
-                baseline_streams["CPU"]["num_streams"] = optimized_cpu_streams
 
         # Sort devices by priority based on baseline streams results using modular function
         sorted_baseline = sort_devices_by_priority(baseline_streams, device_dict)

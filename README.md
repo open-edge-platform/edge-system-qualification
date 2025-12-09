@@ -14,7 +14,7 @@
 
 ## Documentation
 
-For complete documentation, visit: [Intel® ESQ Documentation](https://open-edge-platform.github.io/edge-system-qualification/)
+For complete documentation, visit: [Intel® ESQ Documentation](https://open-edge-platform.github.io/edge-system-qualification/main/)
 
 
 

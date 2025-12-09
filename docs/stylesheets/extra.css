@@ -111,3 +111,19 @@ footer svg {
 
 .md-typeset a             { color: #0068B5 !important; }  /* Link font color - normal */
 .md-typeset a:hover       { color: #333333 !important; }  /* Link font color - hover */
+
+/* Version selector styling */
+.md-version__current {
+  font-size: 0.7rem;
+}
+
+/* Version dropdown list styling */
+.md-version__list {
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+/* Version dropdown item hover effect */
+.md-version__item:hover {
+  background-color: rgba(134, 134, 134, 0.1); 
+}

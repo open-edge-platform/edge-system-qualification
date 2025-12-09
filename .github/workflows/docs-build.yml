@@ -71,10 +71,66 @@ jobs:
           echo "| Runner Labels | \`${{ steps.configure.outputs.runner_labels }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
+  # Detect version information
+  detect-version:
+    name: Detect Version Information
+    needs: setup
+    runs-on: ${{ fromJSON(needs.setup.outputs.runner_labels) }}
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      title: ${{ steps.version.outputs.title }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Detect version from branch
+        id: version
+        run: |
+          echo "[INFO] Detecting version information..."
+          
+          BRANCH_NAME="${{ github.ref_name }}"
+          echo "Branch: ${BRANCH_NAME}"
+          
+          # Determine version based on branch
+          if [[ "${BRANCH_NAME}" == "main" ]]; then
+            VERSION="main"
+            TITLE="main (dev)"
+            echo "[INFO] Main branch detected"
+          elif [[ "${BRANCH_NAME}" =~ ^release/(.+)$ ]]; then
+            VERSION="${BASH_REMATCH[1]}"
+            
+            # For release branches, check if this is the latest release
+            git fetch origin 'refs/heads/release/*:refs/remotes/origin/release/*' || true
+            LATEST_RELEASE=$(git branch -r | grep 'origin/release/' | sed 's|.*/release/||' | sort -V | tail -n 1)
+            
+            if [ "${VERSION}" == "${LATEST_RELEASE}" ]; then
+              TITLE="${VERSION} (latest)"
+              echo "[INFO] Release branch detected - latest version: ${VERSION}"
+            else
+              TITLE="${VERSION}"
+              echo "[INFO] Release branch detected - version: ${VERSION}"
+            fi
+          else
+            VERSION="${BRANCH_NAME}"
+            TITLE="${BRANCH_NAME}"
+            echo "[INFO] Using branch name as version: ${VERSION}"
+          fi
+          
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "title=${TITLE}" >> $GITHUB_OUTPUT
+          
+          echo ""
+          echo "[INFO] Version Detection Complete:"
+          echo "  Version: ${VERSION}"
+          echo "  Title: ${TITLE}"
+
   # Build documentation
   build:
     name: Build Documentation
-    needs: setup
+    needs: [setup, detect-version]
     runs-on: ${{ fromJSON(needs.setup.outputs.runner_labels) }}
     steps:
       - name: Checkout repository
@@ -104,10 +160,12 @@ jobs:
           source .venv_docs/bin/activate
           uv pip install -r requirements-docs.txt
 
-      - name: Build documentation
+      - name: Build documentation with mkdocs
         run: |
           export PATH="$HOME/.local/bin:$PATH"
           source .venv_docs/bin/activate
+          
+          echo "[INFO] Building documentation for version: ${{ needs.detect-version.outputs.version }}"
           mkdocs build --clean
 
       - name: Upload build artifacts
@@ -121,6 +179,9 @@ jobs:
         run: |
           echo "## 🔰 Documentation Build" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### Build Details" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
           echo "| Runner Name | \`${{ runner.name }}\` |" >> $GITHUB_STEP_SUMMARY
@@ -128,12 +189,23 @@ jobs:
           echo "| Event | ${{ github.event_name }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Branch | \`${{ github.ref_name }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| Commit | [\`${{ github.sha }}\`](https://github.com/${{ github.repository }}/commit/${{ github.sha }}) |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### Version Information" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Version | \`${{ needs.detect-version.outputs.version }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Title | ${{ needs.detect-version.outputs.title }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
           
           if [[ "${{ job.status }}" == "success" ]]; then
-            echo "| Status | ✅ Build Successful |" >> $GITHUB_STEP_SUMMARY
+            echo "✅ **Build Status:** Successful" >> $GITHUB_STEP_SUMMARY
           else
-            echo "| Status | ❌ Build Failed |" >> $GITHUB_STEP_SUMMARY
+            echo "❌ **Build Status:** Failed" >> $GITHUB_STEP_SUMMARY
           fi
           
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "Documentation artifacts have been uploaded and are available for download." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "*Note: This is a build-only workflow. To deploy documentation, use the 'Docs Deploy' workflow.*" >> $GITHUB_STEP_SUMMARY

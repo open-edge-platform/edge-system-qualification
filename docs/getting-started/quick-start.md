@@ -114,7 +114,39 @@ curl -LsSf https://astral.sh/uv/install.sh | sh && source $HOME/.local/bin/env
     For detailed `uv` installation instructions, see the official [uv Installation](https://docs.astral.sh/uv/getting-started/installation/) documentation.
 
 
-### 5. Intel® ESQ
+### 5. Platform Power Monitoring
+
+Configure non-root access to RAPL (Running Average Power Limit) powercap files for platform power monitoring:
+
+!!! info "About RAPL Power Monitoring"
+    RAPL provides energy consumption data for Intel® processors. This step enables Intel® ESQ to collect power configuration information without requiring root privileges.
+
+Run the automated setup script to configure group-based permissions:
+
+```bash
+sudo bash -c "$(wget -qLO - https://raw.githubusercontent.com/open-edge-platform/edge-system-qualification/refs/heads/main/scripts/setup-powercap-permissions.sh)"
+```
+
+This setup script:
+
+- **Auto-detects** all powercap energy files on your system
+- Creates a `powercap` group for secure, user-specific access
+- Adds your user to the `powercap` group
+- Configures persistent permissions via `/etc/sysfs.d/powercap.conf` (applied automatically on boot)
+- Applies permissions immediately for the current session
+
+!!! note "Security & Persistence"
+    This configuration uses group-based permissions (mode 0440, owner root:powercap) to grant read-only access to RAPL powercap files exclusively to users in the `powercap` group. Permissions are automatically reapplied on boot via the sysfs configuration.
+
+!!! tip "Verification"
+    Verify access with:
+    ```bash
+    cat /sys/class/powercap/intel-rapl/intel-rapl:0/energy_uj
+    ```
+    If this command prints a number without requiring sudo, the setup was successful.
+
+
+### 6. Intel® ESQ
 
 Install Intel® ESQ from GitHub*:
 

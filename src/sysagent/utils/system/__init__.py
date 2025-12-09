@@ -23,9 +23,7 @@ from ..core.process import (
     run_command_with_output,
     run_git_command,
 )
-
-# Re-export hardware and software modules for advanced usage
-from . import formatter, hardware, software
+from . import formatter, hardware, power, software
 from .cache import SystemInfoCache
 from .formatter import (
     format_hardware_summary,
@@ -33,6 +31,7 @@ from .formatter import (
     generate_simple_report,
 )
 from .info import collect_hardware_info, collect_software_info, collect_system_info
+from .power import collect_power_info
 
 __all__ = [
     # Main classes
@@ -41,6 +40,7 @@ __all__ = [
     "collect_system_info",
     "collect_hardware_info",
     "collect_software_info",
+    "collect_power_info",
     # Formatting functions
     "generate_simple_report",
     "format_hardware_summary",
@@ -58,6 +58,7 @@ __all__ = [
     # Submodules
     "hardware",
     "software",
+    "power",
     "formatter",
     "process",
 ]

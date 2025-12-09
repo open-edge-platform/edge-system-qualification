@@ -1014,7 +1014,7 @@ class DockerClient:
         Cleanup all containers managed by this client.
         """
         container_names = list(self._log_threads.keys())
-        logger.info(f"Cleaning up {len(container_names)} containers")
+        logger.debug(f"Cleaning up {len(container_names)} containers")
 
         for container_name in container_names:
             try:

@@ -290,6 +290,7 @@ suites:
                 devices: [dgpu]
                 tiers:
                   - scalable_ai_graphics_media_24gb
+                  - scalable_ai_graphics_media_52gb
                 kpi_refs:
                   - throughput_dgpu
                 kpi_override:
@@ -305,35 +306,6 @@ suites:
                 devices: [hetero-dgpu]
                 tiers:
                   - scalable_ai_graphics_media_hetero_24gb
-                kpi_refs:
-                  - throughput_hetero_dgpu
-                kpi_override:
-                  throughput_hetero_dgpu:
-                    validation:
-                      reference: 10.0
-                      enabled: true
-
-              - test_id: "AES-GEN-001"
-                display_name: "Gen AI LLM Serving Benchmark - DeepSeek-R1-Distill-Llama-70B INT4 (dGPU)"
-                model_id: "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
-                model_precision: "int4"
-                devices: [dgpu]
-                tiers:
-                  - scalable_ai_graphics_media_52gb
-                kpi_refs:
-                  - throughput_dgpu
-                kpi_override:
-                  throughput_dgpu:
-                    validation:
-                      reference: 10.0
-                      enabled: true
-
-              - test_id: "AES-GEN-001"
-                display_name: "Gen AI LLM Serving Benchmark - DeepSeek-R1-Distill-Llama-70B INT4 (Hetero dGPU)"
-                model_id: "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
-                model_precision: "int4"
-                devices: [hetero-dgpu]
-                tiers:
                   - scalable_ai_graphics_media_hetero_52gb
                 kpi_refs:
                   - throughput_hetero_dgpu

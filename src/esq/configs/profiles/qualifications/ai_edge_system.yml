@@ -373,7 +373,7 @@ suites:
                 kpi_override:
                   streams_max:
                     validation:
-                      reference: 40
+                      reference: 10
                       enabled: true
 
               # Scalable AI Graphic Media
@@ -395,5 +395,5 @@ suites:
                 kpi_override:
                   streams_max:
                     validation:
-                      reference: 10
+                      reference: 40
                       enabled: true

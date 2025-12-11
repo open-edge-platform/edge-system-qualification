@@ -331,7 +331,7 @@ suites:
                 kpi_override:
                   streams_max:
                     validation:
-                      reference: 2
+                      reference: 4
                       enabled: true
 
               # Mainstream
@@ -345,7 +345,7 @@ suites:
                 kpi_override:
                   streams_max:
                     validation:
-                      reference: 3
+                      reference: 8
                       enabled: true
 
               # Efficiency Optimized
@@ -359,7 +359,7 @@ suites:
                 kpi_override:
                   streams_max:
                     validation:
-                      reference: 4
+                      reference: 25
                       enabled: true
 
               # Scalable Performance
@@ -373,7 +373,7 @@ suites:
                 kpi_override:
                   streams_max:
                     validation:
-                      reference: 11
+                      reference: 40
                       enabled: true
 
               # Scalable AI Graphic Media
@@ -395,5 +395,5 @@ suites:
                 kpi_override:
                   streams_max:
                     validation:
-                      reference: 9
+                      reference: 10
                       enabled: true

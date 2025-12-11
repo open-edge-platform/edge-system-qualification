@@ -31,7 +31,7 @@ params:
       height: 1080
       fps: 30
       codec: "h265"
-      loop: 30 # Loop to achieve ~30s duration
+      loop: 120 # Loop to achieve ~120s duration
     - id: "yolo11n"
       type: "model"
       source: "ultralytics"

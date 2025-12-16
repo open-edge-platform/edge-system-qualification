@@ -634,6 +634,8 @@ class DockerClient:
         ports: Mapping[str, int | list[int] | tuple[str, int] | None] | None = None,
         mode: str = "batch",  # "batch" or "server"
         attach_logs: bool = True,  # Whether to attach container logs to Allure report
+        privileged: bool = False,  # Run container in privileged mode
+        ipc_mode: str = None,  # IPC mode (e.g., "host")
     ):
         """
         Run a Docker container with specified configuration.
@@ -663,6 +665,8 @@ class DockerClient:
             ports: Port mappings
             mode: Execution mode - "batch" (wait for completion) or "server" (return immediately)
             attach_logs: Whether to attach container logs to Allure report
+            privileged: Run container in privileged mode
+            ipc_mode: IPC mode (e.g., "host" for shared memory)
 
         Returns:
             For batch mode: dict with container_logs_text, result_text, result_json, container_info
@@ -756,6 +760,8 @@ class DockerClient:
                 cap_add=cap_add,
                 command=command,
                 ports=ports,
+                privileged=privileged,
+                ipc_mode=ipc_mode,
             )
             logger.debug(f"Container {container.name} with mode {mode} started successfully")
 

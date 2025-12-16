@@ -6,6 +6,7 @@
 import logging
 import re
 from uuid import uuid4
+from sysagent.utils.system.ov_helper import get_available_devices, get_openvino_device_type
 
 logger = logging.getLogger(__name__)
 
@@ -327,6 +328,8 @@ def resolve_pipeline_placeholders(pipeline, pipeline_params=None, device_id="CPU
 
     # Use centralized type_key determination
     type_key = get_device_type_key(device_id, device_dict)
+    logger.info(f"Device {device_id}: Determined type_key = '{type_key}'")
+
 
     # Get device properties using OpenVINO
     from sysagent.utils.system.ov_helper import get_openvino_device_properties
@@ -334,15 +337,26 @@ def resolve_pipeline_placeholders(pipeline, pipeline_params=None, device_id="CPU
     device_properties = get_openvino_device_properties(device_id)
     all_properties = device_properties.get("all_properties", {})
 
-    # Detect if integrated GPU is present in the system
+    # Detect if integrated GPU is ENABLED and available in the system
+    # IMPORTANT: Check ALL available devices (via OpenVINO), not just ones in device_dict
+    # This detects only ENABLED iGPUs - disabled iGPUs won't appear in OpenVINO's available_devices
+    # Scenarios:
+    # 1. dGPU-only system (no iGPU hardware): has_igpu=False → use gpu_discrete_primary
+    # 2. System with disabled iGPU (iGPU exists but disabled in BIOS): has_igpu=False → use gpu_discrete_primary  
+    # 3. Hybrid system (iGPU enabled + dGPU): has_igpu=True → use gpu_discrete
     has_igpu = False
-    if device_dict:
-        for dev_id, dev_info in device_dict.items():
-            dev_type = dev_info.get("device_type", "").lower()
-            if "integrated" in dev_type and dev_id.upper().startswith("GPU"):
+    
+    all_system_devices = get_available_devices()
+    for dev_id in all_system_devices:
+        if dev_id.upper().startswith("GPU"):
+            dev_type = get_openvino_device_type(dev_id)
+            if dev_type and "integrated" in dev_type.lower():
                 has_igpu = True
-                logger.debug(f"Integrated GPU detected: {dev_id}")
+                logger.debug(f"Integrated GPU (enabled) detected in system: {dev_id} (type: {dev_type})")
                 break
+    
+    if not has_igpu:
+        logger.debug("No enabled integrated GPU found in system (either no iGPU hardware or iGPU disabled)")
 
     # Compute RENDER_DEVICE_NUM for discrete GPUs
     # Special handling: if this is the first dGPU (GPU.0) and no iGPU exists,
@@ -352,17 +366,27 @@ def resolve_pipeline_placeholders(pipeline, pipeline_params=None, device_id="CPU
 
     if type_key == "gpu_discrete":
         base_render_num = int(128)
-        # Extract device number from device_id (e.g. GPU.1 -> 1)
+        # Extract device number from device_id (e.g. GPU.0 -> 0, GPU.1 -> 1)
+        device_num = 0  # Default to 0 for primary GPU
         try:
-            device_num = int(device_id.split(".")[-1])
+            if "." in device_id:
+                device_num = int(device_id.split(".")[-1])
+            else:
+                # If device_id doesn't contain ".", it's likely the first/primary GPU
+                device_num = 0
+                logger.debug(f"Device ID '{device_id}' has no index, assuming device_num=0")
+            
             render_device_num = str(base_render_num + device_num)
+            logger.debug(f"Device {device_id}: device_num={device_num}, render_device_num={render_device_num}, has_igpu={has_igpu}")
 
             # Special case: first dGPU without iGPU uses renderD128
             # In this case, use default VA decoder instead of numbered one
             if device_num == 0 and not has_igpu:
                 use_default_va_decoder = True
-                logger.debug("First dGPU without iGPU detected - will use default VA decoder")
-        except Exception:
+                logger.info(f"First dGPU (device_num=0) without enabled iGPU detected - will use gpu_discrete_primary mapping")
+        except Exception as e:
+            logger.warning(f"Failed to extract device number from {device_id}: {e}, defaulting to 0")
+            device_num = 0
             render_device_num = str(base_render_num)
 
     # Note: PIPELINE_ID is now handled in build_multi_pipeline_with_devices and build_baseline_pipeline
@@ -385,7 +409,9 @@ def resolve_pipeline_placeholders(pipeline, pipeline_params=None, device_id="CPU
                 # Check if mapping has a gpu_discrete_primary key
                 if "gpu_discrete_primary" in mapping:
                     effective_type_key = "gpu_discrete_primary"
-                    logger.debug("Using gpu_discrete_primary mapping for first dGPU without iGPU")
+                    logger.info(f"Placeholder '{placeholder}': Using gpu_discrete_primary mapping for first dGPU without iGPU")
+                else:
+                    logger.warning(f"Placeholder '{placeholder}': gpu_discrete_primary key not found in mapping, falling back to gpu_discrete")
 
             # Check for property-based overrides
             overrides = mapping.get("overrides", {})

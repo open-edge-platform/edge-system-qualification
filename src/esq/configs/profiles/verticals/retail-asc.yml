@@ -1,8 +1,8 @@
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-name: "profile.vertical.retail"
-display_name: "Retail"
+name: "profile.vertical.retail-asc"
+display_name: "Retail Automated Self Checkout"
 description: "Retail Suites"
 version: "1.0.0"
 params:

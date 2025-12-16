@@ -47,6 +47,7 @@ dependencies = [
     "kagglehub>=0.3.13",
     "py-libnuma>=1.2",
     "nncf>=2.17.0",
+    "timm>=1.0.22",
 ]
 
 [project.scripts]

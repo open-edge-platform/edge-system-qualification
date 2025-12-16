@@ -23,21 +23,85 @@ params:
     os_type:
       - "linux"
     docker_required: true
-suites:
-  - name: "summary"
-    sub_suites:
-      - name: "vertical"
-        tests:
-          test_summary_metro:
-            params:
-              # 1. System Memory STREAM Benchmark
-              - test_id: "METRO-MEM-001"
-                display_name: "System Memory STREAM Benchmark "
-                benchmark_category: "memory_stream"
-                timeout: 180
-                target_test_ids:
-                  - "MEM-STR-001"
-                  - "MEM-STR-002"
-                  - "MEM-STR-003"
-                  - "MEM-STR-004"
+  container_image: "proxy_pl_bm_runner"
+  image_tag: "1.0"
+  dockerfile_name: "Dockerfile"
+  base_image: "intel/dlstreamer:2025.1.2-ubuntu24"
 
+suites:
+  - name: "vertical"
+    sub_suites:
+      - name: "vision"
+        tests:
+          test_proxy_pipelines:
+            params:
+              - test_id: "METRO-PROXY-001"
+                display_name: "LPR Pipeline (Multi-Devices)"
+                devices: [igpu,dgpu]
+                pptest: "LPRAIRunner"
+                timeout: 750
+                force_run: true
+
+              - test_id: "METRO-PROXY-002"
+                display_name: "Smart NVR (iGPU)"
+                devices: [igpu]
+                pptest: "SmartAIRunner"
+                timeout: 750
+                force_run: true
+                display_output: 0  # 0=no display, 1=enable display
+                requirements:
+                  igpu_required: true
+
+              - test_id: "METRO-PROXY-003"
+                display_name: "Smart NVR (dGPU)"
+                devices: [dgpu]
+                pptest: "SmartAIRunner"
+                timeout: 750
+                force_run: true
+                display_output: 0  # 0=no display, 1=enable display
+                requirements:
+                  dgpu_required: true
+                  dgpu_min_devices: 1
+                  dgpu_max_devices: 1
+
+              - test_id: "METRO-PROXY-004"
+                display_name: "Headed Visual AI Proxy Pipeline (iGPU)"
+                devices: [igpu]
+                pptest: "VisualAIRunner"
+                timeout: 750
+                force_run: true
+                display_output: 0  # 0=no display, 1=enable display
+                requirements:
+                  igpu_required: true
+
+              - test_id: "METRO-PROXY-005"
+                display_name: "Headed Visual AI Proxy Pipeline (dGPU)"
+                devices: [dgpu]
+                pptest: "VisualAIRunner"
+                timeout: 750
+                force_run: true
+                display_output: 0  # 0=no display, 1=enable display
+                requirements:
+                  dgpu_required: true
+                  dgpu_min_devices: 1
+                  dgpu_max_devices: 1
+
+              - test_id: "METRO-PROXY-006"
+                display_name: "VSaaS Visual AI Proxy Pipeline (iGPU)"
+                devices: [igpu]
+                pptest: "VsaasAIRunner"
+                timeout: 750
+                force_run: true
+                requirements:
+                  igpu_required: true
+
+              - test_id: "METRO-PROXY-007"
+                display_name: "VSaaS Visual AI Proxy Pipeline (dGPU)"
+                devices: [dgpu]
+                pptest: "VsaasAIRunner"
+                timeout: 750
+                force_run: true
+                requirements:
+                  dgpu_required: true
+                  dgpu_min_devices: 1
+                  dgpu_max_devices: 1

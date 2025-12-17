@@ -94,16 +94,18 @@ def _log_single_suggestion(
     if category == "software.docker.required":
         logger.info(f"{prefix}• {name}: Refer to Docker official installation guide")
         logger.info(f"{prefix}  Then add user to docker group: 'sudo usermod -aG docker $USER && newgrp docker'")
+    elif category == "hardware.gpu.required":
+        logger.info(f"{prefix}• {name}: This test requires any Intel GPU (iGPU or dGPU). Check if:")
+        logger.info(f"{prefix}  - An Intel GPU (integrated or discrete) is present")
+        logger.info(f"{prefix}  - Intel GPU drivers are installed")
     elif category == "hardware.gpu.discrete":
         logger.info(f"{prefix}• {name}: This test requires a discrete GPU (dGPU). Check if:")
-        logger.info(f"{prefix}  - A discrete GPU is properly installed and seated")
-        logger.info(f"{prefix}  - GPU drivers are installed (Intel Arc, AMD, or NVIDIA)")
-        logger.info(f"{prefix}  - GPU is detected by the system (check with 'lspci | grep -i vga')")
+        logger.info(f"{prefix}  - Discrete GPU is properly installed and enabled in BIOS/UEFI")
+        logger.info(f"{prefix}  - Intel GPU drivers are installed")
     elif category == "hardware.gpu.integrated":
         logger.info(f"{prefix}• {name}: This test requires an integrated GPU (iGPU). Check if:")
-        logger.info(f"{prefix}  - Integrated graphics are enabled in BIOS/UEFI")
-        logger.info(f"{prefix}  - Intel graphics drivers are installed")
-        logger.info(f"{prefix}  - CPU supports integrated graphics")
+        logger.info(f"{prefix}  - Integrated GPU is enabled in BIOS/UEFI")
+        logger.info(f"{prefix}  - Intel GPU drivers are installed")
     elif category == "hardware.cpu.cores":
         logger.info(f"{prefix}• {name}: Upgrade to a CPU with more cores")
     elif category == "hardware.memory.available":
@@ -145,16 +147,18 @@ def get_fix_suggestion_for_category(category: str, name: str, check: Dict[str, A
             f"{name}: Install Docker with 'sudo apt install docker.io' or 'curl -fsSL https://get.docker.com | sh'"
         )
         suggestions.append("Then add user to docker group: 'sudo usermod -aG docker $USER && newgrp docker'")
+    elif category == "hardware.gpu.required":
+        suggestions.append(f"{name}: This test requires any Intel GPU (iGPU or dGPU). Check if:")
+        suggestions.append("- An Intel GPU (integrated or discrete) is present")
+        suggestions.append("- Intel GPU drivers are installed")
     elif category == "hardware.gpu.discrete":
         suggestions.append(f"{name}: This test requires a discrete GPU (dGPU). Check if:")
-        suggestions.append("- A discrete GPU is properly installed and seated")
-        suggestions.append("- GPU drivers are installed (Intel Arc, AMD, or NVIDIA)")
-        suggestions.append("- GPU is detected by the system (check with 'lspci | grep -i vga')")
+        suggestions.append("- Discrete GPU is properly installed and enabled in BIOS/UEFI")
+        suggestions.append("- Intel GPU drivers are installed")
     elif category == "hardware.gpu.integrated":
         suggestions.append(f"{name}: This test requires an integrated GPU (iGPU). Check if:")
-        suggestions.append("- Integrated graphics are enabled in BIOS/UEFI")
-        suggestions.append("- Intel graphics drivers are installed")
-        suggestions.append("- CPU supports integrated graphics")
+        suggestions.append("- Integrated GPU is enabled in BIOS/UEFI")
+        suggestions.append("- Intel GPU drivers are installed")
     elif category == "hardware.cpu.cores":
         suggestions.append(f"{name}: Upgrade to a CPU with more cores, or use a different test profile")
     elif category == "hardware.memory.available":

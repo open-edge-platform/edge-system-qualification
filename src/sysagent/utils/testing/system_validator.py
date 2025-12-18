@@ -437,6 +437,45 @@ class SystemValidator:
                 }
             )
 
+        # GPU requirement (either iGPU or dGPU)
+        if "gpu_required" in hw_requirements and hw_requirements["gpu_required"]:
+            gpu_info = hardware.get("gpu", {})
+            devices = gpu_info.get("devices", [])
+
+            # Check for Intel devices with OpenVINO support (either integrated or discrete)
+            intel_devices = [dev for dev in devices if dev.get("vendor_id", "").lower() == "8086"]
+            intel_devices_with_ov = [dev for dev in intel_devices if "openvino" in dev]
+
+            passed = len(intel_devices_with_ov) > 0
+
+            if not passed:
+                if len(intel_devices) > 0:
+                    actual_msg = f"Found {len(intel_devices)} Intel GPU(s) but not detected by OpenVINO"
+                elif any(dev.get("vendor_id", "").lower() != "8086" for dev in devices):
+                    actual_msg = "Found non-Intel GPU(s) only"
+                else:
+                    actual_msg = "No GPU found"
+            else:
+                # Count integrated and discrete GPUs
+                igpu_count = len([dev for dev in intel_devices_with_ov if not dev.get("is_discrete", True)])
+                dgpu_count = len([dev for dev in intel_devices_with_ov if dev.get("is_discrete", False)])
+                if igpu_count > 0 and dgpu_count > 0:
+                    actual_msg = f"{igpu_count} Intel iGPU(s) and {dgpu_count} Intel dGPU(s) detected by OpenVINO"
+                elif igpu_count > 0:
+                    actual_msg = f"{igpu_count} Intel iGPU(s) detected by OpenVINO"
+                else:
+                    actual_msg = f"{dgpu_count} Intel dGPU(s) detected by OpenVINO"
+
+            results.append(
+                {
+                    "name": "GPU required",
+                    "passed": passed,
+                    "actual": actual_msg,
+                    "required": "At least 1 Intel GPU (iGPU or dGPU) detected by OpenVINO",
+                    "category": "hardware.gpu.required",
+                }
+            )
+
         # Integrated GPU requirement
         if "igpu_required" in hw_requirements and hw_requirements["igpu_required"]:
             gpu_info = hardware.get("gpu", {})

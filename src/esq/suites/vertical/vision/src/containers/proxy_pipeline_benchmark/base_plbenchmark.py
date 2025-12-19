@@ -180,9 +180,6 @@ class BaseProxyPipelineBenchmark(BaseDLBenchmark):
                     actual_gpu_freq = float(self.telemetry_list[3])
                     actual_pkg_power = float(self.telemetry_list[6])
                     self.logger.info(f"Using actual telemetry data - GPU Freq: {actual_gpu_freq:.2f} MHz, Pkg Power: {actual_pkg_power:.2f} W")
-                    # Use actual values instead of config defaults
-                    cur_ref_gpu_freq = actual_gpu_freq
-                    cur_ref_pkg_power = actual_pkg_power
                 else:
                     self.logger.warning(f"Insufficient telemetry data ({len(self.telemetry_list)} entries), using config values")
             except (ValueError, IndexError) as e:

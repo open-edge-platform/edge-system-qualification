@@ -138,10 +138,10 @@ class LPRBenchmark(BaseProxyPipelineBenchmark):
         if device_type == "iGPU":
             if self.VDBOX == 1:
                 self.config = {
-                    "ref_stream_list": [7],
+                    "ref_stream_list": [4, 7],
                     "ref_platform": "i5-12400 (16G Mem)",
-                    "ref_gpu_freq": -1,
-                    "ref_pkg_power": -1,
+                    "ref_gpu_freq_list": [-1, 1636.37],
+                    "ref_pkg_power_list": [-1, 11.96],
                     "models": ["yolov8_license_plate_detector+ch_PP-OCRv4_rec_infer"],
                     "modes": self.get_mode_and_compute_devices(available_devices, lpr_execd_modes),
                     # Mode-specific reference values for graph visualization
@@ -150,68 +150,114 @@ class LPRBenchmark(BaseProxyPipelineBenchmark):
                         "Mode 0": 4,  # CPU/CPU/CPU
                         "Mode 2": 7,  # iGPU/iGPU/iGPU
                     },
+                    "mode_ref_gpu_freq": {
+                        "Mode 0": -1,  # CPU/CPU/CPU
+                        "Mode 2": 1636.37,  # iGPU/iGPU/iGPU
+                    },
+                    "mode_ref_pkg_power": {
+                        "Mode 0": -1,  # CPU/CPU/CPU
+                        "Mode 2": 11.96,  # iGPU/iGPU/iGPU
+                    },
                 }
             else:
                 if self.is_MTL:
                     self.config = {
-                        "ref_stream_list": [14],
+                        "ref_stream_list": [6, 15, 17, 17],
                         "ref_platform": "MTL 165H (32G Mem)",
-                        "ref_gpu_freq": -1,
-                        "ref_pkg_power": -1,
+                        "ref_gpu_freq_list": [-1, 1153.45, 1177.11, 243.96],
+                        "ref_pkg_power_list": [-1, 25.41, 26.23, 18.77],
                         "models": ["yolov8_license_plate_detector+ch_PP-OCRv4_rec_infer"],
                         "modes": self.get_mode_and_compute_devices(available_devices, lpr_execd_modes),
                         # Mode-specific reference values for graph visualization
                         # MTL 165H has iGPU and NPU support
                         "mode_ref_streams": {
                             "Mode 0": 6,  # CPU/CPU/CPU
-                            "Mode 2": 14,  # iGPU/iGPU/iGPU
-                            "Mode 3": 18,  # iGPU/iGPU/NPU
-                            "Mode 4": 22,  # iGPU/NPU/NPU
+                            "Mode 2": 15,  # iGPU/iGPU/iGPU
+                            "Mode 3": 17,  # iGPU/iGPU/NPU
+                            "Mode 4": 17,  # iGPU/NPU/NPU
+                        },
+                        "mode_ref_gpu_freq": {
+                            "Mode 0": -1,  # CPU/CPU/CPU
+                            "Mode 2": 1153.45,  # iGPU/iGPU/iGPU
+                            "Mode 3": 1177.11,  # iGPU/iGPU/NPU
+                            "Mode 4": 243.96,  # iGPU/NPU/NPU
+                        },
+                        "mode_ref_pkg_power": {
+                            "Mode 0": -1,  # CPU/CPU/CPU
+                            "Mode 2": 25.41,  # iGPU/iGPU/iGPU
+                            "Mode 3": 26.23,  # iGPU/iGPU/NPU
+                            "Mode 4": 18.77,  # iGPU/NPU/NPU
                         },
                     }
                 else:
                     self.config = {
-                        "ref_stream_list": [12],
+                        "ref_stream_list": [5, 18],
                         "ref_platform": "i7-1360p (16G Mem)",
-                        "ref_gpu_freq": -1,
-                        "ref_pkg_power": -1,
+                        "ref_gpu_freq_list": [-1, 1396.09],
+                        "ref_pkg_power_list": [-1, 36.10],
                         "models": ["yolov8_license_plate_detector+ch_PP-OCRv4_rec_infer"],
                         "modes": self.get_mode_and_compute_devices(available_devices, lpr_execd_modes),
                         # Mode-specific reference values for graph visualization
                         # Note: i7-1360p does not have NPU, so only CPU and iGPU modes
                         "mode_ref_streams": {
                             "Mode 0": 5,  # CPU/CPU/CPU
-                            "Mode 2": 12,  # iGPU/iGPU/iGPU
+                            "Mode 2": 18,  # iGPU/iGPU/iGPU
+                        },
+                        "mode_ref_gpu_freq": {
+                            "Mode 0": -1,  # CPU/CPU/CPU
+                            "Mode 2": 1396.09,  # iGPU/iGPU/iGPU
+                        },
+                        "mode_ref_pkg_power": {
+                            "Mode 0": -1,  # CPU/CPU/CPU
+                            "Mode 2": 36.10,  # iGPU/iGPU/iGPU
                         },
                     }
         elif device_type == "dGPU":
             self.config = {
-                "ref_stream_list": [30],
+                "ref_stream_list": [6, 14, 15, 14],
                 "ref_platform": "ARL Ultra 9 285 + B580",
-                "ref_gpu_freq": -1,
-                "ref_pkg_power": -1,
+                "ref_gpu_freq_list": [-1, 1131.87, 1128.87, 258.76],
+                "ref_pkg_power_list": [-1, 30.04, 30.27, 29.83],
                 "models": ["yolov8_license_plate_detector+ch_PP-OCRv4_rec_infer"],
                 "modes": self.get_mode_and_compute_devices(available_devices, lpr_execd_modes),
                 # Mode-specific reference values for graph visualization
                 # ARL Ultra 9 285 + B580 has dGPU and NPU support
                 "mode_ref_streams": {
                     "Mode 0": 6,  # CPU/CPU/CPU
-                    "Mode 1": 30,  # dGPU/dGPU/dGPU
-                    "Mode 5": 35,  # dGPU/dGPU/NPU
-                    "Mode 6": 40,  # dGPU/NPU/NPU
+                    "Mode 1": 14,  # dGPU/dGPU/dGPU
+                    "Mode 5": 15,  # dGPU/dGPU/NPU
+                    "Mode 6": 14,  # dGPU/NPU/NPU
+                },
+                "mode_ref_gpu_freq": {
+                    "Mode 0": -1,  # CPU/CPU/CPU
+                    "Mode 1": 1131.87,  # dGPU/dGPU/dGPU
+                    "Mode 5": 1128.87,  # dGPU/dGPU/NPU
+                    "Mode 6": 258.76,  # dGPU/NPU/NPU
+                },
+                "mode_ref_pkg_power": {
+                    "Mode 0": -1,  # CPU/CPU/CPU
+                    "Mode 1": 30.04,  # dGPU/dGPU/dGPU
+                    "Mode 5": 30.27,  # dGPU/dGPU/NPU
+                    "Mode 6": 29.83,  # dGPU/NPU/NPU
                 },
             }
         elif device_type == "CPU":
             self.config = {
                 "ref_stream_list": [14],
                 "ref_platform": "Xeon(R) Gold 6414U (128G Mem)",
-                "ref_gpu_freq": -1,
-                "ref_pkg_power": -1,
+                "ref_gpu_freq_list": [-1],
+                "ref_pkg_power_list": [-1],
                 "models": ["yolov8_license_plate_detector+ch_PP-OCRv4_rec_infer"],
                 "modes": self.get_mode_and_compute_devices(available_devices, lpr_execd_modes),
                 # Mode-specific reference values for graph visualization
                 "mode_ref_streams": {
                     "Mode 0": 14,  # CPU/CPU/CPU
+                },
+                "mode_ref_gpu_freq": {
+                    "Mode 0": -1,  # CPU/CPU/CPU
+                },
+                "mode_ref_pkg_power": {
+                    "Mode 0": -1,  # CPU/CPU/CPU
                 },
             }
         else:
@@ -267,11 +313,11 @@ class LPRBenchmark(BaseProxyPipelineBenchmark):
             result, avg_fps, refvalue, duration, model_name, mode, devices = arg
             dev_str = "/".join(f"{dev}({lbl})" for dev, lbl in zip(devices, dev_labels))
 
-            # Use mode-specific reference value if available
+            # Use mode-specific reference values if available
             ref_platform = self.config.get("ref_platform", "Unknown")
             mode_ref_value = self.config.get("mode_ref_streams", {}).get(mode, refvalue)
-            ref_gpu_freq = self.config.get("ref_gpu_freq", -1)
-            ref_pkg_power = self.config.get("ref_pkg_power", -1)
+            mode_ref_gpu_freq = self.config.get("mode_ref_gpu_freq", {}).get(mode, -1)
+            mode_ref_pkg_power = self.config.get("mode_ref_pkg_power", {}).get(mode, -1)
 
             # Telmetry collected
             cpu_freq, cpu_util, sys_mem, gpu_freq, eu_usage, vdbox_usage, pkg_power, gpu_power = self.telemetry_list
@@ -280,7 +326,9 @@ class LPRBenchmark(BaseProxyPipelineBenchmark):
             prefix_esc = f"{tc_name},{model_name},{mode},{dev_str},{result},{avg_fps}"
             prefix_esc = prefix_esc.replace("+", "\\+")
 
-            additional = f"{gpu_freq},{pkg_power},{ref_platform},{mode_ref_value},{ref_gpu_freq},{ref_pkg_power}"
+            additional = (
+                f"{gpu_freq},{pkg_power},{ref_platform},{mode_ref_value},{mode_ref_gpu_freq},{mode_ref_pkg_power}"
+            )
             additional += f",{duration:.2f},No Error"
 
         else:

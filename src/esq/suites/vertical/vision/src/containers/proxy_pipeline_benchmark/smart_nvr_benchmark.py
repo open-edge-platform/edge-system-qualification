@@ -51,8 +51,8 @@ class SmartNVRBenchmark(BaseProxyPipelineBenchmark):
                 self.config = {
                     "compose_size": 4,
                     "ref_stream_list": [10],
-                    "ref_gpu_freq_list": [-1],
-                    "ref_pkg_power_list": [-1],
+                    "ref_gpu_freq_list": [735.93],
+                    "ref_pkg_power_list": [11.96],
                     "ref_platform": "i5-12400 (16G Mem)",
                     "output_width": 1920,
                     "output_height": 1080,
@@ -64,9 +64,9 @@ class SmartNVRBenchmark(BaseProxyPipelineBenchmark):
                 if self.is_MTL:
                     self.config = {
                         "compose_size": 5,
-                        "ref_stream_list": [23, 12, 3],
-                        "ref_gpu_freq_list": [-1, -1, -1],
-                        "ref_pkg_power_list": [-1, -1, -1],
+                        "ref_stream_list": [18, 9, 3],
+                        "ref_gpu_freq_list": [1034.29, 1285.81, 957.05],
+                        "ref_pkg_power_list": [25.85, 26.98, 24.99],
                         "ref_platform": "MTL 165H (32G Mem)",
                         "output_width": 3840,
                         "output_height": 2160,
@@ -77,9 +77,9 @@ class SmartNVRBenchmark(BaseProxyPipelineBenchmark):
                 else:
                     self.config = {
                         "compose_size": 5,
-                        "ref_stream_list": [15, 7, 2],
-                        "ref_gpu_freq_list": [-1, -1, -1],
-                        "ref_pkg_power_list": [-1, -1, -1],
+                        "ref_stream_list": [17, 9, 3],
+                        "ref_gpu_freq_list": [1039.58, 1327.17, 1312.96],
+                        "ref_pkg_power_list": [27.47, 37.52, 26.68],
                         "ref_platform": "i7-1360p (16G Mem)",
                         "output_width": 3840,
                         "output_height": 2160,
@@ -90,10 +90,10 @@ class SmartNVRBenchmark(BaseProxyPipelineBenchmark):
         elif device_type == "dGPU":
             self.config = {
                 "compose_size": 6,
-                "ref_stream_list": [23, 6],
-                "ref_gpu_freq_list": [-1, -1],
-                "ref_pkg_power_list": [-1, -1],
-                "ref_platform": "Arc A380",
+                "ref_stream_list": [5, 1],
+                "ref_gpu_freq_list": [1543.15, 1012.30],
+                "ref_pkg_power_list": [43.35, 31.43],
+                "ref_platform": "Arc™ B-Series B580",
                 "output_width": 3840,
                 "output_height": 2160,
                 "models": ["yolov5m-416", "yolov5m-416+efficientnet-b0"],
@@ -215,7 +215,7 @@ class SmartNVRBenchmark(BaseProxyPipelineBenchmark):
             else:
                 gst_cmd += f"t{idx}. ! queue ! {self.dec_ele} ! {self.post_proc_ele} scale-method=fast ! video/x-raw,width={cell_width},height={cell_height} ! gvafpscounter starting-frame=1000 ! comp.sink_{idx} "
 
-        self.logger.debug(f"Genreated gst command for {stream} streams: ")
+        self.logger.debug(f"Constructed gst command for {stream} streams: ")
         self.logger.debug(gst_cmd)
         return gst_cmd
 

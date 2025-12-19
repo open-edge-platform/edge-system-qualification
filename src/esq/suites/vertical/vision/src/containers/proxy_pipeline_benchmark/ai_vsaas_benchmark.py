@@ -49,8 +49,8 @@ class AIVSaaSBenchmark(BaseProxyPipelineBenchmark):
             if self.VDBOX == 1:
                 self.config = {
                     "ref_stream_list": [10, 4],
-                    "ref_gpu_freq_list": [-1, -1],
-                    "ref_pkg_power_list": [-1, -1],
+                    "ref_gpu_freq_list": [858.21, 991.32],
+                    "ref_pkg_power_list": [93.39, 98.32],
                     "ref_platform": "i5-12400 (16G Mem)",
                     "models": ["yolov5s-416", "yolov5m-416"],
                     "enc_flag": "rate-control=cbr bitrate=2000 target-usage=7",
@@ -59,9 +59,9 @@ class AIVSaaSBenchmark(BaseProxyPipelineBenchmark):
             else:
                 if self.is_MTL:
                     self.config = {
-                        "ref_stream_list": [18, 12, 4],
-                        "ref_gpu_freq_list": [-1, -1, -1],
-                        "ref_pkg_power_list": [-1, -1, -1],
+                        "ref_stream_list": [18, 19, 5],
+                        "ref_gpu_freq_list": [1421.87, 1419.27, 852.81],
+                        "ref_pkg_power_list": [27.80, 28.11, 23.50],
                         "ref_platform": "MTL 165H (32G Mem)",
                         "models": ["yolov5s-416", "yolov5m-416", "yolov5m-416+efficientnet-b0"],
                         "enc_flag": "rate-control=cbr bitrate=2000 target-usage=7",
@@ -69,9 +69,9 @@ class AIVSaaSBenchmark(BaseProxyPipelineBenchmark):
                     }
                 else:
                     self.config = {
-                        "ref_stream_list": [12, 8, 3],
-                        "ref_gpu_freq_list": [-1, -1, -1],
-                        "ref_pkg_power_list": [-1, -1, -1],
+                        "ref_stream_list": [14, 13, 6],
+                        "ref_gpu_freq_list": [1251.51, 1361.60, 1437.98],
+                        "ref_pkg_power_list": [32.10, 34.65, 29.14],
                         "ref_platform": "i7-1360p (16G Mem)",
                         "models": ["yolov5s-416", "yolov5m-416", "yolov5m-416+efficientnet-b0"],
                         "enc_flag": "rate-control=cbr bitrate=2000 target-usage=7",
@@ -79,10 +79,10 @@ class AIVSaaSBenchmark(BaseProxyPipelineBenchmark):
                     }
         elif device_type == "dGPU":
             self.config = {
-                "ref_stream_list": [32, 24, 8],
-                "ref_gpu_freq_list": [-1, -1, -1],
-                "ref_pkg_power_list": [-1, -1, -1],
-                "ref_platform": "Arc A380",
+                "ref_stream_list": [1, 1, 0],
+                "ref_gpu_freq_list": [1020.50, 1208.22, 0],
+                "ref_pkg_power_list": [31.51, 35.62, -1],
+                "ref_platform": "Arc™ B-Series B580",
                 "models": ["yolov5s-416", "yolov5m-416", "yolov5m-416+efficientnet-b0"],
                 "enc_flag": "rate-control=cbr bitrate=2000 target-usage=7",
                 "preproc_backend": "pre-process-backend=vaapi-surface-sharing scale-method=fast",

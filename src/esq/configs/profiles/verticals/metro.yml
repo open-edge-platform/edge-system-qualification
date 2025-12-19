@@ -13,6 +13,7 @@ params:
     display_status: false
   depends_on:
     - "profile.suite.system.memory-stream"
+    - "profile.suite.ai.vision-ov"
   requirements:
     # Hardware requirements
     cpu_min_cores: 4

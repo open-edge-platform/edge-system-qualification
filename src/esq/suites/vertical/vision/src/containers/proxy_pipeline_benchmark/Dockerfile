@@ -59,7 +59,6 @@ COPY --chown=dlstreamer:dlstreamer run_proxy_pipeline_benchmark_parallel.sh .
 
 COPY --chown=dlstreamer:dlstreamer gst_lpr_loop_mp4.sh .
 COPY --chown=dlstreamer:dlstreamer lpr_benchmark.py .
-COPY --chown=dlstreamer:dlstreamer lpr_resources.sh .
 
 # Copy consolidated utilities (prepared in build context by test script)
 COPY --chown=dlstreamer:dlstreamer esq_utils/media/__init__.py ./esq_utils/media/

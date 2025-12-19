@@ -51,8 +51,8 @@ class HeadedVisualAIBenchmark(BaseProxyPipelineBenchmark):
                 self.config = {
                     "compose_size": 3,
                     "ref_stream_list": [9],
-                    "ref_gpu_freq_list": [-1],
-                    "ref_pkg_power_list": [-1],
+                    "ref_gpu_freq_list": [728.11],
+                    "ref_pkg_power_list": [11.93],
                     "ref_platform": "i5-12400 (16G Mem)",
                     "output_width": 1920,
                     "output_height": 1080,
@@ -64,9 +64,9 @@ class HeadedVisualAIBenchmark(BaseProxyPipelineBenchmark):
                 if self.is_MTL:
                     self.config = {
                         "compose_size": 4,
-                        "ref_stream_list": [16, 14, 4],
-                        "ref_gpu_freq_list": [-1, -1, -1],
-                        "ref_pkg_power_list": [-1, -1, -1],
+                        "ref_stream_list": [13, 10, 5],
+                        "ref_gpu_freq_list": [1062.86, 1070.77, 781.55],
+                        "ref_pkg_power_list": [29.08, 28.00, 27.96],
                         "ref_platform": "MTL 165H (32G Mem)",
                         "output_width": 3840,
                         "output_height": 2160,
@@ -77,9 +77,9 @@ class HeadedVisualAIBenchmark(BaseProxyPipelineBenchmark):
                 else:
                     self.config = {
                         "compose_size": 4,
-                        "ref_stream_list": [12, 8, 3],
-                        "ref_gpu_freq_list": [-1, -1, -1],
-                        "ref_pkg_power_list": [-1, -1, -1],
+                        "ref_stream_list": [16, 15, 4],
+                        "ref_gpu_freq_list": [1041.30, 1335.19, 1359.42],
+                        "ref_pkg_power_list": [29.29, 36.86, 30.95],
                         "ref_platform": "i7-1360p (16G Mem)",
                         "output_width": 3840,
                         "output_height": 2160,
@@ -90,10 +90,10 @@ class HeadedVisualAIBenchmark(BaseProxyPipelineBenchmark):
         elif device_type == "dGPU":
             self.config = {
                 "compose_size": 5,
-                "ref_stream_list": [20, 19, 6],
-                "ref_gpu_freq_list": [-1, -1, -1],
+                "ref_stream_list": [19, 11, 2],
+                "ref_gpu_freq_list": [1170.44, 971.86, 1108.34],
                 "ref_pkg_power_list": [-1, -1, -1],
-                "ref_platform": "Arc A380",
+                "ref_platform": "Arc™ B-Series B580",
                 "output_width": 3840,
                 "output_height": 2160,
                 "models": ["yolov5s-416", "yolov5m-416", "yolov5m-416+efficientnet-b0"],

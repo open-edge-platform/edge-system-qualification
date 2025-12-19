@@ -42,6 +42,8 @@ suites:
                 pptest: "LPRAIRunner"
                 timeout: 750
                 force_run: true
+                requirements:
+                  gpu_required: true
 
               - test_id: "METRO-PROXY-002"
                 display_name: "Smart NVR (iGPU)"

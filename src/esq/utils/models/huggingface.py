@@ -10,48 +10,10 @@ for OpenVINO Model Server (OVMS) format, including quantization support.
 
 import json
 import logging
-import multiprocessing
 import os
-import queue
 import shutil
-import traceback
-from typing import Any, Dict
 
 logger = logging.getLogger(__name__)
-
-
-def _run_export_model_worker(
-    result_queue: multiprocessing.Queue,
-    source_model: str,
-    model_name: str,
-    model_repository_path: str,
-    precision: str,
-    task_parameters: Dict[str, Any],
-    config_file_path: str,
-) -> None:
-    """Worker process that runs model export and reports status via queue."""
-    try:
-        from esq.utils.models.export_model import export_text_generation_model
-
-        export_text_generation_model(
-            source_model=source_model,
-            model_name=model_name,
-            model_repository_path=model_repository_path,
-            precision=precision,
-            task_parameters=task_parameters,
-            config_file_path=config_file_path,
-            overwrite_models=False,
-        )
-
-        result_queue.put({"success": True})
-    except Exception as exc:  # pragma: no cover - error path
-        result_queue.put(
-            {
-                "success": False,
-                "error": str(exc),
-                "traceback": traceback.format_exc(),
-            }
-        )
 
 
 def export_ovms_model(
@@ -249,61 +211,52 @@ def export_ovms_model(
         logger.info("Export progress will be shown below:")
         logger.info("=" * 80)
 
-        export_queue: multiprocessing.Queue = multiprocessing.Queue()
-        process = multiprocessing.Process(
-            target=_run_export_model_worker,
-            args=(
-                export_queue,
-                model_id_or_path,
-                model_safe_name_with_quant,
-                models_dir,
-                model_precision,
-                task_parameters,
-                config_path,
-            ),
-        )
-
         try:
-            process.start()
-            process.join(timeout=export_timeout)
+            from esq.utils.models.export_model import export_text_generation_model
 
-            if process.is_alive():
-                logger.error(f"Model export timed out after {export_timeout} seconds")
-                process.terminate()
-                process.join()
-                raise RuntimeError(f"Model export exceeded timeout of {export_timeout} seconds.")
-
-            export_result = None
-            try:
-                export_result = export_queue.get_nowait()
-            except queue.Empty:
-                export_result = None
-
-            if export_result and not export_result.get("success", False):
-                error_message = export_result.get("error", "Unknown error")
-                logger.error(f"Model export reported error: {error_message}")
-                if export_result.get("traceback"):
-                    logger.error(export_result["traceback"])  # Detailed traceback for debugging
-                raise RuntimeError(f"Model export failed: {error_message}")
-
-            if process.exitcode not in (0, None):
-                logger.error(f"Model export process exited with code {process.exitcode}")
-                raise RuntimeError(f"Model export failed with exit code {process.exitcode}")
+            export_text_generation_model(
+                source_model=model_id_or_path,
+                model_name=model_safe_name_with_quant,
+                model_repository_path=models_dir,
+                precision=model_precision,
+                task_parameters=task_parameters,
+                config_file_path=config_path,
+                overwrite_models=False,
+                export_timeout=export_timeout,
+            )
 
             logger.info("=" * 80)
             logger.info(f"Model exported successfully to {models_dir}")
             logger.info(f"MediaPipe servable registered as: {model_safe_name_with_quant}")
 
-        finally:
-            export_queue.close()
-            export_queue.join_thread()
+            # Final validation check to ensure model is properly exported
+            model_export_path = os.path.join(models_dir, model_safe_name_with_quant)
+            from esq.utils.models.export_model import cleanup_incomplete_model_export, validate_openvino_model_export
+
+            if not validate_openvino_model_export(model_export_path, model_type="text_generation"):
+                logger.error(f"Post-export validation failed for: {model_export_path}")
+                cleanup_incomplete_model_export(model_export_path)
+                raise ValueError(
+                    f"Model export validation failed: required OpenVINO model files missing in {model_export_path}"
+                )
+
+        except TimeoutError:
+            raise
+        except ValueError:
+            raise
+        except Exception as e:
+            # Ensure cleanup on unexpected errors
+            model_export_path = os.path.join(models_dir, model_safe_name_with_quant)
+            from esq.utils.models.export_model import cleanup_incomplete_model_export
+
+            cleanup_incomplete_model_export(model_export_path)
+            raise RuntimeError(f"Export failed: {str(e)}") from e
 
         export_duration = time.time() - export_start_time
         logger.debug(f"Model export completed in {export_duration:.2f} seconds")
 
         return True, export_duration, quantization_config, model_safe_name_with_quant
     except Exception as e:
-        logger.error(f"OVMS model export failed with error: {e}")
         export_duration = time.time() - export_start_time
         # Include detailed error message in the exception
         raise RuntimeError(f"OVMS model export failed: {str(e)}") from e

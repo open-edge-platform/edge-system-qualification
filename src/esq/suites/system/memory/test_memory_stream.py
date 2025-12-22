@@ -10,7 +10,6 @@ import os
 import shutil
 from dataclasses import is_dataclass
 from pathlib import Path
-
 import allure
 import pandas as pd
 import pytest
@@ -22,7 +21,6 @@ from sysagent.utils.infrastructure import DockerClient
 logger = logging.getLogger(__name__)
 
 test_container_path = "src/containers/memory_bcmk/"
-
 
 def _create_mem_metrics(value: str = "N/A", unit: str = None) -> dict:
     """
@@ -41,7 +39,6 @@ def _create_mem_metrics(value: str = "N/A", unit: str = None) -> dict:
         "min_time": Metrics(unit=unit, value=value, is_key_metric=False),
         "max_time": Metrics(unit=unit, value=value, is_key_metric=False),
     }
-
 
 @allure.title("System Memory Performance Test (STREAM)")
 def test_memory_stream(

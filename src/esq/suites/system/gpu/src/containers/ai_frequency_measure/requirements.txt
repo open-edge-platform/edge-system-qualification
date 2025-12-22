@@ -1,0 +1,14 @@
+# Copyright (C) 2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+pycocotools>=2.0.7
+matplotlib==3.9.2
+numpy==1.26.4
+pyarrow==16.1.0
+pandas==2.2.0
+pycocotools==2.0.7
+typing-extensions==4.10.0
+torch==2.8.0
+torchvision
+tensorflow==2.16.1
+openvino

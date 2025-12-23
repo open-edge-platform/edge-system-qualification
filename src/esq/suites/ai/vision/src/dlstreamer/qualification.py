@@ -22,6 +22,7 @@ from .pipeline import (
 )
 from .preparation import get_device_specific_docker_image
 from .utils import update_device_metrics
+from sysagent.utils.system import SystemInfoCache
 
 logger = logging.getLogger(__name__)
 
@@ -92,8 +93,13 @@ def run_benchmark_container(
     Helper to run a Docker container for benchmarking.
     Uses modular run_dlstreamer_analyzer_container with server mode for streaming analysis.
     """
+    system_info = SystemInfoCache()
+    hardware_system_info = system_info.get_hardware_info()
     user_gid = os.getuid()
     render_gid = grp.getgrnam("render").gr_gid
+    if cpuset_cpus == "":
+        logical_count = hardware_system_info["cpu"]["logical_count"]
+        cpuset_cpus = "0-" + str(logical_count - 2)
 
     # Select device-specific Docker image
     if container_config:

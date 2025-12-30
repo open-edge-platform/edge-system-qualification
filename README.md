@@ -4,7 +4,7 @@
 
 **Intel® Edge System Qualification (Intel® ESQ)** is a Command Line Interface (CLI) tool that provides a collection of test suites to qualify Edge AI system. It enables users to perform targeted tests, supporting a wide range of use cases from system evaluation to data extraction and reporting.
 
-- This is a preview release of ESQ framework, to perform systems qualification please refer to [Intel® ESQ for Intel® AI Edge Systems](https://www.intel.com/content/www/us/en/developer/articles/guide/esq-for-ai-edge-systems.html)
+- Refer to [Intel® ESQ for Intel® AI Edge Systems](https://www.intel.com/content/www/us/en/developer/articles/guide/esq-for-ai-edge-systems.html) for official main qualification page.
 
 ## Features
 

@@ -12,7 +12,7 @@ import logging
 import os
 import re
 import shutil
-import subprocess  # nosec
+import subprocess  # nosec B404 # Subprocess needed for video processing with ffmpeg
 from pathlib import Path
 from typing import Any, Dict
 

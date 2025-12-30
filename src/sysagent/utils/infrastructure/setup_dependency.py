@@ -39,9 +39,7 @@ def _validate_url_scheme(url: str) -> None:
 
     parsed = urlparse(url)
     if parsed.scheme.lower() not in ("http", "https"):
-        raise ValueError(
-            f"Unsafe URL scheme '{parsed.scheme}'. Only http/https are allowed."
-        )
+        raise ValueError(f"Unsafe URL scheme '{parsed.scheme}'. Only http/https are allowed.")
 
 
 def _download_and_extract(url: str, dest_dir: Path):
@@ -55,12 +53,13 @@ def _download_and_extract(url: str, dest_dir: Path):
     response = requests.get(url, stream=True, timeout=30)
     response.raise_for_status()
 
-    with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
+    # Download to temp file - file auto-deleted when context exits
+    with tempfile.NamedTemporaryFile(delete=True) as tmp_file:
         shutil.copyfileobj(response.raw, tmp_file)
+        tmp_file.flush()  # Ensure data is written
         tmp_path = tmp_file.name
 
-    # Try to extract as zip or tar.gz
-    try:
+        # Extract archive while file is still open
         if url.endswith(".zip"):
             with zipfile.ZipFile(tmp_path, "r") as zip_ref:
                 zip_ref.extractall(dest_dir)
@@ -69,15 +68,12 @@ def _download_and_extract(url: str, dest_dir: Path):
                 tar_ref.extractall(dest_dir)
         logger.info(f"Extracted to: {dest_dir}")
 
-        # Flatten if there's a single top-level folder
+        # Flatten single top-level folder
         items = list(dest_dir.iterdir())
         if len(items) == 1 and items[0].is_dir():
-            top_level = items[0]
-            for item in top_level.iterdir():
+            for item in items[0].iterdir():
                 shutil.move(str(item), str(dest_dir))
-            top_level.rmdir()
-    finally:
-        os.unlink(tmp_path)
+            items[0].rmdir()
 
 
 def _download_with_progress(url: str, dest_path: Path):
@@ -424,8 +420,7 @@ def get_dependency_info(dependency_name: str) -> Dict[str, Any]:
         "name": dependency_name,
         "config": config,
         "path": str(path),
-        "installed": path.exists()
-        and verify_dependency_installation(dependency_name, str(path)),
+        "installed": path.exists() and verify_dependency_installation(dependency_name, str(path)),
         "version": config.get("version", "unknown"),
     }
 
@@ -461,9 +456,7 @@ def download_github_repo(section: str = "tool.sysagent", package: str = "sysagen
 
         # Parse repo from url (expects https://github.com/owner/repo or ...git)
         if url.startswith("https://github.com/"):
-            repo = (
-                url.replace("https://github.com/", "").replace(".git", "").rstrip("/")
-            )
+            repo = url.replace("https://github.com/", "").replace(".git", "").rstrip("/")
         else:
             logger.warning(f"Dependency '{dep_name}' has invalid GitHub URL: {url}")
             continue
@@ -471,9 +464,7 @@ def download_github_repo(section: str = "tool.sysagent", package: str = "sysagen
         archive_url = f"https://github.com/{repo}/archive/{ref}.{archive_format}"
         dep_dest = Path(thirdparty_dir) / dep_name
         if dep_dest.exists() and any(dep_dest.iterdir()):
-            logger.debug(
-                f"Dependency '{dep_name}' already installed at {dep_dest}. Skipping."
-            )
+            logger.debug(f"Dependency '{dep_name}' already installed at {dep_dest}. Skipping.")
             continue
 
         dep_dest.mkdir(parents=True, exist_ok=True)
@@ -527,13 +518,8 @@ def download_file(url: str, target_path: str, sha256sum: str = "") -> Dict[str, 
     if file_exists and is_valid_file(dest_path, sha256sum):
         logger.info(f"File already exists: {os.path.basename(dest_path)}")
     else:
-        if file_exists and (
-            file_size == 0 or (sha256sum and not is_valid_file(dest_path, sha256sum))
-        ):
-            logger.warning(
-                "File exists but is empty or checksum mismatch, "
-                f"re-downloading: {dest_path}"
-            )
+        if file_exists and (file_size == 0 or (sha256sum and not is_valid_file(dest_path, sha256sum))):
+            logger.warning(f"File exists but is empty or checksum mismatch, re-downloading: {dest_path}")
         try:
             resp = requests.get(url, stream=True, timeout=60)
             resp.raise_for_status()

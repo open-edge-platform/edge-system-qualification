@@ -239,7 +239,7 @@ def _prepare_calibration_dataset(model_id: str, dataset_type: str, samples: int,
 
         # Subsample dataset
         if samples > 0 and samples < len(dataset):
-            rng = random.Random(0)  # nosec B311
+            rng = random.Random(0)  # nosec B311 # Fixed seed for deterministic dataset ordering, not cryptographic use
             idx = list(range(len(dataset)))
             rng.shuffle(idx)
             dataset = Subset(dataset, idx[:samples])

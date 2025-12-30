@@ -57,6 +57,14 @@ extra_css:
 plugins:
   - search:
       separator: '[\s\-,:!=\[\]()"`/]+|\.(?!\d)|&[lg]t;|(?!\b)(?=[A-Z][a-z])'
+  - mike:
+      alias_type: symlink
+      redirect_template: null
+      deploy_prefix: ''
+      canonical_version: null
+      version_selector: true
+      css_dir: css
+      javascript_dir: js
   # - minify:
   #     minify_html: true
 
@@ -66,6 +74,8 @@ extra:
     - icon: fontawesome/brands/github
       link: https://github.com/open-edge-platform/edge-system-qualification
   generator: false
+  version:
+    provider: mike
 
 # Extensions
 markdown_extensions:

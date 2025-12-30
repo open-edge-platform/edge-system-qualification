@@ -1,7 +1,6 @@
 # Changelog
 
 Intel® ESQ changelog and version history.
-
 ## Version 2025.2.0 - December 2025
 
 ### Features

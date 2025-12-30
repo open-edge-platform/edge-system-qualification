@@ -112,8 +112,8 @@ params:
       gpu_discrete: "8"
       gpu_discrete_primary: "8"
       npu: "1"
-    SINK_ELEMENT:
-      default: "fakesink sync=true"
+    SYNC:
+      default: "true"
     FPSCOUNTER_PROPS:
       default: "starting-frame=2000"
 
@@ -150,4 +150,3 @@ suites:
                 devices: [npu]
                 requirements:
                   npu_required: true
-            

@@ -114,18 +114,6 @@ def run_device_test(
             logger.info(f"Model export duration: {export_duration:.2f} seconds")
             logger.info(f"Actual model name for OVMS: {actual_model_name}")
 
-            # Validate that the exported model directory is ready for OVMS
-            model_export_path = os.path.join(models_dir, actual_model_name)
-            from esq.utils.models.export_model import validate_openvino_model_export
-
-            if not validate_openvino_model_export(model_export_path, model_type="text_generation"):
-                error_message = (
-                    f"Model export validation failed for {actual_model_name} at {model_export_path}. "
-                    f"Required OpenVINO model files are missing. The model may not have been exported correctly."
-                )
-                logger.error(error_message)
-                raise RuntimeError(error_message)
-
             # Use the actual model name (with quantization suffix) for OVMS
             ovms_model_name = actual_model_name
         else:
@@ -146,19 +134,6 @@ def run_device_test(
 
             # For pre-quantized models, use the safe model name
             ovms_model_name = model_id.replace("/", "_")
-
-            # Validate that the pre-quantized model directory is ready for OVMS
-            # Pre-quantized models use versioned structure: models/{model_name}/1/
-            model_export_path = os.path.join(models_dir, ovms_model_name, "1")
-            from esq.utils.models.export_model import validate_openvino_model_export
-
-            if not validate_openvino_model_export(model_export_path, model_type="text_generation"):
-                error_message = (
-                    f"Pre-quantized model validation failed for {ovms_model_name} at {model_export_path}. "
-                    f"Required OpenVINO model files are missing. The model may not have been downloaded correctly."
-                )
-                logger.error(error_message)
-                raise RuntimeError(error_message)
 
         # Start OVMS server container
         container_info = run_ovms_server_container(
@@ -272,7 +247,7 @@ def run_device_test(
         return result
 
     except Exception as e:
-        logger.error(f"Test execution failed for device {device_id}")
+        logger.error(f"Test failed for device {device_id}: {e}")
 
         # Update metrics with failure
         metric_name = get_metric_name_for_device(device_id, prefix="throughput")

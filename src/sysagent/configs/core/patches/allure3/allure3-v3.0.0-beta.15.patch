@@ -503,10 +503,10 @@ index 000000000..2722f1005
 +}
 diff --git a/packages/web-awesome/src/components/Summary/index.tsx b/packages/web-awesome/src/components/Summary/index.tsx
 new file mode 100644
-index 000000000..daee113c8
+index 000000000..036ee119d
 --- /dev/null
 +++ b/packages/web-awesome/src/components/Summary/index.tsx
-@@ -0,0 +1,3407 @@
+@@ -0,0 +1,3313 @@
 +import { useEffect, useState } from "preact/hooks";
 +import { fetchAttachment } from "@allurereport/web-commons";
 +import * as styles from "./styles.scss";
@@ -2598,20 +2598,11 @@ index 000000000..daee113c8
 +    return (bytes / 1000000000).toFixed(2); // Convert to GB (decimal, not binary)
 +  };
 +
-+  // Helper function to map internal tier names to display tier names
-+  const mapTierDisplayName = (tierName: string | undefined): string | undefined => {
-+    if (!tierName) return undefined;
-+    if (tierName === "Scalable AI Graphics Media") {
-+      return "Scalable Performance Graphics Media";
-+    }
-+    return tierName;
-+  };
-+
 +  // Helper function to get tier display name from any test in a section
 +  const getSectionTierDisplayName = (profilesData: any[]): string | undefined => {
 +    for (const profile of profilesData) {
 +      if (profile.tierDisplayName) {
-+        return mapTierDisplayName(profile.tierDisplayName);
++        return profile.tierDisplayName;
 +      }
 +    }
 +    return undefined;
@@ -2648,11 +2639,7 @@ index 000000000..daee113c8
 +      cpuDetails.push(`${cpu.brand}`);
 +      
 +      // Combine core counts and frequency information in one line
-+      let coreFreqLine = '';
-+      if (cpu.sockets && cpu.sockets > 1) {
-+        coreFreqLine = `${cpu.sockets} sockets • `;
-+      }
-+      coreFreqLine += `${cpu.count} cores • ${cpu.logical_count} threads`;
++      let coreFreqLine = `${cpu.count} cores, ${cpu.logical_count} threads`;
 +      if (cpu.frequency) {
 +        coreFreqLine += ` • Current: ${cpu.frequency.current.toFixed(0)} MHz • Range: ${cpu.frequency.min}-${cpu.frequency.max} MHz`;
 +      }
@@ -2724,87 +2711,6 @@ index 000000000..daee113c8
 +      memoryDetails.push(`${bytesToGB(memory.total)} GB total • ${bytesToGB(memory.available)} GB available (${memory.percent.toFixed(0)}% used)`);
 +      
 +      hardwareInfoData.push({ component: "Memory", details: memoryDetails });
-+    }
-+
-+    // Power information - Intel RAPL (Running Average Power Limit) interface
-+    if (hardware.power?.control_types && hardware.power.control_types.length > 0) {
-+      const powerDetails: string[] = [];
-+      
-+      hardware.power.control_types.forEach((controlType: any) => {
-+        if (controlType.name === "intel-rapl" && controlType.zones && controlType.zones.length > 0) {
-+          controlType.zones.forEach((zone: any) => {
-+            // Only display package-level zones (CPU sockets)
-+            if (zone.name && zone.name.startsWith("package-")) {
-+              const zoneLabel = zone.name.replace("package-", "CPU Package ");
-+              
-+              // First line: Package with energy information
-+              let packageLine = `${zoneLabel}`;
-+              
-+              if (zone.max_energy_range_uj) {
-+                const currentKJ = zone.energy_uj ? (zone.energy_uj / 1000000000).toFixed(0) : "0";
-+                const maxRangeKJ = (zone.max_energy_range_uj / 1000000000).toFixed(0);
-+                const energyPercent = zone.energy_uj ? ((zone.energy_uj / zone.max_energy_range_uj) * 100).toFixed(0) : "0";
-+                packageLine += ` • Energy counter: ${currentKJ} kJ / ${maxRangeKJ} kJ (${energyPercent}%)`;
-+              }
-+              
-+              // Add subzones count if available
-+              if (zone.subzones && zone.subzones.length > 0) {
-+                packageLine += ` • ${zone.subzones.length} subzones`;
-+              }
-+              
-+              powerDetails.push(packageLine);
-+              
-+              // Second line: Limits - dynamically display all available power constraints
-+              if (zone.constraints && zone.constraints.length > 0) {
-+                const constraintParts: string[] = [];
-+                
-+                zone.constraints.forEach((constraint: any) => {
-+                  if (constraint.power_limit_uw && constraint.power_limit_uw > 0) {
-+                    const powerW = (constraint.power_limit_uw / 1000000).toFixed(0);
-+                    const constraintName = constraint.name || 'unknown';
-+                    
-+                    // Format constraint name for display - abbreviated
-+                    let displayName = constraintName.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
-+                    displayName = displayName.replace('Long Term', 'PL1').replace('Short Term', 'PL2').replace('Peak Power', 'Peak');
-+                    
-+                    let constraintStr = `${displayName}: ${powerW} W`;
-+                    
-+                    // Add max power if available to show headroom/margin
-+                    if (constraint.max_power_uw && constraint.max_power_uw > 0) {
-+                      const maxPowerW = (constraint.max_power_uw / 1000000).toFixed(0);
-+                      const marginPercent = ((constraint.power_limit_uw / constraint.max_power_uw) * 100).toFixed(0);
-+                      constraintStr += ` / ${maxPowerW} W (${marginPercent}%)`;
-+                    }
-+                    
-+                    // Add time window if available (and not peak_power which doesn't use time window)
-+                    if (constraint.time_window_us && constraintName !== 'peak_power') {
-+                      const timeMs = (constraint.time_window_us / 1000);
-+                      if (timeMs < 1) {
-+                        constraintStr += ` @${constraint.time_window_us}µs`;
-+                      } else if (timeMs < 1000) {
-+                        constraintStr += ` @${timeMs.toFixed(1)}ms`;
-+                      } else {
-+                        constraintStr += ` @${(timeMs / 1000).toFixed(1)}s`;
-+                      }
-+                    }
-+                    
-+                    constraintParts.push(constraintStr);
-+                  }
-+                });
-+                
-+                if (constraintParts.length > 0) {
-+                  const constraintCount = constraintParts.length;
-+                  powerDetails.push(`${constraintCount} ${constraintCount === 1 ? 'limit' : 'limits'} • ${constraintParts.join(' • ')}`);
-+                }
-+              }
-+            }
-+          });
-+        }
-+      });
-+      
-+      if (powerDetails.length > 0) {
-+        hardwareInfoData.push({ component: "Power", details: powerDetails });
-+      }
 +    }
 +  }
 +
@@ -3043,7 +2949,7 @@ index 000000000..daee113c8
 +              // Tiers ordered from highest to lowest (top to bottom display)
 +              // This creates a bottom-to-top visual hierarchy where Entry is at the bottom
 +              const tiers = [
-+                "Scalable Performance Graphics Media",
++                "Scalable AI Graphics Media",
 +                "Scalable Performance",
 +                "Efficiency Optimized",
 +                "Mainstream",

@@ -10,12 +10,7 @@ time="date \"+%H:%M:%S\".\$((10#\$(date \"+%N\")/1000000))"
 
 baseFileName=$(basename "$0")
 
-# Check if terminal is available for color output
-if [ -t 1 ] && command -v tput >/dev/null 2>&1 && tput colors >/dev/null 2>&1; then
-    _red=$(tput setaf 1);_green=$(tput setaf 2);_yellow=$(tput setaf 3);_magenta=$(tput setaf 5);_reset=$(tput sgr0)
-else
-    _red="";_green="";_yellow="";_magenta="";_reset=""
-fi
+_red=$(tput setaf 1);_green=$(tput setaf 2);_yellow=$(tput setaf 3);_magenta=$(tput setaf 5);_reset=$(tput sgr0)
 
 format_log()
 {

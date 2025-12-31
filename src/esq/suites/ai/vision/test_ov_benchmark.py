@@ -94,26 +94,19 @@ def _create_ov_metrics(value: str = "N/A", unit: str = None) -> dict:
     return {
         "throughput": Metrics(unit=unit, value=value, is_key_metric=True),
         "latency": Metrics(unit=unit, value=value, is_key_metric=False),
-        "cpu_avg_freq": Metrics(unit=unit, value=value, is_key_metric=False),
-        "cpu_util_norm": Metrics(unit=unit, value=value, is_key_metric=False),
-        "memory_util": Metrics(unit=unit, value=value, is_key_metric=False),
-        "gpu_eu_util": Metrics(unit=unit, value=value, is_key_metric=False),
-        "gpu_vdbox_util": Metrics(unit=unit, value=value, is_key_metric=False),
-        "gpu_power_util": Metrics(unit=unit, value=value, is_key_metric=False),
+        "dev_avg_freq": Metrics(unit=unit, value=value, is_key_metric=False),
         "package_power": Metrics(unit=unit, value=value, is_key_metric=False),
+        "duration": Metrics(unit=unit, value=value, is_key_metric=False),
     }
 
 # Mapping between Python metric names (lowercase) and CSV column names
+# Note: Container CSV only provides: Throughput, Latency, Dev Freq, Pkg Power, Duration(s)
 CSV_COLUMN_MAPPING = {
     "throughput": "Throughput",
     "latency": "Latency",
-    "cpu_avg_freq": "CPU Avg Freq",
-    "cpu_util_norm": "CPU Util (norm)",
-    "memory_util": "Memory Util",
-    "gpu_eu_util": "GPU EU Util",
-    "gpu_vdbox_util": "GPU VDBox Util",
-    "gpu_power_util": "GPU Power Util",
-    "package_power": "Package Power",
+    "dev_avg_freq": "Dev Freq",  # Device frequency (CPU or GPU depending on device)
+    "package_power": "Pkg Power",  # Package power from container
+    "duration": "Duration(s)",  # Test duration in seconds
 }
 
 # Platform identification and VD box detection now use utility modules:
@@ -270,7 +263,7 @@ def update_csv_references_with_platform_matching(df, model: str, precision: str,
     Update reference platform and values in CSV dataframe using platform-aware matching.
 
     This ensures CSV table uses the same reference lookup logic as the performance chart.
-    Updates "Reference Platform", "Reference Value", and "Reference Freq" columns in-place.
+    Updates "Ref Platform", "Ref Throughput", and "Ref Dev Freq" columns in-place.
 
     Args:
         df: Pandas DataFrame containing test results from container
@@ -296,7 +289,8 @@ def update_csv_references_with_platform_matching(df, model: str, precision: str,
         reference_data = load_reference_benchmarks(bcmk_ref_path)
 
         # Update reference columns for each row based on device
-        if "Reference Platform" in df.columns and "Device" in df.columns:
+        # Note: Container CSV uses 'Ref Platform', 'Ref Throughput', 'Ref Dev Freq', 'Ref Pkg Power'
+        if "Ref Platform" in df.columns and "Device" in df.columns:
             logger.info("Updating CSV table with platform-aware reference values...")
 
             for idx, row in df.iterrows():
@@ -318,10 +312,11 @@ def update_csv_references_with_platform_matching(df, model: str, precision: str,
                 if ref_value is not None:
                     # Update reference columns in dataframe
                     # Note: df.at[row_index, column_name] is valid pandas syntax for scalar assignment
-                    df.at[idx, "Reference Platform"] = ref_platform  # type: ignore
-                    df.at[idx, "Reference Value"] = ref_value  # type: ignore
-                    if "Reference Freq" in df.columns and ref_freq is not None:
-                        df.at[idx, "Reference Freq"] = ref_freq  # type: ignore
+                    # Container uses 'Ref Platform', 'Ref Throughput', 'Ref Dev Freq', 'Ref Pkg Power'
+                    df.at[idx, "Ref Platform"] = ref_platform  # type: ignore
+                    df.at[idx, "Ref Throughput"] = ref_value  # type: ignore
+                    if "Ref Dev Freq" in df.columns and ref_freq is not None:
+                        df.at[idx, "Ref Dev Freq"] = ref_freq  # type: ignore
 
                     logger.debug(
                         f"Updated CSV row {idx}: Device={device_id}, Ref Platform={ref_platform}, Ref Value={ref_value}"
@@ -331,7 +326,7 @@ def update_csv_references_with_platform_matching(df, model: str, precision: str,
 
             logger.info("CSV reference values updated successfully (now consistent with chart)")
         else:
-            logger.debug("CSV does not contain 'Reference Platform' column - skipping reference update")
+            logger.debug("CSV does not contain 'Ref Platform' column - skipping reference update")
 
     except Exception as ref_update_error:
         logger.warning(
@@ -987,11 +982,11 @@ def test_ov_benchmark(
                         elif metric_name == "latency":
                             unit = "ms"
                         elif "freq" in metric_name:
-                            unit = "MHz"
-                        elif "util" in metric_name:
-                            unit = "%"
+                            unit = "GHz"
                         elif "power" in metric_name:
                             unit = "W"
+                        elif metric_name == "duration":
+                            unit = "s"
                         else:
                             unit = None
 
@@ -1020,11 +1015,15 @@ def test_ov_benchmark(
                     try:
                         df = pd.read_csv(csv_file_path)
 
-                        # Convert 0.0 to -1 for all numeric metric columns (exclude Device, Model, etc.)
+                        # Convert 0.0 to -1 for all numeric metric columns (exclude Device, Model, Reference columns, etc.)
                         numeric_columns = df.select_dtypes(include=["float64", "int64"]).columns
                         metric_cols = ["throughput", "latency", "gpu_freq", "cpu_util", "gpu_util", "power"]
+                        # Exclude reference columns from 0->-1 conversion (they may legitimately be 0)
+                        # Container uses: Ref Platform, Ref Throughput, Ref Dev Freq, Ref Pkg Power
+                        reference_cols = ["Ref Throughput", "Ref Dev Freq", "Ref Pkg Power", "Duration(s)"]
                         for col in numeric_columns:
-                            if col in CSV_COLUMN_MAPPING.values() or col in metric_cols:
+                            # Only convert 0.0 to -1 for metric columns, not reference columns
+                            if (col in CSV_COLUMN_MAPPING.values() or col in metric_cols) and col not in reference_cols:
                                 # Replace 0.0 with -1 for metric columns
                                 df[col] = df[col].apply(lambda x: -1 if x == 0.0 or x == 0 else x)
 
@@ -1178,16 +1177,22 @@ def test_ov_benchmark(
     csv_file_path = Path(f"{ov_results}/ov_results/ov_result_{model}.csv")
     if csv_file_path.exists():
         try:
-            # Read CSV and replace NaN/None values with 0.0
+            # Read CSV for attaching to report
             import pandas as pd
 
             df = pd.read_csv(csv_file_path)
-            # Replace NaN values with 0.0
-            df = df.fillna(0.0)
 
             # Update reference platform and values using platform-aware matching
             # This ensures CSV table matches the graph (both use same reference lookup logic)
             update_csv_references_with_platform_matching(df, model, precision, test_container_path)
+
+            # Now fill any remaining NaN values in non-metric columns for display purposes
+            # Do NOT fill metric columns - they should remain as -1 if data wasn't collected
+            # Only fill text/categorical columns that might have NaN for display
+            text_columns = ["Model", "Precision", "Device", "Result", "Ref Platform"]
+            for col in text_columns:
+                if col in df.columns:
+                    df[col] = df[col].fillna("")
 
             # Save cleaned CSV to a temporary location
             cleaned_csv_path = csv_file_path.parent / f"cleaned_{csv_file_path.name}"
@@ -1197,7 +1202,7 @@ def test_ov_benchmark(
             file_name = os.path.basename(csv_file_path)
             with open(cleaned_csv_path, "rb") as f:
                 allure.attach(f.read(), name=file_name, attachment_type=allure.attachment_type.CSV)
-            logger.debug(f"Attached cleaned CSV results (NaN/None replaced with 0.0): {file_name}")
+            logger.debug(f"Attached cleaned CSV results with updated references: {file_name}")
 
             # Generate and attach performance chart
             try:

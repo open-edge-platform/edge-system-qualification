@@ -274,12 +274,21 @@ def execute(model_names=None, devices=None, precisions="INT8", batch_sizes="auto
             else:
                 single_result = execute_single(run_device, b_model, m_precision, bs, time)
             if bs == "auto":
-                ref_platform, ref_value, ref_freq = get_ref_platform_and_value(
-                    gpu_info, b_model, m_precision, bs, run_device
-                )
+                (
+                    ref_platform,
+                    ref_value,
+                    ref_freq,
+                    ref_power,
+                ) = get_ref_platform_and_value(gpu_info, b_model, m_precision, bs, run_device)
             else:
                 # ref_platform, ref_value = "", ""
                 continue  # only auto batch size to test.
+
+            device_freq = (
+                single_result["CPU_Freq"]
+                if run_device == "CPU"
+                else extra_gpu_values(single_result["GPU_Freq"], run_device)
+            )
             exec_result[b_model].append(
                 {
                     "Model": b_model,
@@ -288,17 +297,13 @@ def execute(model_names=None, devices=None, precisions="INT8", batch_sizes="auto
                     # 'Batch': bs,
                     "Throughput": single_result["throughput"],
                     "Latency": single_result["latency"],
-                    "Reference Platform": ref_platform,
-                    "Reference Throughput": ref_value,
-                    "Reference GPU Freq": ref_freq,  # TO-DO
-                    "CPU Avg Freq": single_result["CPU_Freq"],
-                    "CPU Util (norm)": single_result["CPU_Usage"],
-                    "Memory Util": single_result["Memory_Usage"],
-                    "GPU Freq": extra_gpu_values(single_result["GPU_Freq"], run_device),
-                    "GPU EU Util": extra_gpu_values(single_result["GPU_RCS_Usage"], run_device),
-                    "GPU VDBox Util": extra_gpu_values(single_result["GPU_VCS_Usage"], run_device),
-                    "GPU Power Util": extra_gpu_values(single_result["GPU_Power"], run_device),
-                    "Package Power": single_result["Package Power"],
+                    "Dev Freq": device_freq,
+                    "Pkg Power": single_result["Package Power"],
+                    "Ref Platform": ref_platform,
+                    "Ref Throughput": ref_value,
+                    "Ref Dev Freq": ref_freq,
+                    "Ref Pkg Power": ref_power,
+                    "Duration(s)": time,
                     "Result": "No Error" if single_result["throughput"] else "FAIL",
                 }
             )

@@ -626,7 +626,6 @@ class DockerClient:
         cpuset_cpus: str = None,
         cpuset_mems: str = None,
         shm_size: str = None,
-        cap_add: list[str] | None = None,
         command: str | list[str] | None = None,
         timeout: int = None,
         result_file: str = None,
@@ -634,43 +633,10 @@ class DockerClient:
         ports: Mapping[str, int | list[int] | tuple[str, int] | None] | None = None,
         mode: str = "batch",  # "batch" or "server"
         attach_logs: bool = True,  # Whether to attach container logs to Allure report
-        privileged: bool = False,  # Run container in privileged mode
-        ipc_mode: str = None,  # IPC mode (e.g., "host")
     ):
         """
-        Run a Docker container with specified configuration.
-
-        Args:
-            name: Container name
-            image: Docker image to use
-            entrypoint: Container entrypoint
-            environment: Environment variables (dict, list, or string)
-            volumes: Volume mounts dictionary
-            devices: Device mappings list
-            labels: Container labels dictionary
-            working_dir: Working directory inside container
-            network_mode: Network mode
-            detach: Run container in detached mode
-            remove: Remove container after completion
-            user: User to run container as
-            group_add: Additional groups to add
-            cpuset_cpus: CPUs in which to allow execution
-            cpuset_mems: Memory nodes in which to allow execution
-            shm_size: Size of /dev/shm
-            cap_add: List of Linux capabilities to add (e.g., ['PERFMON', 'SYS_ADMIN'])
-            command: Command to run in container
-            timeout: Timeout for container execution in seconds
-            result_file: Name of result file to extract
-            container_result_file_dir: Directory in container where result file is located
-            ports: Port mappings
-            mode: Execution mode - "batch" (wait for completion) or "server" (return immediately)
-            attach_logs: Whether to attach container logs to Allure report
-            privileged: Run container in privileged mode
-            ipc_mode: IPC mode (e.g., "host" for shared memory)
-
-        Returns:
-            For batch mode: dict with container_logs_text, result_text, result_json, container_info
-            For server mode: container object
+        mode="batch": Run, wait for completion, collect logs/results (default).
+        mode="server": Start detached, return container object immediately.
         """
         container = None
         temp_results_dir = None
@@ -757,11 +723,8 @@ class DockerClient:
                 cpuset_cpus=cpuset_cpus,
                 cpuset_mems=cpuset_mems,
                 shm_size=shm_size,
-                cap_add=cap_add,
                 command=command,
                 ports=ports,
-                privileged=privileged,
-                ipc_mode=ipc_mode,
             )
             logger.debug(f"Container {container.name} with mode {mode} started successfully")
 
@@ -1020,7 +983,7 @@ class DockerClient:
         Cleanup all containers managed by this client.
         """
         container_names = list(self._log_threads.keys())
-        logger.debug(f"Cleaning up {len(container_names)} containers")
+        logger.info(f"Cleaning up {len(container_names)} containers")
 
         for container_name in container_names:
             try:

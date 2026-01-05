@@ -90,7 +90,6 @@ def run_tests(
     no_cache: bool = False,
     filters: List[str] = None,
     run_all_profiles: bool = False,
-    qualification_only: bool = False,
     force: bool = False,
     no_mask: bool = False,
     extra_args: List[str] = None,
@@ -112,7 +111,6 @@ def run_tests(
         run_all_profiles: Whether to run all profile types.
                           If False, only qualification and vertical profiles are run by default
                           with an opt-out prompt for vertical profiles.
-        qualification_only: Whether to run qualification profiles only (skips vertical and suite profiles)
         force: Whether to skip interactive prompts and use default behavior
         no_mask: Whether to disable masking of data in system information
         extra_args: Additional pytest arguments to pass
@@ -199,7 +197,7 @@ def run_tests(
         # Option 3: Run all profiles if no specific profile or suite is provided
         else:
             result_code, tests_ran = _run_all_profiles(
-                skip_system_check, data_dir, verbose, debug, run_all_profiles, qualification_only, force
+                skip_system_check, data_dir, verbose, debug, run_all_profiles, force
             )
 
     except KeyboardInterrupt:
@@ -440,7 +438,6 @@ def _run_all_profiles(
     verbose: bool,
     debug: bool,
     run_all_profiles: bool = False,
-    qualification_only: bool = False,
     force: bool = False,
 ) -> tuple:
     """Run all available profiles or qualification+vertical profiles by default with opt-out prompt.
@@ -452,7 +449,6 @@ def _run_all_profiles(
         debug: Whether to enable debug output
         run_all_profiles: If False (default), run qualification and vertical profiles with opt-out prompt.
                           If True, run all profile types (qualifications, suites, verticals) without prompt.
-        qualification_only: If True, run qualification profiles only (skips vertical and suite profiles)
         force: Whether to skip interactive prompts and use default behavior
 
     Returns:
@@ -489,11 +485,6 @@ def _run_all_profiles(
         include_all_types = True
         skip_vertical_profiles = False
         logger.info("Running all profile types (qualifications, verticals, suites)")
-    elif qualification_only:
-        # --qualification-only option: run qualification profiles only without prompts
-        include_all_types = False
-        skip_vertical_profiles = True
-        logger.info("Running qualification profiles only")
     else:
         # Default behavior: run qualification + vertical with opt-out prompt for vertical
         include_all_types = False

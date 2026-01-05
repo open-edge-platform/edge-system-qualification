@@ -14,7 +14,9 @@ from typing import Any, Dict
 logger = logging.getLogger(__name__)
 
 
-def format_system_summary(hardware_info: Dict[str, Any], software_info: Dict[str, Any]) -> str:
+def format_system_summary(
+    hardware_info: Dict[str, Any], software_info: Dict[str, Any]
+) -> str:
     """
     Format consolidated system summary for both info command and test summaries.
 
@@ -40,7 +42,9 @@ def format_system_summary(hardware_info: Dict[str, Any], software_info: Dict[str
         # Motherboard
         motherboard_dmi = dmi.get("motherboard", {})
         if motherboard_dmi.get("vendor") and motherboard_dmi.get("name"):
-            lines.append(f"Motherboard: {motherboard_dmi['vendor']} {motherboard_dmi['name']}")
+            lines.append(
+                f"Motherboard: {motherboard_dmi['vendor']} {motherboard_dmi['name']}"
+            )
             if motherboard_dmi.get("version"):
                 lines.append(f"  Version: {motherboard_dmi['version']}")
 
@@ -74,7 +78,7 @@ def format_system_summary(hardware_info: Dict[str, Any], software_info: Dict[str
     if gpu.get("device_count") and gpu["device_count"] > 0:
         lines.append(f"GPU: {gpu['device_count']} device(s)")
         devices = gpu.get("devices", [])
-        for i, device in enumerate(devices):  # Show all GPU devices
+        for i, device in enumerate(devices[:2]):  # Show first 2 devices
             name = device.get("full_name", "Unknown")
             discrete = " (Discrete)" if device.get("is_discrete") else " (Integrated)"
             lines.append(f"  {i + 1}. {name}{discrete}")
@@ -93,7 +97,7 @@ def format_system_summary(hardware_info: Dict[str, Any], software_info: Dict[str
     if storage.get("device_count") and storage["device_count"] > 0:
         lines.append(f"Storage: {storage['device_count']} device(s)")
         devices = storage.get("devices", [])
-        for i, device in enumerate(devices):  # Show all storage devices
+        for i, device in enumerate(devices[:4]):  # Show first 4 devices
             name = device.get("model", "Unknown")
             interface = device.get("interface", "")
             size = device.get("size_gb", "")
@@ -123,71 +127,6 @@ def format_system_summary(hardware_info: Dict[str, Any], software_info: Dict[str
 
         if os_info.get("release") and os_info["release"] != "Unknown":
             lines.append(f"  Kernel: {os_info['release']}")
-
-    # Power Information
-    power = hardware_info.get("power", {})
-    if power.get("available") and power.get("control_types"):
-        lines.append("Power: RAPL power monitoring available")
-
-        # Show all zones with constraints
-        for control_type in power.get("control_types", []):
-            zones = control_type.get("zones", [])
-
-            # Show all zones, not just the first one
-            for zone in zones:
-                zone_name = zone.get("name", "Unknown")
-
-                # Count subzones for this zone
-                subzones = zone.get("subzones", [])
-                subzone_count = len(subzones)
-
-                # Build zone info line with subzone count if available
-                zone_info_line = f"  {zone_name}"
-                if subzone_count > 0:
-                    zone_info_line += f" ({subzone_count} subzone{'s' if subzone_count != 1 else ''})"
-
-                # Show energy if available
-                energy_formatted = zone.get("energy_formatted")
-                max_energy_formatted = zone.get("max_energy_range_formatted")
-
-                if energy_formatted and max_energy_formatted:
-                    energy_uj = zone.get("energy_uj", 0)
-                    max_energy_uj = zone.get("max_energy_range_uj", 1)
-                    percentage = (energy_uj / max_energy_uj * 100) if max_energy_uj > 0 else 0
-                    zone_info_line += (
-                        f" - Energy meter: {energy_formatted} / {max_energy_formatted} ({percentage:.1f}%)"
-                    )
-                elif energy_formatted:
-                    zone_info_line += f" - Energy meter: {energy_formatted}"
-
-                lines.append(zone_info_line)
-
-                # Show all power constraints dynamically
-                constraints = zone.get("constraints", [])
-                for constraint in constraints:
-                    power_limit = constraint.get("power_limit_formatted")
-                    power_limit_uw = constraint.get("power_limit_uw", 0)
-                    max_power = constraint.get("max_power_formatted")
-                    max_power_uw = constraint.get("max_power_uw", 0)
-                    constraint_name = constraint.get("name", "")
-                    time_window = constraint.get("time_window_formatted")
-
-                    if power_limit:
-                        constraint_info = f"    Power Limit ({constraint_name}): {power_limit}"
-
-                        # Show max power and utilization percentage if available
-                        # Note: power_limit can exceed max_power on systems with overclocking support
-                        if max_power and max_power_uw > 0:
-                            utilization_pct = (power_limit_uw / max_power_uw * 100) if max_power_uw > 0 else 0
-                            constraint_info += f" / {max_power} ({utilization_pct:.1f}%)"
-
-                        # Show time window if available
-                        if time_window:
-                            constraint_info += f" (window: {time_window})"
-
-                        lines.append(constraint_info)
-    elif power.get("permission_issue"):
-        lines.append("Power: Available (setup required for non-root access)")
 
     lines.append("")  # Empty line after system info
     return "\n".join(lines)
@@ -223,7 +162,9 @@ def generate_simple_report(system_info: Dict[str, Any]) -> str:
                 cpu = hardware["cpu"]
                 summary_hardware["cpu"] = {
                     "brand": cpu.get("brand", "Unknown"),
-                    "logical_cores": cpu.get("logical_count", cpu.get("count", "Unknown")),
+                    "logical_cores": cpu.get(
+                        "logical_count", cpu.get("count", "Unknown")
+                    ),
                     "frequency_mhz": cpu.get("frequency", {}).get("max", 0),
                 }
 
@@ -249,9 +190,9 @@ def generate_simple_report(system_info: Dict[str, Any]) -> str:
                     }
                     # Check for OpenVINO enhanced name
                     if "openvino" in device and "quick_access" in device["openvino"]:
-                        device_summary["full_name"] = device["openvino"]["quick_access"].get(
-                            "full_name", device_summary["full_name"]
-                        )
+                        device_summary["full_name"] = device["openvino"][
+                            "quick_access"
+                        ].get("full_name", device_summary["full_name"])
                     summary_hardware["gpu"]["devices"].append(device_summary)
 
             # Convert NPU info
@@ -265,9 +206,9 @@ def generate_simple_report(system_info: Dict[str, Any]) -> str:
                     device_summary = {"full_name": device.get("device_name", "Unknown")}
                     # Check for OpenVINO enhanced name
                     if "openvino" in device and "quick_access" in device["openvino"]:
-                        device_summary["full_name"] = device["openvino"]["quick_access"].get(
-                            "full_name", device_summary["full_name"]
-                        )
+                        device_summary["full_name"] = device["openvino"][
+                            "quick_access"
+                        ].get("full_name", device_summary["full_name"])
                     summary_hardware["npu"]["devices"].append(device_summary)
 
             # Convert Storage info
@@ -281,17 +222,15 @@ def generate_simple_report(system_info: Dict[str, Any]) -> str:
                     device_summary = {
                         "model": device.get("model", "Unknown"),
                         "interface": device.get("interface", ""),
-                        "size_gb": round(device.get("size", 0) / (1000**3)) if device.get("size") else 0,
+                        "size_gb": round(device.get("size", 0) / (1000**3))
+                        if device.get("size")
+                        else 0,
                     }
                     summary_hardware["storage"]["devices"].append(device_summary)
 
             # Convert DMI info
             if "dmi" in hardware:
                 summary_hardware["dmi"] = hardware["dmi"]
-
-            # Convert Power info (pass through as-is)
-            if "power" in hardware:
-                summary_hardware["power"] = hardware["power"]
 
             # Convert OS info
             if "os" in software:
@@ -303,13 +242,17 @@ def generate_simple_report(system_info: Dict[str, Any]) -> str:
                 }
 
             # Use the consolidated formatter
-            system_summary_text = format_system_summary(summary_hardware, summary_software)
+            system_summary_text = format_system_summary(
+                summary_hardware, summary_software
+            )
             report_lines.append("\n" + system_summary_text)
 
         except Exception as e:
             # Fallback to basic info if conversion fails
             report_lines.append(f"\nError processing system info: {e}")
-            report_lines.append("Basic hardware/software information available in raw format.")
+            report_lines.append(
+                "Basic hardware/software information available in raw format."
+            )
 
     # Add Python packages information if available
     if software:
@@ -321,10 +264,14 @@ def generate_simple_report(system_info: Dict[str, Any]) -> str:
             if installed_packages:
                 report_lines.append("PYTHON PACKAGES:")
                 report_lines.append("-" * 40)
-                for pkg_name, version in list(installed_packages.items())[:10]:  # Show first 10
+                for pkg_name, version in list(installed_packages.items())[
+                    :10
+                ]:  # Show first 10
                     report_lines.append(f"{pkg_name}: {version}")
 
-                total_installed = python_packages.get("total_installed", len(installed_packages))
+                total_installed = python_packages.get(
+                    "total_installed", len(installed_packages)
+                )
                 if len(installed_packages) > 10:
                     report_lines.append(f"... and {total_installed - 10} more packages")
                 else:
@@ -367,7 +314,11 @@ def format_hardware_summary(hardware_info: Dict[str, Any]) -> str:
         total_gb = memory.get("total", 0) / (1000**3)
         summary_parts.append(f"RAM: {total_gb:.0f} GB")
 
-    return " | ".join(summary_parts) if summary_parts else "Hardware information unavailable"
+    return (
+        " | ".join(summary_parts)
+        if summary_parts
+        else "Hardware information unavailable"
+    )
 
 
 def format_software_summary(software_info: Dict[str, Any]) -> str:
@@ -405,4 +356,8 @@ def format_software_summary(software_info: Dict[str, Any]) -> str:
         minor = version_info.get("minor", "?")
         summary_parts.append(f"Python: {major}.{minor}")
 
-    return " | ".join(summary_parts) if summary_parts else "Software information unavailable"
+    return (
+        " | ".join(summary_parts)
+        if summary_parts
+        else "Software information unavailable"
+    )

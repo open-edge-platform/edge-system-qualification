@@ -1,51 +1,19 @@
 # Test Suites
 
-Intel® ESQ provides a comprehensive collection of test suites to assess and qualify your edge system capabilities. Choose from qualification tests with pass/fail criteria, data collection suites for analysis, or industry-specific vertical tests.
+Intel® Edge System Qualification (Intel® ESQ) provides a comprehensive collection of test suites to assess and qualify your edge system capabilities. Choose from qualification tests with pass/fail criteria, data collection suites for analysis, or industry-specific vertical tests.
 
 ## Table of Contents
 
-- [Available Test Suites](#available-test-suites)
 - [Test Suite Types](#test-suite-types)
 - [Qualifications](#qualifications)
-    - [AI Edge System Qualification](#ai-edge-system-qualification)
+    - [Intel® AI Edge System Qualification](#intel-ai-edge-system-qualification)
 - [Vertical](#vertical)
     - [Manufacturing](#manufacturing)
-    - [Metro](#metro)
-    - [Retail - Automated Self Checkout](#retail---automated-self-checkout)
-    - [Retail - Loss Prevention](#retail---loss-prevention)
+    - [Retail](#retail)
 - [Horizontal](#horizontal)
-    - [Generative AI Suite](#generative-ai-suite)
-    - [Vision AI Suite - Light](#vision-ai-suite---light)
-    - [Vision AI Suite - OpenVINO](#vision-ai-suite---openvino)
-    - [Vision AI Suite - VRB](#vision-ai-suite---vrb)
-    - [System GPU - OpenVINO](#system-gpu---openvino)
+    - [Generative AI](#generative-ai)
+    - [Vision AI - Light](#vision-ai---light)
     - [System Memory - STREAM](#system-memory---stream)
-
-
----
-
-## Available Test Suites
-
-Quick reference of all available test suites and their profile names.
-
-| Profile Name | Category | Description | Run Command |
-|--------------|----------|-------------|-------------|
-| `profile.qualification.ai-edge-system` | Qualification | AI Edge System qualification | `esq run --profile profile.qualification.ai-edge-system` |
-| `profile.vertical.manufacturing` | Vertical | Manufacturing Suites | `esq run --profile profile.vertical.manufacturing` |
-| `profile.vertical.metro` | Vertical | Metro Suites | `esq run --profile profile.vertical.metro` |
-| `profile.vertical.retail-asc` | Vertical | Retail Automated Self-Checkout | `esq run --profile profile.vertical.retail-asc` |
-| `profile.vertical.retail-lp` | Vertical | Retail Loss Prevention | `esq run --profile profile.vertical.retail-lp` |
-| `profile.suite.ai.gen` | Horizontal | Gen AI suite profile | `esq run --profile profile.suite.ai.gen` |
-| `profile.suite.ai.vision-light` | Horizontal | Vision AI suite profile - Light | `esq run --profile profile.suite.ai.vision-light` |
-| `profile.suite.ai.vision-ov` | Horizontal | OpenVINO Benchmark Suite - Measures raw inference performance using OpenVINO Runtime API | `esq run --profile profile.suite.ai.vision-ov` |
-| `profile.suite.ai.vision-vrb` | Horizontal | Vision AI suite profile - Verified Reference Blueprints | `esq run --profile profile.suite.ai.vision-vrb` |
-| `profile.suite.system.gpu-ov` | Horizontal | System GPU Performance suite using OpenVINO benchmark | `esq run --profile profile.suite.system.gpu-ov` |
-| `profile.suite.system.memory-stream` | Horizontal | System Memory Performance suite using STREAM benchmark | `esq run --profile profile.suite.system.memory-stream` |
-
-**List all available profiles**:
-```bash
-esq list
-```
 
 ---
 
@@ -53,15 +21,15 @@ esq list
 
 | Test Suite | Purpose | Benefit |
 |------|---------|----------|
-| **Qualifications** | Measuring system performance to qualify against AI Edge Systems Qualifications Metrics | Gain Catalog inclusion and other marketing benefits from Intel.  |
+| **Qualifications** | Measuring system performance to qualify against Intel® AI Edge Systems Qualifications Metrics | Gain Catalog inclusion and other marketing benefits from Intel.  |
 | **Vertical** | System benchmarking vertical specific proxy workloads like retail self checkout, smart NVR and manufacturing defect detection | Gain understanding and communicate on system's potential to be used in a variety of verticals and use-cases |
-| **Horizontal** | 	General system benchmarking (includes OpenVINO™, Audio, Memory Performance) | Gain understanding on system's resource utilization and performance like System memory and GPU during select AI workload  |
+| **Horizontal** | 	General system benchmarking (includes OpenVINO™ toolkit, Audio, Memory Performance) | Gain understanding on system's resource utilization and performance like System memory and GPU during select AI workload  |
 
 ---
 
 ## Qualifications
 
-### AI Edge System Qualification
+### Intel® AI Edge System Qualification
 
 **Profile**: `profile.qualification.ai-edge-system`
 
@@ -69,24 +37,24 @@ esq list
 
 Generative AI test on text generation
 
-| Tier | Test ID | Test Case | Qualification Criteria |
-|------|---------|-----------|-----------| 
-| Entry | AES-GEN-001 | Gen AI LLM Serving Benchmark - DeepSeek-R1-Distill-Qwen-1.5B INT4 | >= 10.0 tokens/sec |
-| Mainstream | AES-GEN-001 | Gen AI LLM Serving Benchmark - Phi-4-mini-reasoning 3.8B INT4 | >= 10.0 tokens/sec |
-| Efficiency Optimized | AES-GEN-001 | Gen AI LLM Serving Benchmark - DeepSeek-R1-Distill-Qwen-7B INT4 | >= 10.0 tokens/sec |
-| Scalable Performance | AES-GEN-001 | Gen AI LLM Serving Benchmark - Qwen3-32B INT4 | >= 10.0 tokens/sec  |
-| Scalable Performance Graphics Media | AES-GEN-001 | Gen AI LLM Serving Benchmark - Phi-4-mini-reasoning 3.8B INT4<br>Gen AI LLM Serving Benchmark - DeepSeek-R1-Distill-Qwen-14B INT4<br>Gen AI LLM Serving Benchmark - Qwen3-32B INT4 | >= 10.0 tokens/sec |
+| Tier | Test ID | Test Case |
+|------|---------|-----------| 
+| Entry | AES-GEN-001 | Gen AI LLM Serving Benchmark - DeepSeek-R1-Distill-Qwen-1.5B INT4 |
+| Mainstream | AES-GEN-001 | Gen AI LLM Serving Benchmark - Phi-4-mini-reasoning 3.8B INT4 |
+| Efficiency Optimized | AES-GEN-001 | Gen AI LLM Serving Benchmark - DeepSeek-R1-Distill-Qwen-7B INT4 |
+| Scalable Performance | AES-GEN-001 | Gen AI LLM Serving Benchmark - Qwen3-32B INT4 |
+| Scalable Performance Graphics Media | AES-GEN-001 | Gen AI LLM Serving Benchmark - Phi-4-mini-reasoning 3.8B INT4<br>Gen AI LLM Serving Benchmark - DeepSeek-R1-Distill-Qwen-14B INT4<br>Gen AI LLM Serving Benchmark - Qwen3-32B INT4<br>Gen AI LLM Serving Benchmark - DeepSeek-R1-Distill-Llama-70B INT4 |
 
 
-Vision AI test using Intel® DLStreamer
+Vision AI test using Deep Learning Streamer (DL Streamer)
 
-| Tier | Test ID | Test Case | Qualification Criteria |
-|------|---------|-----------|-----------| 
-| Entry | AES-VSN-001 | Vision AI Analysis - multi-stream 1080p15 H.264 gvadetect YOLO11n INT8 gvatrack gvaclassify EfficientNet-B0 INT8 | >=  4.0 streams |
-| Mainstream | AES-VSN-001 | Vision AI Analysis - multi-stream 1080p15 H.264 gvadetect YOLO11n INT8 gvatrack gvaclassify EfficientNet-B0 INT8 | >=  8.0 streams |
-| Efficiency Optimized | AES-VSN-001 | Vision AI Analysis - multi-stream 1080p15 H.264 gvadetect YOLO11n INT8 gvatrack gvaclassify EfficientNet-B0 INT8 | >=  25.0 streams |
-| Scalable Performance | AES-VSN-001 | Vision AI Analysis - multi-stream 1080p15 H.264 gvadetect YOLO11n INT8 gvatrack gvaclassify EfficientNet-B0 INT8 | >=  10.0 streams |
-| Scalable Performance Graphics Media | AES-VSN-001 | Vision AI Analysis - multi-stream 1080p15 H.264 gvadetect YOLO11n INT8 gvatrack gvaclassify EfficientNet-B0 INT8 | >=  40.0 streams |
+| Tier | Test ID | Test Case |
+|------|---------|-----------| 
+| Entry | AES-VSN-001 | Vision AI Analysis - multi-stream 1080p30 H.265 gvadetect YOLO11n INT8 gvatrack gvaclassify ResNet50 INT8 |
+| Mainstream | AES-VSN-001 | Vision AI Analysis - multi-stream 1080p30 H.265 gvadetect YOLO11n INT8 gvatrack gvaclassify ResNet50 INT8 |
+| Efficiency Optimized | AES-VSN-001 | Vision AI Analysis - multi-stream 1080p30 H.265 gvadetect YOLO11n INT8 gvatrack gvaclassify ResNet50 INT8 |
+| Scalable Performance | AES-VSN-001 | Vision AI Analysis - multi-stream 1080p30 H.265 gvadetect YOLO11n INT8 gvatrack gvaclassify ResNet50 INT8 |
+| Scalable Performance Graphics Media | AES-VSN-001 | Vision AI Analysis - multi-stream 1080p30 H.265 gvadetect YOLO11n INT8 gvatrack gvaclassify ResNet50 INT8 |
 
 **Run this profile**:
 ```bash
@@ -120,34 +88,11 @@ esq run --profile profile.vertical.manufacturing
 
 ---
 
-### Metro
+### Retail
 
-**Profile**: `profile.vertical.metro`
+**Profile**: `profile.vertical.retail`
 
-**Test Cases**:
-
-| Test ID | Test Case |
-|---------|-----------|  
-| METRO-PROXY-001 | LPR Pipeline (Multi-Devices) |
-| METRO-PROXY-002 | Smart NVR (iGPU) |
-| METRO-PROXY-003 | Smart NVR (dGPU) |
-| METRO-PROXY-004 | Headed Visual AI Proxy Pipeline (iGPU) |
-| METRO-PROXY-005 | Headed Visual AI Proxy Pipeline (dGPU) |
-| METRO-PROXY-006 | VSaaS Visual AI Proxy Pipeline (iGPU) |
-| METRO-PROXY-007 | VSaaS Visual AI Proxy Pipeline (dGPU) |
-
-**Run this profile**:
-```bash
-esq run --profile profile.vertical.metro
-```
-
----
-
-### Retail - Automated Self Checkout
-
-**Profile**: `profile.vertical.retail-asc`
-
-**Test Cases**:
+**Test Case**:
 
 | Test ID | Test Case |
 |---------|-----------| 
@@ -158,34 +103,14 @@ esq run --profile profile.vertical.metro
 
 **Run this profile**:
 ```bash
-esq run --profile profile.vertical.retail-asc
-```
-
----
-
-### Retail - Loss Prevention
-
-**Profile**: `profile.vertical.retail-lp`
-
-**Test Cases**:
-
-| Test ID | Test Case |
-|---------|-----------|  
-| RTL-LPP-001 | Loss Prevention - multi-stream 1080p15 Items-in-Basket H.264 gvadetect YOLO11n INT8 gvatrack gvaclassify EfficientNet-B0 INT8 (iGPU) |
-| RTL-LPP-002 | Loss Prevention - multi-stream 1080p15 Hidden-Items-Product-Switching H.264 gvadetect YOLO11n INT8 gvatrack gvaclassify EfficientNet-B0 INT8 (iGPU) |
-| RTL-LPP-003 | Loss Prevention - multi-stream 1080p15 Fake-Scan-Detection H.264 gvadetect YOLO11n INT8 gvatrack gvaclassify EfficientNet-B0 INT8 (iGPU) |
-| RTL-LPP-004 | Loss Prevention - multi-stream 1080p15 H.264 gvadetect YOLO11n INT8 gvatrack gvaclassify EfficientNet-B0 INT8 (iGPU) |
-
-**Run this profile**:
-```bash
-esq run --profile profile.vertical.retail-lp
+esq run --profile profile.vertical.retail
 ```
 
 ---
 
 ## Horizontal
 
-### Generative AI Suite
+### Generative AI
 
 **Profile**: `profile.suite.ai.gen`
 
@@ -236,7 +161,7 @@ esq run --profile profile.suite.ai.gen
 
 ---
 
-### Vision AI Suite - Light
+### Vision AI - Light
 
 **Profile**: `profile.suite.ai.vision-light`
 
@@ -257,90 +182,11 @@ esq run --profile profile.suite.ai.vision-light
 
 ---
 
-### Vision AI Suite - VRB
-
-**Profile**: `profile.suite.ai.vision-vrb`
-
-**Test Cases**:
-
-| Test ID | Test Case |
-|---------|-----------| 
-| VSN-VRB-001 | DL Streamer Analysis - multi-stream 1080p15 H.264 gvadetect YOLO11n INT8 gvatrack gvaclassify EfficientNet-B0 INT8 |
-| VSN-VRB-002 | DL Streamer Analysis - multi-stream 1080p15 H.264 gvadetect YOLO11n INT8 gvatrack gvaclassify EfficientNet-B0 INT8 (CPU) |
-| VSN-VRB-003 | DL Streamer Analysis - multi-stream 1080p15 H.264 gvadetect YOLO11n INT8 gvatrack gvaclassify EfficientNet-B0 INT8 (iGPU) |
-| VSN-VRB-004 | DL Streamer Analysis - multi-stream 1080p15 H.264 gvadetect YOLO11n INT8 gvatrack gvaclassify EfficientNet-B0 INT8 (dGPU) |
-| VSN-VRB-005 | DL Streamer Analysis - multi-stream 1080p15 H.264 gvadetect YOLO11n INT8 gvatrack gvaclassify EfficientNet-B0 INT8 (NPU) |
-
-**Run this profile**:
-```bash
-esq run --profile profile.suite.ai.vision-vrb
-```
-
----
-
-### Vision AI Suite - OpenVINO
-
-**Profile**: `profile.suite.ai.vision-ov`
-
-<details markdown="1">
-<summary><b>Test Cases</b> (click to expand)</summary>
-
-| Test ID | Test Case |
-|---------|-----------|  
-| VSN-OBM-001 | OpenVINO Benchmark - resnet-50-tf INT8 (iGPU) |
-| VSN-OBM-002 | OpenVINO Benchmark - resnet-50-tf INT8 (dGPU) |
-| VSN-OBM-003 | OpenVINO Benchmark - resnet-50-tf INT8 (NPU) |
-| VSN-OBM-004 | OpenVINO Benchmark - efficientnet-b0 INT8 (iGPU) |
-| VSN-OBM-005 | OpenVINO Benchmark - efficientnet-b0 INT8 (dGPU) |
-| VSN-OBM-006 | OpenVINO Benchmark - efficientnet-b0 INT8 (NPU) |
-| VSN-OBM-007 | OpenVINO Benchmark - ssdlite_mobilenet_v2 INT8 (iGPU) |
-| VSN-OBM-008 | OpenVINO Benchmark - ssdlite_mobilenet_v2 INT8 (dGPU) |
-| VSN-OBM-009 | OpenVINO Benchmark - ssdlite_mobilenet_v2 INT8 (NPU) |
-| VSN-OBM-010 | OpenVINO Benchmark - mobilenet-v2-pytorch INT8 (iGPU) |
-| VSN-OBM-011 | OpenVINO Benchmark - mobilenet-v2-pytorch INT8 (dGPU) |
-| VSN-OBM-012 | OpenVINO Benchmark - mobilenet-v2-pytorch INT8 (NPU) |
-| VSN-OBM-013 | OpenVINO Benchmark - yolo-v5s INT8 (iGPU) |
-| VSN-OBM-014 | OpenVINO Benchmark - yolo-v5s INT8 (dGPU) |
-| VSN-OBM-015 | OpenVINO Benchmark - yolo-v5s INT8 (NPU) |
-| VSN-OBM-016 | OpenVINO Benchmark - yolo-v8s INT8 (iGPU) |
-| VSN-OBM-017 | OpenVINO Benchmark - yolo-v8s INT8 (dGPU) |
-| VSN-OBM-018 | OpenVINO Benchmark - clip-vit-base-patch16 INT8 (iGPU) |
-| VSN-OBM-019 | OpenVINO Benchmark - clip-vit-base-patch16 INT8 (dGPU) |
-
-</details>
-
-<br>
-
-**Run this profile**:
-```bash
-esq run --profile profile.suite.ai.vision-ov
-```
-
----
-
-### System GPU - OpenVINO
-
-**Profile**: `profile.suite.system.gpu-ov`
-
-**Test Cases**:
-
-| Test ID | Test Case |
-|---------|-----------|  
-| GPU-OBM-001 | AI GPU Frequency Measure - OV Benchmark yolo-v5s FP16 (iGPU) |
-| GPU-OBM-002 | AI GPU Frequency Measure - OV Benchmark yolo-v5s FP16 (dGPU) |
-
-**Run this profile**:
-```bash
-esq run --profile profile.suite.system.gpu-ov
-```
-
----
-
 ### System Memory - STREAM
 
 **Profile**: `profile.suite.system.memory-stream`
 
-**Test Cases**:
+**Test Case**:
 
 | Test ID | Test Case |
 |---------|-----------| 

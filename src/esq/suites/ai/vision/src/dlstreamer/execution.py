@@ -33,11 +33,11 @@ def run_device_test(
     num_sockets: int,
     consecutive_success_threshold: int,
     consecutive_failure_threshold: int,
-    consecutive_timeout_threshold: int,
     max_streams_above_baseline: int,
     qualified_devices: Dict[str, Any],
     metrics=None,
     baseline_streams=None,
+    visualize_stream: bool = False,
     container_config: Dict[str, Any] = None,
 ) -> Result:
     """
@@ -49,6 +49,7 @@ def run_device_test(
         pipeline_params: Pipeline parameters
         metrics: Default metrics for the device
         baseline_streams: Baseline stream information
+        visualize_stream: Whether to visualize the stream
         container_config: Container configuration with available images (optional)
 
     Returns:
@@ -107,8 +108,8 @@ def run_device_test(
             num_sockets=num_sockets,
             consecutive_success_threshold=consecutive_success_threshold,
             consecutive_failure_threshold=consecutive_failure_threshold,
-            consecutive_timeout_threshold=consecutive_timeout_threshold,
             max_streams_above_baseline=max_streams_above_baseline,
+            visualize_stream=visualize_stream,
             container_config=container_config,
         )
         final_results[device_id] = device_result

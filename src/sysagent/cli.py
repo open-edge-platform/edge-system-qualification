@@ -104,10 +104,9 @@ def main() -> int:
                 no_cache=args.no_cache,
                 filters=args.filter,
                 run_all_profiles=args.all,
-                qualification_only=args.qualification_only,
                 force=force,
                 no_mask=args.no_mask,
-                extra_args=[],  # Placeholder for any future extra args
+                extra_args=[],  # No extra args from command line
             )
         elif args.command == "info":
             run_system_info = get_command_function("run_system_info")

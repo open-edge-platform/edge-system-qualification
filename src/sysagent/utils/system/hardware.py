@@ -19,7 +19,6 @@ import psutil
 
 from .ov_helper import collect_openvino_devices
 from .pci_helper import get_pci_devices
-from .power import collect_power_info
 
 logger = logging.getLogger(__name__)
 
@@ -158,15 +157,14 @@ def collect_hardware_info() -> Dict[str, Any]:
 
     hardware_info = {
         "cpu": collect_cpu_info(openvino_cpu),
-        "dmi": collect_dmi_info(),
         "gpu": collect_gpu_info(pci_devices, openvino_gpu),
-        "memory": collect_memory_info(),
-        "network": collect_network_info(),
         "npu": collect_npu_info(pci_devices, openvino_npu),
-        "openvino": all_openvino_devices,
-        "pci": pci_devices,
-        "power": collect_power_info(),
+        "memory": collect_memory_info(),
         "storage": collect_storage_info(),
+        "network": collect_network_info(),
+        "dmi": collect_dmi_info(),
+        "pci": pci_devices,
+        "openvino": all_openvino_devices,
     }
 
     return hardware_info

@@ -17,12 +17,11 @@ from .container import run_dlstreamer_analyzer_container
 from .pipeline import (
     build_multi_pipeline_with_devices,
     get_fpscounter_config,
-    get_sink_element_config,
+    get_sync_config,
     resolve_pipeline_placeholders,
 )
 from .preparation import get_device_specific_docker_image
 from .utils import update_device_metrics
-from sysagent.utils.system import SystemInfoCache
 
 logger = logging.getLogger(__name__)
 
@@ -87,19 +86,15 @@ def run_benchmark_container(
     cpuset_cpus: str = "",
     cpuset_mems: str = "",
     num_streams: int = None,
+    visualize_stream: bool = False,
     container_config: Dict[str, Any] = None,
 ) -> docker.models.containers.Container:
     """
     Helper to run a Docker container for benchmarking.
     Uses modular run_dlstreamer_analyzer_container with server mode for streaming analysis.
     """
-    system_info = SystemInfoCache()
-    hardware_system_info = system_info.get_hardware_info()
     user_gid = os.getuid()
     render_gid = grp.getgrnam("render").gr_gid
-    if cpuset_cpus == "":
-        logical_count = hardware_system_info["cpu"]["logical_count"]
-        cpuset_cpus = "0-" + str(logical_count - 2)
 
     # Select device-specific Docker image
     if container_config:
@@ -118,13 +113,14 @@ def run_benchmark_container(
     # Use modular pipeline utilities
     resolved_pipeline = resolve_pipeline_placeholders(pipeline, pipeline_params, device_id, device_dict)
     if num_streams is not None:
-        sink_element = get_sink_element_config(pipeline_params, device_id, device_dict)
+        sync_value = get_sync_config(pipeline_params, device_id, device_dict)
         fpscounter_config = get_fpscounter_config(pipeline_params, device_id, device_dict)
         multi_pipeline, result_pipeline = build_multi_pipeline_with_devices(
             pipeline=resolved_pipeline,
             device_id=device_id,
             num_streams=num_streams,
-            sink_element=sink_element,
+            visualize_stream=visualize_stream,
+            pipeline_sync=sync_value,
             fpscounter_elements=fpscounter_config,
         )
     else:
@@ -192,6 +188,7 @@ def run_concurrent_analysis(
     pipeline_timeout: int,
     target_fps: float,
     num_sockets: int = 1,
+    visualize_stream: bool = False,
     container_config: Dict[str, Any] = None,
 ) -> None:
     """
@@ -239,6 +236,7 @@ def run_concurrent_analysis(
                     cpuset_cpus=cpus,
                     cpuset_mems=mems,
                     num_streams=streams_per_socket,
+                    visualize_stream=visualize_stream,
                     container_config=container_config,
                 )
                 containers.append(container)
@@ -258,6 +256,7 @@ def run_concurrent_analysis(
                 target_fps=target_fps,
                 combined_analysis=analysis_tasks,
                 num_streams=data.get("num_streams", None),
+                visualize_stream=visualize_stream,
                 container_config=container_config,
             )
             containers.append(container)
@@ -283,8 +282,8 @@ def qualify_device(
     num_sockets: int = 1,
     consecutive_success_threshold: int = 1,
     consecutive_failure_threshold: int = 1,
-    consecutive_timeout_threshold: int = 2,
     max_streams_above_baseline: int = 10,
+    visualize_stream: bool = False,
     container_config: Dict[str, Any] = None,
 ) -> bool:
     """
@@ -294,9 +293,7 @@ def qualify_device(
 
     Args:
         consecutive_success_threshold: Number of consecutive successes before trying higher streams
-        consecutive_failure_threshold: Number of consecutive failures (non-timeout) before trying lower streams
-        consecutive_timeout_threshold: Number of consecutive timeout failures before trying lower streams
-                                       (only below baseline)
+        consecutive_failure_threshold: Number of consecutive failures before trying lower streams
         max_streams_above_baseline: Maximum streams to explore above baseline (limits +1 increment)
     """
     logger.debug(f"Active devices for qualification: {active_devices}")
@@ -323,7 +320,6 @@ def qualify_device(
     current_analysis_status = "unknown"
     consecutive_successes = 0
     consecutive_failures = 0
-    consecutive_timeouts = 0
 
     logger.debug(f"[{device_id}] Current FPS: {current_fps}")
     logger.info(
@@ -332,8 +328,7 @@ def qualify_device(
     )
     logger.info(
         f"[{device_id}] Thresholds: {consecutive_success_threshold} consecutive successes to go higher, "
-        f"{consecutive_failure_threshold} consecutive failures to go lower, "
-        f"{consecutive_timeout_threshold} consecutive timeouts (below baseline) to go lower"
+        f"{consecutive_failure_threshold} consecutive failures to go lower"
     )
 
     if is_multisocket:
@@ -377,6 +372,7 @@ def qualify_device(
             pipeline_timeout=pipeline_timeout,
             target_fps=target_fps,
             num_sockets=num_sockets,
+            visualize_stream=visualize_stream,
             container_config=container_config,
         )
 
@@ -411,9 +407,9 @@ def qualify_device(
 
             current_analysis_status = latest_result[device_id].get("analysis_status", "unknown")
             if current_analysis_status != "success":
-                # Check if this is a timeout above baseline (overcommitment) or below baseline
+                # Check if this is a timeout above baseline (overcommitment) or below baseline (genuine failure)
                 if current_num_streams > initial_streams and last_successful_streams > 0:
-                    # Timeout/failure above baseline with previous success - likely overcommitment
+                    # Timeout above baseline with previous success - likely overcommitment
                     logger.warning(
                         f"[{device_id}] Timeout/failure at {current_num_streams} streams (above baseline "
                         f"{initial_streams}). Using last successful: {last_successful_streams} streams."
@@ -440,110 +436,18 @@ def qualify_device(
                     )
                     return True
                 else:
-                    # Failure at or below baseline - check if it's a timeout or other failure
+                    # Timeout at or below baseline - genuine failure
                     current_fps = latest_result.get(device_id, {}).get("per_stream_fps", 0.0)
-
-                    # Distinguish between timeout and other failures
-                    if current_analysis_status == "timeout":
-                        # Timeout at or below baseline - immediately lower streams via binary search
-                        consecutive_timeouts += 1
-                        consecutive_failures = 0  # Reset non-timeout failure counter
-
-                        logger.warning(
-                            f"[{device_id}] Timeout at {current_num_streams} streams (baseline: {initial_streams}), "
-                            f"consecutive timeouts: {consecutive_timeouts}/{consecutive_timeout_threshold}"
-                        )
-
-                        # Check if we've exceeded the consecutive timeout threshold
-                        if consecutive_timeouts >= consecutive_timeout_threshold:
-                            # Threshold reached - check if we have a previous successful configuration
-                            if last_successful_streams > 0:
-                                logger.warning(
-                                    f"[{device_id}] Consecutive timeout threshold reached, but using last "
-                                    f"successful configuration: {last_successful_streams} streams at "
-                                    f"{last_successful_fps:.2f} FPS"
-                                )
-                                device_data["pass"] = True
-                                device_data["per_stream_fps"] = last_successful_fps
-                                device_data["num_streams"] = last_successful_streams
-
-                                # Restore last successful FPS to all active devices
-                                for other_dev_id in active_devices:
-                                    if (
-                                        other_dev_id != device_id
-                                        and "last_successful_fps" in active_devices[other_dev_id]
-                                    ):
-                                        active_devices[other_dev_id]["per_stream_fps"] = active_devices[other_dev_id][
-                                            "last_successful_fps"
-                                        ]
-
-                                _save_device_result(device_result_path, device_id, device_data)
-                                update_device_metrics(
-                                    active_devices=active_devices,
-                                    device_id=device_id,
-                                    results_dir=results_dir,
-                                    num_sockets=num_sockets,
-                                    target_fps=target_fps,
-                                )
-                                return True
-                            else:
-                                # No successful configuration found
-                                error_reason = (
-                                    f"Pipeline timeout at {current_num_streams} streams "
-                                    f"(baseline: {initial_streams}) after {consecutive_timeouts} "
-                                    f"consecutive timeouts. No successful configuration found."
-                                )
-                                logger.error(f"[{device_id}] {error_reason}. Device disqualified.")
-                                device_data["pass"] = False
-                                device_data["num_streams"] = 0
-                                device_data["error_reason"] = error_reason
-                                _save_device_result(device_result_path, device_id, device_data)
-                                return False
-
-                        # Haven't reached threshold yet - continue with binary search to lower streams
-                        max_streams = current_num_streams
-                        next_streams = (min_streams + current_num_streams) // 2
-                        if next_streams == current_num_streams:
-                            next_streams = current_num_streams - 1
-                        if next_streams < 1:
-                            next_streams = 1
-
-                        # Check if we've converged or exhausted search space
-                        if next_streams == current_num_streams or (min_streams >= max_streams):
-                            # Can't go lower - fail device
-                            error_reason = (
-                                f"Pipeline timeout at {current_num_streams} streams "
-                                f"(baseline: {initial_streams}). Cannot lower streams further."
-                            )
-                            logger.error(f"[{device_id}] {error_reason}. Device disqualified.")
-                            device_data["pass"] = False
-                            device_data["num_streams"] = 0
-                            device_data["error_reason"] = error_reason
-                            _save_device_result(device_result_path, device_id, device_data)
-                            return False
-
-                        # Continue with lower stream count via binary search
-                        current_num_streams = next_streams
-                        logger.info(
-                            f"[{device_id}] Timeout detected, lowering streams via binary search: "
-                            f"{current_num_streams} streams (range: {min_streams}-{max_streams}), "
-                            f"consecutive timeouts: {consecutive_timeouts}/{consecutive_timeout_threshold}"
-                        )
-                        # Skip to next iteration to test with lower streams
-                        time.sleep(2)
-                        continue
-                    else:
-                        # Non-timeout failure (parse_failed, main_failed, result_failed, error, etc.)
-                        error_reason = (
-                            f"Analysis failed at {current_num_streams} streams (baseline: {initial_streams}) "
-                            f"with {current_fps:.2f} FPS due to '{current_analysis_status}'"
-                        )
-                        logger.error(f"[{device_id}] {error_reason}. Device disqualified.")
-                        device_data["pass"] = False
-                        device_data["num_streams"] = 0
-                        device_data["error_reason"] = error_reason
-                        _save_device_result(device_result_path, device_id, device_data)
-                        return False
+                    error_reason = (
+                        f"Analysis failed at {current_num_streams} streams (baseline: {initial_streams}) "
+                        f"with {current_fps:.2f} FPS due to '{current_analysis_status}'"
+                    )
+                    logger.error(f"[{device_id}] {error_reason}. Device disqualified.")
+                    device_data["pass"] = False
+                    device_data["num_streams"] = 0
+                    device_data["error_reason"] = error_reason
+                    _save_device_result(device_result_path, device_id, device_data)
+                    return False
 
             current_fps = latest_result[device_id].get("per_stream_fps", 0)
             device_data.update(latest_result[device_id])
@@ -616,7 +520,6 @@ def qualify_device(
             device_data["last_successful_fps"] = last_successful_fps
             consecutive_successes += 1
             consecutive_failures = 0  # Reset failure counter on success
-            consecutive_timeouts = 0  # Reset timeout counter on success
 
             # Track last successful FPS for all other active devices
             for other_dev_id, other_dev_data in combined_analysis.items():
@@ -711,10 +614,8 @@ def qualify_device(
                     f"consecutive successes), retesting with {current_num_streams} streams to confirm stability."
                 )
         else:
-            # Failed to meet target (non-timeout failure - FPS > 0 but below target)
-            # Note: Timeout failures are handled earlier in the code when analysis_status != "success"
+            # Failed to meet target - update failure counter
             consecutive_successes = 0  # Reset success counter on failure
-            consecutive_timeouts = 0  # Reset timeout counter on FPS-based failure (pipeline ran but didn't meet target)
             consecutive_failures += 1
 
             # Check if we should try lower based on consecutive failure threshold

@@ -11,13 +11,14 @@ Intel® ESQ provides a comprehensive collection of test suites to assess and qua
 - [Vertical](#vertical)
     - [Manufacturing](#manufacturing)
     - [Metro](#metro)
-    - [Retail - Automated Self Checkout](#retail---automated-self-checkout)
-    - [Retail - Loss Prevention](#retail---loss-prevention)
+    - [Retail](#retail)
+        - [Automated Self Checkout](#automated-self-checkout)
+        - [Loss Prevention](#loss-prevention)
 - [Horizontal](#horizontal)
-    - [Generative AI Suite](#generative-ai-suite)
-    - [Vision AI Suite - Light](#vision-ai-suite---light)
-    - [Vision AI Suite - OpenVINO](#vision-ai-suite---openvino)
-    - [Vision AI Suite - VRB](#vision-ai-suite---vrb)
+    - [Generative AI](#generative-ai)
+    - [Vision AI - Edge Workloads and Benchmarks Pipelines - Light](#vision-ai---edge-workloads-and-benchmarks-pipelines---light)
+    - [Vision AI - Verified Reference Blueprints](#vision-ai---verified-reference-blueprints)
+    - [Vision AI - OpenVINO](#vision-ai---openvino)
     - [System GPU - OpenVINO](#system-gpu---openvino)
     - [System Memory - STREAM](#system-memory---stream)
 
@@ -31,16 +32,16 @@ Quick reference of all available test suites and their profile names.
 | Profile Name | Category | Description | Run Command |
 |--------------|----------|-------------|-------------|
 | `profile.qualification.ai-edge-system` | Qualification | AI Edge System qualification | `esq run --profile profile.qualification.ai-edge-system` |
-| `profile.vertical.manufacturing` | Vertical | Manufacturing Suites | `esq run --profile profile.vertical.manufacturing` |
-| `profile.vertical.metro` | Vertical | Metro Suites | `esq run --profile profile.vertical.metro` |
+| `profile.vertical.manufacturing` | Vertical | Manufacturing | `esq run --profile profile.vertical.manufacturing` |
+| `profile.vertical.metro` | Vertical | Metro | `esq run --profile profile.vertical.metro` |
 | `profile.vertical.retail-asc` | Vertical | Retail Automated Self-Checkout | `esq run --profile profile.vertical.retail-asc` |
 | `profile.vertical.retail-lp` | Vertical | Retail Loss Prevention | `esq run --profile profile.vertical.retail-lp` |
-| `profile.suite.ai.gen` | Horizontal | Gen AI suite profile | `esq run --profile profile.suite.ai.gen` |
-| `profile.suite.ai.vision-light` | Horizontal | Vision AI suite profile - Light | `esq run --profile profile.suite.ai.vision-light` |
-| `profile.suite.ai.vision-ov` | Horizontal | OpenVINO Benchmark Suite - Measures raw inference performance using OpenVINO Runtime API | `esq run --profile profile.suite.ai.vision-ov` |
-| `profile.suite.ai.vision-vrb` | Horizontal | Vision AI suite profile - Verified Reference Blueprints | `esq run --profile profile.suite.ai.vision-vrb` |
-| `profile.suite.system.gpu-ov` | Horizontal | System GPU Performance suite using OpenVINO benchmark | `esq run --profile profile.suite.system.gpu-ov` |
-| `profile.suite.system.memory-stream` | Horizontal | System Memory Performance suite using STREAM benchmark | `esq run --profile profile.suite.system.memory-stream` |
+| `profile.suite.ai.gen` | Horizontal | Gen AI profile | `esq run --profile profile.suite.ai.gen` |
+| `profile.suite.ai.vision-light` | Horizontal | Vision AI profile - Edge Workloads and Benchmarks Pipelines - Light | `esq run --profile profile.suite.ai.vision-light` |
+| `profile.suite.ai.vision-ov` | Horizontal | OpenVINO Benchmark - Measures raw inference performance using OpenVINO Runtime API | `esq run --profile profile.suite.ai.vision-ov` |
+| `profile.suite.ai.vision-vrb` | Horizontal | Vision AI profile - Verified Reference Blueprints | `esq run --profile profile.suite.ai.vision-vrb` |
+| `profile.suite.system.gpu-ov` | Horizontal | System GPU Performance using OpenVINO benchmark | `esq run --profile profile.suite.system.gpu-ov` |
+| `profile.suite.system.memory-stream` | Horizontal | System Memory Performance using STREAM benchmark | `esq run --profile profile.suite.system.memory-stream` |
 
 **List all available profiles**:
 ```bash
@@ -143,7 +144,9 @@ esq run --profile profile.vertical.metro
 
 ---
 
-### Retail - Automated Self Checkout
+### Retail
+
+#### Automated Self Checkout
 
 **Profile**: `profile.vertical.retail-asc`
 
@@ -163,7 +166,7 @@ esq run --profile profile.vertical.retail-asc
 
 ---
 
-### Retail - Loss Prevention
+#### Loss Prevention
 
 **Profile**: `profile.vertical.retail-lp`
 
@@ -185,7 +188,7 @@ esq run --profile profile.vertical.retail-lp
 
 ## Horizontal
 
-### Generative AI Suite
+### Generative AI
 
 **Profile**: `profile.suite.ai.gen`
 
@@ -236,7 +239,7 @@ esq run --profile profile.suite.ai.gen
 
 ---
 
-### Vision AI Suite - Light
+### Vision AI - Edge Workloads and Benchmarks Pipelines - Light
 
 **Profile**: `profile.suite.ai.vision-light`
 
@@ -257,7 +260,7 @@ esq run --profile profile.suite.ai.vision-light
 
 ---
 
-### Vision AI Suite - VRB
+### Vision AI - Verified Reference Blueprints
 
 **Profile**: `profile.suite.ai.vision-vrb`
 
@@ -278,7 +281,7 @@ esq run --profile profile.suite.ai.vision-vrb
 
 ---
 
-### Vision AI Suite - OpenVINO
+### Vision AI - OpenVINO
 
 **Profile**: `profile.suite.ai.vision-ov`
 

@@ -14,8 +14,88 @@ import tempfile
 from pathlib import Path
 
 import jinja2
+from sysagent.utils.core import run_command
 
 logger = logging.getLogger(__name__)
+
+
+def validate_openvino_model_export(model_path: str, model_type: str = "text_generation") -> bool:
+    """
+    Validate that an OpenVINO model directory contains all required files.
+
+    This function checks if a model has been properly exported by verifying the presence
+    of critical model files. This is essential to detect incomplete or failed exports.
+
+    Args:
+        model_path: Path to the model directory
+        model_type: Type of model (text_generation, embeddings, etc.)
+
+    Returns:
+        bool: True if model is valid, False otherwise
+
+    Required files for text_generation models:
+        - openvino_language_model.xml (primary model file) OR openvino_model.xml
+        - openvino_language_model.bin (weights) OR openvino_model.bin
+        - openvino_tokenizer.xml (tokenizer)
+        - openvino_detokenizer.xml (detokenizer)
+
+    Reference: https://huggingface.co/docs/optimum/intel/openvino/export
+    """
+    if not os.path.isdir(model_path):
+        logger.error(f"Model path does not exist: {model_path}")
+        return False
+
+    # For text generation models, check for essential files
+    if model_type == "text_generation":
+        # Check for model files (either openvino_language_model.* or openvino_model.*)
+        has_language_model = os.path.isfile(os.path.join(model_path, "openvino_language_model.xml")) and os.path.isfile(
+            os.path.join(model_path, "openvino_language_model.bin")
+        )
+        has_model = os.path.isfile(os.path.join(model_path, "openvino_model.xml")) and os.path.isfile(
+            os.path.join(model_path, "openvino_model.bin")
+        )
+
+        # Must have at least one set of model files
+        if not (has_language_model or has_model):
+            logger.error(
+                f"Model directory missing required XML/BIN files: {model_path}\\n"
+                f"Expected: openvino_language_model.xml/.bin OR openvino_model.xml/.bin"
+            )
+            return False
+
+        # Check for tokenizer/detokenizer files
+        has_tokenizer = os.path.isfile(os.path.join(model_path, "openvino_tokenizer.xml"))
+        has_detokenizer = os.path.isfile(os.path.join(model_path, "openvino_detokenizer.xml"))
+
+        if not (has_tokenizer and has_detokenizer):
+            logger.warning(
+                f"Model directory missing tokenizer/detokenizer files: {model_path}\\n"
+                f"This may cause inference issues. Expected: openvino_tokenizer.xml and openvino_detokenizer.xml"
+            )
+            # Don't fail validation for missing tokenizer - it may be added later
+
+    logger.debug(f"Model validation passed for: {model_path}")
+    return True
+
+
+def cleanup_incomplete_model_export(model_path: str) -> None:
+    """
+    Clean up incomplete or failed model export directory.
+
+    This removes directories that were created but not properly populated with model files.
+    This is critical to prevent subsequent tests from detecting a directory exists but
+    failing because the model files are missing.
+
+    Args:
+        model_path: Path to the model directory to clean up
+    """
+    if os.path.isdir(model_path):
+        logger.info(f"Cleaning up incomplete model export directory: {model_path}")
+        try:
+            shutil.rmtree(model_path)
+            logger.info(f"Successfully removed incomplete export directory: {model_path}")
+        except Exception as e:
+            logger.error(f"Failed to remove incomplete export directory {model_path}: {e}")
 
 
 def get_optimum_cli_path():
@@ -650,6 +730,7 @@ def export_text_generation_model(
     task_parameters,
     config_file_path,
     overwrite_models=False,
+    export_timeout=3600,
 ):
     model_path = "./"
     # validation for tool parsing
@@ -661,6 +742,11 @@ def export_text_generation_model(
             raise ValueError(
                 "Both tool_parser and reasoning_parser need to be set to gptoss when one of them is set to gptoss"
             )
+
+    # Prepare environment with PYTHONUNBUFFERED to prevent subprocess output buffering
+    env = os.environ.copy()
+    env["PYTHONUNBUFFERED"] = "1"
+
     ### Export model
     if os.path.isfile(os.path.join(source_model, "openvino_model.xml")) or os.path.isfile(
         os.path.join(source_model, "openvino_language_model.xml")
@@ -674,11 +760,18 @@ def export_text_generation_model(
                     precision
                 )
             )
-        hugging_face_cmd = "huggingface-cli download {} --local-dir {} ".format(
-            source_model, os.path.join(model_repository_path, model_name)
-        )
-        if os.system(hugging_face_cmd):
-            raise ValueError("Failed to download llm model", source_model)
+        hugging_face_cmd = [
+            "huggingface-cli",
+            "download",
+            source_model,
+            "--local-dir",
+            os.path.join(model_repository_path, model_name),
+        ]
+        result = run_command(hugging_face_cmd, timeout=export_timeout, stream_output=True, env=env)
+        if result.timed_out:
+            raise TimeoutError(f"Model download timed out after {export_timeout}s")
+        if result.returncode != 0:
+            raise ValueError(f"Model download failed with exit code {result.returncode}")
     else:  # assume HF model name or local pytorch model folder
         llm_model_path = os.path.join(model_repository_path, model_name)
         print("Exporting LLM model to ", llm_model_path)
@@ -695,19 +788,28 @@ def export_text_generation_model(
             optimum_cli_path = get_optimum_cli_path()
             logger.debug(f"Using optimum-cli from: {optimum_cli_path}")
 
-            optimum_command = (
-                "{} export openvino --model {} --task text-generation-with-past "
-                "--weight-format {} {} --trust-remote-code {}".format(
-                    optimum_cli_path,
-                    source_model,
-                    precision,
-                    task_parameters["extra_quantization_params"],
-                    llm_model_path,
-                )
-            )
+            # Build command as list for subprocess
+            optimum_command = [
+                optimum_cli_path,
+                "export",
+                "openvino",
+                "--model",
+                source_model,
+                "--task",
+                "text-generation-with-past",
+                "--weight-format",
+                precision,
+            ]
+
+            # Add extra quantization params if provided
+            if task_parameters["extra_quantization_params"]:
+                optimum_command.extend(task_parameters["extra_quantization_params"].split())
+
+            optimum_command.extend(["--trust-remote-code", llm_model_path])
+
             print("=" * 80)
             print("OPTIMUM-CLI EXPORT COMMAND:")
-            print(optimum_command)
+            print(" ".join(optimum_command))
             print("=" * 80)
             print("Command parameters:")
             print(f"  - Source model: {source_model}")
@@ -718,17 +820,43 @@ def export_text_generation_model(
             print("=" * 80)
             print("Starting model export... (this may take a long time for large models)")
             print("=" * 80)
-            if os.system(optimum_command):
-                raise ValueError("Failed to export llm model", source_model)
+
+            # Use secure run_command utility with streaming for real-time progress
+            # stream_output=True enables real-time console output while capturing for error handling
+            result = run_command(optimum_command, timeout=export_timeout, stream_output=True, env=env)
+            if result.timed_out:
+                cleanup_incomplete_model_export(llm_model_path)
+                raise TimeoutError(f"Export timed out after {export_timeout}s")
+            if result.returncode != 0:
+                cleanup_incomplete_model_export(llm_model_path)
+                raise ValueError(f"Export failed with exit code {result.returncode}")
+
+            # Validate that the model was properly exported
+            if not validate_openvino_model_export(llm_model_path, model_type="text_generation"):
+                cleanup_incomplete_model_export(llm_model_path)
+                raise ValueError(
+                    f"Model export validation failed: required files missing in {llm_model_path}. "
+                    f"The export process may have completed but did not generate all necessary files."
+                )
+
             if not (os.path.isfile(os.path.join(llm_model_path, "openvino_detokenizer.xml"))):
                 print(
                     "Tokenizer and detokenizer not found in the exported model. Exporting tokenizer and detokenizer from HF model"
                 )
-                convert_tokenizer_command = "convert_tokenizer --with-detokenizer -o {} {}".format(
-                    llm_model_path, source_model
-                )
-                if os.system(convert_tokenizer_command):
-                    raise ValueError("Failed to export tokenizer and detokenizer", source_model)
+                convert_tokenizer_command = [
+                    "convert_tokenizer",
+                    "--with-detokenizer",
+                    "-o",
+                    llm_model_path,
+                    source_model,
+                ]
+                result = run_command(convert_tokenizer_command, timeout=export_timeout, stream_output=True, env=env)
+                if result.timed_out:
+                    cleanup_incomplete_model_export(llm_model_path)
+                    raise TimeoutError(f"Tokenizer export timed out after {export_timeout}s")
+                if result.returncode != 0:
+                    cleanup_incomplete_model_export(llm_model_path)
+                    raise ValueError(f"Tokenizer export failed with exit code {result.returncode}")
     ### Export draft model for speculative decoding
     draft_source_model = task_parameters.get("draft_source_model", None)
     draft_model_dir_name = None
@@ -746,11 +874,18 @@ def export_text_generation_model(
                         precision
                     )
                 )
-            hugging_face_cmd = "huggingface-cli download {} --local-dir {} ".format(
-                source_model, os.path.join(draft_llm_model_path, draft_source_model)
-            )
-            if os.system(hugging_face_cmd):
-                raise ValueError("Failed to download llm model", source_model)
+            hugging_face_cmd = [
+                "huggingface-cli",
+                "download",
+                source_model,
+                "--local-dir",
+                os.path.join(draft_llm_model_path, draft_source_model),
+            ]
+            result = run_command(hugging_face_cmd, timeout=export_timeout, stream_output=True, env=env)
+            if result.timed_out:
+                raise TimeoutError(f"Draft model download timed out after {export_timeout}s")
+            if result.returncode != 0:
+                raise ValueError(f"Draft model download failed with exit code {result.returncode}")
         else:  # assume HF model name or local pytorch model folder
             print("Exporting draft LLM model to ", draft_llm_model_path)
             if not os.path.isdir(draft_llm_model_path) or overwrite_models:
@@ -758,12 +893,31 @@ def export_text_generation_model(
                 optimum_cli_path = get_optimum_cli_path()
                 logger.debug(f"Using optimum-cli from: {optimum_cli_path}")
 
-                optimum_command = "{} export openvino --model {} --weight-format {} --trust-remote-code {}".format(
-                    optimum_cli_path, draft_source_model, precision, draft_llm_model_path
-                )
-                if os.system(optimum_command):
-                    raise ValueError("Failed to export llm model", source_model)
+                optimum_command = [
+                    optimum_cli_path,
+                    "export",
+                    "openvino",
+                    "--model",
+                    draft_source_model,
+                    "--weight-format",
+                    precision,
+                    "--trust-remote-code",
+                    draft_llm_model_path,
+                ]
+                result = run_command(optimum_command, timeout=export_timeout, stream_output=True, env=env)
+                if result.timed_out:
+                    cleanup_incomplete_model_export(draft_llm_model_path)
+                    raise TimeoutError(f"Draft model export timed out after {export_timeout}s")
+                if result.returncode != 0:
+                    cleanup_incomplete_model_export(draft_llm_model_path)
+                    raise ValueError(f"Draft model export failed with exit code {result.returncode}")
 
+                # Validate that the draft model was properly exported
+                if not validate_openvino_model_export(draft_llm_model_path, model_type="text_generation"):
+                    cleanup_incomplete_model_export(draft_llm_model_path)
+                    raise ValueError(
+                        f"Draft model export validation failed: required files missing in {draft_llm_model_path}"
+                    )
     ### Prepare plugin config string for jinja rendering
     plugin_config = {}
     if task_parameters["kv_cache_precision"] is not None:
@@ -823,6 +977,7 @@ def export_embeddings_model(
     config_file_path,
     truncate=True,
     overwrite_models=False,
+    export_timeout=3600,
 ):
     if os.path.isfile(os.path.join(model_name, "openvino_model.xml")):
         print("OV model is source folder. Skipping conversion.")
@@ -854,18 +1009,29 @@ def export_embeddings_model(
                 optimum_cli_path = get_optimum_cli_path()
                 logger.debug(f"Using optimum-cli from: {optimum_cli_path}")
 
-                optimum_command = (
-                    "{} export openvino --disable-convert-tokenizer --model {} --task feature-extraction "
-                    "--weight-format {} {} --trust-remote-code --library sentence_transformers {}".format(
-                        optimum_cli_path,
-                        source_model,
-                        precision,
-                        task_parameters["extra_quantization_params"],
-                        tmpdirname,
-                    )
-                )
-                if os.system(optimum_command):
-                    raise ValueError("Failed to export embeddings model", source_model)
+                # Get the optimum-cli path in the current environment
+                optimum_cli_path = get_optimum_cli_path()
+                logger.debug(f"Using optimum-cli from: {optimum_cli_path}")
+
+                optimum_command = [
+                    optimum_cli_path,
+                    "export",
+                    "openvino",
+                    "--disable-convert-tokenizer",
+                    "--model",
+                    source_model,
+                    "--task",
+                    "feature-extraction",
+                    "--weight-format",
+                    precision,
+                ]
+                if task_parameters["extra_quantization_params"]:
+                    optimum_command.extend(task_parameters["extra_quantization_params"].split())
+                optimum_command.extend(["--trust-remote-code", "--library", "sentence_transformers", tmpdirname])
+
+                result = run_command(optimum_command, timeout=export_timeout, capture_output=False)
+                if result.returncode != 0:
+                    raise ValueError(f"Failed to export embeddings model: {source_model}")
                 set_rt_info(tmpdirname, "openvino_model.xml", "config.json")
                 if truncate:
                     max_context_length = get_models_max_context(tmpdirname, "config.json")
@@ -879,11 +1045,12 @@ def export_embeddings_model(
             tokenizer_path = os.path.join(model_repository_path, model_name, "tokenizer", version)
             print("Exporting tokenizer to ", tokenizer_path)
             if not os.path.isdir(tokenizer_path) or overwrite_models:
-                convert_tokenizer_command = "convert_tokenizer -o {} {} {}".format(
-                    tmpdirname, source_model, set_max_context_length
-                )
-                if os.system(convert_tokenizer_command):
-                    raise ValueError("Failed to export tokenizer model", source_model)
+                convert_tokenizer_command = ["convert_tokenizer", "-o", tmpdirname, source_model]
+                if set_max_context_length:
+                    convert_tokenizer_command.extend(set_max_context_length.split())
+                result = run_command(convert_tokenizer_command, timeout=export_timeout, capture_output=False)
+                if result.returncode != 0:
+                    raise ValueError(f"Failed to export tokenizer model: {source_model}")
                 set_rt_info(tmpdirname, "openvino_tokenizer.xml", "tokenizer_config.json")
                 os.makedirs(tokenizer_path, exist_ok=True)
                 shutil.move(
@@ -929,24 +1096,38 @@ def export_embeddings_model_ov(
         optimum_cli_path = get_optimum_cli_path()
         logger.debug(f"Using optimum-cli from: {optimum_cli_path}")
 
-        optimum_command = (
-            "{} export openvino --model {} --disable-convert-tokenizer --task feature-extraction "
-            "--weight-format {} {} --trust-remote-code --library sentence_transformers {}".format(
-                optimum_cli_path,
-                source_model,
-                precision,
-                task_parameters["extra_quantization_params"],
-                destination_path,
-            )
-        )
-        if os.system(optimum_command):
-            raise ValueError("Failed to export embeddings model", source_model)
+        optimum_command = [
+            optimum_cli_path,
+            "export",
+            "openvino",
+            "--model",
+            source_model,
+            "--disable-convert-tokenizer",
+            "--task",
+            "feature-extraction",
+            "--weight-format",
+            precision,
+        ]
+        if task_parameters["extra_quantization_params"]:
+            optimum_command.extend(task_parameters["extra_quantization_params"].split())
+        optimum_command.extend(["--trust-remote-code", "--library", "sentence_transformers", destination_path])
+
+        result = run_command(optimum_command, timeout=3600, capture_output=False)
+        if result.returncode != 0:
+            raise ValueError(f"Failed to export embeddings model: {source_model}")
+
+        if truncate:
+            max_context_length = get_models_max_context(destination_path, "config.json")
+            if max_context_length is not None:
+                set_max_context_length = "--max_length " + str(max_context_length)
+
         print("Exporting tokenizer to ", destination_path)
-        convert_tokenizer_command = "convert_tokenizer -o {} {} {}".format(
-            destination_path, source_model, set_max_context_length
-        )
-        if os.system(convert_tokenizer_command):
-            raise ValueError("Failed to export tokenizer model", source_model)
+        convert_tokenizer_command = ["convert_tokenizer", "-o", destination_path, source_model]
+        if set_max_context_length:
+            convert_tokenizer_command.extend(set_max_context_length.split())
+        result = run_command(convert_tokenizer_command, timeout=3600, capture_output=False)
+        if result.returncode != 0:
+            raise ValueError(f"Failed to export tokenizer model: {source_model}")
     # Enable autoescape for security compliance
     gtemplate = jinja2.Environment(loader=jinja2.BaseLoader, autoescape=True).from_string(embedding_graph_ov_template)
     graph_content = gtemplate.render(model_path="./", **task_parameters)
@@ -969,6 +1150,7 @@ def export_rerank_model_ov(
     config_file_path,
     max_doc_length,
     overwrite_models=False,
+    export_timeout=3600,
 ):
     destination_path = os.path.join(model_repository_path, model_name)
     print("Exporting rerank model to ", destination_path)
@@ -977,18 +1159,29 @@ def export_rerank_model_ov(
         optimum_cli_path = get_optimum_cli_path()
         logger.debug(f"Using optimum-cli from: {optimum_cli_path}")
 
-        optimum_command = (
-            "{} export openvino --model {} --disable-convert-tokenizer --task text-classification "
-            "--weight-format {} {} --trust-remote-code {}".format(
-                optimum_cli_path,
-                source_model,
-                precision,
-                task_parameters["extra_quantization_params"],
-                destination_path,
-            )
-        )
-        if os.system(optimum_command):
-            raise ValueError("Failed to export rerank model", source_model)
+        # Get the optimum-cli path in the current environment
+        optimum_cli_path = get_optimum_cli_path()
+        logger.debug(f"Using optimum-cli from: {optimum_cli_path}")
+
+        optimum_command = [
+            optimum_cli_path,
+            "export",
+            "openvino",
+            "--model",
+            source_model,
+            "--disable-convert-tokenizer",
+            "--task",
+            "text-classification",
+            "--weight-format",
+            precision,
+        ]
+        if task_parameters["extra_quantization_params"]:
+            optimum_command.extend(task_parameters["extra_quantization_params"].split())
+        optimum_command.extend(["--trust-remote-code", destination_path])
+
+        result = run_command(optimum_command, timeout=export_timeout, capture_output=False)
+        if result.returncode != 0:
+            raise ValueError(f"Failed to export rerank model: {source_model}")
         print("Exporting tokenizer to ", destination_path)
         export_rerank_tokenizer(source_model, destination_path, max_doc_length)
     # Enable autoescape for security compliance
@@ -1014,6 +1207,7 @@ def export_rerank_model(
     config_file_path,
     max_doc_length,
     overwrite_models=False,
+    export_timeout=3600,
 ):
     if os.path.isfile(os.path.join(model_name, "openvino_model.xml")):
         print("OV model is source folder. Skipping conversion.")
@@ -1040,11 +1234,25 @@ def export_rerank_model(
             embeddings_path = os.path.join(model_repository_path, model_name, "rerank", version)
             print("Exporting rerank model to ", embeddings_path)
             if not os.path.isdir(embeddings_path) or overwrite_models:
-                optimum_command = "optimum-cli export openvino --disable-convert-tokenizer --model {} --task text-classification --weight-format {} {} --trust-remote-code {}".format(
-                    source_model, precision, task_parameters["extra_quantization_params"], tmpdirname
-                )
-                if os.system(optimum_command):
-                    raise ValueError("Failed to export rerank model", source_model)
+                optimum_command = [
+                    "optimum-cli",
+                    "export",
+                    "openvino",
+                    "--disable-convert-tokenizer",
+                    "--model",
+                    source_model,
+                    "--task",
+                    "text-classification",
+                    "--weight-format",
+                    precision,
+                ]
+                if task_parameters["extra_quantization_params"]:
+                    optimum_command.extend(task_parameters["extra_quantization_params"].split())
+                optimum_command.extend(["--trust-remote-code", tmpdirname])
+
+                result = run_command(optimum_command, timeout=export_timeout, capture_output=False)
+                if result.returncode != 0:
+                    raise ValueError(f"Failed to export rerank model: {source_model}")
                 set_rt_info(tmpdirname, "openvino_model.xml", "config.json")
                 os.makedirs(embeddings_path, exist_ok=True)
                 shutil.move(os.path.join(tmpdirname, "openvino_model.xml"), os.path.join(embeddings_path, "model.xml"))
@@ -1081,7 +1289,14 @@ def export_rerank_model(
 
 
 def export_image_generation_model(
-    model_repository_path, source_model, model_name, precision, task_parameters, config_file_path, num_streams
+    model_repository_path,
+    source_model,
+    model_name,
+    precision,
+    task_parameters,
+    config_file_path,
+    num_streams,
+    export_timeout=3600,
 ):
     model_path = "./"
     target_path = os.path.join(model_repository_path, model_name)
@@ -1090,12 +1305,23 @@ def export_image_generation_model(
     if os.path.isfile(model_index_path):
         print("Model index file already exists. Skipping conversion, re-generating graph only.")
     else:
-        optimum_command = "optimum-cli export openvino --model {} --weight-format {} {} {}".format(
-            source_model, precision, task_parameters["extra_quantization_params"], target_path
-        )
-        print(f"optimum cli command: {optimum_command}")
-        if os.system(optimum_command):
-            raise ValueError("Failed to export image generation model", source_model)
+        optimum_command = [
+            "optimum-cli",
+            "export",
+            "openvino",
+            "--model",
+            source_model,
+            "--weight-format",
+            precision,
+        ]
+        if task_parameters["extra_quantization_params"]:
+            optimum_command.extend(task_parameters["extra_quantization_params"].split())
+        optimum_command.append(target_path)
+
+        print(f"optimum cli command: {' '.join(optimum_command)}")
+        result = run_command(optimum_command, timeout=export_timeout, capture_output=False)
+        if result.returncode != 0:
+            raise ValueError(f"Failed to export image generation model: {source_model}")
 
     plugin_config = {}
     assert num_streams >= 0, "num_streams should be a non-negative integer"

@@ -66,8 +66,8 @@ params:
       overrides:
         FULL_DEVICE_NAME:
           "Intel(R) Unsupported video type": "'video/x-raw'"
-    SYNC:
-      default: "true"
+    SINK_ELEMENT:
+      default: "fakesink sync=true"
 
 suites:
   - name: "ai"

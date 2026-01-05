@@ -2,8 +2,8 @@
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-name: "profile.suite.ai.vision"
-description: "Vision AI suite profile"
+name: "profile.suite.ai.vision-light"
+description: "Vision AI suite profile - Light"
 version: "1.0.0"
 params:
   labels:
@@ -31,7 +31,7 @@ params:
       height: 1080
       fps: 30
       codec: "h265"
-      loop: 30 # Loop to achieve ~30s duration
+      loop: 120 # Loop to achieve ~120s duration
     - id: "yolo11n"
       type: "model"
       source: "ultralytics"
@@ -112,8 +112,8 @@ params:
       gpu_discrete: "8"
       gpu_discrete_primary: "8"
       npu: "1"
-    SYNC:
-      default: "true"
+    SINK_ELEMENT:
+      default: "fakesink sync=true"
     FPSCOUNTER_PROPS:
       default: "starting-frame=2000"
 
@@ -125,28 +125,29 @@ suites:
         tests:
           test_dlstreamer:
             params:
-              - test_id: "VSN-DLS-001"
-                display_name: "DL Streamer Benchmark - multi-stream 1080p30 H.265 gvadetect YOLO11n INT8 gvatrack gvaclassify ResNet50 INT8"
+              - test_id: "VSN-LGT-001"
+                display_name: "DL Streamer Analysis - multi-stream 1080p30 H.265 gvadetect YOLO11n INT8 gvatrack gvaclassify ResNet50 INT8"
                 devices: [cpu, igpu, dgpu, npu]
 
-              - test_id: "VSN-DLS-002"
-                display_name: "DL Streamer Benchmark - multi-stream 1080p30 H.265 gvadetect YOLO11n INT8 gvatrack gvaclassify ResNet50 INT8 (CPU)"
+              - test_id: "VSN-LGT-002"
+                display_name: "DL Streamer Analysis - multi-stream 1080p30 H.265 gvadetect YOLO11n INT8 gvatrack gvaclassify ResNet50 INT8 (CPU)"
                 devices: [cpu]
 
-              - test_id: "VSN-DLS-003"
-                display_name: "DL Streamer Benchmark - multi-stream 1080p30 H.265 gvadetect YOLO11n INT8 gvatrack gvaclassify ResNet50 INT8 (iGPU)"
+              - test_id: "VSN-LGT-003"
+                display_name: "DL Streamer Analysis - multi-stream 1080p30 H.265 gvadetect YOLO11n INT8 gvatrack gvaclassify ResNet50 INT8 (iGPU)"
                 devices: [igpu]
                 requirements:
                   igpu_required: true
 
-              - test_id: "VSN-DLS-004"
-                display_name: "DL Streamer Benchmark - multi-stream 1080p30 H.265 gvadetect YOLO11n INT8 gvatrack gvaclassify ResNet50 INT8 (dGPU)"
+              - test_id: "VSN-LGT-004"
+                display_name: "DL Streamer Analysis - multi-stream 1080p30 H.265 gvadetect YOLO11n INT8 gvatrack gvaclassify ResNet50 INT8 (dGPU)"
                 devices: [dgpu]
                 requirements:
                   dgpu_required: true
 
-              - test_id: "VSN-DLS-005"
-                display_name: "DL Streamer Benchmark - multi-stream 1080p30 H.265 gvadetect YOLO11n INT8 gvatrack gvaclassify ResNet50 INT8 (NPU)"
+              - test_id: "VSN-LGT-005"
+                display_name: "DL Streamer Analysis - multi-stream 1080p30 H.265 gvadetect YOLO11n INT8 gvatrack gvaclassify ResNet50 INT8 (NPU)"
                 devices: [npu]
                 requirements:
                   npu_required: true
+            

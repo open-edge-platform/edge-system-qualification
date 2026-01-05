@@ -1,12 +1,11 @@
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-name: "profile.vertical.retail"
-display_name: "Retail"
+name: "profile.vertical.retail-asc"
+display_name: "Retail Automated Self Checkout"
 description: "Retail Suites"
 version: "1.0.0"
 params:
-  visualize_stream: false
   labels:
     profile_display_name: "Retail"
     group: "retail"
@@ -56,8 +55,8 @@ params:
       overrides:
         FULL_DEVICE_NAME:
           "Intel(R) Unsupported video type": "'video/x-raw'"
-    SYNC:
-      default: "false"
+    SINK_ELEMENT:
+      default: "fakesink sync=false"
 
 suites:
   - name: "ai"

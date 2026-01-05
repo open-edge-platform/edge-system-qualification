@@ -57,13 +57,16 @@ USAGE PATTERNS:
   1. Run qualification and vertical profiles with opt-out prompt (default):
      {cli_name} run
 
-  2. Run all available profiles:
+  2. Run qualification profiles only (no prompt):
+     {cli_name} run --qualification-only
+
+  3. Run all available profiles:
      {cli_name} run --all
 
-  3. Run a specific profile:
+  4. Run a specific profile:
      {cli_name} run -p PROFILE_NAME
 
-  4. Run with filters:
+  5. Run with filters:
      {cli_name} run -p PROFILE_NAME --filter test_id=T0069
      {cli_name} run -p PROFILE_NAME --filter display_name="CPU Test"
      {cli_name} run -p PROFILE_NAME --filter test_id=T0069 --filter devices=cpu
@@ -71,6 +74,7 @@ USAGE PATTERNS:
 EXAMPLES:
   {cli_name} run                                      # Run qualification + vertical profiles (with opt-out prompt)
   {cli_name} run --force                              # Skip prompt, use default (include vertical profiles)
+  {cli_name} run --qualification-only                 # Run qualification profiles only (no vertical/suite profiles)
   {cli_name} run --all                                # Run all profile types
   {cli_name} run -p profile.suite.ai.vision           # Run specific profile
 
@@ -86,6 +90,12 @@ For available profiles, use: {cli_name} list
         "-a",
         action="store_true",
         help=("Run all profile types. By default, qualification and vertical profiles are run with an opt-out prompt."),
+    )
+    execution_group.add_argument(
+        "--qualification-only",
+        "-qo",
+        action="store_true",
+        help="Run qualification profiles only (skips vertical and suite profiles without prompting)",
     )
     execution_group.add_argument(
         "--profile", "-p", metavar="PROFILE_NAME", help="Run a specific profile (e.g., profile.suite.ai-vision)"

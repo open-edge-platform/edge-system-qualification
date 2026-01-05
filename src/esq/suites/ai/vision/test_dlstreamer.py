@@ -62,7 +62,6 @@ def test_dlstreamer(
     devices = configs.get("devices", [])
     timeout = configs.get("timeout", 300)
     pipeline_timeout = configs.get("pipeline_timeout", 180)
-    visualize_stream = configs.get("visualize_stream", False)
     docker_image_tag_analyzer = configs.get(
         "docker_image_tag_analyzer",
         f"{configs.get('docker_image_name_analyzer', 'test-dlstreamer-analyzer')}:"
@@ -76,6 +75,7 @@ def test_dlstreamer(
     docker_container_prefix = configs.get("docker_container_prefix", "test-dlstreamer")
     consecutive_success_threshold = configs.get("consecutive_success_threshold", 1)
     consecutive_failure_threshold = configs.get("consecutive_failure_threshold", 2)
+    consecutive_timeout_threshold = configs.get("consecutive_timeout_threshold", 2)
     max_streams_above_baseline = configs.get("max_streams_above_baseline", 3)
 
     # Setup
@@ -165,7 +165,6 @@ def test_dlstreamer(
                 "consecutive_success_threshold": consecutive_success_threshold,
                 "consecutive_failure_threshold": consecutive_failure_threshold,
                 "max_streams_above_baseline": max_streams_above_baseline,
-                "visualize_stream": visualize_stream,
                 "type": "baseline_streams",
             }
 
@@ -291,17 +290,8 @@ def test_dlstreamer(
             },
         )
 
-        # Optimize CPU baseline streams when running multiple devices
+        # Prepare baseline streams dictionary
         baseline_streams = {res.metadata["device_id"]: res.metadata for res in baseline_streams_results}
-        if len(device_list) > 1 and "CPU" in baseline_streams:
-            original_cpu_streams = baseline_streams["CPU"].get("num_streams", 1)
-            optimized_cpu_streams = max(1, original_cpu_streams // 3)  # Scale down by ratio of 3
-
-            if optimized_cpu_streams != original_cpu_streams:
-                logger.info("Optimizing CPU baseline streams for multi-device analysis:")
-                logger.info(f"  Original CPU baseline: {original_cpu_streams} streams")
-                logger.info(f"  Optimized CPU baseline: {optimized_cpu_streams} streams (scaled by 1/3)")
-                baseline_streams["CPU"]["num_streams"] = optimized_cpu_streams
 
         # Sort devices by priority based on baseline streams results using modular function
         sorted_baseline = sort_devices_by_priority(baseline_streams, device_dict)
@@ -332,7 +322,6 @@ def test_dlstreamer(
                 "consecutive_success_threshold": consecutive_success_threshold,
                 "consecutive_failure_threshold": consecutive_failure_threshold,
                 "max_streams_above_baseline": max_streams_above_baseline,
-                "visualize_stream": visualize_stream,
                 "devices": devices,
             }
 
@@ -356,11 +345,11 @@ def test_dlstreamer(
                     num_sockets=num_sockets,
                     consecutive_success_threshold=consecutive_success_threshold,
                     consecutive_failure_threshold=consecutive_failure_threshold,
+                    consecutive_timeout_threshold=consecutive_timeout_threshold,
                     max_streams_above_baseline=max_streams_above_baseline,
                     qualified_devices=qualified_devices,
                     metrics=default_metrics,
                     baseline_streams=baseline_streams.get(device_id, {}),
-                    visualize_stream=visualize_stream,
                     container_config=container_config,
                 ),
                 test_name=test_name,

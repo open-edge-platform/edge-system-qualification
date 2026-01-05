@@ -3,7 +3,8 @@
 Install all required dependencies to run all tests and evaluate your edge system.
 
 !!! info
-    This is a preview release of ESQ framework, to perform systems qualification please refer to [Intel® ESQ for Intel® AI Edge Systems](https://www.intel.com/content/www/us/en/developer/articles/guide/esq-for-ai-edge-systems.html)
+    Refer to [Intel® ESQ for Intel® AI Edge Systems](https://www.intel.com/content/www/us/en/developer/articles/guide/esq-for-ai-edge-systems.html) for official main qualification page.
+
 
 ## Requirements
 
@@ -14,13 +15,13 @@ Before starting, ensure your system meets the following requirements:
 
 Intel® ESQ supports a wide range of Intel® edge systems optimized for various performance and use case requirements.
 
-| **Category** | **CPU** | **Memory** | **Storage** | **Discrete GPU** |
-|--------------|------------------------|------------|-------------|------------------|
-| **Scalable Performance** | Intel® Xeon® 5 processor | 256–512 GB | 1 TB | Optional |
-| **Scalable AI, Graphics & Media** | Intel® processors with Intel® Arc™ Graphics | Min 64 GB | 512 GB | **Required: Alchemist or Battlemage** |
-| **Efficiency Optimized AI** | Intel® Core™ Ultra processor Series 1 or Series 2 | Min 32 GB | 512 GB | Optional |
-| **Mainstream** | 14th generation Intel® Core™ processors or higher | Min 32 GB | 256 GB | Optional |
-| **Entry** | Intel® Core™ processor, Intel® Processor, Intel Atom® | Min 16 GB | 256 GB | Not supported |
+| **Category** | **Processors** | **Specifications** |**Storage** | **Discrete GPU Options** |
+|--------------|------------------------|------------------------|-------------|------------------|
+| **Scalable Performance Graphics Media** | **Xeon-Based**: <br>Intel® Xeon® 6 Processors,<br>5th Gen Intel® Xeon® Scalable Processors,<br>Intel® Xeon® W Processors<br><br>**Core-Based**: <br>Intel® Core Ultra Series 2,<br> Intel® Core™ Series 2 | **Xeon-Based**: <br>**SKU**: Dual and Single Socket<br>**Minimum Cores**: 32 cores<br> **Memory**: Minimum 512 GB DDR5, 5600 MT/s (1DPC)<br><br> **Core-Based**:<br> **Minimum Cores**: 8 Performance-cores (P-cores)<br>**Memory**: Minimum 64GB DDR5<br>| **Recommended**: 1TB | **Intel® Arc™ B-Series Graphics** |
+| **Scalable Performance** | Intel® Xeon® 6 Processors,<br> 5th Gen Intel® Xeon® Scalable Processors, <br>Intel® Xeon® W Processors | **SKU**: Dual and Single Socket<br>**Minimum Cores**: 32 cores<br> **Memory**: Minimum 512 GB <br>| **Recommended**: 1TB | N/A |
+| **Efficiency Optimized** | Intel® Core™ Ultra processor Series 2 | **Graphics**: Integrated GPU with 7 Xe-Cores or more <br> **SKU**: Single Socket <br>**Minimum Cores**: 8 Performance-cores (P-cores)<br>**System Memory**: Minimum 32 GB DDR5 (Dual Channel)<br>**Recommended speed**: 5600 MT/s| **Recommended**: 512 GB | N/A |
+| **Mainstream** | Intel® Core™ Series 2 | **Minimum Cores**: 8 Performance-cores (P-cores)<br>**System Memory**: Minimum 32 GB DDR5 | **Recommended**: 512 GB | N/A |
+| **Entry** | Intel® Processor for Desktop,<br>Intel® Processor X-series, <br>Intel® Processor N-series | **Memory**: Minimum 32 GB DDR5 (recommended for light AI workloads) | **Recommended**: 512 GB | N/A |
 
 ### 2. Operating System
 
@@ -38,11 +39,11 @@ Install a supported operating system before proceeding.
 Configure system drivers:
 
 ```bash
-sudo bash -c "$(wget -qLO - https://raw.githubusercontent.com/intel/edge-developer-kit-reference-scripts/refs/heads/main/main_installer.sh)"
+sudo bash -c "$(wget -qLO - https://raw.githubusercontent.com/open-edge-platform/edge-developer-kit-reference-scripts/refs/heads/main/main_installer.sh)"
 ```
 
 !!! info "Additional Reference"
-    For detailed information about system drivers, see the [Edge Developer Kit Reference Scripts](https://github.com/intel/edge-developer-kit-reference-scripts) documentation.
+    For detailed information about system drivers, see the [Edge Developer Kit Reference Scripts](https://github.com/open-edge-platform/edge-developer-kit-reference-scripts) documentation.
 
 ### 2. System Dependencies
 
@@ -114,7 +115,39 @@ curl -LsSf https://astral.sh/uv/install.sh | sh && source $HOME/.local/bin/env
     For detailed `uv` installation instructions, see the official [uv Installation](https://docs.astral.sh/uv/getting-started/installation/) documentation.
 
 
-### 5. Intel® ESQ
+### 5. Platform Power Monitoring
+
+Configure non-root access to RAPL (Running Average Power Limit) powercap files for platform power monitoring:
+
+!!! info "About RAPL Power Monitoring"
+    RAPL provides energy consumption data for Intel® processors. This step enables Intel® ESQ to collect power configuration information without requiring root privileges.
+
+Run the automated setup script to configure group-based permissions:
+
+```bash
+sudo bash -c "$(wget -qLO - https://raw.githubusercontent.com/open-edge-platform/edge-system-qualification/refs/heads/main/scripts/setup-powercap-permissions.sh)"
+```
+
+This setup script:
+
+- **Auto-detects** all powercap energy files on your system
+- Creates a `powercap` group for secure, user-specific access
+- Adds your user to the `powercap` group
+- Configures persistent permissions via `/etc/sysfs.d/powercap.conf` (applied automatically on boot)
+- Applies permissions immediately for the current session
+
+!!! note "Security & Persistence"
+    This configuration uses group-based permissions (mode 0440, owner root:powercap) to grant read-only access to RAPL powercap files exclusively to users in the `powercap` group. Permissions are automatically reapplied on boot via the sysfs configuration.
+
+!!! tip "Verification"
+    Verify access with:
+    ```bash
+    cat /sys/class/powercap/intel-rapl/intel-rapl:0/energy_uj
+    ```
+    If this command prints a number without requiring sudo, the setup was successful.
+
+
+### 6. Intel® ESQ
 
 Install Intel® ESQ from GitHub*:
 

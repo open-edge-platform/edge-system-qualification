@@ -351,7 +351,7 @@ class SecureProcessExecutor:
     def _run_with_pipe(
         self, cmd_list: List[str], cwd: Optional[str], env: Dict[str, str], timeout: float
     ) -> ProcessResult:
-        """Execute command with real-time output streaming."""
+        """Execute command with real-time output streaming to console and logging."""
         start_time = time.time()
         stdout_lines = []
         stderr_lines = []
@@ -361,7 +361,7 @@ class SecureProcessExecutor:
             cwd=cwd,
             env=env,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stderr=subprocess.STDOUT,  # Merge stderr into stdout for unified output
             text=True,
             bufsize=1,
             universal_newlines=True,
@@ -386,15 +386,20 @@ class SecureProcessExecutor:
                 if process.stdout:
                     line = process.stdout.readline()
                     if line:
-                        stdout_lines.append(line.rstrip())
-                        logger.debug(f"Process output: {line.rstrip()}")
+                        line_stripped = line.rstrip()
+                        stdout_lines.append(line_stripped)
+                        logger.info(line_stripped)
 
-                time.sleep(0.1)
+                time.sleep(0.01)  # Prevent busy waiting
 
             # Get any remaining output
             stdout, stderr = process.communicate()
             if stdout:
-                stdout_lines.extend(stdout.splitlines())
+                remaining_lines = stdout.splitlines()
+                for line in remaining_lines:
+                    if line:
+                        stdout_lines.append(line)
+                        logger.info(line)
             if stderr:
                 stderr_lines.extend(stderr.splitlines())
 
@@ -470,6 +475,7 @@ def run_command(
     timeout: Optional[float] = None,
     check: bool = False,
     capture_output: bool = True,
+    stream_output: bool = False,
 ) -> ProcessResult:
     """
     Execute a command securely with default settings.
@@ -484,12 +490,22 @@ def run_command(
         timeout: Execution timeout
         check: Raise exception on failure
         capture_output: Capture stdout/stderr
+        stream_output: Stream output in real-time to console (implies capture_output=True)
 
     Returns:
         ProcessResult: Execution results
     """
     executor = get_executor()
-    return executor.run(command=command, cwd=cwd, env=env, timeout=timeout, check=check, capture_output=capture_output)
+    mode = ProcessExecutionMode.PIPE if stream_output else ProcessExecutionMode.CAPTURE
+    return executor.run(
+        command=command,
+        cwd=cwd,
+        env=env,
+        timeout=timeout,
+        check=check,
+        capture_output=capture_output,
+        mode=mode,
+    )
 
 
 def run_command_with_output(

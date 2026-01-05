@@ -1017,10 +1017,22 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#retail-automated-self-checkout" class="md-nav__link">
+  <a href="#retail" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Retail - Automated Self Checkout
+        Retail
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Retail">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#automated-self-checkout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Automated Self Checkout
       
     </span>
   </a>
@@ -1028,13 +1040,18 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#retail-loss-prevention" class="md-nav__link">
+  <a href="#loss-prevention" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Retail - Loss Prevention
+        Loss Prevention
       
     </span>
   </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -1056,10 +1073,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#generative-ai-suite" class="md-nav__link">
+  <a href="#generative-ai" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Generative AI Suite
+        Generative AI
       
     </span>
   </a>
@@ -1067,10 +1084,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#vision-ai-suite-light" class="md-nav__link">
+  <a href="#vision-ai-edge-workloads-and-benchmarks-pipelines-light" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Vision AI Suite - Light
+        Vision AI - Edge Workloads and Benchmarks Pipelines - Light
       
     </span>
   </a>
@@ -1078,10 +1095,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#vision-ai-suite-vrb" class="md-nav__link">
+  <a href="#vision-ai-verified-reference-blueprints" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Vision AI Suite - VRB
+        Vision AI - Verified Reference Blueprints
       
     </span>
   </a>
@@ -1089,10 +1106,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#vision-ai-suite-openvino" class="md-nav__link">
+  <a href="#vision-ai-openvino" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Vision AI Suite - OpenVINO
+        Vision AI - OpenVINO
       
     </span>
   </a>
@@ -1172,15 +1189,18 @@
 <li><a href="#vertical">Vertical</a><ul>
 <li><a href="#manufacturing">Manufacturing</a></li>
 <li><a href="#metro">Metro</a></li>
-<li><a href="#retail---automated-self-checkout">Retail - Automated Self Checkout</a></li>
-<li><a href="#retail---loss-prevention">Retail - Loss Prevention</a></li>
+<li><a href="#retail">Retail</a><ul>
+<li><a href="#automated-self-checkout">Automated Self Checkout</a></li>
+<li><a href="#loss-prevention">Loss Prevention</a></li>
+</ul>
+</li>
 </ul>
 </li>
 <li><a href="#horizontal">Horizontal</a><ul>
-<li><a href="#generative-ai-suite">Generative AI Suite</a></li>
-<li><a href="#vision-ai-suite---light">Vision AI Suite - Light</a></li>
-<li><a href="#vision-ai-suite---openvino">Vision AI Suite - OpenVINO</a></li>
-<li><a href="#vision-ai-suite---vrb">Vision AI Suite - VRB</a></li>
+<li><a href="#generative-ai">Generative AI</a></li>
+<li><a href="#vision-ai---edge-workloads-and-benchmarks-pipelines---light">Vision AI - Edge Workloads and Benchmarks Pipelines - Light</a></li>
+<li><a href="#vision-ai---verified-reference-blueprints">Vision AI - Verified Reference Blueprints</a></li>
+<li><a href="#vision-ai---openvino">Vision AI - OpenVINO</a></li>
 <li><a href="#system-gpu---openvino">System GPU - OpenVINO</a></li>
 <li><a href="#system-memory---stream">System Memory - STREAM</a></li>
 </ul>
@@ -1208,13 +1228,13 @@
 <tr>
 <td><code>profile.vertical.manufacturing</code></td>
 <td>Vertical</td>
-<td>Manufacturing Suites</td>
+<td>Manufacturing</td>
 <td><code>esq run --profile profile.vertical.manufacturing</code></td>
 </tr>
 <tr>
 <td><code>profile.vertical.metro</code></td>
 <td>Vertical</td>
-<td>Metro Suites</td>
+<td>Metro</td>
 <td><code>esq run --profile profile.vertical.metro</code></td>
 </tr>
 <tr>
@@ -1232,37 +1252,37 @@
 <tr>
 <td><code>profile.suite.ai.gen</code></td>
 <td>Horizontal</td>
-<td>Gen AI suite profile</td>
+<td>Gen AI profile</td>
 <td><code>esq run --profile profile.suite.ai.gen</code></td>
 </tr>
 <tr>
 <td><code>profile.suite.ai.vision-light</code></td>
 <td>Horizontal</td>
-<td>Vision AI suite profile - Light</td>
+<td>Vision AI profile - Edge Workloads and Benchmarks Pipelines - Light</td>
 <td><code>esq run --profile profile.suite.ai.vision-light</code></td>
 </tr>
 <tr>
 <td><code>profile.suite.ai.vision-ov</code></td>
 <td>Horizontal</td>
-<td>OpenVINO Benchmark Suite - Measures raw inference performance using OpenVINO Runtime API</td>
+<td>OpenVINO Benchmark - Measures raw inference performance using OpenVINO Runtime API</td>
 <td><code>esq run --profile profile.suite.ai.vision-ov</code></td>
 </tr>
 <tr>
 <td><code>profile.suite.ai.vision-vrb</code></td>
 <td>Horizontal</td>
-<td>Vision AI suite profile - Verified Reference Blueprints</td>
+<td>Vision AI profile - Verified Reference Blueprints</td>
 <td><code>esq run --profile profile.suite.ai.vision-vrb</code></td>
 </tr>
 <tr>
 <td><code>profile.suite.system.gpu-ov</code></td>
 <td>Horizontal</td>
-<td>System GPU Performance suite using OpenVINO benchmark</td>
+<td>System GPU Performance using OpenVINO benchmark</td>
 <td><code>esq run --profile profile.suite.system.gpu-ov</code></td>
 </tr>
 <tr>
 <td><code>profile.suite.system.memory-stream</code></td>
 <td>Horizontal</td>
-<td>System Memory Performance suite using STREAM benchmark</td>
+<td>System Memory Performance using STREAM benchmark</td>
 <td><code>esq run --profile profile.suite.system.memory-stream</code></td>
 </tr>
 </tbody>
@@ -1480,7 +1500,8 @@
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>esq<span class="w"> </span>run<span class="w"> </span>--profile<span class="w"> </span>profile.vertical.metro
 </span></code></pre></div></p>
 <hr />
-<h3 id="retail-automated-self-checkout">Retail - Automated Self Checkout<a class="headerlink" href="#retail-automated-self-checkout" title="Permanent link">&para;</a></h3>
+<h3 id="retail">Retail<a class="headerlink" href="#retail" title="Permanent link">&para;</a></h3>
+<h4 id="automated-self-checkout">Automated Self Checkout<a class="headerlink" href="#automated-self-checkout" title="Permanent link">&para;</a></h4>
 <p><strong>Profile</strong>: <code>profile.vertical.retail-asc</code></p>
 <p><strong>Test Cases</strong>:</p>
 <table>
@@ -1513,7 +1534,7 @@
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>esq<span class="w"> </span>run<span class="w"> </span>--profile<span class="w"> </span>profile.vertical.retail-asc
 </span></code></pre></div></p>
 <hr />
-<h3 id="retail-loss-prevention">Retail - Loss Prevention<a class="headerlink" href="#retail-loss-prevention" title="Permanent link">&para;</a></h3>
+<h4 id="loss-prevention">Loss Prevention<a class="headerlink" href="#loss-prevention" title="Permanent link">&para;</a></h4>
 <p><strong>Profile</strong>: <code>profile.vertical.retail-lp</code></p>
 <p><strong>Test Cases</strong>:</p>
 <table>
@@ -1547,7 +1568,7 @@
 </span></code></pre></div></p>
 <hr />
 <h2 id="horizontal">Horizontal<a class="headerlink" href="#horizontal" title="Permanent link">&para;</a></h2>
-<h3 id="generative-ai-suite">Generative AI Suite<a class="headerlink" href="#generative-ai-suite" title="Permanent link">&para;</a></h3>
+<h3 id="generative-ai">Generative AI<a class="headerlink" href="#generative-ai" title="Permanent link">&para;</a></h3>
 <p><strong>Profile</strong>: <code>profile.suite.ai.gen</code></p>
 <details>
 <summary><b>Test Cases</b> (click to expand)</summary>
@@ -1687,7 +1708,7 @@
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>esq<span class="w"> </span>run<span class="w"> </span>--profile<span class="w"> </span>profile.suite.ai.gen
 </span></code></pre></div></p>
 <hr />
-<h3 id="vision-ai-suite-light">Vision AI Suite - Light<a class="headerlink" href="#vision-ai-suite-light" title="Permanent link">&para;</a></h3>
+<h3 id="vision-ai-edge-workloads-and-benchmarks-pipelines-light">Vision AI - Edge Workloads and Benchmarks Pipelines - Light<a class="headerlink" href="#vision-ai-edge-workloads-and-benchmarks-pipelines-light" title="Permanent link">&para;</a></h3>
 <p><strong>Profile</strong>: <code>profile.suite.ai.vision-light</code></p>
 <p><strong>Test Cases</strong>:</p>
 <table>
@@ -1724,7 +1745,7 @@
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>esq<span class="w"> </span>run<span class="w"> </span>--profile<span class="w"> </span>profile.suite.ai.vision-light
 </span></code></pre></div></p>
 <hr />
-<h3 id="vision-ai-suite-vrb">Vision AI Suite - VRB<a class="headerlink" href="#vision-ai-suite-vrb" title="Permanent link">&para;</a></h3>
+<h3 id="vision-ai-verified-reference-blueprints">Vision AI - Verified Reference Blueprints<a class="headerlink" href="#vision-ai-verified-reference-blueprints" title="Permanent link">&para;</a></h3>
 <p><strong>Profile</strong>: <code>profile.suite.ai.vision-vrb</code></p>
 <p><strong>Test Cases</strong>:</p>
 <table>
@@ -1761,7 +1782,7 @@
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>esq<span class="w"> </span>run<span class="w"> </span>--profile<span class="w"> </span>profile.suite.ai.vision-vrb
 </span></code></pre></div></p>
 <hr />
-<h3 id="vision-ai-suite-openvino">Vision AI Suite - OpenVINO<a class="headerlink" href="#vision-ai-suite-openvino" title="Permanent link">&para;</a></h3>
+<h3 id="vision-ai-openvino">Vision AI - OpenVINO<a class="headerlink" href="#vision-ai-openvino" title="Permanent link">&para;</a></h3>
 <p><strong>Profile</strong>: <code>profile.suite.ai.vision-ov</code></p>
 <details>
 <summary><b>Test Cases</b> (click to expand)</summary>

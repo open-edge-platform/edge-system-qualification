@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/logo.svg">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.618322db.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -1315,47 +1315,47 @@
 <thead>
 <tr>
 <th><strong>Category</strong></th>
-<th><strong>CPU</strong></th>
-<th><strong>Memory</strong></th>
+<th><strong>Processors</strong></th>
+<th><strong>Specifications</strong></th>
 <th><strong>Storage</strong></th>
-<th><strong>Discrete GPU</strong></th>
+<th><strong>Discrete GPU Options</strong></th>
 </tr>
 </thead>
 <tbody>
 <tr>
+<td><strong>Scalable Performance Graphics Media</strong></td>
+<td><strong>Xeon-Based</strong>: <br>Intel® Xeon® 6 Processors,<br>5<sup>th</sup> Gen Intel® Xeon® Scalable Processors,<br>Intel® Xeon® W Processors<br><br><strong>Core-Based</strong>: <br>Intel® Core Ultra Series 2,<br> Intel® Core™ Series 2</td>
+<td><strong>Xeon-Based</strong>: <br><strong>SKU</strong>: Dual and Single Socket<br><strong>Minimum Cores</strong>: 32 cores<br> <strong>Memory</strong>: Minimum 512 GB DDR5, 5600 MT/s (1DPC)<br><br> <strong>Core-Based</strong>:<br> <strong>Minimum Cores</strong>: 8 Performance-cores (P-cores)<br><strong>Memory</strong>: Minimum 64GB DDR5<br></td>
+<td><strong>Recommended</strong>: 1TB</td>
+<td><strong>Intel® Arc™ B-Series Graphics</strong></td>
+</tr>
+<tr>
 <td><strong>Scalable Performance</strong></td>
-<td>Intel® Xeon® 5 processor</td>
-<td>256–512 GB</td>
-<td>1 TB</td>
-<td>Optional</td>
+<td>Intel® Xeon® 6 Processors,<br> 5<sup>th</sup> Gen Intel® Xeon® Scalable Processors, <br>Intel® Xeon® W Processors</td>
+<td><strong>SKU</strong>: Dual and Single Socket<br><strong>Minimum Cores</strong>: 32 cores<br> <strong>Memory</strong>: Minimum 512 GB <br></td>
+<td><strong>Recommended</strong>: 1TB</td>
+<td>N/A</td>
 </tr>
 <tr>
-<td><strong>Scalable AI, Graphics &amp; Media</strong></td>
-<td>Intel® processors with Intel® Arc™ Graphics</td>
-<td>Min 64 GB</td>
-<td>512 GB</td>
-<td><strong>Required: Alchemist or Battlemage</strong></td>
-</tr>
-<tr>
-<td><strong>Efficiency Optimized AI</strong></td>
-<td>Intel® Core™ Ultra processor Series 1 or Series 2</td>
-<td>Min 32 GB</td>
-<td>512 GB</td>
-<td>Optional</td>
+<td><strong>Efficiency Optimized</strong></td>
+<td>Intel® Core™ Ultra processor Series 2</td>
+<td><strong>Graphics</strong>: Integrated GPU with 7 Xe-Cores or more <br> <strong>SKU</strong>: Single Socket <br><strong>Minimum Cores</strong>: 8 Performance-cores (P-cores)<br><strong>System Memory</strong>: Minimum 32 GB DDR5 (Dual Channel)<br><strong>Recommended speed</strong>: 5600 MT/s</td>
+<td><strong>Recommended</strong>: 512 GB</td>
+<td>N/A</td>
 </tr>
 <tr>
 <td><strong>Mainstream</strong></td>
-<td>14<sup>th</sup> generation Intel® Core™ processors or higher</td>
-<td>Min 32 GB</td>
-<td>256 GB</td>
-<td>Optional</td>
+<td>Intel® Core™ Series 2</td>
+<td><strong>Minimum Cores</strong>: 8 Performance-cores (P-cores)<br><strong>System Memory</strong>: Minimum 32 GB DDR5</td>
+<td><strong>Recommended</strong>: 512 GB</td>
+<td>N/A</td>
 </tr>
 <tr>
 <td><strong>Entry</strong></td>
-<td>Intel® Core™ processor, Intel® Processor, Intel Atom®</td>
-<td>Min 16 GB</td>
-<td>256 GB</td>
-<td>Not supported</td>
+<td>Intel® Processor for Desktop,<br>Intel® Processor X-series, <br>Intel® Processor N-series</td>
+<td><strong>Memory</strong>: Minimum 32 GB DDR5 (recommended for light AI workloads)</td>
+<td><strong>Recommended</strong>: 512 GB</td>
+<td>N/A</td>
 </tr>
 </tbody>
 </table>
@@ -1385,11 +1385,11 @@
 <h2 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">&para;</a></h2>
 <h3 id="1-system-drivers">1. System Drivers<a class="headerlink" href="#1-system-drivers" title="Permanent link">&para;</a></h3>
 <p>Configure system drivers:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>sudo<span class="w"> </span>bash<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>wget<span class="w"> </span>-qLO<span class="w"> </span>-<span class="w"> </span>https://raw.githubusercontent.com/intel/edge-developer-kit-reference-scripts/refs/heads/main/main_installer.sh<span class="k">)</span><span class="s2">&quot;</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>sudo<span class="w"> </span>bash<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>wget<span class="w"> </span>-qLO<span class="w"> </span>-<span class="w"> </span>https://raw.githubusercontent.com/open-edge-platform/edge-developer-kit-reference-scripts/refs/heads/main/main_installer.sh<span class="k">)</span><span class="s2">&quot;</span>
 </span></code></pre></div>
 <div class="admonition info">
 <p class="admonition-title">Additional Reference</p>
-<p>For detailed information about system drivers, see the <a href="https://github.com/intel/edge-developer-kit-reference-scripts">Edge Developer Kit Reference Scripts</a> documentation.</p>
+<p>For detailed information about system drivers, see the <a href="https://github.com/open-edge-platform/edge-developer-kit-reference-scripts">Edge Developer Kit Reference Scripts</a> documentation.</p>
 </div>
 <h3 id="2-system-dependencies">2. System Dependencies<a class="headerlink" href="#2-system-dependencies" title="Permanent link">&para;</a></h3>
 <p>Install essential system packages:</p>
@@ -1632,10 +1632,10 @@ If this command prints a number without requiring sudo, the setup was successful
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["announce.dismiss", "content.action.edit", "content.action.view", "content.code.annotate", "content.code.copy", "content.tabs.link", "content.tooltips", "navigation.expand", "navigation.footer", "navigation.indexes", "navigation.instant", "navigation.instant.prefetch", "navigation.sections", "navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.tracking", "search.highlight", "search.share", "search.suggest", "toc.follow"], "search": "../../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["announce.dismiss", "content.action.edit", "content.action.view", "content.code.annotate", "content.code.copy", "content.tabs.link", "content.tooltips", "navigation.expand", "navigation.footer", "navigation.indexes", "navigation.instant", "navigation.instant.prefetch", "navigation.sections", "navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.tracking", "search.highlight", "search.share", "search.suggest", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
     
   </body>

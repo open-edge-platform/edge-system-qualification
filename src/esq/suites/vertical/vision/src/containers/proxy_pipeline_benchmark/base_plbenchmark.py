@@ -111,6 +111,9 @@ class BaseProxyPipelineBenchmark(BaseDLBenchmark):
     def bpl_run_lpr_benchmark(self):
         self.get_gst_elements("h264")
         max_stream = -1
+        # Track best result across all modes to preserve correct telemetry
+        best_result = -1
+        best_telemetry_list = None
 
         for j, (mode, devices) in enumerate(self.config["modes"].items()):
             for i, mod in enumerate(self.config["models"]):
@@ -139,10 +142,29 @@ class BaseProxyPipelineBenchmark(BaseDLBenchmark):
                     avg_fps = 0.0  # Placeholder - will be populated from logs/telemetry
                 else:
                     raise TypeError(f"Unexpected result type from run_test_round: {type(result)}, value: {result}")
+
+                # Track best result and save its telemetry
+                if result > best_result:
+                    best_result = result
+                    # Deep copy telemetry list to preserve it
+                    best_telemetry_list = list(self.telemetry_list) if self.telemetry_list else None
+                    self.logger.info(
+                        f"New best result: {best_result} streams (mode: {mode}, model: {mod}). "
+                        f"Telemetry saved."
+                    )
+
                 self.report_csv(result, avg_fps, cur_ref_value, duration, mod, mode, devices)
                 self.logger.info(
                     f"{self.benchmark_name} execution [model: {mod}, input resolution: 1080p@{self.target_fps}, device: {self.device}] finished in {duration:.2f} seconds"
                 )
+
+        # Restore best telemetry after all modes complete
+        if best_telemetry_list is not None:
+            self.telemetry_list = best_telemetry_list
+            self.logger.info(
+                f"Restored telemetry from best result ({best_result} streams). "
+                f"Final telemetry will reflect the highest performing mode."
+            )
 
     def run_benchmark(self):
         self.get_gst_elements("h264")
@@ -161,34 +183,88 @@ class BaseProxyPipelineBenchmark(BaseDLBenchmark):
 
             self.telemetry_file = f"{self.telemetry_file_prefix}_{mod}_{self.device}.result"
             self.result_file = f"{self.result_file_prefix}_{mod}_{self.device}.result"
-            self.logger.info(
-                f"Running {self.benchmark_name} using model: {mod}, input resolution: 1080p@{self.target_fps}, device: {self.device}"
-            )
+
+            self.logger.info("="*80)
+            self.logger.info(f"[MODEL {i+1}/{len(self.config['models'])}] STARTING TEST")
+            self.logger.info(f"Model: {mod}")
+            self.logger.info(f"Device: {self.device}")
+            self.logger.info(f"Resolution: 1080p@{self.target_fps}")
+            self.logger.info(f"Reference streams: {cur_ref_value}")
+            self.logger.info("="*80)
+
             start_time = time.time()
             result = self.run_test_round(
                 resolution="1080p", codec="h264", ref_stream=cur_ref_value, model_name=mod, max_stream=max_stream
             )
+
+            self.logger.info("="*80)
+            self.logger.info(f"[MODEL {i+1}/{len(self.config['models'])}] TEST ROUND COMPLETED")
+            self.logger.info(f"Result: {result} streams achieved")
+            self.logger.info("[PROGRESS] Processing results and updating telemetry...")
+            self.logger.info("="*80)
+
             end_time = time.time()
             duration = end_time - start_time
+
+            # Log the average FPS for the best result
+            if hasattr(self, 'best_avg_fps'):
+                self.logger.info(f"  Best Average FPS: {self.best_avg_fps:.2f} (for {result} streams)")
+            else:
+                self.logger.info("  Average FPS: Not available")
+
+            # Ensure telemetry is read from the current model's telemetry file
+            # run_test_round should have updated telemetry, but verify the file exists
+            if not os.path.isfile(self.telemetry_file):
+                self.logger.warning(f"Telemetry file not found: {self.telemetry_file}")
+                self.telemetry_list = [-1] * 8
+            elif result == 0:
+                self.logger.warning(f"No successful streams for model {mod}, setting telemetry to -1")
+                self.telemetry_list = [-1] * 8
+            else:
+                # Re-read telemetry to ensure we have the latest data for this model
+                try:
+                    self.logger.info(f"[PROGRESS] Calling update_telemetry() for {mod}...")
+                    self.update_telemetry()
+                    self.logger.info(f"[PROGRESS] Telemetry updated successfully for {mod}: {self.telemetry_list}")
+                except Exception as e:
+                    self.logger.error(f"Failed to update telemetry for {mod}: {e}")
+                    self.telemetry_list = [-1] * 8
 
             # Extract actual GPU Freq and Pkg Power from telemetry data collected during test
             # Telemetry list order: [0]=CPU Freq, [1]=CPU Usage, [2]=Mem Usage, 
             #                        [3]=GPU Freq, [4]=EU Usage, [5]=VDBox Usage, 
             #                        [6]=Pkg Power, [7]=GPU Power
+            # Initialize with reference config values (will be overwritten if telemetry is valid)
+            actual_gpu_freq = cur_ref_gpu_freq
+            actual_pkg_power = cur_ref_pkg_power
             try:
                 if len(self.telemetry_list) >= 8:
-                    actual_gpu_freq = float(self.telemetry_list[3])
-                    actual_pkg_power = float(self.telemetry_list[6])
-                    self.logger.info(f"Using actual telemetry data - GPU Freq: {actual_gpu_freq:.2f} MHz, Pkg Power: {actual_pkg_power:.2f} W")
+                    telemetry_gpu_freq = float(self.telemetry_list[3])
+                    telemetry_pkg_power = float(self.telemetry_list[6])
+                    if telemetry_gpu_freq > 0:
+                        actual_gpu_freq = telemetry_gpu_freq
+                        actual_pkg_power = telemetry_pkg_power
+                        self.logger.info(f"Using actual telemetry data - GPU Freq: {actual_gpu_freq:.2f} MHz, Pkg Power: {actual_pkg_power:.2f} W")
+                    else:
+                        self.logger.warning("GPU Freq is 0, telemetry may not be available. Using config values.")
                 else:
                     self.logger.warning(f"Insufficient telemetry data ({len(self.telemetry_list)} entries), using config values")
-            except (ValueError, IndexError) as e:
+            except (ValueError, IndexError, TypeError) as e:
                 self.logger.warning(f"Failed to extract telemetry data: {e}, using config values")
 
+            self.logger.info(f"[PROGRESS] Writing results to CSV for {mod}...")
             self.report_csv(result, cur_ref_value, cur_ref_gpu_freq, cur_ref_pkg_power, duration, mod)
-            self.logger.info(
-                f"{self.benchmark_name} execution [model: {mod}, input resolution: 1080p@{self.target_fps}, device: {self.device}] finished in {duration:.2f} seconds"
-            )
+            self.logger.info("[PROGRESS] CSV report written successfully")
+
+            self.logger.info("="*80)
+            self.logger.info(f"[MODEL {i+1}/{len(self.config['models'])}] COMPLETED")
+            self.logger.info(f"{self.benchmark_name} execution finished in {duration:.2f} seconds")
+            self.logger.info(f"Model: {mod}, Result: {result} streams")
+            self.logger.info("="*80)
+
+            # Add small delay to ensure logs are flushed
+            import time as time_module
+            time_module.sleep(0.5)
 
     def run_test_round_with_config(self, stream, resolution=None, codec=None, bitrate=None, model_name=None):
         self.logger.info(f"Start to run the pipeline with {stream} streams")

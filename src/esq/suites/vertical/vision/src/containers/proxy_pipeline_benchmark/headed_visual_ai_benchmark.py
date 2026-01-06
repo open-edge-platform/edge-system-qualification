@@ -188,14 +188,25 @@ class HeadedVisualAIBenchmark(BaseProxyPipelineBenchmark):
             else:
                 gst_cmd += f"filesrc location={video_src} ! qtdemux ! h264parse ! {self.dec_ele} ! video/x-raw(memory:VAMemory) "
 
-            gst_cmd += f"! gvadetect model={det_model_path} {preproc_backend} model-proc={det_proc_json_path} batch-size=1 nireq=2 ie-config=NUM_STREAMS=2 inference-interval=3 model-instance-id=detect{i} device={inf_device} threshold=0.5 "
+            # Optimize inference parameters for dGPU
+            if device_type == "dGPU":
+                detect_params = "batch-size=2 nireq=4 ie-config=NUM_STREAMS=4"
+            else:
+                detect_params = "batch-size=1 nireq=2 ie-config=NUM_STREAMS=2"
+
+            gst_cmd += f"! gvadetect model={det_model_path} {preproc_backend} model-proc={det_proc_json_path} {detect_params} inference-interval=3 model-instance-id=detect{i} device={inf_device} threshold=0.5 "
             gst_cmd += "! gvatrack tracking-type=short-term-imageless "
 
             if cls_model_name:
                 if self.is_MTL and device_type == "iGPU":
                     gst_cmd += f"! gvaclassify model={cls_model_path} {preproc_backend} model-proc={cls_proc_json_path} batch-size=1 nireq=2 inference-interval=3 inference-region=roi-list model-instance-id=classify{i} device=NPU "
                 else:
-                    gst_cmd += f"! gvaclassify model={cls_model_path} {preproc_backend} model-proc={cls_proc_json_path} batch-size=1 nireq=2 ie-config=NUM_STREAMS=2 inference-interval=3 inference-region=roi-list model-instance-id=classify{i} device={inf_device} "
+                    # Optimize classification parameters for dGPU
+                    if device_type == "dGPU":
+                        classify_params = "batch-size=2 nireq=4 ie-config=NUM_STREAMS=4"
+                    else:
+                        classify_params = "batch-size=1 nireq=2 ie-config=NUM_STREAMS=2"
+                    gst_cmd += f"! gvaclassify model={cls_model_path} {preproc_backend} model-proc={cls_proc_json_path} {classify_params} inference-interval=3 inference-region=roi-list model-instance-id=classify{i} device={inf_device} "
 
             gst_cmd += f"! tee name=t{i} "
             if device_type == "CPU":
@@ -246,7 +257,6 @@ CSV_FILE_PREFIX = f"{OUTPUT_DIR}/headed_visual_ai_proxy_pipeline"
 
 SINK_DIR = "/home/dlstreamer/sink"
 
-
 def run_headed_visual_ai_benchmark(device, monitor_num, is_mtl, has_igpu, config_file):
     if config_file == "none":
         config_file = None
@@ -272,7 +282,6 @@ def run_headed_visual_ai_benchmark(device, monitor_num, is_mtl, has_igpu, config
         headed_visual_ai_runner.run_benchmark()
     else:
         headed_visual_ai_runner.run_pipeline_with_config()
-
 
 if __name__ == "__main__":
 

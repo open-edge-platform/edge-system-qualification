@@ -71,6 +71,7 @@ def folder_copy_all(src_dir, dst_dir):
             # Copy individual files
             shutil.copy2(src_path, dst_path)  # preserves metadata
 
+
 def proxy_pl_suite(suite_name: str, resources_base_dir: str):
     """
     Configure test suite and CSV files based on suite name.
@@ -159,6 +160,7 @@ def proxy_pl_suite(suite_name: str, resources_base_dir: str):
             video_path = None
 
     return test_suite, csvlist, models_path, video_path
+
 
 def _generate_proxy_pipeline_charts(pp_results: str, suite_name: str, configs: dict, logger):
     """
@@ -439,7 +441,7 @@ def _run_proxy_pipeline_container(
     image_tag: str,
     benchmark_script: str,
     output_dir: str,
-    devices: list,
+    device_dict: dict,
     platform_info: dict,
     configs: dict,
     config_file: str = None,
@@ -458,13 +460,13 @@ def _run_proxy_pipeline_container(
         image_name: Docker image name
         image_tag: Docker image tag
         benchmark_script: Benchmark script name (e.g., "lpr_benchmark")
-        output_dir: Host output directory
-        devices: List of device strings (iGPU, dGPU.0, etc.)
-        platform_info: Platform information from detect_platform_type()
-        configs: Test configuration dictionary (for reading display_output, etc.)
-        config_file: Optional configuration file path
-        round_num: Test iteration number
-        fps: Target FPS for benchmarking
+        output_dir: Path to output directory
+        device_dict: Dictionary of device_id -> device_info from get_available_devices_by_category()
+        platform_info: Platform detection information
+        configs: Test configuration dictionary
+        config_file: Optional config file path
+        round_num: Round number for multiple iterations
+        fps: Target FPS for benchmark
 
     Returns:
         dict: Container execution result with keys: exit_code, container_logs_text, etc.
@@ -517,7 +519,7 @@ def _run_proxy_pipeline_container(
     display = os.environ.get("DISPLAY", ":0")
     environment = {
         "DISPLAY": display,
-        "DEVICES_LIST": " ".join(devices),
+        "DEVICES_LIST": " ".join(device_dict.keys()),
         "PL_NAME": benchmark_script,
         "OUTPUT_DIR": "/home/dlstreamer/output",
         "ROUND": str(round_num),
@@ -625,11 +627,25 @@ def _run_proxy_pipeline_container(
 
     # Build command - run parallel benchmark script
     # The script expects device names in canonical format (e.g., iGPU, dGPU.0, dGPU.1, CPU, NPU)
-    # Convert OpenVINO device format to canonical format using centralized utility
+    # Convert OpenVINO device format to canonical format using actual device types
     from esq.utils.media.validation import normalize_device_name
 
-    device_args = [normalize_device_name(dev) for dev in devices]
-    logger.debug(f"Normalized devices for benchmark: {devices} → {device_args}")
+    # Build canonical device mapping using actual device types (not positional assumptions)
+    dgpu_index = 0
+    device_args = []
+    for device_id, device_info in device_dict.items():
+        device_type = device_info.get("device_type")
+        canonical_name = normalize_device_name(device_id, device_type)
+        
+        # If discrete GPU, add sequential index
+        if canonical_name == "dGPU":
+            canonical_name = f"dGPU.{dgpu_index}"
+            dgpu_index += 1
+        
+        device_args.append(canonical_name)
+        logger.debug(f"Device {device_id} (Type={device_type}) mapped to {canonical_name}")
+
+    logger.debug(f"Normalized devices for benchmark: {list(device_dict.keys())} → {device_args}")
 
     # Display output: 0=fakesink (no display), 1=xvimagesink (display enabled)
     display_output = str(configs.get("display_output", 0))
@@ -806,6 +822,14 @@ def test_proxy_pipelines(
 
     docker_client = DockerClient()
 
+    # Cleanup stale containers from previous interrupted runs
+    container_prefix = configs.get("container_image", "proxy_pl_bm_runner")
+    logger.info(f"Cleaning up stale containers with prefix: {container_prefix}")
+    try:
+        docker_client.cleanup_containers_by_name_pattern(container_prefix)
+    except Exception as cleanup_error:
+        logger.warning(f"Failed to cleanup stale containers: {cleanup_error}")
+
     # Initialize variables for finally block and exception handlers (moved to top for broader coverage)
     test_failed = False
     failure_message = ""
@@ -829,40 +853,21 @@ def test_proxy_pipelines(
                 f"dGPU_count={platform_info['dgpu_count']}, MTL={platform_info['is_mtl']}"
             )
 
-            # Copy consolidated utilities into Docker build context
-            logger.info("Preparing Docker build context with consolidated utilities...")
-            import shutil
-            from pathlib import Path
+            # Use extended Docker build context to include shared utilities
+            # Build context set to esq/ directory to access utils/media/ directly
+            logger.info("Preparing Docker build with extended build context...")
 
-            # Source paths (absolute paths relative to test file)
             test_file_dir = Path(__file__).resolve().parent
+            # Set build context to esq/ directory (3 levels up from test file)
             # test_file_dir = .../src/esq/suites/vertical/vision/
-            # parent.parent.parent = .../src/esq/
-            esq_utils_src = test_file_dir.parent.parent.parent / "utils" / "media"
+            # esq_dir = .../src/esq/
+            esq_dir = test_file_dir.parent.parent.parent
 
-            # Destination paths (inside Docker build context)
-            docker_build_path = Path(docker_dir)
-            esq_utils_dst = docker_build_path / "esq_utils" / "media"
+            # Dockerfile path relative to esq/ build context
+            relative_dockerfile = "suites/vertical/vision/src/containers/proxy_pipeline_benchmark/Dockerfile"
 
-            # Create destination directories
-            esq_utils_dst.mkdir(parents=True, exist_ok=True)
-
-            # Copy ESQ utilities (including container_utils.py for subprocess execution)
-            util_files = [
-                "__init__.py",
-                "pipeline_utils.py",
-                "telemetry.py",
-                "validation.py",
-                "container_utils.py",
-            ]
-            for util_file in util_files:
-                src = esq_utils_src / util_file
-                dst = esq_utils_dst / util_file
-                if src.exists():
-                    shutil.copy2(src, dst)
-                    logger.debug(f"Copied {util_file} to build context")
-                else:
-                    logger.warning(f"Utility file not found: {src}")
+            logger.debug(f"Build context directory: {esq_dir}")
+            logger.debug(f"Relative Dockerfile path: {relative_dockerfile}")
 
             # Build arguments
             build_args = {
@@ -870,10 +875,10 @@ def test_proxy_pipelines(
             }
 
             build_result = docker_client.build_image(
-                path=docker_dir,
+                path=str(esq_dir),
                 tag=docker_image_tag,
                 nocache=docker_nocache,
-                dockerfile=dockerfile_name,
+                dockerfile=relative_dockerfile,
                 buildargs=build_args,
             )
 
@@ -1068,7 +1073,7 @@ def test_proxy_pipelines(
                             image_tag=configs.get("image_tag", "1.0"),
                             benchmark_script=test_suite,
                             output_dir=pp_results,
-                            devices=list(device_dict.keys()),
+                            device_dict=device_dict,
                             platform_info=platform_info,
                             configs=configs_with_paths,
                             config_file=None,
@@ -1232,30 +1237,48 @@ def test_proxy_pipelines(
                                                 ) as log_f:
                                                     log_lines = log_f.readlines()
 
-                                                # Pattern: "[INFO] LPR Average fps is X" or
-                                                # "[INFO] Average fps is X"
+                                                # Pattern 1: "[INFO] LPR Average fps is X" or "[INFO] Average fps is X"
+                                                # Pattern 2: "[PROGRESS] Pipeline completed. Average fps is X" (SmartNVR/VSaaS)
+                                                # Pattern 3: "Best Average FPS: X" (final result summary)
                                                 import re
 
-                                                fps_pattern = (
-                                                    r"\[INFO\]\s+(?:LPR\s+)?"
-                                                    r"Average\s+fps\s+is\s+([\d.]+)"
-                                                )
+                                                fps_pattern1 = r"\[INFO\]\s+(?:LPR\s+)?Average\s+fps\s+is\s+([\d.]+)"
+                                                fps_pattern2 = r"\[PROGRESS\].*Average\s+fps\s+is\s+([\d.]+)"
+                                                fps_pattern3 = r"Best\s+Average\s+FPS:\s+([\d.]+)"
 
-                                                # Find all FPS values in log
+                                                # Find all FPS values in log (from all patterns)
                                                 fps_values = []
+                                                best_fps = None
+
                                                 for line in log_lines:
-                                                    match = re.search(fps_pattern, line, re.IGNORECASE)
+                                                    # Try pattern 3 first (Best Average FPS - this is the final result)
+                                                    match = re.search(fps_pattern3, line, re.IGNORECASE)
+                                                    if match:
+                                                        best_fps = float(match.group(1))
+                                                        continue
+
+                                                    # Try pattern 1 (LPR/INFO logs)
+                                                    match = re.search(fps_pattern1, line, re.IGNORECASE)
+                                                    if match:
+                                                        fps_values.append(float(match.group(1)))
+                                                        continue
+
+                                                    # Try pattern 2 (PROGRESS logs - SmartNVR/VSaaS)
+                                                    match = re.search(fps_pattern2, line, re.IGNORECASE)
                                                     if match:
                                                         fps_values.append(float(match.group(1)))
 
-                                                # Use last FPS (final/best config)
-                                                if fps_values:
-                                                    result.metrics["avg_fps"].value = fps_values[-1]
+                                                # Use Best Average FPS if available, otherwise use last FPS
+                                                final_fps = best_fps if best_fps is not None else (fps_values[-1] if fps_values else None)
+
+                                                if final_fps is not None:
+                                                    result.metrics["avg_fps"].value = final_fps
                                                     result.metrics["avg_fps"].unit = "fps"
+                                                    source = "Best Average FPS" if best_fps is not None else "last FPS value"
                                                     logger.info(
-                                                        f"Extracted avg_fps={fps_values[-1]} "
-                                                        f"from {log_filename} (found "
-                                                        f"{len(fps_values)} entries)"
+                                                        f"Extracted avg_fps={final_fps} "
+                                                        f"from {log_filename} ({source}, found "
+                                                        f"{len(fps_values)} total FPS entries)"
                                                     )
                                                 else:
                                                     logger.warning(f"No FPS in log: {log_filename}")
@@ -1270,13 +1293,9 @@ def test_proxy_pipelines(
 
                                         # GPU Frequency (MHz)
                                         if "GPU Freq" in df.columns:
-                                            gpu_freq_val = (
-                                                float(best_row["GPU Freq"])
-                                                if str(best_row["GPU Freq"]) not in ["N/A", "nan", "", "-1"]
-                                                else 0.0
-                                            )
-                                            if gpu_freq_val > 0:
-                                                result.metrics["gpu_freq_mhz"].value = gpu_freq_val
+                                            gpu_freq_str = str(best_row["GPU Freq"])
+                                            if gpu_freq_str not in ["N/A", "nan", ""]:
+                                                result.metrics["gpu_freq_mhz"].value = float(gpu_freq_str)
                                                 result.metrics["gpu_freq_mhz"].unit = "MHz"
                                                 logger.info(
                                                     f"Extracted GPU Freq={result.metrics['gpu_freq_mhz'].value} MHz"
@@ -1284,13 +1303,9 @@ def test_proxy_pipelines(
 
                                         # Package Power (Watts)
                                         if "Pkg Power" in df.columns:
-                                            pkg_power_val = (
-                                                float(best_row["Pkg Power"])
-                                                if str(best_row["Pkg Power"]) not in ["N/A", "nan", "", "-1"]
-                                                else 0.0
-                                            )
-                                            if pkg_power_val > 0:
-                                                result.metrics["pkg_power_w"].value = pkg_power_val
+                                            pkg_power_str = str(best_row["Pkg Power"])
+                                            if pkg_power_str not in ["N/A", "nan", ""]:
+                                                result.metrics["pkg_power_w"].value = float(pkg_power_str)
                                                 result.metrics["pkg_power_w"].unit = "W"
                                                 logger.info(
                                                     f"Extracted Pkg Power={result.metrics['pkg_power_w'].value} W"
@@ -1411,11 +1426,11 @@ def test_proxy_pipelines(
         )
         test_interrupted = True
         logger.error(failure_message)
-        # Cleanup any running containers
+        # Cleanup any running containers with extended timeout for graceful shutdown
         if container_name:
             try:
                 logger.debug(f"Cleaning up container: {container_name}")
-                docker_client.cleanup_container(container_name, timeout=10)
+                docker_client.cleanup_container(container_name, timeout=30)
                 logger.debug(f"Successfully cleaned up container: {container_name}")
             except Exception as cleanup_err:
                 logger.warning(
@@ -1451,7 +1466,7 @@ def test_proxy_pipelines(
         if container_name:
             try:
                 logger.debug(f"Finally block: Cleaning up container {container_name}")
-                docker_client.cleanup_container(container_name, timeout=10)
+                docker_client.cleanup_container(container_name, timeout=30)
                 logger.info(f"Finally block: Successfully cleaned up container {container_name}")
             except Exception as cleanup_err:
                 logger.warning(

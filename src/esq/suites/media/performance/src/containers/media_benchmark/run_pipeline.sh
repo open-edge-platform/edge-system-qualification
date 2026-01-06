@@ -27,8 +27,7 @@ fi
 # Example: "filesrc location=file.mp4 ! decoder ! sink" must become separate args
 # DO NOT quote ${gst_cmd} as it will break GStreamer pipeline parsing.
 # shellcheck disable=SC2086
-# GST_DEBUG disabled for performance - set to 2 or 3 only for debugging
-gst-launch-1.0 -e -v ${gst_cmd} &
+GST_DEBUG=3 gst-launch-1.0 -e -v ${gst_cmd} &
 
 gst_pid=$!
 

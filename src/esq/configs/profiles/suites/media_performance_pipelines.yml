@@ -1,0 +1,356 @@
+# Copyright (C) 2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+name: "profile.suite.media.performance-pipelines"
+description: "Media Performance"
+version: "1.0.0"
+params:
+  labels:
+    profile_display_name: "Media Performance"
+    group: "media.performance"
+    type: "suite"
+    display_status: false
+  requirements:
+    # Hardware requirements
+    cpu_min_cores: 2
+    memory_min_gb: 5.0
+    storage_total_min_gb: 64.0
+    storage_min_gb: 10.0 # Free storage for test execution
+    # Software requirements
+    os_type:
+      - "linux"
+    docker_required: true
+  container_image: "media_perf_runner"
+  image_tag: "1.0"
+  dockerfile_name: "Dockerfile"
+  base_image: "intel/dlstreamer:2025.1.2-ubuntu24"
+  display_output: 0  # 0=headless (fakesink), 1=display enabled (xvimagesink) - default headless for CI
+  skip_container_execution: False  # Set to true to skip container run and use existing CSV results (for quick testing)
+  force_run: true
+
+suites:
+  - name: "media"
+    sub_suites:
+      - name: "performance"
+        tests:
+          test_media_pipelines:
+            params:
+              - test_id: "MDA-DEC-001"
+                display_name: "Media Decode 4Mbps H.264 1080p@30 (iGPU)"
+                operation: "decode"
+                codec: "H.264"
+                bitrate: "4Mbps"
+                resolution: "1080p30"
+                device: [igpu]
+                timeout: 1650
+                requirements:
+                  igpu_required: true
+                kpi_refs:
+                  - streams_max
+
+              - test_id: "MDA-DEC-002"
+                display_name: "Media Decode 16Mbps H.264 4k@30 (iGPU)"
+                operation: "decode"
+                codec: "H.264"
+                bitrate: "16Mbps"
+                resolution: "4k@30"
+                device: [igpu]
+                timeout: 1650
+                requirements:
+                  igpu_required: true
+                kpi_refs:
+                  - streams_max
+
+              - test_id: "MDA-DEC-003"
+                display_name: "Media Decode 4Mbps H.264 1080p@30 (dGPU)"
+                operation: "decode"
+                codec: "H.264"
+                bitrate: "4Mbps"
+                resolution: "1080p30"
+                device: [dgpu]
+                timeout: 1650
+                requirements:
+                  dgpu_required: true
+                kpi_refs:
+                  - streams_max
+
+              - test_id: "MDA-DEC-004"
+                display_name: "Media Decode 16Mbps H.264 4k@30 (dGPU)"
+                operation: "decode"
+                codec: "H.264"
+                bitrate: "16Mbps"
+                resolution: "4k@30"
+                device: [dgpu]
+                timeout: 1650
+                requirements:
+                  dgpu_required: true
+                kpi_refs:
+                  - streams_max
+
+              - test_id: "MDA-DEC-005"
+                display_name: "Media Decode 2Mbps H.265 1080p@30 (iGPU)"
+                operation: "decode"
+                codec: "H.265"
+                bitrate: "2Mbps"
+                resolution: "1080p30"
+                device: [igpu]
+                timeout: 1650
+                requirements:
+                  igpu_required: true
+                kpi_refs:
+                  - streams_max
+              
+              - test_id: "MDA-DEC-006"
+                display_name: "Media Decode 8Mbps H.265 4k@30 (iGPU)"
+                operation: "decode"
+                codec: "H.265"
+                bitrate: "8Mbps"
+                resolution: "4k@30"
+                device: [igpu]
+                timeout: 1650
+                requirements:
+                  igpu_required: true
+                kpi_refs:
+                  - streams_max
+
+              - test_id: "MDA-DEC-007"
+                display_name: "Media Decode 2Mbps H.265 1080p@30 (dGPU)"
+                operation: "decode"
+                codec: "H.265"
+                bitrate: "2Mbps"
+                resolution: "1080p30"
+                device: [dgpu]
+                timeout: 1650
+                requirements:
+                  dgpu_required: true
+                kpi_refs:
+                  - streams_max
+              
+              - test_id: "MDA-DEC-008"
+                display_name: "Media Decode 8Mbps H.265 4k@30 (dGPU)"
+                operation: "decode"
+                codec: "H.265"
+                bitrate: "8Mbps"
+                resolution: "4k@30"
+                device: [dgpu]
+                timeout: 1650
+                requirements:
+                  dgpu_required: true
+                kpi_refs:
+                  - streams_max
+
+              - test_id: "MDA-COMP-001"
+                display_name: "Media Decode + Compose 4Mbps H.264 1080p@30 (iGPU)"
+                operation: "decode + compose"
+                codec: "H.264"
+                bitrate: "4Mbps"
+                resolution: "1080p30"
+                device: [igpu]
+                timeout: 1800
+                display_output: 0  # Enable display output for compose tests
+                requirements:
+                  igpu_required: true
+                kpi_refs:
+                  - streams_max
+
+              - test_id: "MDA-COMP-002"
+                display_name: "Media Decode + Compose 16Mbps H.264 4k@30 (iGPU)"
+                operation: "decode + compose"
+                codec: "H.264"
+                bitrate: "16Mbps"
+                resolution: "4k@30"
+                device: [igpu]
+                timeout: 1800
+                display_output: 0  # Enable display output for compose tests
+                requirements:
+                  igpu_required: true
+                kpi_refs:
+                  - streams_max
+
+              - test_id: "MDA-COMP-005"
+                display_name: "Media Decode + Compose 4Mbps H.264 1080p@30 (dGPU)"
+                operation: "decode + compose"
+                codec: "H.264"
+                bitrate: "4Mbps"
+                resolution: "1080p30"
+                device: [dgpu]
+                timeout: 1800
+                display_output: 0  # Enable display output for compose tests
+                requirements:
+                  dgpu_required: true
+                kpi_refs:
+                  - streams_max
+
+              - test_id: "MDA-COMP-006"
+                display_name: "Media Decode + Compose 16Mbps H.264 4k@30 (dGPU)"
+                operation: "decode + compose"
+                codec: "H.264"
+                bitrate: "16Mbps"
+                resolution: "4k@30"
+                device: [dgpu]
+                timeout: 1800
+                display_output: 0  # Enable display output for compose tests
+                requirements:
+                  dgpu_required: true
+                kpi_refs:
+                  - streams_max
+
+              - test_id: "MDA-COMP-003"
+                display_name: "Media Decode + Compose 2Mbps H.265 1080p@30 (iGPU)"
+                operation: "decode + compose"
+                codec: "H.265"
+                bitrate: "2Mbps"
+                resolution: "1080p30"
+                device: [igpu]
+                timeout: 1800
+                display_output: 0  # Enable display output for compose tests
+                requirements:
+                  igpu_required: true
+                kpi_refs:
+                  - streams_max
+
+              - test_id: "MDA-COMP-004"
+                display_name: "Media Decode + Compose 8Mbps H.265 4k@30 (iGPU)"
+                operation: "decode + compose"
+                codec: "H.265"
+                bitrate: "8Mbps"
+                resolution: "4k@30"
+                device: [igpu]
+                timeout: 1800
+                display_output: 0  # Enable display output for compose tests
+                requirements:
+                  igpu_required: true
+                kpi_refs:
+                  - streams_max
+
+              - test_id: "MDA-COMP-007"
+                display_name: "Media Decode + Compose 2Mbps H.265 1080p@30 (dGPU)"
+                operation: "decode + compose"
+                codec: "H.265"
+                bitrate: "2Mbps"
+                resolution: "1080p30"
+                device: [dgpu]
+                timeout: 1800
+                display_output: 0  # Enable display output for compose tests
+                requirements:
+                  dgpu_required: true
+                kpi_refs:
+                  - streams_max
+
+              - test_id: "MDA-COMP-008"
+                display_name: "Media Decode + Compose 8Mbps H.265 4k@30 (dGPU)"
+                operation: "decode + compose"
+                codec: "H.265"
+                bitrate: "8Mbps"
+                resolution: "4k@30"
+                device: [dgpu]
+                timeout: 1800
+                display_output: 0  # Enable display output for compose tests
+                requirements:
+                  dgpu_required: true
+                kpi_refs:
+                  - streams_max
+
+              - test_id: "MDA-ENC-001"
+                display_name: "Media Encode 4Mbps H.264 1080p@30 (iGPU)"
+                operation: "encode"
+                codec: "H.264"
+                bitrate: "4Mbps"
+                resolution: "1080p30"
+                device: [igpu]
+                timeout: 1800
+                requirements:
+                  igpu_required: true
+                kpi_refs:
+                  - streams_max
+
+              - test_id: "MDA-ENC-002"
+                display_name: "Media Encode 16Mbps H.264 4k@30 (iGPU)"
+                operation: "encode"
+                codec: "H.264"
+                bitrate: "16Mbps"
+                resolution: "4k@30"
+                device: [igpu]
+                timeout: 1800
+                requirements:
+                  igpu_required: true
+                kpi_refs:
+                  - streams_max
+
+              - test_id: "MDA-ENC-003"
+                display_name: "Media Encode 4Mbps H.264 1080p@30 (dGPU)"
+                operation: "encode"
+                codec: "H.264"
+                bitrate: "4Mbps"
+                resolution: "1080p30"
+                device: [dgpu]
+                timeout: 1800
+                requirements:
+                  dgpu_required: true
+                kpi_refs:
+                  - streams_max
+
+              - test_id: "MDA-ENC-004"
+                display_name: "Media Encode 16Mbps H.264 4k@30 (dGPU)"
+                operation: "encode"
+                codec: "H.264"
+                bitrate: "16Mbps"
+                resolution: "4k@30"
+                device: [dgpu]
+                timeout: 1800
+                requirements:
+                  dgpu_required: true
+                kpi_refs:
+                  - streams_max
+
+              - test_id: "MDA-ENC-005"
+                display_name: "Media Encode 2Mbps H.265 1080p@30 (iGPU)"
+                operation: "encode"
+                codec: "H.265"
+                bitrate: "2Mbps"
+                resolution: "1080p30"
+                device: [igpu]
+                timeout: 1800
+                requirements:
+                  igpu_required: true
+                kpi_refs:
+                  - streams_max
+
+              - test_id: "MDA-ENC-006"
+                display_name: "Media Encode 8Mbps H.265 4k@30 (iGPU)"
+                operation: "encode"
+                codec: "H.265"
+                bitrate: "8Mbps"
+                resolution: "4k@30"
+                device: [igpu]
+                timeout: 1800
+                requirements:
+                  igpu_required: true
+                kpi_refs:
+                  - streams_max
+
+              - test_id: "MDA-ENC-007"
+                display_name: "Media Encode 2Mbps H.265 1080p@30 (dGPU)"
+                operation: "encode"
+                codec: "H.265"
+                bitrate: "2Mbps"
+                resolution: "1080p30"
+                device: [dgpu]
+                timeout: 1800
+                requirements:
+                  dgpu_required: true
+                kpi_refs:
+                  - streams_max
+
+              - test_id: "MDA-ENC-008"
+                display_name: "Media Encode 8Mbps H.265 4k@30 (dGPU)"
+                operation: "encode"
+                codec: "H.265"
+                bitrate: "8Mbps"
+                resolution: "4k@30"
+                device: [dgpu]
+                timeout: 3000
+                requirements:
+                  dgpu_required: true
+                kpi_refs:
+                  - streams_max

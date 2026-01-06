@@ -69,18 +69,22 @@ class LPRBenchmark(BaseProxyPipelineBenchmark):
             }.get(dev, "unknown_decode")
 
         elif stage == "detect":
+            # Determine correct OpenVINO device ID for dGPU
+            dgpu_device = self._get_dgpu_openvino_device()
             return {
                 "CPU": f"device=CPU pre-process-backend=opencv {det_opt}",
                 "iGPU": f"device=GPU pre-process-backend=va-surface-sharing {det_opt}",
-                "dGPU": f"device=GPU.1 pre-process-backend=va-surface-sharing {det_opt}",
+                "dGPU": f"device={dgpu_device} pre-process-backend=va-surface-sharing {det_opt}",
                 "NPU": f"device=NPU pre-process-backend=opencv {det_opt}",
             }.get(dev, "unknown_detect")
 
         elif stage == "classify":
+            # Determine correct OpenVINO device ID for dGPU
+            dgpu_device = self._get_dgpu_openvino_device()
             return {
                 "CPU": f"device=CPU pre-process-backend=opencv {cls_opt}",
                 "iGPU": f"device=GPU pre-process-backend=va-surface-sharing {cls_opt}",
-                "dGPU": f"device=GPU.1 pre-process-backend=va-surface-sharing {cls_opt}",
+                "dGPU": f"device={dgpu_device} pre-process-backend=va-surface-sharing {cls_opt}",
                 "NPU": f"device=NPU pre-process-backend=opencv {cls_opt}",
             }.get(dev, "unknown_classify")
         return "unknown_element"
@@ -88,6 +92,25 @@ class LPRBenchmark(BaseProxyPipelineBenchmark):
     def get_normalize_device_name(self, dev):
         """Remove suffix like '.0', '.1' specifically for dGPU.0/1 to get canonical device name."""
         return re.sub(r"\.\d+$", "", dev)
+
+    def _get_dgpu_openvino_device(self):
+        """Calculate the correct OpenVINO device ID for discrete GPU."""
+        # Extract dGPU index from device name (e.g., dGPU.0 -> 0, dGPU.1 -> 1)
+        device_parts = self.device.split(".")
+        if len(device_parts) > 1:
+            dgpu_idx = int(device_parts[1])
+        else:
+            dgpu_idx = 0
+
+        # OpenVINO enumeration: GPU/GPU.0 = iGPU (if present), GPU.1+ = dGPUs
+        if self.has_igpu:
+            # iGPU takes GPU.0, so first dGPU is GPU.1, second is GPU.2, etc.
+            openvino_device = f"GPU.{dgpu_idx + 1}"
+        else:
+            # No iGPU, so first dGPU is GPU.0, second is GPU.1, etc.
+            openvino_device = f"GPU.{dgpu_idx}"
+
+        return openvino_device
 
     def get_mode_and_compute_devices(self, available_devices, lpr_execd_modes):
         modes_dict = {}

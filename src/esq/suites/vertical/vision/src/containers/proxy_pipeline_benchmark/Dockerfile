@@ -50,24 +50,26 @@ RUN mkdir -p $HOME/sample_video/ && chown -R dlstreamer:dlstreamer $HOME/sample_
 RUN mkdir -p /home/dlstreamer/sink && chown -R dlstreamer:dlstreamer /home/dlstreamer/sink && chmod -R 770 /home/dlstreamer/sink
 RUN mkdir -p $HOME/share/models/ && chown -R dlstreamer:dlstreamer $HOME/share/models/ && chmod -R 770 $HOME/share/models/
 
-COPY --chown=dlstreamer:dlstreamer gst_loop_mp4.sh .
-COPY --chown=dlstreamer:dlstreamer smart_nvr_benchmark.py .
-COPY --chown=dlstreamer:dlstreamer headed_visual_ai_benchmark.py .
-COPY --chown=dlstreamer:dlstreamer ai_vsaas_benchmark.py .
-COPY --chown=dlstreamer:dlstreamer base_plbenchmark.py .
-COPY --chown=dlstreamer:dlstreamer run_proxy_pipeline_benchmark_parallel.sh .
+# Copy ESQ media utilities from extended build context (esq/ directory)
+# Build context is set to esq/ by test_proxy_pipelines.py, so we reference utils/ directly
+# These provide secure subprocess wrappers and shared benchmarking/telemetry functionality
+COPY --chown=dlstreamer:dlstreamer utils/media/__init__.py ./esq_utils/media/
+COPY --chown=dlstreamer:dlstreamer utils/media/pipeline_utils.py ./esq_utils/media/
+COPY --chown=dlstreamer:dlstreamer utils/media/telemetry.py ./esq_utils/media/
+COPY --chown=dlstreamer:dlstreamer utils/media/validation.py ./esq_utils/media/
+COPY --chown=dlstreamer:dlstreamer utils/media/container_utils.py ./esq_utils/media/
 
-COPY --chown=dlstreamer:dlstreamer gst_lpr_loop_mp4.sh .
-COPY --chown=dlstreamer:dlstreamer lpr_benchmark.py .
-
-# Copy consolidated utilities (prepared in build context by test script)
-COPY --chown=dlstreamer:dlstreamer esq_utils/media/__init__.py ./esq_utils/media/
-COPY --chown=dlstreamer:dlstreamer esq_utils/media/pipeline_utils.py ./esq_utils/media/
-COPY --chown=dlstreamer:dlstreamer esq_utils/media/telemetry.py ./esq_utils/media/
-COPY --chown=dlstreamer:dlstreamer esq_utils/media/validation.py ./esq_utils/media/
-COPY --chown=dlstreamer:dlstreamer esq_utils/media/container_utils.py ./esq_utils/media/
-COPY --chown=dlstreamer:dlstreamer run_pipeline.sh .
-COPY --chown=dlstreamer:dlstreamer check_va_plugins.sh .
+# Copy benchmark scripts from container directory
+COPY --chown=dlstreamer:dlstreamer suites/vertical/vision/src/containers/proxy_pipeline_benchmark/gst_loop_mp4.sh .
+COPY --chown=dlstreamer:dlstreamer suites/vertical/vision/src/containers/proxy_pipeline_benchmark/smart_nvr_benchmark.py .
+COPY --chown=dlstreamer:dlstreamer suites/vertical/vision/src/containers/proxy_pipeline_benchmark/headed_visual_ai_benchmark.py .
+COPY --chown=dlstreamer:dlstreamer suites/vertical/vision/src/containers/proxy_pipeline_benchmark/ai_vsaas_benchmark.py .
+COPY --chown=dlstreamer:dlstreamer suites/vertical/vision/src/containers/proxy_pipeline_benchmark/base_plbenchmark.py .
+COPY --chown=dlstreamer:dlstreamer suites/vertical/vision/src/containers/proxy_pipeline_benchmark/run_proxy_pipeline_benchmark_parallel.sh .
+COPY --chown=dlstreamer:dlstreamer suites/vertical/vision/src/containers/proxy_pipeline_benchmark/gst_lpr_loop_mp4.sh .
+COPY --chown=dlstreamer:dlstreamer suites/vertical/vision/src/containers/proxy_pipeline_benchmark/lpr_benchmark.py .
+COPY --chown=dlstreamer:dlstreamer suites/vertical/vision/src/containers/proxy_pipeline_benchmark/run_pipeline.sh .
+COPY --chown=dlstreamer:dlstreamer suites/vertical/vision/src/containers/proxy_pipeline_benchmark/check_va_plugins.sh .
 
 ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/intel/oneapi/compiler/2024.2/lib
 

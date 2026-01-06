@@ -19,6 +19,7 @@ import time
 # Support both installed package and Docker container usage
 try:
     from sysagent.utils.core.process import run_command
+
     # For Popen cases, we need to use subprocess with proper validation
     # FW API doesn't expose Popen directly, so use container_utils wrapper
     from esq.utils.media.container_utils import secure_popen
@@ -210,27 +211,32 @@ class BaseDLBenchmark:
             prefix: Record identifier prefix
             cur_record: Full CSV record line to write
         """
+        self.logger.info(f"[PROGRESS] Opening CSV file: {csv_path}")
         with open(csv_path, "r+") as f:
             # Acquire lock to ensure only 1 process can modify file
+            self.logger.info("[PROGRESS] Acquiring file lock...")
             fcntl.flock(f, fcntl.LOCK_EX)
+            self.logger.info("[PROGRESS] File lock acquired")
             try:
                 pattern = re.compile(f"{prefix},.*")
                 content = f.read()
                 if pattern.search(content):
-                    self.logger.info(f"Existed result for {prefix}, update")
+                    self.logger.info(f"Existed result for {prefix}, updating")
                     updated_content = pattern.sub(f"{cur_record}", content)
 
                     f.seek(0)
                     f.write(updated_content)
                     f.truncate()
                 else:
-                    self.logger.info(f"No record for {prefix}, add one")
+                    self.logger.info(f"No record for {prefix}, adding new")
                     # Move to end of file
                     f.seek(0, os.SEEK_END)
                     f.write(f"{cur_record}\n")
+                self.logger.info("[PROGRESS] CSV write complete")
             finally:
                 # Release the lock
                 fcntl.flock(f, fcntl.LOCK_UN)
+                self.logger.info("[PROGRESS] File lock released")
 
     def collect_telemetry(self):
         """Start telemetry collection in separate process."""
@@ -251,8 +257,11 @@ class BaseDLBenchmark:
         """Stop telemetry collection process."""
         if self.tele_process.is_alive():
             try:
+                self.logger.info(f"[PROGRESS] Sending SIGUSR1 to telemetry process (PID: {self.tele_process.pid})...")
                 os.kill(self.tele_process.pid, signal.SIGUSR1)
+                self.logger.info("[PROGRESS] Waiting for telemetry process to join (timeout: 5s)...")
                 self.tele_process.join(timeout=5)
+                self.logger.info("[PROGRESS] Telemetry process joined successfully")
             except Exception as e:
                 self.logger.warning(f"Failed to stop telemetry gracefully: {e}")
 
@@ -267,6 +276,8 @@ class BaseDLBenchmark:
                 self.logger.error("Telemetry process didn't terminate, forcing kill")
                 self.tele_process.kill()
                 self.tele_process.join(timeout=1)
+        else:
+            self.logger.info("[PROGRESS] Telemetry process already stopped")
 
     def update_telemetry(self):
         """Read telemetry results from file."""
@@ -292,22 +303,61 @@ class BaseDLBenchmark:
         """
         raise NotImplementedError
 
-    def run_gst_pipeline(self, gst_cmd):
+    def run_gst_pipeline(self, gst_cmd, expected_stream_count=None):
         """
-        Run GStreamer pipeline and collect metrics.
+        Execute GStreamer pipeline and parse FPS results.
 
         Args:
             gst_cmd: GStreamer command string
+            expected_stream_count: Number of streams we expect in this test (for validation)
 
         Returns:
             tuple: (avg_fps, status)
                 avg_fps: Average FPS achieved
                 status: 0 on success, 1 on failure
         """
+        # Store expected stream count for parsing validation
+        self._expected_stream_count = expected_stream_count
+
+        # Only use unique filenames for VSaaS benchmark
+        # VSaaS uses gvafpscounter which has state persistence issues across test runs
+        # LPR/SmartNVR don't need this workaround
+        use_unique_filename = (
+            expected_stream_count is not None and
+            self.benchmark_name == "AI VSaaS Gateway Benchmark"
+        )
+        if use_unique_filename:
+            import time as time_module
+            timestamp = int(time_module.time() * 1000)  # Milliseconds
+            unique_result_file = f"{self.result_file}.{timestamp}"
+            self.logger.debug(f"Using unique result file for VSaaS: {unique_result_file}")
+            current_result_file = unique_result_file
+        else:
+            current_result_file = self.result_file
+            self.logger.debug(f"Using standard result file: {current_result_file}")
+
+        try:
+            # Create/truncate file
+            result_file_handle = open(current_result_file, "w")
+            result_file_handle.flush()
+            os.fsync(result_file_handle.fileno())
+
+            file_size_before = os.path.getsize(current_result_file)
+            self._last_file_size_before = file_size_before
+            self._current_result_file = current_result_file  # Store for later use
+
+            if file_size_before != 0:
+                self.logger.error(f"ERROR: Newly created file is not empty! Size: {file_size_before} bytes")
+
+            self.logger.debug(f"Created unique result file, size: {file_size_before} bytes")
+        except Exception as e:
+            self.logger.error(f"Failed to create result file: {e}")
+            return 0.0, 1
+
         gst_process = secure_popen(
             ["bash", "./run_pipeline.sh", self.device, gst_cmd],
             text=True,
-            stdout=open(self.result_file, "w"),
+            stdout=result_file_handle,
             stderr=subprocess.STDOUT,
         )
 
@@ -317,11 +367,21 @@ class BaseDLBenchmark:
 
         status = 0
         avg_fps = 0.0
+        start_wait_time = time.time()
+        last_progress_log = start_wait_time
 
         try:
             while gst_process.poll() is None:
-                # Kill pipeline if no output for 60 seconds
-                if os.path.isfile(self.result_file) and (time.time() - os.path.getmtime(self.result_file)) > 60:
+                current_time = time.time()
+                elapsed = current_time - start_wait_time
+
+                # Log progress every 30 seconds to show pipeline is still running
+                if current_time - last_progress_log >= 30:
+                    self.logger.info(f"[PROGRESS] Pipeline running... elapsed: {elapsed:.0f}s")
+                    last_progress_log = current_time
+
+                # Kill pipeline if no output for 120 seconds
+                if os.path.isfile(self.result_file) and (time.time() - os.path.getmtime(self.result_file)) > 120:
                     with open(self.result_file, "r") as f:
                         if "overall" not in f.read():
                             status = 1
@@ -343,19 +403,162 @@ class BaseDLBenchmark:
                     self.logger.warning("Process didn't terminate gracefully, forcing kill")
                     gst_process.kill()
                     gst_process.wait()
+
+            # Close result file handle to ensure all data is flushed
+            # and file can be properly truncated in next iteration
+            try:
+                result_file_handle.flush()  # Force flush before close
+                os.fsync(result_file_handle.fileno())  # Sync to filesystem
+                result_file_handle.close()
+                self.logger.debug(f"Result file handle flushed, synced, and closed: {self.result_file}")
+                # Longer delay to ensure filesystem and Docker volume sync complete
+                time.sleep(0.5)
+            except Exception as e:
+                self.logger.warning(f"Error closing result file handle: {e}")
+
             self.stop_telemetry()
 
-        # Parse results from output file
-        with open(self.result_file, "r") as f:
-            for line in f:
-                if "ERROR: from element" in line:
-                    status = 1
-                    break
-                if "overall" in line:
-                    match = re.search(r"per-stream=\s*([\d]+\.\d+)\s+fps", line)
-                    if match:
-                        avg_fps = float(match.group(1))
-                    break
+        # Copy result file content before potential issues with next iteration
+        # Read from the unique file we created for this iteration
+        result_file_content = None
+        current_file = getattr(self, "_current_result_file", self.result_file)
+
+        try:
+            # Verify file exists and is readable
+            if not os.path.exists(current_file):
+                self.logger.error(f"ERROR: Result file does not exist after pipeline: {current_file}")
+                return 0.0, 1
+
+            with open(current_file, "r") as f:
+                result_file_content = f.read()
+            file_size_after = os.path.getsize(current_file)
+
+            # Quick sanity check on content
+            num_overall_lines = result_file_content.count("FpsCounter(overall")
+            self.logger.debug(
+                f"Read {len(result_file_content)} bytes from result file for parsing "
+                f"(file: {os.path.basename(current_file)}, size: {file_size_after} bytes, {num_overall_lines} overall lines)"
+            )
+
+            # Clean up old unique result files (only for VSaaS which uses unique filenames)
+            try:
+                if self.benchmark_name == "AI VSaaS Gateway Benchmark":
+                    import glob
+
+                    pattern = f"{self.result_file}.*"
+                    old_files = glob.glob(pattern)
+                    for old_file in old_files:
+                        if old_file != current_file:
+                            os.remove(old_file)
+                            self.logger.debug(f"Cleaned up old VSaaS result file: {os.path.basename(old_file)}")
+            except Exception as cleanup_error:
+                self.logger.warning(f"Failed to cleanup old result files: {cleanup_error}")
+
+            # Sanity check: File should have grown from the truncated size
+            if hasattr(self, "_last_file_size_before"):
+                if file_size_after <= self._last_file_size_before:
+                    self.logger.warning(
+                        f"WARNING: Result file did not grow! Before: {self._last_file_size_before}, "
+                        f"After: {file_size_after}. Truncation may have failed!"
+                    )
+        except Exception as e:
+            self.logger.error(f"Failed to read result file: {e}")
+            return 0.0, 1
+
+        # Parse results from in-memory content (already read above)
+        # For multi-stream tests, each stream has its own gvafpscounter that outputs:
+        # - Periodic "last X.XXsec" updates
+        # - Final "overall X.XXsec" summary at end
+        # Format: "FpsCounter(overall X.XXsec): total=XXX.XX fps, number-streams=N, per-stream=XX.XX fps"
+        # File may contain "overall" lines from previous stream counts during ramp-up.
+        # We must ONLY collect lines where number-streams matches the MAXIMUM value (current test).
+
+        fps_measurements = []
+        overall_lines_by_stream_count = {}
+
+        for line in result_file_content.splitlines():
+            if "ERROR: from element" in line:
+                status = 1
+                break
+            # Collect all "overall" lines and group by number-streams count
+            if "FpsCounter(overall" in line and "number-streams=" in line:
+                # Extract number-streams value to identify which test iteration this is from
+                stream_match = re.search(r"number-streams=(\d+)", line)
+                if stream_match:
+                    stream_count = int(stream_match.group(1))
+                    if stream_count not in overall_lines_by_stream_count:
+                        overall_lines_by_stream_count[stream_count] = []
+                    overall_lines_by_stream_count[stream_count].append(line)
+
+        # Debug: Log what we found BEFORE filtering
+        if overall_lines_by_stream_count:
+            all_stream_counts = sorted(overall_lines_by_stream_count.keys())
+            expected = getattr(self, "_expected_stream_count", "unknown")
+            self.logger.debug(
+                f"BEFORE filtering - Found stream counts in file: {all_stream_counts}, "
+                f"Expected: {expected}, Total lines: {sum(len(v) for v in overall_lines_by_stream_count.values())}"
+            )
+
+            # Only validate for VSaaS which uses gvafpscounter with number-streams
+            # LPR/SmartNVR don't use gvafpscounter, so validation doesn't apply
+            if (
+                hasattr(self, "_expected_stream_count")
+                and self._expected_stream_count
+                and self.benchmark_name == "AI VSaaS Gateway Benchmark"
+            ):
+                if self._expected_stream_count not in all_stream_counts:
+                    self.logger.error(
+                        f"ERROR: Expected stream count {self._expected_stream_count} not found in result file! "
+                        f"Found: {all_stream_counts}. This indicates gvafpscounter is outputting stale data."
+                    )
+                    self.logger.error("Treating this as a test failure to avoid using incorrect FPS data.")
+                    return 0.0, 1
+        else:
+            self.logger.warning("No FpsCounter(overall) lines found in result file!")
+
+        # Use the EXPECTED stream count if available (VSaaS), otherwise fall back to MAX (LPR/SmartNVR)
+        if overall_lines_by_stream_count:
+            # Use expected stream count if we have it, otherwise use max
+            if (
+                hasattr(self, "_expected_stream_count")
+                and self._expected_stream_count
+                and self._expected_stream_count in overall_lines_by_stream_count
+            ):
+                target_stream_count = self._expected_stream_count
+                self.logger.debug(f"Using EXPECTED stream count: {target_stream_count}")
+            else:
+                target_stream_count = max(overall_lines_by_stream_count.keys())
+                self.logger.debug(f"Using MAX stream count: {target_stream_count}")
+
+            overall_lines = overall_lines_by_stream_count[target_stream_count]
+
+            # Debug: Show all stream counts found in file for troubleshooting
+            all_stream_counts = sorted(overall_lines_by_stream_count.keys())
+            self.logger.debug(
+                f"Found {len(overall_lines_by_stream_count)} different stream counts in result file: {all_stream_counts}. "
+                f"Using stream count: {target_stream_count} with {len(overall_lines)} counters"
+            )
+
+            # Extract per-stream FPS from each overall line for the current stream count
+            # Line format: "... total=404.56 fps, number-streams=5, per-stream=80.91 fps ..."
+            for line in overall_lines:
+                # Match specifically: "per-stream= <number> fps"
+                match = re.search(r"per-stream=\s*([\d]+\.?\d*)\s+fps", line)
+                if match:
+                    fps_value = float(match.group(1))
+                    fps_measurements.append(fps_value)
+
+        # Calculate average FPS across all per-stream measurements
+        if fps_measurements:
+            avg_fps = sum(fps_measurements) / len(fps_measurements)
+            self.logger.debug(
+                f"FPS calculation: {len(fps_measurements)} counter(s), "
+                f"measurements={fps_measurements}, average={avg_fps:.2f}"
+            )
+        else:
+            # No valid FPS measurements found
+            self.logger.warning("No FPS measurements found in result file")
+
         return avg_fps, status
 
     def _meet_target_fps(self, fps):
@@ -392,6 +595,7 @@ class BaseDLBenchmark:
         high = ref_stream
         current_stream = 0
         result = 0
+        best_avg_fps = 0.0  # Track best FPS for reporting
 
         while True:
             if quick_search:
@@ -408,8 +612,9 @@ class BaseDLBenchmark:
             else:
                 gst_cmd = self.gen_gst_command(current_stream, resolution, codec, bitrate, model_name)
 
-            avg_fps, status = self.run_gst_pipeline(gst_cmd)
-            self.logger.info(f"Average fps is {avg_fps}")
+            self.logger.info(f"[PROGRESS] Executing pipeline for {current_stream} streams...")
+            avg_fps, status = self.run_gst_pipeline(gst_cmd, expected_stream_count=current_stream)
+            self.logger.info(f"[PROGRESS] Pipeline completed. Average fps is {avg_fps}")
 
             if status != 0:
                 self.logger.error(f"Failed to run the pipeline with {current_stream} streams")
@@ -420,7 +625,10 @@ class BaseDLBenchmark:
                 else:
                     quick_search = False
                 result = current_stream
+                best_avg_fps = avg_fps  # Store FPS for best result
+                self.logger.info(f"[PROGRESS] Target FPS met with {result} streams. Updating telemetry...")
                 self.update_telemetry()
+                self.logger.info("[PROGRESS] Telemetry updated successfully")
             else:
                 if current_stream < ref_stream:
                     high = current_stream - 1
@@ -430,6 +638,8 @@ class BaseDLBenchmark:
             if low > high:
                 break
 
+        self.logger.info(f"[PROGRESS] Binary search complete. Optimal stream count: {result}")
+
         if result == 0:
             self.telemetry_list = [-1] * 8
         else:
@@ -438,11 +648,17 @@ class BaseDLBenchmark:
                     result = f"{result}(cpu_usage < 25%)"
 
         if self.benchmark_name == "LPR Benchmark":
+            self.logger.info(f"[PROGRESS] Running final LPR verification with {result} streams...")
             gst_cmd = self.gen_gst_command(result, resolution=resolution, model_name=model_name)
             avg_fps, status = self.run_gst_pipeline(gst_cmd)
             self.logger.info(f"{self.benchmark_name} Average fps is {avg_fps}")
+            best_avg_fps = avg_fps  # Update best FPS for LPR
             result = f"{avg_fps}@{result}"
 
+        # Expose best_avg_fps as instance variable for reporting
+        self.best_avg_fps = best_avg_fps
+
+        self.logger.info(f"[PROGRESS] run_test_round returning result: {result}")
         return result
 
     def run_benchmark(self):

@@ -189,13 +189,25 @@ class SmartNVRBenchmark(BaseProxyPipelineBenchmark):
                 gst_cmd += f"t{i}. ! queue ! decodebin "
             else:
                 gst_cmd += f"t{i}. ! queue ! {self.dec_ele} ! video/x-raw(memory:VAMemory) "
-            gst_cmd += f"! gvadetect model={det_model_path} {preproc_backend} model-proc={det_proc_json_path} batch-size=1 nireq=2 ie-config=NUM_STREAMS=2 inference-interval=2 model-instance-id=detect{i} device={inf_device} threshold=0.5 "
+
+            # Optimize inference parameters for dGPU
+            if device_type == "dGPU":
+                detect_params = "batch-size=2 nireq=4 ie-config=NUM_STREAMS=4"
+            else:
+                detect_params = "batch-size=1 nireq=2 ie-config=NUM_STREAMS=2"
+
+            gst_cmd += f"! gvadetect model={det_model_path} {preproc_backend} model-proc={det_proc_json_path} {detect_params} inference-interval=2 model-instance-id=detect{i} device={inf_device} threshold=0.5 "
             gst_cmd += "! gvatrack tracking-type=short-term-imageless "
             if cls_model_name:
                 if self.is_MTL and device_type == "iGPU":
                     gst_cmd += f"! gvaclassify model={cls_model_path} {preproc_backend} model-proc={cls_proc_json_path} batch-size=1 nireq=2 inference-interval=2 inference-region=roi-list model-instance-id=classify{i} device=NPU "
                 else:
-                    gst_cmd += f"! gvaclassify model={cls_model_path} {preproc_backend} model-proc={cls_proc_json_path} batch-size=1 nireq=2 ie-config=NUM_STREAMS=2 inference-interval=2 inference-region=roi-list model-instance-id=classify{i} device={inf_device} "
+                    # Optimize classification parameters for dGPU
+                    if device_type == "dGPU":
+                        classify_params = "batch-size=2 nireq=4 ie-config=NUM_STREAMS=4"
+                    else:
+                        classify_params = "batch-size=1 nireq=2 ie-config=NUM_STREAMS=2"
+                    gst_cmd += f"! gvaclassify model={cls_model_path} {preproc_backend} model-proc={cls_proc_json_path} {classify_params} inference-interval=2 inference-region=roi-list model-instance-id=classify{i} device={inf_device} "
 
             if self.enable_mqtt:
                 gst_cmd += f"! gvametaconvert format=json json-indent=4 source={video_src} add-empty-results=true ! gvametapublish method=mqtt address={self.mqtt_address} mqtt-client-id=client{i} topic={self.mqtt_topic} "

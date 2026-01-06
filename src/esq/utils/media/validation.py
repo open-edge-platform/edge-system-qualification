@@ -209,7 +209,7 @@ NPU_PLATFORM_DEV_IDS = [
 logger = logging.getLogger(__name__)
 
 
-def normalize_device_name(device: str) -> str:
+def normalize_device_name(device: str, device_type: str = None) -> str:
     """
     Normalize OpenVINO device format to canonical benchmark format.
 
@@ -218,19 +218,21 @@ def normalize_device_name(device: str) -> str:
 
     Args:
         device: OpenVINO device name (e.g., "GPU", "GPU.0", "GPU.1", "CPU", "NPU", "HETERO:GPU.0,GPU.1")
+        device_type: OpenVINO DEVICE_TYPE property (e.g., "Type.INTEGRATED", "Type.DISCRETE")
+                     If provided, uses actual device type instead of positional assumption.
+                     If None, falls back to legacy positional logic (NOT RECOMMENDED).
 
     Returns:
         Canonical device name:
-        - "GPU" or "GPU.0" → "iGPU" (integrated GPU)
-        - "GPU.1" → "dGPU.0" (first discrete GPU)
-        - "GPU.2" → "dGPU.1" (second discrete GPU)
+        - Integrated GPU → "iGPU" (based on device_type)
+        - Discrete GPU → "dGPU.N" (based on device_type and position)
         - "CPU" → "CPU"
         - "NPU" → "NPU"
         - "HETERO:..." → "HETERO:..." (pass through, handled separately)
 
-    Note: Relies on OpenVINO's device numbering where:
-        - GPU or GPU.0 is always the integrated GPU (if present)
-        - GPU.1+ are discrete GPUs
+    Note: When device_type is provided, the function uses OpenVINO's authoritative
+          DEVICE_TYPE property instead of assuming GPU.0 is always iGPU.
+          This handles systems where discrete GPU enumerates before integrated GPU.
     """
     device_upper = device.upper()
 
@@ -246,20 +248,29 @@ def normalize_device_name(device: str) -> str:
     if device_upper == "NPU":
         return "NPU"
 
-    # Handle GPU devices
-    if device_upper == "GPU" or device_upper == "GPU.0":
-        # GPU or GPU.0 is always integrated GPU in OpenVINO
-        return "iGPU"
+    # Handle GPU devices - MUST have device_type parameter
+    if device_upper.startswith("GPU") or device_upper == "GPU":
+        if not device_type:
+            # device_type is REQUIRED for correct normalization
+            logger.error(
+                f"normalize_device_name() called without device_type for '{device}'. "
+                "Cannot determine if GPU is integrated or discrete without device_type. "
+                "This will cause incorrect device mapping. Returning device as-is."
+            )
+            return device
 
-    if device_upper.startswith("GPU."):
-        try:
-            # Extract GPU number (e.g., "GPU.1" → 1)
-            gpu_num = int(device_upper.split(".")[1])
-            if gpu_num > 0:
-                # Convert to dGPU numbering: GPU.1 → dGPU.0, GPU.2 → dGPU.1
-                return f"dGPU.{gpu_num - 1}"
-        except (IndexError, ValueError):
-            pass
+        # Use ACTUAL device type from OpenVINO (CORRECT approach)
+        device_type_lower = str(device_type).lower()
+
+        if "integrated" in device_type_lower:
+            # This is iGPU regardless of position
+            return "iGPU"
+        elif "discrete" in device_type_lower:
+            # This is dGPU - return base name, caller will add index if multiple dGPUs
+            # Single dGPU systems: return "dGPU" or "dGPU.0"
+            # Multi-dGPU systems: caller should maintain counter and add suffix
+            # For now, just return "dGPU" and let caller handle indexing
+            return "dGPU"
 
     # Unknown format - log warning and return as-is
     logger.warning(f"Unknown device format: '{device}'. Returning as-is.")
@@ -423,9 +434,7 @@ def check_va_plugins() -> str:
         # or environment variables passed to subprocess
 
         # Check gvafpscounter plugin
-        gva_result = run_command(
-            ["gst-inspect-1.0", "gvafpscounter"], capture_output=True, env={"GST_DEBUG": "3"}
-        )
+        gva_result = run_command(["gst-inspect-1.0", "gvafpscounter"], capture_output=True, env={"GST_DEBUG": "3"})
 
         logger.debug(f"gvafpscounter check: {gva_result.stdout}")
 

@@ -244,10 +244,32 @@ class TelemetryCollector:
                 latest_gpu_top_output = self.gpu_top_process.stdout.readline().strip().split()
 
         if latest_gpu_top_output is not None:
-            # GPU frequency
+            # GPU frequency - normalize to MHz (intel_gpu_top may output GHz or MHz)
             cur_gpu_freq = latest_gpu_top_output[1]
             try:
-                self.total_gpu_freq += float(cur_gpu_freq)
+                freq_value = float(cur_gpu_freq)
+
+                # Normalize units based on magnitude
+                if freq_value < 100:
+                    # Values < 100 indicate GHz units (e.g., 1.02 GHz on B580)
+                    freq_value = freq_value * 1000  # Convert GHz to MHz
+
+                # Validate frequency is in expected range for active GPU
+                # GPU frequencies under load should be 300-2500 MHz
+                # If frequency is suspiciously low (< 200 MHz), log warning
+                if freq_value > 0 and freq_value < 200:
+                    # Log warning on first occurrence only (check if we've logged before)
+                    if not hasattr(self, '_low_freq_warned'):
+                        import logging
+                        logger = logging.getLogger(__name__)
+                        logger.warning(
+                            f"GPU frequency suspiciously low: {freq_value:.2f} MHz. "
+                            f"Expected 300-2500 MHz for dGPU under load. "
+                            f"Check if workload is offloading to correct GPU (renderD{self.gpu_render})."
+                        )
+                        self._low_freq_warned = True
+
+                self.total_gpu_freq += freq_value
             except ValueError:
                 self.skip_gpu_freq += 1
 
@@ -271,21 +293,41 @@ class TelemetryCollector:
                     self.skip_package_power_usage += 1
 
             # EU usage (RCS for iGPU, CCS for dGPU)
-            cur_rcs_usage = latest_gpu_top_output[4 + power_cnt]
             try:
+                rcs_index = 4 + power_cnt
+                ccs_index = 16 + power_cnt
+
                 if "dGPU" in self.device:
-                    cur_ccs_usage = latest_gpu_top_output[16 + power_cnt]
-                    self.total_eu_usage += float(cur_ccs_usage)
+                    # Check if CCS index is within bounds (different GPU architectures have different layouts)
+                    if ccs_index < len(latest_gpu_top_output):
+                        cur_ccs_usage = latest_gpu_top_output[ccs_index]
+                        self.total_eu_usage += float(cur_ccs_usage)
+                    else:
+                        # Fallback to RCS for dGPUs that don't have CCS at expected index
+                        if rcs_index < len(latest_gpu_top_output):
+                            cur_rcs_usage = latest_gpu_top_output[rcs_index]
+                            self.total_eu_usage += float(cur_rcs_usage)
+                        else:
+                            self.skip_eu_usage += 1
                 else:
-                    self.total_eu_usage += float(cur_rcs_usage)
-            except ValueError:
+                    # iGPU uses RCS
+                    if rcs_index < len(latest_gpu_top_output):
+                        cur_rcs_usage = latest_gpu_top_output[rcs_index]
+                        self.total_eu_usage += float(cur_rcs_usage)
+                    else:
+                        self.skip_eu_usage += 1
+            except (ValueError, IndexError):
                 self.skip_eu_usage += 1
 
             # VDBox usage
-            cur_vdbox_usage = latest_gpu_top_output[10 + power_cnt]
             try:
-                self.total_vdbox_usage += float(cur_vdbox_usage)
-            except ValueError:
+                vdbox_index = 10 + power_cnt
+                if vdbox_index < len(latest_gpu_top_output):
+                    cur_vdbox_usage = latest_gpu_top_output[vdbox_index]
+                    self.total_vdbox_usage += float(cur_vdbox_usage)
+                else:
+                    self.skip_vdbox_usage += 1
+            except (ValueError, IndexError):
                 self.skip_vdbox_usage += 1
 
     def collect_xpu_smi_output(self):
@@ -393,6 +435,5 @@ class TelemetryCollector:
             if self.xpu_xmi_process and self.xpu_xmi_process.poll() is None:
                 self.xpu_xmi_process.terminate()
                 self.xpu_xmi_process.wait()
-
 
 Telemetry = TelemetryCollector

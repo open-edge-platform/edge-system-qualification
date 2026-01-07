@@ -17,11 +17,11 @@ Intel® ESQ supports a wide range of Intel® edge systems optimized for various 
 
 | **Category** | **Processors** | **Specifications** |**Storage** | **Discrete GPU Options** |
 |--------------|------------------------|------------------------|-------------|------------------|
-| **Scalable Performance Graphics Media** | **Xeon-Based**: <br>Intel® Xeon® 6 Processors,<br>5th Gen Intel® Xeon® Scalable Processors,<br>Intel® Xeon® W Processors<br><br>**Core-Based**: <br>Intel® Core Ultra Series 2,<br> Intel® Core™ Series 2 | **Xeon-Based**: <br>**SKU**: Dual and Single Socket<br>**Minimum Cores**: 32 cores<br> **Memory**: Minimum 512 GB DDR5, 5600 MT/s (1DPC)<br><br> **Core-Based**:<br> **Minimum Cores**: 8 Performance-cores (P-cores)<br>**Memory**: Minimum 64GB DDR5<br>| **Recommended**: 1TB | **Intel® Arc™ B-Series Graphics** |
-| **Scalable Performance** | Intel® Xeon® 6 Processors,<br> 5th Gen Intel® Xeon® Scalable Processors, <br>Intel® Xeon® W Processors | **SKU**: Dual and Single Socket<br>**Minimum Cores**: 32 cores<br> **Memory**: Minimum 512 GB <br>| **Recommended**: 1TB | N/A |
-| **Efficiency Optimized** | Intel® Core™ Ultra processor Series 2 | **Graphics**: Integrated GPU with 7 Xe-Cores or more <br> **SKU**: Single Socket <br>**Minimum Cores**: 8 Performance-cores (P-cores)<br>**System Memory**: Minimum 32 GB DDR5 (Dual Channel)<br>**Recommended speed**: 5600 MT/s| **Recommended**: 512 GB | N/A |
-| **Mainstream** | Intel® Core™ Series 2 | **Minimum Cores**: 8 Performance-cores (P-cores)<br>**System Memory**: Minimum 32 GB DDR5 | **Recommended**: 512 GB | N/A |
-| **Entry** | Intel® Processor for Desktop,<br>Intel® Processor X-series, <br>Intel® Processor N-series | **Memory**: Minimum 32 GB DDR5 (recommended for light AI workloads) | **Recommended**: 512 GB | N/A |
+| **Scalable Performance Graphics Media** | **Xeon-Based**: <br>Intel® Xeon® 6 Processors,<br>5th Gen Intel® Xeon® Scalable Processors,<br>Intel® Xeon® W Processors<br><br>**Core-Based**: <br>Intel® Core Ultra Series 2,<br> Intel® Core™ Series 2 | **Xeon-Based**: <br>**SKU**: Dual and Single Socket<br>**Minimum System Memory**: 128 GB DDR5 (Dual Channel)<br><br> **Core-Based**:<br> **Minimum System Memory**: 64GB DDR5 (Dual Channel)<br>| **Recommended**: 1TB | **Intel® Arc™ B-Series Graphics,**<br>**Intel® Arc™ Pro B-Series Graphics** |
+| **Scalable Performance** | Intel® Xeon® 6 Processors,<br> 5th Gen Intel® Xeon® Scalable Processors, <br>Intel® Xeon® W Processors | **SKU**: Dual and Single Socket<br>**Minimum System Memory**: 128 GB DDR5 (Dual Channnel) <br>| **Recommended**: 1TB | N/A |
+| **Efficiency Optimized** | Intel® Core™ Ultra processor Series 2 | **Graphics**: Integrated GPU with 7 Xe-Cores or more <br> **SKU**: Single Socket <br>**Minimum System Memory**: 32 GB DDR5 (Dual Channel)| **Recommended**: 512 GB | N/A |
+| **Mainstream** | Intel® Core™ Series 2 | **Minimum System Memory**: 32 GB DDR5 (Dual Channel)| **Recommended**: 512 GB | N/A |
+| **Entry** | Intel® Processor for Desktop,<br>Intel® Processor X-series, <br>Intel® Processor N-series | **Minimum System Memory**: 32 GB DDR5 (Dual Channel) | **Recommended**: 512 GB | N/A |
 
 ### 2. Operating System
 

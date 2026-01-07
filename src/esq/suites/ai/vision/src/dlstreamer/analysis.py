@@ -25,12 +25,13 @@ def parse_device_result_file(device_id: str, results_dir: str) -> Dict[str, Any]
     result_file = os.path.join(results_dir, f"total_streams_result_0_{device_id}.json")
 
     default_result = {
-        "device_id": device_id,
-        "num_streams": 0,
-        "per_stream_fps": 0.0,
         "pass": False,
-        "status": False,
         "error": "No result file found",
+        "metadata": {
+            "num_streams": -1,
+            "per_stream_fps": 0.0,
+        },
+        # Note: qualification_state is excluded from parsed results (internal only)
     }
 
     if not os.path.exists(result_file):
@@ -43,13 +44,22 @@ def parse_device_result_file(device_id: str, results_dir: str) -> Dict[str, Any]
 
         if device_id in data:
             device_data = data[device_id]
-            return {
-                "device_id": device_id,
-                "num_streams": device_data.get("num_streams", 0),
-                "per_stream_fps": device_data.get("per_stream_fps", 0.0),
+
+            # Return complete device data including all metadata from FPS counter
+            # This includes: parse_source, fps_counter_duration, per_stream_fps_list,
+            # num_streams, per_stream_fps, total_fps, etc.
+            result = {
                 "pass": device_data.get("pass", False),
-                "status": True,
             }
+
+            # Include all fields from device_data EXCEPT internal/redundant ones
+            # Exclude: device_id (already the key), status (redundant with pass),
+            #          qualification_state (internal binary search tracking)
+            for key, value in device_data.items():
+                if key not in ["device_id", "status", "qualification_state"]:
+                    result[key] = value
+
+            return result
         else:
             return {**default_result, "error": f"Device {device_id} not found in result file"}
 

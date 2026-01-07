@@ -1,25 +1,24 @@
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-import os
 import io
-import csv
-import json
-import base64
+import os
+import subprocess  # nosec B404 # Subprocess needed for secure script execution and archiving
 import tarfile
-import subprocess # nosec B404
-import textwrap
 import warnings
-import pandas as pd
-import matplotlib
 from pathlib import Path
-matplotlib.use("Agg")   # important for headless CI
-import matplotlib.pyplot as plt
-import allure
 
+import matplotlib
+import pandas as pd
+
+matplotlib.use("Agg")  # important for headless CI
 import logging
 
+import allure
+import matplotlib.pyplot as plt
+
 logger = logging.getLogger(__name__)
+
 
 def run_shell_script(script_path, *args):
     """
@@ -45,12 +44,7 @@ def run_shell_script(script_path, *args):
     cmd = ["bash", str(script)] + [str(arg) for arg in args]
 
     try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            check=True
-        )
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
         logger.info(f"Script executed successfully: {script}")
         logger.debug(f"stdout: {result.stdout}")
         logger.debug(f"stderr: {result.stderr}")
@@ -60,6 +54,7 @@ def run_shell_script(script_path, *args):
         logger.error(f"Script execution failed: {script}, rc={e.returncode}")
         logger.debug(f"stderr: {e.stderr}")
         return None
+
 
 def create_tar(source_path, output_tar, compress=True):
     """
@@ -78,6 +73,7 @@ def create_tar(source_path, output_tar, compress=True):
         tar.add(source_path, arcname=os.path.basename(source_path))
     logger.debug(f"Archive created successfully: {output_tar}")
 
+
 def attach_csv_and_image(csv_path, image_path=None):
     """
     Convert CSV file content into a table PNG and attach both the table
@@ -85,20 +81,15 @@ def attach_csv_and_image(csv_path, image_path=None):
     """
     try:
         if not os.path.exists(csv_path):
-            allure.attach(f"CSV not found: {csv_path}",
-                          name="Error",
-                          attachment_type=allure.attachment_type.TEXT)
+            allure.attach(f"CSV not found: {csv_path}", name="Error", attachment_type=allure.attachment_type.TEXT)
             return
 
         df = pd.read_csv(csv_path)
 
         fig, ax = plt.subplots(figsize=(len(df.columns) * 2, len(df) * 0.6 + 1))
-        ax.axis('off')
+        ax.axis("off")
 
-        table = ax.table(cellText=df.values,
-                         colLabels=df.columns,
-                         cellLoc='center',
-                         loc='center')
+        table = ax.table(cellText=df.values, colLabels=df.columns, cellLoc="center", loc="center")
         table.auto_set_font_size(False)
         table.set_fontsize(8)
         table.scale(1.2, 1.2)
@@ -106,26 +97,21 @@ def attach_csv_and_image(csv_path, image_path=None):
         for (row, col), cell in table.get_celld().items():
             if row == 0:  # header row
                 cell.set_facecolor("#d9d9d9")  # light gray
-                cell.set_text_props(weight='bold')
+                cell.set_text_props(weight="bold")
 
         buf = io.BytesIO()
-        plt.savefig(buf, format='png', bbox_inches='tight', dpi=200)
+        plt.savefig(buf, format="png", bbox_inches="tight", dpi=200)
         plt.close(fig)
         buf.seek(0)
 
-        allure.attach(buf.read(),
-                      name="CSV Table Summary",
-                      attachment_type=allure.attachment_type.PNG)
+        allure.attach(buf.read(), name="CSV Table Summary", attachment_type=allure.attachment_type.PNG)
 
         if image_path and os.path.exists(image_path):
             with open(image_path, "rb") as f:
-                allure.attach(f.read(),
-                              name="Additional Image",
-                              attachment_type=allure.attachment_type.PNG)
+                allure.attach(f.read(), name="Additional Image", attachment_type=allure.attachment_type.PNG)
     except Exception as e:
-        allure.attach(str(e),
-                      name="Attach Error",
-                      attachment_type=allure.attachment_type.TEXT)
+        allure.attach(str(e), name="Attach Error", attachment_type=allure.attachment_type.TEXT)
+
 
 def get_values_from_csv(csv_path, filter_column, filter_value, target_columns):
     """

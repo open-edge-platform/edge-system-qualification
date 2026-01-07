@@ -15,7 +15,7 @@ import os
 import re
 import shlex
 import signal
-import subprocess  # nosec
+import subprocess  # nosec B404 # Subprocess needed for DLStreamer pipeline execution and analysis
 import time
 from pathlib import Path
 

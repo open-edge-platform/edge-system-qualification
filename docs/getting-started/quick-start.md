@@ -3,7 +3,8 @@
 Install all required dependencies to run all tests and evaluate your edge system.
 
 !!! info
-    This is a preview release of ESQ framework, to perform systems qualification please refer to [Intel® ESQ for Intel® AI Edge Systems](https://www.intel.com/content/www/us/en/developer/articles/guide/esq-for-ai-edge-systems.html)
+    This is a preview release of the Intel® Edge System Qualification (Intel® ESQ) framework for performing systems qualification. 
+    Please refer to [Intel® ESQ for Intel® AI Edge Systems](https://www.intel.com/content/www/us/en/developer/articles/guide/esq-for-ai-edge-systems.html).
 
 ## Requirements
 
@@ -16,11 +17,12 @@ Intel® ESQ supports a wide range of Intel® edge systems optimized for various 
 
 | **Category** | **CPU** | **Memory** | **Storage** | **Discrete GPU** |
 |--------------|------------------------|------------|-------------|------------------|
+| **Scalable Performance Graphics Media** | Intel® processors with Intel® Arc™ Graphics | Min 64 GB | 512 GB | **Required: Alchemist or Battlemage** |
 | **Scalable Performance** | Intel® Xeon® 5 processor | 256–512 GB | 1 TB | Optional |
-| **Scalable AI, Graphics & Media** | Intel® processors with Intel® Arc™ Graphics | Min 64 GB | 512 GB | **Required: Alchemist or Battlemage** |
-| **Efficiency Optimized AI** | Intel® Core™ Ultra processor Series 1 or Series 2 | Min 32 GB | 512 GB | Optional |
+| **Efficiency Optimized** | Intel® Core™ Ultra processor Series 1 or Series 2 | Min 32 GB | 512 GB | Optional |
 | **Mainstream** | 14th generation Intel® Core™ processors or higher | Min 32 GB | 256 GB | Optional |
-| **Entry** | Intel® Core™ processor, Intel® Processor, Intel Atom® | Min 16 GB | 256 GB | Not supported |
+| **Entry** | Intel® Core™ processor, Intel® Processor, Intel Atom® processor| Min 16 GB | 256 GB | Not supported |
+
 
 ### 2. Operating System
 
@@ -38,11 +40,11 @@ Install a supported operating system before proceeding.
 Configure system drivers:
 
 ```bash
-sudo bash -c "$(wget -qLO - https://raw.githubusercontent.com/intel/edge-developer-kit-reference-scripts/refs/heads/main/main_installer.sh)"
+sudo bash -c "$(wget -qLO - https://raw.githubusercontent.com/open-edge-platform/edge-developer-kit-reference-scripts/refs/heads/main/main_installer.sh)"
 ```
 
 !!! info "Additional Reference"
-    For detailed information about system drivers, see the [Edge Developer Kit Reference Scripts](https://github.com/intel/edge-developer-kit-reference-scripts) documentation.
+    For detailed information about system drivers, see the [Edge Developer Kit Reference Scripts](https://github.com/open-edge-platform/edge-developer-kit-reference-scripts) documentation.
 
 ### 2. System Dependencies
 
@@ -57,21 +59,21 @@ sudo apt update && sudo apt install -y curl git
 Install Docker* Engine:
 
 ```bash
-# Add Docker's official GPG key
+# Add Docker's official GPG key.
 sudo apt-get update
 sudo apt-get install ca-certificates curl
 sudo install -m 0755 -d /etc/apt/keyrings
 sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
 sudo chmod a+r /etc/apt/keyrings/docker.asc
 
-# Add the repository to Apt sources
+# Add the repository to Apt sources.
 echo \
   "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
   $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
   sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 sudo apt-get update
 
-# Install Docker packages
+# Install Docker packages.
 sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 ```
 
@@ -84,7 +86,7 @@ Add your user to the docker group:
 sudo usermod -aG docker $USER
 ```
 
-To activate your new group membership immediately in your current terminal, run:
+To activate your new group membership, run this command immediately in your current terminal:
 
 ```bash
 newgrp docker
@@ -133,13 +135,13 @@ esq --version
 Run all tests and review the generated test report:
 
 !!! tip "Newer Version"
-    Before running a new version of ESQ, run the following command to clean up any previously created `esq_data` folder:
+    Before running a new version of Intel® ESQ, run the following command to clean up previously created `esq_data` folder:
     
     ```bash
     esq clean --all
     ```
     
-    This ensures that leftover data from previous ESQ versions does not interfere with the new installation. If you have uninstalled ESQ but the `esq_data` folder still exists, remove it using the above command before running any new ESQ commands. Otherwise, ESQ may not work as expected.
+    This ensures that leftover data from previous Intel® ESQ versions do not interfere with the new installation. If you have uninstalled the Intel® ESQ, but the `esq_data` folder still exists, remove it using the above command before running any new Intel® ESQ commands. Otherwise, Intel® ESQ may not work as expected.
 
 ### 1. Run Intel® ESQ
 
@@ -151,9 +153,9 @@ esq run
 
 By default, this command will:
 
-1. Run qualification profiles (always included)
-2. Run vertical profiles (unless you choose to skip them at the prompt)
-3. Collect metrics and generate a test report
+1. Run qualification profiles (always included).
+2. Run vertical profiles (unless you choose to skip them at the prompt).
+3. Collect metrics and generate a test report.
 
 !!! tip "Verbose Output"
     Use the `--verbose` option to see detailed information while running tests:

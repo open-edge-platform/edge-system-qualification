@@ -23,7 +23,7 @@
   }
 }
 
-/* Get started button */
+/* Quick Start button - primary */
 .md-typeset .md-button--primary {
     color: var(--md-primary-fg-color)  !important;
     background-color: var(--md-primary-bg-color);
@@ -32,9 +32,24 @@
     border-radius: 8px;
 }
 .md-typeset .md-button--primary:hover {
-  color: var(--md-primary-bg-color);
-  background-color: var(--md-primary-fg-color);
-  border-color: var(--md-primary-bg-color);
+  color: #ffffff !important;
+  background-color: #333333;
+  border-color: #333333;
+}
+
+/* Get Started button - secondary */
+.tx-hero .md-button:not(.md-button--primary) {
+    color: #000000 !important;
+    background-color: #ffffff;
+    border: 2px solid #000000;
+    font-weight: normal;
+    border-radius: 8px;
+    margin-left: 0.5rem;
+}
+.tx-hero .md-button:not(.md-button--primary):hover {
+  color: #ffffff !important;
+  background-color: #666666;
+  border-color: #666666;
 }
 
 .tx-hero {
@@ -114,9 +129,16 @@
           <h2>Qualify Your Edge AI System</h2>
           <p>Intel® ESQ is a CLI tool that provides a collection of test suites to qualify Edge AI system. It enables users to perform targeted tests, supporting a wide range of use cases from system evaluation to data extraction and reporting.</p>
           <a
+            href="getting-started/quick-start/"
+            title="Quick Start"
+            class="md-button md-button--primary"
+          >
+            Quick Start
+          </a>
+          <a
             href="getting-started/"
             title="Get Started"
-            class="md-button md-button--primary"
+            class="md-button"
           >
             Get started
           </a>

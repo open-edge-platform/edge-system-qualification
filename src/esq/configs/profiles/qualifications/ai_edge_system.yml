@@ -42,7 +42,7 @@ params:
       height: 1080
       fps: 30
       codec: "h265"
-      loop: 30 # Loop to achieve ~30s duration
+      loop: 120 # Loop to achieve ~120s duration
     - id: "yolo11n"
       type: "model"
       source: "ultralytics"
@@ -350,7 +350,7 @@ suites:
             params:
               # Entry
               - test_id: "AES-VSN-001"
-                display_name: "Vision AI Benchmark - multi-stream 1080p30 H.265 gvadetect YOLO11n INT8 gvatrack gvaclassify ResNet50 INT8"
+                display_name: "Vision AI Analysis - multi-stream 1080p30 H.265 gvadetect YOLO11n INT8 gvatrack gvaclassify ResNet50 INT8"
                 devices: [cpu, igpu, dgpu, npu]
                 tiers:
                   - entry
@@ -364,7 +364,7 @@ suites:
 
               # Mainstream
               - test_id: "AES-VSN-001"
-                display_name: "Vision AI Benchmark - multi-stream 1080p30 H.265 gvadetect YOLO11n INT8 gvatrack gvaclassify ResNet50 INT8"
+                display_name: "Vision AI Analysis - multi-stream 1080p30 H.265 gvadetect YOLO11n INT8 gvatrack gvaclassify ResNet50 INT8"
                 devices: [cpu, igpu, dgpu, npu]
                 tiers:
                   - mainstream
@@ -378,7 +378,7 @@ suites:
 
               # Efficiency Optimized
               - test_id: "AES-VSN-001"
-                display_name: "Vision AI Benchmark - multi-stream 1080p30 H.265 gvadetect YOLO11n INT8 gvatrack gvaclassify ResNet50 INT8"
+                display_name: "Vision AI Analysis - multi-stream 1080p30 H.265 gvadetect YOLO11n INT8 gvatrack gvaclassify ResNet50 INT8"
                 devices: [cpu, igpu, dgpu, npu]
                 tiers:
                   - efficiency_optimized
@@ -392,7 +392,7 @@ suites:
 
               # Scalable Performance
               - test_id: "AES-VSN-001"
-                display_name: "Vision AI Benchmark - multi-stream 1080p30 H.265 gvadetect YOLO11n INT8 gvatrack gvaclassify ResNet50 INT8"
+                display_name: "Vision AI Analysis - multi-stream 1080p30 H.265 gvadetect YOLO11n INT8 gvatrack gvaclassify ResNet50 INT8"
                 devices: [cpu, igpu, dgpu, npu]
                 tiers:
                   - scalable_performance
@@ -406,7 +406,7 @@ suites:
 
               # Scalable AI Graphic Media
               - test_id: "AES-VSN-001"
-                display_name: "Vision AI Benchmark - multi-stream 1080p30 H.265 gvadetect YOLO11n INT8 gvatrack gvaclassify ResNet50 INT8"
+                display_name: "Vision AI Analysis - multi-stream 1080p30 H.265 gvadetect YOLO11n INT8 gvatrack gvaclassify ResNet50 INT8"
                 devices: [cpu, igpu, dgpu, npu]
                 tiers:
                   # dGPU based specific tiers

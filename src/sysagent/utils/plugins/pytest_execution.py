@@ -367,10 +367,19 @@ def prepare_test():
                     )
                     # pytest.fail(f"{results.metadata.get('error', 'Unknown error')}")
 
-                # Cache the result
+                # Cache the result only if it's not an error state
+                # Don't cache results with status=False (failed/error states)
+                should_cache = True
                 if cache_result:
-                    cache_result(results, cache_configs=cache_configs)
-                    logger.debug(f"Cached '{name}' for test: {test_name}")
+                    if isinstance(results, Result):
+                        status = results.metadata.get("status", True)
+                        if status is False:
+                            should_cache = False
+                            logger.debug(f"Skipping cache for '{name}' due to failed status (status={status})")
+
+                    if should_cache:
+                        cache_result(results, cache_configs=cache_configs)
+                        logger.debug(f"Cached '{name}' for test: {test_name}")
 
                 return results
             except KeyboardInterrupt:

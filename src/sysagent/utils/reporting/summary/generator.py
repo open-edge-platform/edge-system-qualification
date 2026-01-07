@@ -519,6 +519,7 @@ class CoreResultsSummaryGenerator:
                 # Include metadata and metrics from latest run if available
                 "metadata": latest_run.get("metadata", {}),
                 "metrics": latest_run.get("metrics", {}),
+                "extended_metadata": latest_run.get("extended_metadata", {}),
             }
             unique_test_cases.append(unique_test_case)
 

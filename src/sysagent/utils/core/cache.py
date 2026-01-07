@@ -214,7 +214,15 @@ class TestResultCache:
                 metrics_dict = result_dict.get("metrics", {})
                 metrics = {k: Metrics(**v) for k, v in metrics_dict.items()}
                 metadata = result_dict.get("metadata", {})
-                return Result(parameters=parameters, metrics=metrics, metadata=metadata)
+                extended_metadata = result_dict.get("extended_metadata", {})
+                kpis = result_dict.get("kpis", {})
+                return Result(
+                    parameters=parameters,
+                    metrics=metrics,
+                    metadata=metadata,
+                    extended_metadata=extended_metadata,
+                    kpis=kpis,
+                )
         except (json.JSONDecodeError, KeyError, TypeError) as e:
             logger.warning(f"Error reading cache for {test_name}: {e}")
             return None

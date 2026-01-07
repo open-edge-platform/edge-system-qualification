@@ -11,8 +11,17 @@ from typing import Any, Dict
 from sysagent.utils.core import Metrics, Result, get_metric_name_for_device
 from sysagent.utils.system.ov_helper import get_openvino_device_type
 
+from .concurrent import confirm_steady_state_concurrent_analysis
 from .preparation import get_device_specific_docker_image
 from .qualification import qualify_device
+from .results import (
+    finalize_device_metrics,
+    process_device_results,
+    update_device_pipeline_info,
+    update_final_results_metadata,
+    validate_final_streams_results,
+)
+from .utils import update_metrics_to_error_state
 
 logger = logging.getLogger(__name__)
 
@@ -33,11 +42,12 @@ def run_device_test(
     num_sockets: int,
     consecutive_success_threshold: int,
     consecutive_failure_threshold: int,
+    consecutive_timeout_threshold: int,
+    steady_state_confirmation_threshold: int,
     max_streams_above_baseline: int,
     qualified_devices: Dict[str, Any],
     metrics=None,
     baseline_streams=None,
-    visualize_stream: bool = False,
     container_config: Dict[str, Any] = None,
 ) -> Result:
     """
@@ -49,7 +59,6 @@ def run_device_test(
         pipeline_params: Pipeline parameters
         metrics: Default metrics for the device
         baseline_streams: Baseline stream information
-        visualize_stream: Whether to visualize the stream
         container_config: Container configuration with available images (optional)
 
     Returns:
@@ -77,13 +86,22 @@ def run_device_test(
     logger.debug(f"Baseline streams for device {device_id}: {json.dumps(baseline_streams, indent=2)}")
 
     # Initial guess for stream count based on baseline
-    device_type = get_openvino_device_type(device_id)
+    # For multi-stage pipelines, device_type is "multi_stage" (not a real OpenVINO device)
+    if device_id == "multi_stage":
+        device_type = "multi_stage"
+    else:
+        device_type = get_openvino_device_type(device_id)
+
     estimated_streams = max(1, int(baseline_streams.get("num_streams", 1)))
     device_result = {
         "device_type": device_type,
-        "num_streams": estimated_streams,
-        "per_stream_fps": 0,
         "pass": False,
+        # Binary search state - used internally during qualification iterations
+        "qualification_state": {
+            "num_streams": estimated_streams,
+            "per_stream_fps": 0,
+            "last_successful_fps": 0,
+        },
     }
 
     # Store original qualified devices to restore on error
@@ -108,31 +126,41 @@ def run_device_test(
             num_sockets=num_sockets,
             consecutive_success_threshold=consecutive_success_threshold,
             consecutive_failure_threshold=consecutive_failure_threshold,
+            consecutive_timeout_threshold=consecutive_timeout_threshold,
             max_streams_above_baseline=max_streams_above_baseline,
-            visualize_stream=visualize_stream,
             container_config=container_config,
         )
         final_results[device_id] = device_result
 
         if is_qualified:
             logger.info(f"[{device_id}] ✓ PASSED qualification. Adding to active devices.")
+            # Keep qualification_state during qualification for multi-device concurrent analysis
+            # It will be removed later when storing in extended_metadata
             qualified_devices[device_id] = device_result
         else:
             logger.warning(f"[{device_id}] ✗ FAILED qualification. Continuing with next device.")
 
         logger.debug(f"Updating final Result after benchmark: {json.dumps(final_results, indent=2)}")
         # Update metrics and metadata if pass and per stream FPS is available
-        if is_qualified and device_result.get("per_stream_fps", 0) > 0:
+        # Read from metadata structure for measurements, qualification_state for qualification results
+        metadata = device_result.get("metadata", {})
+        qual_state = device_result.get("qualification_state", {})
+        if is_qualified and metadata.get("per_stream_fps", 0) > 0:
             status = True
-            num_streams = device_result.get("num_streams", 0)
-            per_stream_fps = device_result.get("per_stream_fps", 0)
+            num_streams = metadata.get("num_streams", -1)
+            per_stream_fps = metadata.get("per_stream_fps", 0)
         else:
             status = False
-            num_streams = 0
+            # Read num_streams from qualification_state to distinguish:
+            # -1 = pipeline errors/timeouts, 0 = ran but didn't meet target FPS
+            num_streams = qual_state.get("num_streams", -1)
             per_stream_fps = 0
             # Propagate error reason if available
             if "error_reason" in device_result:
                 result.metadata["error"] = device_result["error_reason"]
+            logger.debug(
+                f"Device {device_id} failed qualification: num_streams from qualification_state = {num_streams}"
+            )
 
         result.metrics.update(
             {get_metric_name_for_device(device_id, prefix="streams_max"): Metrics(unit="streams", value=num_streams)}
@@ -140,8 +168,7 @@ def run_device_test(
         result.metadata.update(
             {
                 "status": status,
-                "Number of Streams": num_streams,
-                "Per Stream FPS": per_stream_fps,
+                f"Average Per-Stream FPS - {device_id}": f"{per_stream_fps:.2f}",
             }
         )
         logger.debug(f"Final Result after benchmark: {json.dumps(result.to_dict(), indent=2)}")
@@ -153,6 +180,16 @@ def run_device_test(
         cleanup_stale_containers(docker_client, docker_container_prefix)
     except KeyboardInterrupt:
         logger.warning("Test interrupted by user. Cleaning up containers.")
+
+        # Set metrics to -1 to indicate interruption
+        if metrics:
+            update_metrics_to_error_state(metrics, value=-1, filter_prefix="streams_max")
+
+        # Update result to reflect interruption
+        result.metrics = metrics if metrics else result.metrics
+        result.metadata["status"] = False
+        result.metadata["error"] = "Test interrupted by user"
+
         from .utils import cleanup_stale_containers, cleanup_thread_pool
 
         cleanup_stale_containers(docker_client, docker_container_prefix)
@@ -172,286 +209,298 @@ def run_device_test(
     return result
 
 
-def process_device_results(device_list: list, qualified_devices: Dict[str, Any], results: Result) -> None:
-    """
-    Process and update results metadata for all qualified devices.
-    Individual device metrics and aggregate metrics are handled separately in the main test.
-
-    Args:
-        device_list: List of device IDs
-        qualified_devices: Dictionary of qualified device results
-        results: Main results object to update
-    """
-    logger.info("Updating device metadata with latest concurrent run metrics that passed qualification")
-
-    for dev_id, dev_data in qualified_devices.items():
-        # Only update with devices that have passed qualification
-        if dev_data.get("pass", False):
-            # Update the results metadata with the latest qualified device metrics
-            latest_streams = dev_data.get("num_streams", 0)
-            latest_fps = dev_data.get("per_stream_fps", 0)
-
-            # Update metadata
-            results.metadata[f"Maximum Streams {dev_id}"] = latest_streams
-            results.metadata[f"Stream FPS {dev_id}"] = latest_fps
-
-            logger.info(f"Updated device {dev_id}: {latest_streams} streams at {latest_fps:.2f} FPS")
-
-    logger.info(f"Final qualified devices: {len(qualified_devices)} of {len(device_list)} devices passed")
-
-
-def update_device_pipeline_info(
-    results: Result,
-    qualified_devices: Dict[str, Any],
-    pipeline: str,
-    pipeline_params: Dict[str, Any],
+def run_multi_device_test(
+    docker_client,
     device_dict: Dict[str, Any],
-) -> None:
+    sorted_devices: list,
+    device_list: list,
+    pipeline: str,
+    pipeline_params: Dict[str, Dict[str, str]],
+    docker_image_tag_analyzer: str,
+    docker_container_prefix: str,
+    data_dir: str,
+    container_mnt_dir: str,
+    pipeline_timeout: int,
+    results_dir: str,
+    target_fps: float,
+    num_sockets: int,
+    consecutive_success_threshold: int,
+    consecutive_failure_threshold: int,
+    consecutive_timeout_threshold: int,
+    steady_state_confirmation_threshold: int,
+    max_streams_above_baseline: int,
+    baseline_streams: Dict[str, Any],
+    container_config: Dict[str, Any],
+    configs: Dict[str, Any],
+    test_name: str,
+    devices: list,
+    timeout: int,
+    test_display_name: str,
+    metrics: Dict[str, Any],
+    baseline_streams_results: list,
+) -> Result:
     """
-    Update results with pipeline information for all qualified devices.
+    Execute total streams analysis for all devices and return final result.
+
+    This function orchestrates the multi-device test workflow:
+    1. Run qualification for each device sequentially
+    2. Confirm steady-state with concurrent analysis
+    3. Build and return final consolidated result
 
     Args:
-        results: Main results object to update
-        qualified_devices: Dictionary of qualified device results
+        docker_client: Docker client instance
+        device_dict: Dictionary containing device information
+        sorted_devices: List of device IDs in priority order
+        device_list: List of all device IDs
         pipeline: Pipeline configuration string
         pipeline_params: Pipeline parameters dictionary
-        device_dict: Dictionary containing device information
-    """
-    from .pipeline import get_pipeline_info
-
-    logger.info("Updating pipeline information for qualified devices")
-
-    for dev_id, dev_data in qualified_devices.items():
-        if not dev_data.get("pass", False) or dev_data.get("num_streams", 0) <= 0:
-            logger.warning(f"Device {dev_id} did not qualify with any streams. Skipping pipeline info.")
-            continue
-
-        num_streams = dev_data.get("num_streams", 0)
-
-        try:
-            # Get baseline pipeline information
-            base_pipeline_info = get_pipeline_info(
-                device_id=dev_id,
-                pipeline=pipeline,
-                pipeline_params=pipeline_params,
-                device_dict=device_dict,
-                num_streams=num_streams,
-                is_baseline=True,
-            )
-
-            # Get pipeline information for this device
-            multi_pipeline_info = get_pipeline_info(
-                device_id=dev_id,
-                pipeline=pipeline,
-                pipeline_params=pipeline_params,
-                device_dict=device_dict,
-                num_streams=num_streams,
-                is_baseline=False,
-            )
-
-            # Update results parameters with pipeline information
-            results.parameters[f"Base Pipeline {dev_id}"] = base_pipeline_info.get("baseline_pipeline", "")
-            results.parameters[f"Base Result Pipeline {dev_id}"] = base_pipeline_info.get("result_pipeline", "")
-            results.parameters[f"Multi Pipeline {dev_id}"] = multi_pipeline_info.get("multi_pipeline", "")
-            results.parameters[f"Multi Result Pipeline {dev_id}"] = multi_pipeline_info.get("result_pipeline", "")
-
-            logger.debug(f"Updated pipeline info for device {dev_id}")
-
-        except Exception as e:
-            logger.warning(f"Failed to get pipeline info for device {dev_id}: {e}")
-            continue
-
-
-def validate_final_streams_results(
-    results: Result,
-    qualified_devices: Dict[str, Any],
-    device_list: list,
-    failed_devices: Dict[str, Any] = None,
-) -> bool:
-    """
-    Validate final streams results and update error status if needed.
-
-    Args:
-        results: Main results object to update
-        qualified_devices: Dictionary of qualified device results
-        device_list: List of all device IDs tested
-        failed_devices: Dictionary of failed device results with error_reason (optional)
+        docker_image_tag_analyzer: Docker image tag for analyzer
+        docker_container_prefix: Prefix for container names
+        data_dir: Data directory path
+        container_mnt_dir: Container mount directory
+        pipeline_timeout: Timeout for pipeline execution
+        results_dir: Directory for result files
+        target_fps: Target FPS threshold
+        num_sockets: Number of CPU sockets
+        consecutive_success_threshold: Success threshold for binary search
+        consecutive_failure_threshold: Failure threshold for binary search
+        consecutive_timeout_threshold: Timeout threshold for binary search
+        steady_state_confirmation_threshold: Confirmation threshold for steady-state
+        max_streams_above_baseline: Maximum streams to explore above baseline
+        baseline_streams: Dictionary of baseline stream information per device
+        container_config: Container configuration with available images
+        configs: Test configuration dictionary
+        test_name: Test name
+        devices: List of device categories
+        timeout: Overall test timeout
+        test_display_name: Display name for the test
+        metrics: Default metrics dictionary
+        baseline_streams_results: List of baseline preparation results
 
     Returns:
-        True if validation passed, False if failed
+        Result object with consolidated test outcomes
     """
-    # Check if total streams is 0 or less for both single and multiple device scenarios
-    final_total_streams = 0
+    import json
+    import os
 
-    if len(device_list) > 1 and "streams_max" in results.metrics:
-        final_total_streams = results.metrics["streams_max"].value
-    else:
-        # For single device, check the individual device metric
-        for metric_name, metric_obj in results.metrics.items():
-            if metric_name.startswith("streams_max") and metric_obj.value > 0:
-                final_total_streams += metric_obj.value
+    from sysagent.utils.core import Metrics, Result, get_metric_name_for_device
 
-    if final_total_streams <= 0:
-        qualified_device_names = [
-            dev_id for dev_id, dev_data in qualified_devices.items() if dev_data.get("pass", False)
-        ]
-        failed_device_names = [dev_id for dev_id in device_list if dev_id not in qualified_device_names]
+    local_qualified_devices = {}
+    local_failed_devices = {}
 
-        # Build detailed error message with device-specific error reasons
-        error_details = []
-        if failed_devices:
-            for dev_id in failed_device_names:
-                if dev_id in failed_devices and "error_reason" in failed_devices[dev_id]:
-                    error_details.append(f"{dev_id}: {failed_devices[dev_id]['error_reason']}")
-                else:
-                    error_details.append(f"{dev_id}: Unknown error")
+    # Run total streams analysis for all devices in device_list
+    for device_id in sorted_devices:
+        logger.info(f"\n{'=' * 60}\nProcessing device: {device_id}\n{'=' * 60}")
 
-        if len(device_list) > 1:
-            base_message = (
-                f"No devices qualified for multi-device testing. "
-                f"All devices failed qualification: {failed_device_names}"
-            )
-        else:
-            base_message = f"Device failed qualification. No streams achieved: {failed_device_names}"
+        # Prepare device-specific configurations
+        metric_name = get_metric_name_for_device(device_id, prefix="streams_max")
+        default_metrics = {metric_name: Metrics(unit="streams", value=-1)}
 
-        # Append detailed error reasons if available
-        if error_details:
-            error_message = base_message + ". Details: " + "; ".join(error_details)
-        else:
-            error_message = base_message
+        # Execute device test WITHOUT caching at device level
+        # The overall multi-device result will be cached instead
+        result = run_device_test(
+            docker_client=docker_client,
+            device_dict=device_dict,
+            device_id=device_id,
+            pipeline=pipeline,
+            pipeline_params=pipeline_params,
+            docker_image_tag_analyzer=docker_image_tag_analyzer,
+            docker_container_prefix=docker_container_prefix,
+            data_dir=data_dir,
+            container_mnt_dir=container_mnt_dir,
+            pipeline_timeout=pipeline_timeout,
+            results_dir=results_dir,
+            target_fps=target_fps,
+            num_sockets=num_sockets,
+            consecutive_success_threshold=consecutive_success_threshold,
+            consecutive_failure_threshold=consecutive_failure_threshold,
+            consecutive_timeout_threshold=consecutive_timeout_threshold,
+            steady_state_confirmation_threshold=steady_state_confirmation_threshold,
+            max_streams_above_baseline=max_streams_above_baseline,
+            qualified_devices=local_qualified_devices,
+            metrics=default_metrics,
+            baseline_streams=baseline_streams.get(device_id, {}),
+            container_config=container_config,
+        )
 
-        logger.error(error_message)
-        results.metadata["status"] = False
-        results.metadata["error"] = error_message
-        return False
+        if result.metadata.get("status", False):
+            # Device test succeeded - read complete result file directly
+            # (including qualification_state for concurrent analysis)
+            result_file = os.path.join(results_dir, f"total_streams_result_0_{device_id}.json")
 
-    logger.info(f"Final streams validation passed: {final_total_streams} total streams")
-    return True
+            if os.path.exists(result_file):
+                try:
+                    with open(result_file, "r") as f:
+                        result_data = json.load(f)
 
+                    if device_id in result_data:
+                        device_result = result_data[device_id]
 
-def finalize_device_metrics(results: Result, qualified_devices: Dict[str, Any], device_list: list) -> None:
-    """
-    Finalize device metrics by ensuring individual device metrics are preserved
-    and updating aggregate metrics for multi-device scenarios.
+                        # Check 'pass' field to determine if device qualified
+                        if device_result.get("pass", False):
+                            # Extract num_streams from result metadata for logging
+                            device_metadata = device_result.get("metadata", {})
+                            device_streams = device_metadata.get("num_streams", -1)
+                            stream_fps = device_metadata.get("per_stream_fps", 0.0)
 
-    Args:
-        results: Main results object to update
-        qualified_devices: Dictionary of qualified device results
-        device_list: List of all device IDs tested
-    """
-    logger.info("Finalizing device metrics")
+                            # Keep full result with qualification_state for multi-device concurrent analysis
+                            local_qualified_devices[device_id] = device_result
+                            logger.info(
+                                f"Device {device_id} qualified with {device_streams} streams at {stream_fps:.2f} FPS"
+                            )
+                        else:
+                            error_reason = device_result.get("error_reason", "Device failed qualification")
+                            logger.error(f"Device {device_id} failed qualification: {error_reason}")
 
-    # Always ensure individual device metrics are updated for all qualified devices
-    for dev_id, dev_data in qualified_devices.items():
-        if dev_data.get("pass", False):
-            device_metric_name = get_metric_name_for_device(dev_id, prefix="streams_max")
-            device_streams = dev_data.get("num_streams", 0)
+                            # Read num_streams from qualification_state to distinguish between:
+                            # -1 = pipeline errors/timeouts, 0 = ran but didn't meet target FPS
+                            qual_state = device_result.get("qualification_state", {})
+                            num_streams = qual_state.get("num_streams", -1)
+                            logger.debug(
+                                f"Device {device_id} failed: reading num_streams = {num_streams} from qualification_state"
+                            )
 
-            # Ensure individual device metric exists and is updated
-            if device_metric_name not in results.metrics:
-                results.metrics[device_metric_name] = Metrics(unit="streams", value=device_streams)
-                logger.debug(f"Added missing individual device metric {device_metric_name} = {device_streams}")
+                            local_failed_devices[device_id] = {
+                                "error_reason": error_reason,
+                                "num_streams": num_streams,
+                                "pass": False,
+                            }
+                            continue
+                    else:
+                        error_reason = f"Device {device_id} not found in result file"
+                        logger.error(error_reason)
+                        local_failed_devices[device_id] = {
+                            "error_reason": error_reason,
+                            "num_streams": -1,  # True error - device not in result
+                            "pass": False,
+                        }
+                        continue
+                except Exception as e:
+                    error_reason = f"Failed to read result file: {str(e)}"
+                    logger.error(f"Error reading results for device {device_id}: {error_reason}")
+                    local_failed_devices[device_id] = {
+                        "error_reason": error_reason,
+                        "num_streams": -1,  # True error - couldn't read file
+                        "pass": False,
+                    }
+                    continue
             else:
-                results.metrics[device_metric_name].value = device_streams
-                logger.debug(f"Updated individual device metric {device_metric_name} = {device_streams}")
-
-    # Update aggregate streams_max if it exists (for both single and multi-device scenarios)
-    if "streams_max" in results.metrics:
-        total_streams = sum(
-            dev_data.get("num_streams", 0)
-            for dev_id, dev_data in qualified_devices.items()
-            if dev_data.get("pass", False)
-        )
-
-        results.metrics["streams_max"].value = total_streams
-        if len(device_list) > 1:
-            logger.info(f"Updated aggregate streams_max for multi-device scenario: {total_streams}")
+                error_reason = result.metadata.get("error", "Failed to parse device result")
+                logger.error(f"Failed to parse results for device {device_id}: {error_reason}")
+                local_failed_devices[device_id] = {
+                    "error_reason": error_reason,
+                    "num_streams": -1,  # True error - no result file
+                    "pass": False,
+                }
+                continue
         else:
-            logger.info(f"Updated aggregate streams_max for single-device scenario: {total_streams}")
+            error_reason = result.metadata.get("error", "Unknown error")
+            logger.error(f"Test failed for device {device_id}: {error_reason}")
 
-    logger.debug(f"Finalized metrics for {len(qualified_devices)} qualified devices")
+            # Even if status is False, try to read result file to get qualification_state
+            # This allows us to distinguish between errors (-1) and performance failures (0)
+            result_file = os.path.join(results_dir, f"total_streams_result_0_{device_id}.json")
+            num_streams = -1  # Default to error
 
+            if os.path.exists(result_file):
+                try:
+                    with open(result_file, "r") as f:
+                        result_data = json.load(f)
+                    if device_id in result_data:
+                        device_result = result_data[device_id]
+                        qual_state = device_result.get("qualification_state", {})
+                        num_streams = qual_state.get("num_streams", -1)
+                        logger.debug(
+                            f"Device {device_id} test failed but qualification ran: "
+                            f"num_streams from qualification_state = {num_streams}"
+                        )
+                except Exception as e:
+                    logger.debug(f"Could not read qualification_state for {device_id}: {e}")
 
-def update_final_results_metadata(
-    results: Result,
-    qualified_devices: Dict[str, Any],
-    device_list: list,
-    baseline_streams_results: list = None,
-    requested_device_categories: list = None,
-    target_fps: float = None,
-) -> None:
-    """
-    Update final results with device metadata and summary information.
-    Uses the enhanced auto_set_key_metric function instead of hardcoded logic.
+            # Store failed device information for error reporting
+            local_failed_devices[device_id] = {
+                "error_reason": error_reason,
+                "num_streams": num_streams,
+                "pass": False,
+            }
+            continue
 
-    Args:
-        results: Main results object to update
-        qualified_devices: Dictionary of qualified device results
-        device_list: List of all device IDs tested
-        baseline_streams_results: List of baseline preparation results (optional)
-        requested_device_categories: List of device categories requested in config (optional)
-        target_fps: Target FPS for stream qualification (optional)
-    """
-    if baseline_streams_results:
-        baseline_fps_count = 0
-        for baseline_result in baseline_streams_results:
-            device_id = baseline_result.metadata.get("device_id")
-            per_stream_fps = baseline_result.metadata.get("per_stream_fps", 0.0)
-            if device_id:
-                results.metadata[f"Baseline Pipeline Throughput (FPS) - {device_id}"] = f"{per_stream_fps:.2f}"
-                baseline_fps_count += 1
-                logger.debug(f"Adding baseline pipeline throughput FPS for {device_id}: {per_stream_fps:.2f}")
+    # After all devices qualified, confirm steady-state with concurrent analysis
+    steady_state_confirmed = confirm_steady_state_concurrent_analysis(
+        docker_client=docker_client,
+        device_dict=device_dict,
+        qualified_devices=local_qualified_devices,
+        pipeline=pipeline,
+        pipeline_params=pipeline_params,
+        docker_image_tag_analyzer=docker_image_tag_analyzer,
+        docker_container_prefix=docker_container_prefix,
+        data_dir=data_dir,
+        container_mnt_dir=container_mnt_dir,
+        pipeline_timeout=pipeline_timeout,
+        results_dir=results_dir,
+        target_fps=target_fps,
+        num_sockets=num_sockets,
+        confirmation_threshold=steady_state_confirmation_threshold,
+        container_config=container_config,
+    )
 
-                # Calculate estimated max streams based on baseline FPS / target FPS
-                if target_fps and target_fps > 0 and per_stream_fps > 0:
-                    estimated_max_streams = int(per_stream_fps / target_fps)
-                    results.metadata[f"Estimated Max Streams (Baseline / Target FPS) - {device_id}"] = (
-                        estimated_max_streams
-                    )
-                    logger.debug(
-                        f"Estimated max streams for {device_id}: {estimated_max_streams} "
-                        f"(baseline {per_stream_fps:.2f} FPS / target {target_fps:.2f} FPS)"
-                    )
+    if not steady_state_confirmed:
+        logger.debug("Steady-state not fully confirmed but proceeding with last known stable configuration")
 
-        if baseline_fps_count > 0:
-            logger.info(f"Baseline per-stream FPS captured for {baseline_fps_count} device(s)")
+    # Build final result with all device metrics
+    final_result = Result.from_test_config(
+        configs=configs,
+        name=test_name,
+        parameters={
+            "Devices": devices,
+            "Device List": device_list,
+            "Target FPS": target_fps,
+            "Consecutive Success Threshold": consecutive_success_threshold,
+            "Consecutive Failure Threshold": consecutive_failure_threshold,
+            "Max Streams Above Baseline": max_streams_above_baseline,
+            "Timeout (s)": timeout,
+            "Display Name": test_display_name,
+            "Pipeline": pipeline,
+            "Pipeline Params": pipeline_params,
+        },
+        metrics=metrics,
+        metadata={
+            "status": True,
+        },
+    )
 
-    # Update overall test status
-    if qualified_devices:
-        results.metadata["status"] = True
+    # Store structured device data in extended_metadata for analysis and visualization
+    # Remove internal qualification_state from qualified devices for clean final results
+    clean_qualified_devices = {
+        dev_id: {k: v for k, v in dev_data.items() if k != "qualification_state"}
+        for dev_id, dev_data in local_qualified_devices.items()
+    }
+    final_result.extended_metadata = {
+        "qualified_devices": clean_qualified_devices,
+        "failed_devices": local_failed_devices,
+    }
 
-        # Add summary information
-        results.metadata["qualified_devices_count"] = len(qualified_devices)
-        results.metadata["total_devices_count"] = len(device_list)
-        results.metadata["qualification_rate"] = len(qualified_devices) / len(device_list) if device_list else 0
+    # Process device results using modular function
+    process_device_results(device_list, local_qualified_devices, final_result)
 
-        # Calculate total streams
-        total_streams = 0
-        for device_id, device_data in qualified_devices.items():
-            total_streams += device_data.get("num_streams", 0)
+    # Finalize device metrics using modular function (pass failed_devices for proper metric updates)
+    finalize_device_metrics(final_result, local_qualified_devices, device_list, local_failed_devices)
 
-        results.metadata["total_qualified_streams"] = total_streams
+    # Validate final streams results using modular function
+    validate_final_streams_results(final_result, local_qualified_devices, device_list, local_failed_devices)
 
-        # Determine effective device count for key metric selection
-        # Treat as multi-device if:
-        # 1. Multiple devices detected, OR
-        # 2. Multiple device categories requested in config, OR
-        # 3. Multiple dGPU devices detected (GPU.0, GPU.1, etc.)
-        dgpu_count = sum(1 for dev_id in device_list if dev_id.upper().startswith("GPU."))
-        effective_device_count = max(
-            len(device_list),
-            len(requested_device_categories) if requested_device_categories else 0,
-            dgpu_count if dgpu_count > 1 else 0,
-        )
+    # Update pipeline information for qualified devices using modular function
+    update_device_pipeline_info(final_result, local_qualified_devices, pipeline, pipeline_params, device_dict)
 
-        # Use the enhanced auto_set_key_metric function instead of hardcoded logic
-        results.auto_set_key_metric(device_count=effective_device_count)
+    # Update final results metadata using modular function
+    update_final_results_metadata(
+        final_result,
+        local_qualified_devices,
+        device_list,
+        baseline_streams_results,
+        requested_device_categories=devices,
+        target_fps=target_fps,
+    )
 
-        logger.info(f"Test completed successfully: {len(qualified_devices)}/{len(device_list)} devices qualified")
-        logger.info(f"Total qualified streams: {total_streams}")
-    else:
-        results.metadata["status"] = False
-        # Only set generic error if no specific error already exists (from validate_final_streams_results)
-        if "error" not in results.metadata or not results.metadata["error"]:
-            results.metadata["error"] = "No devices passed qualification"
-        logger.warning("Test failed: No devices passed qualification")
+    logger.debug(f"DL Streamer Test results: {json.dumps(final_result.to_dict(), indent=2)}")
+    return final_result

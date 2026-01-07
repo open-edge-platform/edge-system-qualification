@@ -106,14 +106,14 @@ def install_allure_cli_from_repo(node_dir: str, force_reinstall: bool = False) -
         # Apply patches using subprocess
         for patch_file in patch_files:
             patch_path = os.path.join(patches_dir, patch_file)
-            logger.info(f"Applying patch: {patch_file}")
+            logger.debug(f"Applying patch: {patch_file}")
 
             try:
                 patch_applied = apply_patch(patch_path, allure_repo_dir)
                 if patch_applied:
-                    logger.info(f"Successfully applied patch: {patch_file}")
+                    logger.debug(f"Successfully applied patch: {patch_file}")
                 else:
-                    logger.info(f"Patch already applied or skipped: {patch_file}")
+                    logger.debug(f"Patch already applied or skipped: {patch_file}")
             except Exception as e:
                 logger.error(f"Failed to apply patch {patch_file}: {str(e)}")
                 raise
@@ -126,19 +126,19 @@ def install_allure_cli_from_repo(node_dir: str, force_reinstall: bool = False) -
 
     # Step 1: Install dependencies with yarn
     allure_repo_relative = os.path.relpath(allure_repo_dir, os.getcwd())
-    logger.info(f"Installing dependencies in {allure_repo_relative}")
+    logger.debug(f"Installing dependencies in {allure_repo_relative}")
     try:
         result = run_command([yarn_bin, "install"], cwd=allure_repo_dir, check=True, env=env)
-        logger.info("Dependencies installed successfully")
+        logger.debug("Dependencies installed successfully")
     except Exception as e:
         logger.error(f"Failed to install dependencies: {str(e)}")
         raise
 
     # Step 2: Build the project
-    logger.info("Building Allure3 project")
+    logger.debug("Building Allure3 project")
     try:
         result = run_command([yarn_bin, "build"], cwd=allure_repo_dir, check=True, env=env)
-        logger.info("Allure3 project built successfully")
+        logger.debug("Allure3 project built successfully")
     except Exception as e:
         logger.error(f"Failed to build Allure3 project: {str(e)}")
         raise

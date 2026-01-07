@@ -23,9 +23,7 @@ from sysagent.utils.core.process import (
 logger = logging.getLogger(__name__)
 
 
-def _run_git_command(
-    cmd: List[str], cwd: str = None, check: bool = True
-) -> ProcessResult:
+def _run_git_command(cmd: List[str], cwd: str = None, check: bool = True) -> ProcessResult:
     """
     Execute a git command with proper error handling and logging.
 
@@ -40,9 +38,7 @@ def _run_git_command(
     Raises:
         Exception: If command fails and check=True
     """
-    logger.debug(
-        f"Executing git command: git {' '.join(cmd)} in {cwd or 'current directory'}"
-    )
+    logger.debug(f"Executing git command: git {' '.join(cmd)} in {cwd or 'current directory'}")
 
     result = run_git_command(cmd, cwd=cwd, check=check)
 
@@ -100,9 +96,7 @@ def _initialize_git_repository(directory: str) -> None:
             from sysagent.utils.config.config_loader import get_project_name
 
             project_name = get_project_name()
-            _run_git_command(
-                ["config", "user.name", f"{project_name.upper()} Auto"], cwd=directory
-            )
+            _run_git_command(["config", "user.name", f"{project_name.upper()} Auto"], cwd=directory)
 
         try:
             _run_git_command(["config", "user.email"], cwd=directory)
@@ -114,15 +108,11 @@ def _initialize_git_repository(directory: str) -> None:
                 ["config", "user.email", f"{project_name.lower()}@intel.com"],
                 cwd=directory,
             )  # Create an initial commit to ensure patches can be applied
-        _run_git_command(
-            ["commit", "-m", "Initial commit from downloaded archive"], cwd=directory
-        )
+        _run_git_command(["commit", "-m", "Initial commit from downloaded archive"], cwd=directory)
         logger.debug("Created initial commit in the repository")
     except Exception as e:
         # This could happen if there are no files to commit or other git issues
-        logger.warning(
-            f"Failed to create initial commit: {e.stderr}. Will try to continue."
-        )
+        logger.warning(f"Failed to create initial commit: {e.stderr}. Will try to continue.")
 
 
 def _apply_patch_with_patch_command(patch_path: str, cwd: str) -> bool:
@@ -185,7 +175,7 @@ def _apply_patch_with_patch_command(patch_path: str, cwd: str) -> bool:
         )
 
         if result.success:
-            logger.info(f"Successfully applied patch with patch command: {patch_name}")
+            logger.debug(f"Successfully applied patch with patch command: {patch_name}")
             return True
         else:
             # Check if this is because the patch is already applied
@@ -216,9 +206,7 @@ def _apply_patch_with_patch_command(patch_path: str, cwd: str) -> bool:
     except Exception as e:
         logger.debug(f"patch command raised exception for {patch_name}: {e}")
         # Also be lenient with exceptions - treat as already applied
-        logger.info(
-            f"Patch {patch_name} encountered exception, assuming already applied"
-        )
+        logger.info(f"Patch {patch_name} encountered exception, assuming already applied")
         return False
 
 
@@ -245,9 +233,7 @@ def apply_patch(patch_path: str, cwd: str) -> bool:
         logger.debug(f"patch command utility is available, using it for {patch_name}")
     except (Exception, FileNotFoundError):
         patch_available = False
-        logger.debug(
-            f"patch command utility not available, using git apply for {patch_name}"
-        )
+        logger.debug(f"patch command utility not available, using git apply for {patch_name}")
 
     if patch_available:
         # Use patch command utility (preferred method for new files/directories)
@@ -280,55 +266,38 @@ def _apply_patch_with_git_apply(patch_path: str, cwd: str) -> bool:
     except Exception as e:
         # Check if this is because the patch is already applied
         if "stderr" in str(e) and any(
-            phrase in str(e).lower()
-            for phrase in ["patch does not apply", "already exists", "with conflicts"]
+            phrase in str(e).lower() for phrase in ["patch does not apply", "already exists", "with conflicts"]
         ):
-            logger.debug(
-                f"Patch {patch_name} appears to be already applied or has conflicts"
-            )
+            logger.debug(f"Patch {patch_name} appears to be already applied or has conflicts")
             return False
         else:
             logger.debug(f"Patch {patch_name} check failed: {e}")
 
     # Try git apply with --index flag to handle new files and stage them
     try:
-        _run_git_command(
-            ["apply", "--index", "--ignore-whitespace", patch_path], cwd=cwd, check=True
-        )
+        _run_git_command(["apply", "--index", "--ignore-whitespace", patch_path], cwd=cwd, check=True)
         logger.info(f"Successfully applied patch with git apply --index: {patch_name}")
         return True
     except Exception as e:
         apply_index_error = str(e)
-        logger.debug(
-            f"git apply --index failed for patch {patch_name}: {apply_index_error}"
-        )
+        logger.debug(f"git apply --index failed for patch {patch_name}: {apply_index_error}")
 
         # Check if it's because the patch is already applied
-        if any(
-            phrase in apply_index_error.lower()
-            for phrase in ["patch does not apply", "already exists"]
-        ):
+        if any(phrase in apply_index_error.lower() for phrase in ["patch does not apply", "already exists"]):
             logger.debug(f"Patch {patch_name} appears to be already applied")
             return False
 
     # Try git apply without --index (for compatibility)
     try:
-        _run_git_command(
-            ["apply", "--ignore-whitespace", patch_path], cwd=cwd, check=True
-        )
+        _run_git_command(["apply", "--ignore-whitespace", patch_path], cwd=cwd, check=True)
         logger.info(f"Successfully applied patch with basic git apply: {patch_name}")
         return True
     except Exception as e:
         basic_apply_error = str(e)
-        logger.debug(
-            f"Basic git apply failed for patch {patch_name}: {basic_apply_error}"
-        )
+        logger.debug(f"Basic git apply failed for patch {patch_name}: {basic_apply_error}")
 
         # Check if it's because the patch is already applied
-        if any(
-            phrase in basic_apply_error.lower()
-            for phrase in ["patch does not apply", "already exists"]
-        ):
+        if any(phrase in basic_apply_error.lower() for phrase in ["patch does not apply", "already exists"]):
             logger.debug(f"Patch {patch_name} appears to be already applied")
             return False
 

@@ -12,7 +12,7 @@ kpi:
     unit: "streams"
     severity: "normal"
     description: "Maximum number of concurrent video streams"
-    default_value: 0.0
+    default_value: -1
 
   streams_max_cpu:
     name: "Maximum Streams CPU"
@@ -24,7 +24,7 @@ kpi:
     unit: "streams"
     severity: "normal"
     description: "Maximum number of concurrent video streams on CPU"
-    default_value: 0.0
+    default_value: -1
 
   streams_max_igpu:
     name: "Maximum Streams iGPU"
@@ -36,7 +36,7 @@ kpi:
     unit: "streams"
     severity: "normal"
     description: "Maximum number of concurrent video streams on iGPU"
-    default_value: 0.0
+    default_value: -1
 
   streams_max_dgpu:
     name: "Maximum Streams dGPU"
@@ -48,7 +48,7 @@ kpi:
     unit: "streams"
     severity: "normal"
     description: "Maximum number of concurrent video streams on dGPU"
-    default_value: 0.0
+    default_value: -1
 
   streams_max_npu:
     name: "Maximum Streams NPU"
@@ -60,12 +60,52 @@ kpi:
     unit: "streams"
     severity: "normal"
     description: "Maximum number of concurrent video streams on NPU"
-    default_value: 0.0
+    default_value: -1
 
 tests:
   test_dlstreamer:
     params:
       - display_name: "DL Streamer - Default"
+        # =============================================================================
+        # Binary Search Qualification Thresholds
+        # =============================================================================
+        # These parameters control the intelligent binary search algorithm used to find
+        # the maximum number of streams each device can handle while maintaining target FPS.
+        #
+        # consecutive_success_threshold: 1
+        #   - Number of consecutive successful runs (FPS >= target) before trying higher streams
+        #   - Lower values explore higher stream counts more aggressively
+        #   - Higher values ensure more stable results before increasing load
+        #   - Default: 1
+        #
+        # consecutive_failure_threshold: 1
+        #   - Number of consecutive FPS-based failures (FPS > 0 but < target) before reducing streams
+        #   - Applies when device is running but underperforming
+        #   - Lower values retreat quickly from marginal configurations
+        #   - Higher values give more chances to achieve target FPS
+        #   - Default: 1
+        #
+        # consecutive_timeout_threshold: 2
+        #   - Number of consecutive timeout failures before reducing streams (below baseline only)
+        #   - Timeout = pipeline analysis exceeds timeout limit or returns 0 FPS
+        #   - Only applies when testing BELOW baseline streams (conservative approach)
+        #   - Prevents getting stuck on configurations that consistently timeout
+        #   - Default: 2
+        #
+        # steady_state_confirmation_threshold: 2
+        #   - Number of consecutive successful runs required to confirm steady-state stability
+        #   - Used for final verification when all devices run concurrently
+        #   - If any device cannot consistently achieve target FPS, its streams are reduced
+        #   - Higher values ensure more reliable long-term performance
+        #   - Default: 2
+        #
+        # max_streams_above_baseline: 3
+        #   - Maximum number of streams to explore above baseline per device
+        #   - For multi-socket CPU: applies per socket (e.g., 2 sockets × 3 = 6 additional streams)
+        #   - Limits exploration to prevent excessive testing time
+        #   - Conservative approach: baseline + limited increment
+        #   - Default: 3
+        # =============================================================================
         assets:
           # Video assets
           # Video asset with H.264 codec, resolution downscale, and duration trim
@@ -133,6 +173,23 @@ tests:
             ! gvadetect model=./models/yolo11n/fp16/yolo11n.xml device=${DEVICE_ID} ${INFERENCE_ELEMENTS} batch-size=1
             ! queue
         pipeline_params:
+        # ========================================================================
+        # Pipeline Parameter Structure (Consistent Format)
+        # ========================================================================
+        # All pipeline parameters follow this structure:
+        #   PARAMETER_NAME:
+        #     default: "default_value"              # Fallback if no type match
+        #     cpu: "cpu_specific_value"            # CPU device value
+        #     npu: "npu_specific_value"            # NPU device value
+        #     igpu: "igpu_value"                   # iGPU without dGPU (single GPU system)
+        #     igpu_indexed: "igpu_idx"             # iGPU with dGPU present (GPU.0)
+        #     dgpu: "dgpu_value"                   # dGPU with iGPU present (GPU.1, GPU.2)
+        #     dgpu_primary: "dgpu_pri"             # Single dGPU without iGPU (GPU)
+        #     dgpu_indexed: "dgpu_idx"             # Multi-dGPU without iGPU (GPU.0, GPU.1)
+        #     overrides:                            # Device-specific overrides
+        #       DEVICE_PROPERTY_NAME:               # OpenVINO device property
+        #         "property_value": "override"     # Override for specific property value
+        # ========================================================================
           DECODE_ELEMENTS:
             cpu: "parsebin ! avdec_h264 ! 'video/x-raw'"
             gpu_integrated: "parsebin ! vah264dec ! vapostproc ! 'video/x-raw(memory:VAMemory)'"

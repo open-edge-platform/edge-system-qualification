@@ -17,6 +17,7 @@ from sysagent.utils.infrastructure import DockerClient, download_file
 
 from .container import run_dlstreamer_analyzer_container, run_video_utils_container
 from .pipeline import build_baseline_pipeline, resolve_pipeline_placeholders
+from .utils import create_error_result
 
 logger = logging.getLogger(__name__)
 
@@ -468,12 +469,15 @@ def prepare_baseline(
         )
     except KeyboardInterrupt:
         error_message = f"Interrupt detected during baseline streams analysis for device {device_id}"
-        logger.warning(f"{error_message}")
+        logger.warning(error_message)
         from .utils import cleanup_stale_containers, cleanup_thread_pool
 
         cleanup_stale_containers(docker_client, docker_container_prefix)
         cleanup_thread_pool()
+
+        create_error_result(device_id, error_message)
         raise KeyboardInterrupt(error_message)
+
     except Exception as e:
         error_message = f"An error occurred during baseline streams analysis for device {device_id}: {e}"
         logger.error(error_message)
@@ -481,7 +485,7 @@ def prepare_baseline(
 
         cleanup_stale_containers(docker_client, docker_container_prefix)
         cleanup_thread_pool()
-        pytest.fail(error_message)
+        return create_error_result(device_id, error_message)
 
     if not baseline_streams:
         error_message = (
@@ -493,16 +497,25 @@ def prepare_baseline(
 
         cleanup_stale_containers(docker_client, docker_container_prefix)
         cleanup_thread_pool()
-        pytest.fail(error_message)
+        return create_error_result(device_id, error_message)
 
     device_info = baseline_streams.get(device_id, {})
-    num_streams = device_info.get("num_streams", 1)
+    num_streams = device_info.get("num_streams", -1)
     fps = device_info.get("per_stream_fps", 0.0)
     baseline_passed = fps >= target_fps
 
+    if num_streams == -1:
+        error_message = (
+            f"Baseline streams analysis for {device_id} did not return valid results. "
+            f"num_streams={num_streams}, per_stream_fps={fps}. "
+            "Please check the pipeline configuration."
+        )
+        logger.error(error_message)
+        return create_error_result(device_id, error_message, num_streams, fps)
+
     logger.info(f"Baseline streams analysis completed for {device_id}: {num_streams} streams @ {fps:.2f} FPS")
 
-    result = Result(
+    return Result(
         metadata={
             "status": True,
             "device_id": device_id,
@@ -512,8 +525,6 @@ def prepare_baseline(
             "baseline_streams": baseline_streams,
         }
     )
-
-    return result
 
 
 def prepare_estimate_num_streams_for_device(
@@ -593,9 +604,13 @@ def prepare_estimate_num_streams_for_device(
             raise RuntimeError("Could not extract test results from container.")
 
         device_info = baseline_streams.get(device_id, {})
+        # Check for valid baseline results
+        # Note: num_streams can be -1 for errors, 0 for ran-but-failed, or positive for success
         if not device_info.get("num_streams", 0) > 0 and not device_info.get("per_stream_fps", 0) > 0:
             error_message = (
                 f"Baseline streams analysis for {device_id} did not return valid results. "
+                f"num_streams={device_info.get('num_streams', 'N/A')}, "
+                f"per_stream_fps={device_info.get('per_stream_fps', 'N/A')}. "
                 "Please check the pipeline configuration."
             )
             logger.error(error_message)
@@ -603,7 +618,8 @@ def prepare_estimate_num_streams_for_device(
 
             cleanup_stale_containers(docker_client, docker_container_prefix)
             cleanup_thread_pool()
-            pytest.fail(error_message)
+
+            return {device_id: {"num_streams": -1, "per_stream_fps": 0.0, "error": error_message, "status": "error"}}
 
         return baseline_streams
 
@@ -613,4 +629,5 @@ def prepare_estimate_num_streams_for_device(
 
         cleanup_stale_containers(docker_client, docker_container_prefix)
         cleanup_thread_pool()
-        pytest.fail(str(e))
+
+        return {device_id: {"num_streams": -1, "per_stream_fps": 0.0, "error": str(e), "status": "error"}}

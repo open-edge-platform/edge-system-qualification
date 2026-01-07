@@ -47,6 +47,10 @@ class Result:
         parameters: Test configuration parameters
         metrics: Measured test metrics with units
         metadata: Additional test metadata and status information (auto-populated with defaults and config metadata)
+                  Should contain simple property-value pairs for human-readable reporting
+        extended_metadata: Structured metadata for storing complex objects and data structures
+                          Used for data analysis, visualization, and programmatic access
+                          Not constrained to simple key-value pairs like metadata
         kpis: KPI configurations and validation results, structured as:
               {kpi_name: {"config": {...}, "validation": {...}, "mode": "all|any|skip"}}
     """
@@ -55,6 +59,7 @@ class Result:
     parameters: Dict[str, Any] = field(default_factory=dict)
     metrics: Dict[str, Metrics] = field(default_factory=dict)
     metadata: Dict[str, Any] = field(default_factory=dict)
+    extended_metadata: Dict[str, Any] = field(default_factory=dict)
     kpis: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
@@ -77,6 +82,7 @@ class Result:
             "parameters": self.parameters,
             "metrics": {k: asdict(v) for k, v in self.metrics.items()},
             "metadata": self.metadata,
+            "extended_metadata": self.extended_metadata,
             "kpis": self.kpis,
         }
 
@@ -257,6 +263,7 @@ class Result:
             )
 
             # For multi-device tests, prefer aggregate metrics for KPI validation
+            # Prioritize aggregate metrics even if they have error values (0 or -1)
             if aggregate_metrics:
                 # Prioritize certain metric types for key metric selection
                 priority_metrics = ["streams_max", "throughput", "performance_score", "fps_total"]
@@ -264,12 +271,18 @@ class Result:
                     for metric_name in aggregate_metrics:
                         if priority_metric in metric_name.lower():
                             self.set_key_metric(metric_name)
-                            logger.debug(f"Set key metric to aggregate metric '{metric_name}' for multi-device test")
+                            logger.debug(
+                                f"Set key metric to aggregate metric '{metric_name}' for multi-device test "
+                                f"(value: {self.metrics[metric_name].value})"
+                            )
                             return
 
                 # If no priority metrics found, use the first aggregate metric
                 self.set_key_metric(aggregate_metrics[0])
-                logger.debug(f"Set key metric to first aggregate metric '{aggregate_metrics[0]}' for multi-device test")
+                logger.debug(
+                    f"Set key metric to first aggregate metric '{aggregate_metrics[0]}' for multi-device test "
+                    f"(value: {self.metrics[aggregate_metrics[0]].value})"
+                )
                 return
 
             # If no aggregate metrics but have device-specific metrics, choose the highest value one
@@ -404,6 +417,7 @@ class Result:
             parameters=data.get("parameters", {}),
             metrics=metrics,
             metadata=data.get("metadata", {}),
+            extended_metadata=data.get("extended_metadata", {}),
             kpis=data.get("kpis", {}),
         )
 

@@ -55,8 +55,11 @@ def validate_pipeline_command(pipeline_cmd: str) -> str:
     if len(pipeline_cmd.strip()) == 0:
         raise ValueError("Pipeline command cannot be empty")
 
-    if len(pipeline_cmd) > 50000:  # Reasonable limit for GStreamer pipelines
-        raise ValueError("Pipeline command too long (max 50000 characters)")
+    max_length = 60000  # Set a reasonable maximum length for pipeline commands
+    if len(pipeline_cmd) > max_length:
+        raise ValueError(
+            f"Pipeline command length exceeds maximum allowed length ({max_length} characters): {len(pipeline_cmd)}"
+        )
 
     # Check for dangerous shell command injection patterns
     # Note: GStreamer pipelines can have newlines and use | for element connections, so we allow those
@@ -422,8 +425,14 @@ def parse_result(use_average=False, result_output_path=None):
     Parse GStreamer pipeline results from output file.
 
     Returns:
-        Tuple of (total_fps, num_streams, per_stream_fps)
-        Returns (0.0, 0.0, 0.0) if parsing fails
+        Dict containing analysis metadata:
+            - parse_source: "average" or "overall" indicating which FpsCounter pattern was used
+            - fps_counter_duration: duration in seconds from FPS counter
+            - per_stream_fps_list: list of FPS values for each stream
+            - num_streams: number of streams detected
+            - per_stream_fps: average FPS per stream
+            - total_fps: total FPS across all streams
+        Returns {} if parsing fails
 
     Note:
         Looks for FpsCounter(average) or FpsCounter(overall) patterns.
@@ -436,12 +445,12 @@ def parse_result(use_average=False, result_output_path=None):
 
     if not result_output_path:
         logger.error("Result output path is not provided.")
-        return 0.0, 0.0, 0.0
+        return {}
 
     result_path = (Path(result_output_path)).resolve()
     if not result_path.exists():
         logger.debug(f"Result output file {result_output_path} does not exist.")
-        return 0.0, 0.0, 0.0
+        return {}
 
     try:
         with open(result_path) as f:
@@ -449,8 +458,9 @@ def parse_result(use_average=False, result_output_path=None):
 
         if not result_output:
             logger.warning(f"Result output file {result_output_path} is empty.")
-            return 0.0, 0.0, 0.0
+            return {}
 
+        parse_source = "average" if use_average else "overall"
         if use_average:
             indices = [i for i, val in enumerate(result_output) if "FpsCounter(average" in val]
             search_pattern = "FpsCounter(average"
@@ -468,22 +478,47 @@ def parse_result(use_average=False, result_output_path=None):
                 )
             else:
                 logger.warning(f"No FpsCounter patterns found in result file {result_output_path}")
-            return 0.0, 0.0, 0.0
+            return {}
 
         fps_str = result_output[indices[-1]]
         found_res = re.findall(r"[\d+.\d+]+", fps_str)
 
         if len(found_res) < 4:
             logger.warning(f"Insufficient numerical values found in fps string: {fps_str}")
-            return 0.0, 0.0, 0.0
+            return {}
 
-        res = float(found_res[1]), int(found_res[2]), float(found_res[3])
-        total_fps, num_streams, per_stream_fps = res
-        return total_fps, num_streams, per_stream_fps
+        # Extract values: found_res[0]=duration, found_res[1]=total_fps,
+        # found_res[2]=num_streams, found_res[3]=per_stream_fps
+        fps_counter_duration = float(found_res[0]) if found_res else 0.0
+        total_fps = float(found_res[1])
+        num_streams = int(found_res[2])
+        per_stream_fps = float(found_res[3])
+
+        # Extract per-stream FPS list from the parentheses
+        per_stream_fps_list = []
+        try:
+            # Find content within parentheses at the end of the line
+            match = re.search(r"\(([\d., ]+)\)", fps_str)
+            if match:
+                fps_values_str = match.group(1)
+                per_stream_fps_list = [float(x.strip()) for x in fps_values_str.split(",") if x.strip()]
+        except Exception as parse_err:
+            logger.debug(f"Could not parse per-stream FPS list: {parse_err}")
+
+        metadata = {
+            "parse_source": parse_source,
+            "fps_counter_duration": fps_counter_duration,
+            "per_stream_fps_list": per_stream_fps_list,
+            "num_streams": num_streams,
+            "per_stream_fps": per_stream_fps,
+            "total_fps": total_fps,
+        }
+
+        return metadata
 
     except Exception as e:
         logger.error(f"Error parsing result file {result_output_path}: {e}")
-        return 0.0, 0.0, 0.0
+        return {}
 
 
 def get_baseline_stream_analysis(baseline_pipeline=None, result_pipeline=None, pipeline_timeout=300, device_id=None):
@@ -519,7 +554,7 @@ def get_baseline_stream_analysis(baseline_pipeline=None, result_pipeline=None, p
         logger.error(f"Input validation failed in baseline stream analysis: {e}")
         return {
             "total_fps": 0.0,
-            "num_streams": 0,
+            "num_streams": -1,
             "per_stream_fps": 0.0,
             "main_process_exit_code": None,
             "result_process_exit_code": None,
@@ -543,7 +578,7 @@ def get_baseline_stream_analysis(baseline_pipeline=None, result_pipeline=None, p
     # Initialize result structure
     result_info = {
         "total_fps": 0.0,
-        "num_streams": 0,
+        "num_streams": -1,
         "per_stream_fps": 0.0,
         "main_process_exit_code": None,
         "result_process_exit_code": None,
@@ -629,9 +664,12 @@ def get_baseline_stream_analysis(baseline_pipeline=None, result_pipeline=None, p
             else:
                 logger.warning(f"Baseline main pipeline exited with code {main_process.returncode}: {stderr_output}")
 
-        total_fps, num_streams, per_stream_fps = parse_result(
-            use_average=False, result_output_path=baseline_result_path
-        )
+        parse_metadata = parse_result(use_average=False, result_output_path=baseline_result_path)
+
+        # Extract values from metadata
+        total_fps = parse_metadata.get("total_fps", 0.0)
+        num_streams = parse_metadata.get("num_streams", 0)
+        per_stream_fps = parse_metadata.get("per_stream_fps", 0.0)
 
         # Check if parsing was successful
         if per_stream_fps == 0.0 and num_streams == 0:
@@ -643,20 +681,16 @@ def get_baseline_stream_analysis(baseline_pipeline=None, result_pipeline=None, p
             logger.error(error_msg)
             result_info.update(
                 {
-                    "total_fps": total_fps,
-                    "num_streams": num_streams,
-                    "per_stream_fps": per_stream_fps,
                     "status": "parse_failed",
                     "error_reason": error_msg,
+                    "metadata": parse_metadata,
                 }
             )
         else:
             result_info.update(
                 {
-                    "total_fps": total_fps,
-                    "num_streams": num_streams,
-                    "per_stream_fps": per_stream_fps,
                     "status": "success",
+                    "metadata": parse_metadata,
                 }
             )
 
@@ -744,9 +778,6 @@ def get_n_stream_analysis_per_device(
 
     # Initialize result structure
     result_info = {
-        "total_fps": 0.0,
-        "num_streams": 0,
-        "per_stream_fps": 0.0,
         "main_process_exit_code": None,
         "result_process_exit_code": None,
         "status": "error",
@@ -785,10 +816,12 @@ def get_n_stream_analysis_per_device(
             )
 
         # Wait for result pipeline to complete
+        timeout_occurred = False
         try:
             pipeline_process.wait(timeout=pipeline_timeout)
         except subprocess.TimeoutExpired:
             logger.warning(f"Warning: Result pipeline process timeout ({pipeline_timeout} seconds), terminating...")
+            timeout_occurred = True
 
             # Use robust termination for both processes
             result_terminated = terminate_process_safely(pipeline_process, "multi-stream result pipeline", timeout=3)
@@ -801,40 +834,88 @@ def get_n_stream_analysis_per_device(
                     "status": "timeout",
                 }
             )
-            return result_info
+            # Don't return immediately - try to parse results first
+            # FPS measurements may have been written before timeout
 
-        # Capture result process information
-        result_info["result_process_exit_code"] = pipeline_process.returncode
-        if pipeline_process.returncode != 0:
-            stderr_output = pipeline_process.stderr.read().decode() if pipeline_process.stderr else "No stderr"
-            logger.error(f"Result pipeline failed with exit code {pipeline_process.returncode}: {stderr_output}")
+        # Capture result process information (if not already set by timeout)
+        if not timeout_occurred:
+            result_info["result_process_exit_code"] = pipeline_process.returncode
+            if pipeline_process.returncode != 0:
+                stderr_output = pipeline_process.stderr.read().decode() if pipeline_process.stderr else "No stderr"
+                logger.error(f"Result pipeline failed with exit code {pipeline_process.returncode}: {stderr_output}")
 
-            # Use robust termination for main process
+                # Use robust termination for main process
+                main_terminated = terminate_process_safely(main_process, "multi-stream main pipeline", timeout=3)
+                result_info["main_process_exit_code"] = main_process.returncode
+                result_info["status"] = "result_failed"
+                return result_info
+
+            # Clean up main process using robust termination
             main_terminated = terminate_process_safely(main_process, "multi-stream main pipeline", timeout=3)
             result_info["main_process_exit_code"] = main_process.returncode
-            result_info["status"] = "result_failed"
-            return result_info
 
-        # Clean up main process using robust termination
-        main_terminated = terminate_process_safely(main_process, "multi-stream main pipeline", timeout=3)
-        result_info["main_process_exit_code"] = main_process.returncode
+            if main_process.returncode is not None and main_process.returncode not in [0, -15]:  # -15 is SIGTERM
+                stderr_output = main_process.stderr.read().decode() if main_process.stderr else "No stderr"
 
-        if main_process.returncode is not None and main_process.returncode not in [0, -15]:  # -15 is SIGTERM
-            stderr_output = main_process.stderr.read().decode() if main_process.stderr else "No stderr"
+                # Check for non-critical GStreamer cleanup issues (exit code -9 with GStreamer warnings)
+                if main_process.returncode == -9 and "GStreamer-WARNING" in stderr_output:
+                    logger.warning("Detected GStreamer issue (SIGKILL -9) - non-critical if results collected")
+                # Check for segmentation fault or longjmp errors
+                elif (
+                    "Segmentation fault" in stderr_output or "longjmp causes uninitialized stack frame" in stderr_output
+                ):
+                    logger.warning("Detected GStreamer issue (segfault/longjmp) - non-critical if results collected")
+                else:
+                    logger.warning(f"Main pipeline exited with code {main_process.returncode}: {stderr_output}")
 
-            # Check for non-critical GStreamer cleanup issues (exit code -9 with GStreamer warnings)
-            if main_process.returncode == -9 and "GStreamer-WARNING" in stderr_output:
-                logger.warning("Detected GStreamer issue (SIGKILL -9) - non-critical if results collected")
-            # Check for segmentation fault or longjmp errors
-            elif "Segmentation fault" in stderr_output or "longjmp causes uninitialized stack frame" in stderr_output:
-                logger.warning("Detected GStreamer issue (segfault/longjmp) - non-critical if results collected")
+        # Parse results - always attempt to extract diagnostic data, even after timeout
+        parse_metadata = parse_result(use_average=True, result_output_path=streams_result_path)
+
+        # Extract values from metadata
+        total_fps = parse_metadata.get("total_fps", 0.0)
+        num_streams = parse_metadata.get("num_streams", 0)
+        per_stream_fps = parse_metadata.get("per_stream_fps", 0.0)
+
+        # Determine final status based on timeout and parsing results
+        if timeout_occurred:
+            # Timeout occurred - results are diagnostic only, NOT valid for qualification
+            if per_stream_fps > 0.0 and num_streams > 0:
+                # We have diagnostic data from incomplete analysis
+                fps_duration = parse_metadata.get("fps_counter_duration", 0.0)
+                parse_source = parse_metadata.get("parse_source", "unknown")
+
+                # Provide concise error message with diagnostic data
+                error_msg = (
+                    f"Pipeline timeout after {pipeline_timeout}s. Diagnostic data: "
+                    f"{num_streams} streams @ {per_stream_fps:.2f} FPS over {fps_duration:.1f}s "
+                    f"(source: FpsCounter({parse_source})). "
+                    f"Check pipeline configuration or increase timeout."
+                )
+                logger.warning(error_msg)
+                result_info.update(
+                    {
+                        "status": "timeout",  # Keep as timeout - not valid for qualification
+                        "error_reason": error_msg,
+                        "metadata": parse_metadata,
+                        "incomplete_analysis": True,
+                    }
+                )
             else:
-                logger.warning(f"Main pipeline exited with code {main_process.returncode}: {stderr_output}")
-
-        total_fps, num_streams, per_stream_fps = parse_result(use_average=True, result_output_path=streams_result_path)
-
-        # Check if parsing was successful
-        if per_stream_fps == 0.0 and num_streams == 0:
+                # Timeout with no diagnostic data - early pipeline failure
+                error_msg = (
+                    f"Pipeline timeout after {pipeline_timeout}s with no FPS data captured. "
+                    f"This indicates early pipeline failure or hang. "
+                    f"Check logs for pipeline initialization errors or device issues."
+                )
+                logger.error(error_msg)
+                result_info.update(
+                    {
+                        "status": "timeout",
+                        "error_reason": error_msg,
+                    }
+                )
+        elif per_stream_fps == 0.0 and num_streams == 0:
+            # No timeout but failed to parse results - pipeline terminated early
             error_msg = (
                 "Failed to parse FPS results. No FpsCounter(average) entries found in output. "
                 "Pipeline may have terminated before gvafpscounter output summary statistics. "
@@ -843,20 +924,16 @@ def get_n_stream_analysis_per_device(
             logger.error(error_msg)
             result_info.update(
                 {
-                    "total_fps": total_fps,
-                    "num_streams": num_streams,
-                    "per_stream_fps": per_stream_fps,
                     "status": "parse_failed",
                     "error_reason": error_msg,
                 }
             )
         else:
+            # Successfully completed analysis without timeout - ONLY valid case
             result_info.update(
                 {
-                    "total_fps": total_fps,
-                    "num_streams": num_streams,
-                    "per_stream_fps": per_stream_fps,
                     "status": "success",
+                    "metadata": parse_metadata,
                 }
             )
 
@@ -920,13 +997,15 @@ def baseline_streams_analysis(
             device_id=device_id,
         )
 
-        per_stream_fps = analysis_result["per_stream_fps"]
+        # Extract from metadata
+        metadata = analysis_result.get("metadata", {})
+        per_stream_fps = metadata.get("per_stream_fps", 0.0)
 
         # Check if baseline analysis was successful
         if per_stream_fps > 0:
             estimated_num_streams = max(int(per_stream_fps / target_fps), 0)
             # Calculate baseline analysis duration
-            analysis_duration = time.time() - analysis_start_time
+            analysis_duration = round(time.time() - analysis_start_time, 2)
             logger.debug(
                 f"\n{'=' * 40}\nBaseline Stream Analysis Completed \n{'=' * 40}"
                 f"\nDevice ID: {device_id}, "
@@ -938,31 +1017,43 @@ def baseline_streams_analysis(
             baseline_num_streams[device_id] = {
                 "per_stream_fps": per_stream_fps,
                 "num_streams": estimated_num_streams,
-                "total_fps": analysis_result.get("total_fps", 0.0),
+                "metadata": metadata,
                 "main_process_exit_code": analysis_result.get("main_process_exit_code"),
                 "result_process_exit_code": analysis_result.get("result_process_exit_code"),
                 "analysis_status": analysis_result.get("status", "unknown"),
                 "analysis_duration": analysis_duration,
             }
         else:
-            analysis_duration = time.time() - analysis_start_time
-            logger.warning(f"Baseline analysis failed for {device_id}: invalid per_stream_fps={per_stream_fps}")
+            analysis_duration = round(time.time() - analysis_start_time, 2)
+            # Determine if this is an error (timeout/failure) or just 0 FPS but ran successfully
+            analysis_status = analysis_result.get("status", "failed")
+            # Only "success" status is valid - timeout indicates incomplete analysis
+            if analysis_status in ["timeout", "error", "parse_failed", "main_failed", "result_failed"]:
+                # Pipeline had errors - use -1 to indicate error
+                num_streams_value = -1
+                logger.warning(
+                    f"Baseline analysis failed for {device_id} due to {analysis_status}: "
+                    f"invalid per_stream_fps={per_stream_fps}"
+                )
+            else:
+                # Pipeline ran but got 0 FPS - use 0 to indicate it ran but didn't work well
+                num_streams_value = 0
+                logger.warning(f"Baseline analysis for {device_id} got 0 FPS (status: {analysis_status})")
             baseline_num_streams[device_id] = {
                 "per_stream_fps": 0.0,
-                "num_streams": 0.0,
-                "total_fps": analysis_result.get("total_fps", 0.0),
+                "num_streams": int(num_streams_value),
+                "metadata": metadata,
                 "main_process_exit_code": analysis_result.get("main_process_exit_code"),
                 "result_process_exit_code": analysis_result.get("result_process_exit_code"),
-                "analysis_status": analysis_result.get("status", "failed"),
+                "analysis_status": analysis_status,
                 "analysis_duration": analysis_duration,
             }
     except Exception as e:
-        analysis_duration = time.time() - analysis_start_time
+        analysis_duration = round(time.time() - analysis_start_time, 2)
         logger.warning(f"Error during baseline stream analysis for {device_id}: {e}")
         baseline_num_streams[device_id] = {
             "per_stream_fps": 0.0,
-            "num_streams": 0.0,
-            "total_fps": 0.0,
+            "num_streams": -1,
             "main_process_exit_code": None,
             "result_process_exit_code": None,
             "analysis_status": "error",
@@ -1022,9 +1113,10 @@ def total_streams_analysis(
             run_id=run_id,
         )
 
-        # Extract values from the analysis result
-        calculated_per_stream_fps = analysis_result["per_stream_fps"]
-        num_streams = analysis_result["num_streams"]
+        # Extract values from metadata
+        metadata = analysis_result.get("metadata", {})
+        calculated_per_stream_fps = metadata.get("per_stream_fps", 0.0)
+        num_streams = metadata.get("num_streams", -1)
 
         # Check if results are valid (non-zero values indicate successful analysis)
         if calculated_per_stream_fps > 0 and num_streams > 0:
@@ -1036,35 +1128,37 @@ def total_streams_analysis(
     except Exception as e:
         logger.error(f"Error during stream analysis for device {device_id}: {e}")
         analysis_result = {
-            "total_fps": 0.0,
-            "num_streams": 0,
-            "per_stream_fps": 0.0,
             "main_process_exit_code": None,
             "result_process_exit_code": None,
             "status": "error",
         }
         calculated_per_stream_fps = 0.0
-        num_streams = 0
+        num_streams = int(-1)
         is_kpi_achieved = False
 
     # Calculate total analysis duration
-    analysis_duration = time.time() - analysis_start_time
+    analysis_duration = round(time.time() - analysis_start_time, 2)
 
-    # Update the current device's results with comprehensive information
+    # Update the current device's results - all FPS data in metadata only
     update_data = {
-        "per_stream_fps": calculated_per_stream_fps,
         "pass": is_kpi_achieved,
-        "num_streams": num_streams,
-        "total_fps": analysis_result.get("total_fps", 0.0),
         "main_process_exit_code": analysis_result.get("main_process_exit_code"),
         "result_process_exit_code": analysis_result.get("result_process_exit_code"),
         "analysis_status": analysis_result.get("status", "unknown"),
         "analysis_duration": analysis_duration,
     }
 
-    # Include error_reason if present (from parse failures)
+    # Include error_reason if present (from parse failures or timeouts)
     if "error_reason" in analysis_result:
         update_data["error_reason"] = analysis_result["error_reason"]
+
+    # Include metadata if present
+    if "metadata" in analysis_result:
+        update_data["metadata"] = analysis_result["metadata"]
+
+    # Include incomplete_analysis flag if present
+    if "incomplete_analysis" in analysis_result:
+        update_data["incomplete_analysis"] = analysis_result["incomplete_analysis"]
 
     results[device_id].update(update_data)
 

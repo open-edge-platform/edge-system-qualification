@@ -1,27 +1,26 @@
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-import json
 import logging
 import os
 from typing import Any, Dict
 
 import pytest
 from esq.suites.ai.vision.src.dlstreamer.execution import (
-    finalize_device_metrics,
-    process_device_results,
-    run_device_test,
-    update_device_pipeline_info,
-    update_final_results_metadata,
-    validate_final_streams_results,
+    run_multi_device_test,
 )
 from esq.suites.ai.vision.src.dlstreamer.preparation import prepare_assets, prepare_baseline
+from esq.suites.ai.vision.src.dlstreamer.results import (
+    update_final_results_metadata,
+)
 
 # Import DLStreamer modular utilities
 from esq.suites.ai.vision.src.dlstreamer.utils import (
     cleanup_stale_containers,
     cleanup_thread_pool,
+    create_device_metrics,
     sort_devices_by_priority,
+    update_metrics_to_error_state,
 )
 
 # Import from sysagent utilities
@@ -62,7 +61,6 @@ def test_dlstreamer(
     devices = configs.get("devices", [])
     timeout = configs.get("timeout", 300)
     pipeline_timeout = configs.get("pipeline_timeout", 180)
-    visualize_stream = configs.get("visualize_stream", False)
     docker_image_tag_analyzer = configs.get(
         "docker_image_tag_analyzer",
         f"{configs.get('docker_image_name_analyzer', 'test-dlstreamer-analyzer')}:"
@@ -75,7 +73,9 @@ def test_dlstreamer(
     )
     docker_container_prefix = configs.get("docker_container_prefix", "test-dlstreamer")
     consecutive_success_threshold = configs.get("consecutive_success_threshold", 1)
-    consecutive_failure_threshold = configs.get("consecutive_failure_threshold", 2)
+    consecutive_failure_threshold = configs.get("consecutive_failure_threshold", 1)
+    consecutive_timeout_threshold = configs.get("consecutive_timeout_threshold", 2)
+    steady_state_confirmation_threshold = configs.get("steady_state_confirmation_threshold", 2)
     max_streams_above_baseline = configs.get("max_streams_above_baseline", 3)
 
     # Setup
@@ -97,17 +97,43 @@ def test_dlstreamer(
     # Verify docker client connection
     docker_client = DockerClient()
 
-    # Get available devices based on device categories
-    logger.info(f"Configured device categories: {devices}")
-    device_dict = get_available_devices_by_category(device_categories=devices)
+    # Check for multi-stage single pipeline mode
+    multi_stage_single_pipeline = configs.get("multi_stage_single_pipeline", False)
 
-    # Extract device IDs to maintain compatibility with existing code
-    device_list = list(device_dict.keys())
-    logger.debug(f"Available devices: {device_dict}")
-    if not device_dict:
-        pytest.fail(f"No available devices found for device categories: {devices}")
+    if multi_stage_single_pipeline:
+        # Special mode: Multi-stage pipeline with different devices per stage
+        # Pipeline is treated as a single unit (not run per-device separately)
+        # The 'devices' param validates that ALL required devices are available
+        # Device property placeholders (${DEVICE_NPU}, ${DEVICE_IGPU}, etc.) are resolved
+        # by the pipeline module based on system configuration
+        logger.info("Multi-stage single pipeline mode enabled")
+        logger.info(f"Validating required device categories: {devices}")
+
+        # Get available devices to validate they exist
+        device_dict = get_available_devices_by_category(device_categories=devices)
+
+        if not device_dict:
+            pytest.fail(f"Multi-stage pipeline requires devices {devices}, but none are available on this system.")
+
+        # In multi-stage mode, use a composite device ID for the entire pipeline
+        # This represents the multi-stage configuration as a single logical device
+        device_list = ["multi_stage"]
+        logger.info(f"Running multi-stage pipeline as single configuration: {device_list}")
+    else:
+        # Standard mode: use ${DEVICE_ID} placeholder, run separately per device
+        # Device property placeholders in pipeline_params are resolved automatically
+        logger.info("Standard mode: using device categories for dynamic device assignment")
+        logger.info(f"Configured device categories: {devices}")
+        device_dict = get_available_devices_by_category(device_categories=devices)
+
+        # Extract device IDs to maintain compatibility with existing code
+        device_list = list(device_dict.keys())
+
+        if not device_dict:
+            pytest.fail(f"No available devices found for device categories: {devices}")
 
     # Log detailed device information
+    logger.debug(f"Available devices: {device_dict}")
     for device_id, device_info in device_dict.items():
         logger.debug(f"Device {device_id}: Type={device_info['device_type']}, Name={device_info['full_name']}")
 
@@ -165,7 +191,6 @@ def test_dlstreamer(
                 "consecutive_success_threshold": consecutive_success_threshold,
                 "consecutive_failure_threshold": consecutive_failure_threshold,
                 "max_streams_above_baseline": max_streams_above_baseline,
-                "visualize_stream": visualize_stream,
                 "type": "baseline_streams",
             }
 
@@ -195,6 +220,38 @@ def test_dlstreamer(
 
             baseline_streams_results.append(result)
 
+            # Check immediately if this baseline analysis failed
+            if not result.metadata.get("status", False):
+                device_id = result.metadata.get("device_id", "Unknown")
+                num_streams = result.metadata.get("num_streams", -1)
+                per_stream_fps = result.metadata.get("per_stream_fps", 0.0)
+                error_msg = result.metadata.get("error", "Unknown error")
+                logger.error(
+                    f"Baseline streams analysis failed for device {device_id}: "
+                    f"num_streams={num_streams}, per_stream_fps={per_stream_fps}, error={error_msg}"
+                )
+
+                # Create failed result with error details using helper function
+                results = Result.from_test_config(
+                    configs=configs,
+                    name=test_name,
+                    parameters={
+                        "Devices": devices,
+                        "Device List": device_list,
+                        "Target FPS": target_fps,
+                    },
+                    metrics=create_device_metrics(device_list),
+                    metadata={
+                        "status": False,
+                        "error": f"Baseline streams analysis failed for device {device_id}",
+                        "failed_device": device_id,
+                        "baseline_error": error_msg,
+                        "num_streams": num_streams,
+                        "per_stream_fps": per_stream_fps,
+                    },
+                )
+                pytest.fail(f"Baseline streams analysis failed for device {device_id}: {error_msg}")
+
         for result in baseline_streams_results:
             if result.metadata.get("status", False):
                 logger.info(
@@ -203,7 +260,14 @@ def test_dlstreamer(
                     f"Num Streams: {result.metadata.get('num_streams', 'N/A')}"
                 )
             else:
-                logger.error(f"Baseline streams analysis failed for device {result.metadata['device_id']}")
+                device_id = result.metadata.get("device_id", "Unknown")
+                num_streams = result.metadata.get("num_streams", -1)
+                per_stream_fps = result.metadata.get("per_stream_fps", 0.0)
+                error_msg = result.metadata.get("error", "Unknown error")
+                logger.error(
+                    f"Baseline streams analysis failed for device {device_id}: "
+                    f"num_streams={num_streams}, per_stream_fps={per_stream_fps}, error={error_msg}"
+                )
 
         # Step 3: Execute test
         qualified_devices: Dict[str, Any] = {}
@@ -267,7 +331,38 @@ def test_dlstreamer(
                 all_metrics["streams_max"] = "streams"
                 logger.debug("Added aggregate streams_max metric")
 
-        metrics = {kpi: Metrics(unit=unit, value=0.0) for kpi, unit in all_metrics.items()}
+        metrics = {kpi: Metrics(unit=unit, value=-1) for kpi, unit in all_metrics.items()}
+
+        # Check if any baseline analysis succeeded
+        baseline_success_count = sum(1 for r in baseline_streams_results if r.metadata.get("status", False))
+        if baseline_success_count == 0:
+            # All baseline analyses failed - create result with error details and fail
+            logger.error("All baseline streams analyses failed. Cannot proceed with test.")
+
+            # Create failed result with error details
+            results = Result.from_test_config(
+                configs=configs,
+                name=test_name,
+                parameters={
+                    "Devices": devices,
+                    "Device List": device_list,
+                    "Target FPS": target_fps,
+                },
+                metrics=metrics,
+                metadata={
+                    "status": False,
+                    "error": "All baseline streams analyses failed",
+                    "failed_devices": {
+                        r.metadata.get("device_id"): {
+                            "num_streams": r.metadata.get("num_streams", -1),
+                            "per_stream_fps": r.metadata.get("per_stream_fps", 0.0),
+                            "error": r.metadata.get("error", "Unknown"),
+                        }
+                        for r in baseline_streams_results
+                    },
+                },
+            )
+            pytest.fail("All baseline streams analyses failed")
 
         # Initialize results template using from_test_config for automatic metadata application
         results = Result.from_test_config(
@@ -291,17 +386,8 @@ def test_dlstreamer(
             },
         )
 
-        # Optimize CPU baseline streams when running multiple devices
+        # Prepare baseline streams dictionary
         baseline_streams = {res.metadata["device_id"]: res.metadata for res in baseline_streams_results}
-        if len(device_list) > 1 and "CPU" in baseline_streams:
-            original_cpu_streams = baseline_streams["CPU"].get("num_streams", 1)
-            optimized_cpu_streams = max(1, original_cpu_streams // 3)  # Scale down by ratio of 3
-
-            if optimized_cpu_streams != original_cpu_streams:
-                logger.info("Optimizing CPU baseline streams for multi-device analysis:")
-                logger.info(f"  Original CPU baseline: {original_cpu_streams} streams")
-                logger.info(f"  Optimized CPU baseline: {optimized_cpu_streams} streams (scaled by 1/3)")
-                baseline_streams["CPU"]["num_streams"] = optimized_cpu_streams
 
         # Sort devices by priority based on baseline streams results using modular function
         sorted_baseline = sort_devices_by_priority(baseline_streams, device_dict)
@@ -311,112 +397,65 @@ def test_dlstreamer(
         # Cleanup before starting the test
         cleanup()
 
-        # Track failed devices with error details
-        failed_devices = {}
+        # Cache configuration for the overall multi-device test
+        overall_cache_configs = {
+            "target_fps": target_fps,
+            "pipeline": pipeline,
+            "pipeline_params": pipeline_params,
+            "consecutive_success_threshold": consecutive_success_threshold,
+            "consecutive_failure_threshold": consecutive_failure_threshold,
+            "consecutive_timeout_threshold": consecutive_timeout_threshold,
+            "steady_state_confirmation_threshold": steady_state_confirmation_threshold,
+            "max_streams_above_baseline": max_streams_above_baseline,
+            "devices": sorted(devices),  # Sort to ensure consistent cache key
+            "device_list": sorted(device_list),  # Include actual detected devices
+            "type": "total_streams_multi_device",
+        }
 
-        # Run total streams analysis for all devices in device_list
-        for device_id in sorted_devices:
-            logger.info(f"\n{'=' * 60}\nProcessing device: {device_id}\n{'=' * 60}")
-            # logger.info(f"Running test for device: {device_id}")
-
-            # Prepare device-specific configurations
-            metric_name = get_metric_name_for_device(device_id, prefix="streams_max")
-            default_metrics = {metric_name: Metrics(unit="streams", value=0.0)}
-
-            # Specific cache configurations for each device
-            cache_configs = {
-                "device_id": device_id,
-                "target_fps": target_fps,
-                "pipeline": pipeline,
-                "pipeline_params": pipeline_params,
-                "consecutive_success_threshold": consecutive_success_threshold,
-                "consecutive_failure_threshold": consecutive_failure_threshold,
-                "max_streams_above_baseline": max_streams_above_baseline,
-                "visualize_stream": visualize_stream,
-                "devices": devices,
-            }
-
-            # Execute test with cache using modular function
-            result = execute_test_with_cache(
-                cached_result=cached_result,
-                cache_result=cache_result,
-                run_test_func=lambda: run_device_test(
-                    docker_client=docker_client,
-                    device_dict=device_dict,
-                    device_id=device_id,
-                    pipeline=pipeline,
-                    pipeline_params=pipeline_params,
-                    docker_image_tag_analyzer=docker_image_tag_analyzer,
-                    docker_container_prefix=docker_container_prefix,
-                    data_dir=data_dir,
-                    container_mnt_dir=container_mnt_dir,
-                    pipeline_timeout=pipeline_timeout,
-                    results_dir=results_dir,
-                    target_fps=target_fps,
-                    num_sockets=num_sockets,
-                    consecutive_success_threshold=consecutive_success_threshold,
-                    consecutive_failure_threshold=consecutive_failure_threshold,
-                    max_streams_above_baseline=max_streams_above_baseline,
-                    qualified_devices=qualified_devices,
-                    metrics=default_metrics,
-                    baseline_streams=baseline_streams.get(device_id, {}),
-                    visualize_stream=visualize_stream,
-                    container_config=container_config,
-                ),
-                test_name=test_name,
+        # Execute the multi-device test with overall caching
+        results = execute_test_with_cache(
+            cached_result=cached_result,
+            cache_result=cache_result,
+            run_test_func=lambda: run_multi_device_test(
+                docker_client=docker_client,
+                device_dict=device_dict,
+                sorted_devices=sorted_devices,
+                device_list=device_list,
+                pipeline=pipeline,
+                pipeline_params=pipeline_params,
+                docker_image_tag_analyzer=docker_image_tag_analyzer,
+                docker_container_prefix=docker_container_prefix,
+                data_dir=data_dir,
+                container_mnt_dir=container_mnt_dir,
+                pipeline_timeout=pipeline_timeout,
+                results_dir=results_dir,
+                target_fps=target_fps,
+                num_sockets=num_sockets,
+                consecutive_success_threshold=consecutive_success_threshold,
+                consecutive_failure_threshold=consecutive_failure_threshold,
+                consecutive_timeout_threshold=consecutive_timeout_threshold,
+                steady_state_confirmation_threshold=steady_state_confirmation_threshold,
+                max_streams_above_baseline=max_streams_above_baseline,
+                baseline_streams=baseline_streams,
+                container_config=container_config,
                 configs=configs,
-                cache_configs=cache_configs,
-                name=f"Total streams analysis for device {device_id}",
-            )
-
-            if result.metadata.get("status", False):
-                # If the result is from cache, update qualified_devices accordingly
-                device_streams = result.metrics[metric_name].value
-                stream_fps = result.metadata.get("Per Stream FPS", 0)
-                dev_type = None
-                if device_id in device_dict:
-                    dev_type = device_dict[device_id]["device_type"]
-
-                device_result = {
-                    "device_type": dev_type,
-                    "num_streams": device_streams,
-                    "per_stream_fps": stream_fps,
-                    "pass": True,
-                }
-                qualified_devices[device_id] = device_result
-
-                logger.debug(f"[before update] DL Streamer Test results: {json.dumps(results.to_dict(), indent=2)}")
-                logger.info(f"Device {device_id} qualified with {device_streams} streams at {stream_fps:.2f} FPS")
-            else:
-                error_reason = result.metadata.get("error", "Unknown error")
-                logger.error(f"Test failed for device {device_id}: {error_reason}")
-                # Store failed device information for error reporting
-                failed_devices[device_id] = {"error_reason": error_reason, "num_streams": 0, "pass": False}
-                continue
-
-        # Process device results using modular function
-        process_device_results(device_list, qualified_devices, results)
-
-        # Finalize device metrics using modular function
-        finalize_device_metrics(results, qualified_devices, device_list)
-
-        # Validate final streams results using modular function
-        validate_final_streams_results(results, qualified_devices, device_list, failed_devices)
-
-        # Update pipeline information for qualified devices using modular function
-        update_device_pipeline_info(results, qualified_devices, pipeline, pipeline_params, device_dict)
-
-        # Update final results metadata using modular function
-        update_final_results_metadata(
-            results,
-            qualified_devices,
-            device_list,
-            baseline_streams_results,
-            requested_device_categories=devices,
-            target_fps=target_fps,
+                test_name=test_name,
+                devices=devices,
+                timeout=timeout,
+                test_display_name=test_display_name,
+                metrics=metrics,
+                baseline_streams_results=baseline_streams_results,
+            ),
+            test_name=test_name,
+            configs=configs,
+            cache_configs=overall_cache_configs,
+            name="Multi-device total streams analysis",
         )
 
-        logger.debug(f"DL Streamer Test results: {json.dumps(results.to_dict(), indent=2)}")
+        # Extract qualified_devices from extended_metadata for downstream processing
+        qualified_devices = results.extended_metadata.get("qualified_devices", {})
+
+        logger.info(f"Multi-device test completed with {len(qualified_devices)} qualified devices")
 
         # Check if test failed and store failure info
         if not results.metadata.get("status", False):
@@ -456,6 +495,16 @@ def test_dlstreamer(
         test_interrupted = True
         logger.error(failure_message)
 
+        # Ensure metrics are set to -1 to indicate interrupted/error state
+        if results is not None:
+            # Set all stream metrics to -1 to indicate interruption
+            update_metrics_to_error_state(results.metrics, value=-1, filter_prefix="streams_max")
+
+            # Mark as failed with interrupt error
+            results.metadata["status"] = False
+            results.metadata["error"] = failure_message
+            results.metadata["Target FPS"] = target_fps
+
         if results is not None and baseline_streams_results:
             try:
                 update_final_results_metadata(
@@ -487,7 +536,8 @@ def test_dlstreamer(
                 all_metrics = {}
                 for kpi in current_kpi_refs:
                     all_metrics[kpi] = get_kpi_config(kpi).get("unit", "")
-            metrics = {kpi: Metrics(unit=unit, value=0.0) for kpi, unit in all_metrics.items()}
+            # Use -1 to indicate error/interrupted state
+            metrics = {kpi: Metrics(unit=unit, value=-1) for kpi, unit in all_metrics.items()}
 
             results = Result.from_test_config(
                 configs=configs,
@@ -504,6 +554,9 @@ def test_dlstreamer(
         else:
             results.metadata["status"] = False
             results.metadata["error"] = str(e)
+            results.metadata["Target FPS"] = target_fps
+            # Set all stream metrics to -1 to indicate error state
+            update_metrics_to_error_state(results.metrics, value=-1, filter_prefix="streams_max")
 
         if results is not None and baseline_streams_results:
             try:

@@ -2,8 +2,8 @@
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-name: "profile.suite.ai.vision"
-description: "Vision AI suite profile"
+name: "profile.suite.ai.vision-light"
+description: "Vision AI suite profile - Light"
 version: "1.0.0"
 params:
   labels:
@@ -31,7 +31,7 @@ params:
       height: 1080
       fps: 30
       codec: "h265"
-      loop: 30 # Loop to achieve ~30s duration
+      loop: 120 # Loop to achieve ~120s duration
     - id: "yolo11n"
       type: "model"
       source: "ultralytics"
@@ -59,6 +59,7 @@ params:
       sha256: "27195581b907f35669ff7a127a7a6c3d0779e2c8240c889e0e7441c1c6f4a5ce"
       path: "./models/resnet-50/resnet-50-optimized.json"
   target_fps: 28.5
+  pipeline_timeout: 180
   pipeline: |
     filesrc location=./videos/18856748-bears_1920_1080_30fps_30s.h265
       ! ${DECODE_ELEMENTS}
@@ -84,36 +85,34 @@ params:
       ! queue
   pipeline_params:
     DECODE_ELEMENTS:
+      default: "h265parse ! avdec_h265 ! capsfilter caps='video/x-raw'"
       cpu: "h265parse ! avdec_h265 ! capsfilter caps='video/x-raw'"
-      gpu_integrated: "h265parse ! vah265dec ! capsfilter caps='video/x-raw(memory:VAMemory)'"
-      gpu_discrete: "h265parse ! varenderD{RENDER_DEVICE_NUM}h265dec ! capsfilter caps='video/x-raw(memory:VAMemory)'"
-      gpu_discrete_primary: "h265parse ! vah265dec ! capsfilter caps='video/x-raw(memory:VAMemory)'"
       npu: "h265parse ! vah265dec ! capsfilter caps='video/x-raw(memory:VAMemory)'"
+      igpu: "h265parse ! vah265dec ! capsfilter caps='video/x-raw(memory:VAMemory)'"
+      igpu_indexed: "h265parse ! vah265dec ! capsfilter caps='video/x-raw(memory:VAMemory)'"
+      dgpu: "h265parse ! varenderD{RENDER_DEVICE_NUM}h265dec ! capsfilter caps='video/x-raw(memory:VAMemory)'"
+      dgpu_primary: "h265parse ! vah265dec ! capsfilter caps='video/x-raw(memory:VAMemory)'"
+      dgpu_indexed: "h265parse ! varenderD{RENDER_DEVICE_NUM}h265dec ! capsfilter caps='video/x-raw(memory:VAMemory)'"
     INFERENCE_ELEMENTS:
-      cpu: "pre-process-backend={PRE_PROCESS_BACKEND} nireq=2 ie-config=NUM_STREAMS=2"
-      gpu_integrated: "pre-process-backend={PRE_PROCESS_BACKEND} nireq=2 ie-config=NUM_STREAMS=2"
-      gpu_discrete: "pre-process-backend={PRE_PROCESS_BACKEND} nireq=2 ie-config=NUM_STREAMS=2"
-      gpu_discrete_primary: "pre-process-backend={PRE_PROCESS_BACKEND} nireq=2 ie-config=NUM_STREAMS=2"
-      npu: "pre-process-backend={PRE_PROCESS_BACKEND} nireq=4"
-    PRE_PROCESS_BACKEND:
-      cpu: "opencv"
-      gpu_integrated: "va-surface-sharing"
-      gpu_discrete: "va-surface-sharing"
-      gpu_discrete_primary: "va-surface-sharing"
-      npu: "opencv"
-    VIDEO_RAW_TYPE:
-      default: "'video/x-raw(memory:VAMemory)'"
-      overrides:
-        FULL_DEVICE_NAME:
-          "Intel(R) Unsupported video type": "'video/x-raw'"
+      default: "pre-process-backend=opencv nireq=2 ie-config=NUM_STREAMS=2"
+      cpu: "pre-process-backend=opencv nireq=2 ie-config=NUM_STREAMS=2"
+      npu: "pre-process-backend=opencv nireq=4"
+      igpu: "pre-process-backend=va-surface-sharing nireq=2 ie-config=NUM_STREAMS=2"
+      igpu_indexed: "pre-process-backend=va-surface-sharing nireq=2 ie-config=NUM_STREAMS=2"
+      dgpu: "pre-process-backend=va-surface-sharing nireq=2 ie-config=NUM_STREAMS=2"
+      dgpu_primary: "pre-process-backend=va-surface-sharing nireq=2 ie-config=NUM_STREAMS=2"
+      dgpu_indexed: "pre-process-backend=va-surface-sharing nireq=2 ie-config=NUM_STREAMS=2"
     BATCH_SIZE:
+      default: "1"
       cpu: "1"
-      gpu_integrated: "8"
-      gpu_discrete: "8"
-      gpu_discrete_primary: "8"
       npu: "1"
-    SYNC:
-      default: "true"
+      igpu: "8"
+      igpu_indexed: "8"
+      dgpu: "8"
+      dgpu_primary: "8"
+      dgpu_indexed: "8"
+    SINK_ELEMENT:
+      default: "fakesink sync=true"
     FPSCOUNTER_PROPS:
       default: "starting-frame=2000"
 
@@ -125,28 +124,29 @@ suites:
         tests:
           test_dlstreamer:
             params:
-              - test_id: "VSN-DLS-001"
-                display_name: "DL Streamer Benchmark - multi-stream 1080p30 H.265 gvadetect YOLO11n INT8 gvatrack gvaclassify ResNet50 INT8"
+              - test_id: "VSN-LGT-001"
+                display_name: "DL Streamer Analysis - multi-stream 1080p30 H.265 gvadetect YOLO11n INT8 gvatrack gvaclassify ResNet50 INT8"
                 devices: [cpu, igpu, dgpu, npu]
 
-              - test_id: "VSN-DLS-002"
-                display_name: "DL Streamer Benchmark - multi-stream 1080p30 H.265 gvadetect YOLO11n INT8 gvatrack gvaclassify ResNet50 INT8 (CPU)"
+              - test_id: "VSN-LGT-002"
+                display_name: "DL Streamer Analysis - multi-stream 1080p30 H.265 gvadetect YOLO11n INT8 gvatrack gvaclassify ResNet50 INT8 (CPU)"
                 devices: [cpu]
 
-              - test_id: "VSN-DLS-003"
-                display_name: "DL Streamer Benchmark - multi-stream 1080p30 H.265 gvadetect YOLO11n INT8 gvatrack gvaclassify ResNet50 INT8 (iGPU)"
+              - test_id: "VSN-LGT-003"
+                display_name: "DL Streamer Analysis - multi-stream 1080p30 H.265 gvadetect YOLO11n INT8 gvatrack gvaclassify ResNet50 INT8 (iGPU)"
                 devices: [igpu]
                 requirements:
                   igpu_required: true
 
-              - test_id: "VSN-DLS-004"
-                display_name: "DL Streamer Benchmark - multi-stream 1080p30 H.265 gvadetect YOLO11n INT8 gvatrack gvaclassify ResNet50 INT8 (dGPU)"
+              - test_id: "VSN-LGT-004"
+                display_name: "DL Streamer Analysis - multi-stream 1080p30 H.265 gvadetect YOLO11n INT8 gvatrack gvaclassify ResNet50 INT8 (dGPU)"
                 devices: [dgpu]
                 requirements:
                   dgpu_required: true
 
-              - test_id: "VSN-DLS-005"
-                display_name: "DL Streamer Benchmark - multi-stream 1080p30 H.265 gvadetect YOLO11n INT8 gvatrack gvaclassify ResNet50 INT8 (NPU)"
+              - test_id: "VSN-LGT-005"
+                display_name: "DL Streamer Analysis - multi-stream 1080p30 H.265 gvadetect YOLO11n INT8 gvatrack gvaclassify ResNet50 INT8 (NPU)"
                 devices: [npu]
                 requirements:
                   npu_required: true
+            

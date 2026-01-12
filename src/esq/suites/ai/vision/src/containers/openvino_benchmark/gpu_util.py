@@ -3,7 +3,7 @@
 
 import json
 import re
-import subprocess  # nosec B404
+import subprocess  # nosec B404 # For GPU device detection (intel_gpu_top)
 
 
 def _get_device_type(device_id):

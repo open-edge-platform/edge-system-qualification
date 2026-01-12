@@ -547,7 +547,7 @@ def _run_proxy_pipeline_container(
         # Execute xauth command using explicit pipeline without shell=True
         # Chain three processes: xauth nlist | sed | xauth nmerge
         # Inputs are sanitized above to prevent command injection
-        import subprocess  # nosec B404 - subprocess needed for xauth pipeline
+        import subprocess  # nosec B404 # For xauth pipeline
 
         p1 = None
         p2 = None
@@ -636,12 +636,12 @@ def _run_proxy_pipeline_container(
     for device_id, device_info in device_dict.items():
         device_type = device_info.get("device_type")
         canonical_name = normalize_device_name(device_id, device_type)
-        
+
         # If discrete GPU, add sequential index
         if canonical_name == "dGPU":
             canonical_name = f"dGPU.{dgpu_index}"
             dgpu_index += 1
-        
+
         device_args.append(canonical_name)
         logger.debug(f"Device {device_id} (Type={device_type}) mapped to {canonical_name}")
 
@@ -681,7 +681,7 @@ def _run_proxy_pipeline_container(
             environment=environment,
             user="root:root",  # Run as root for GPU access
             group_add=[render_gid, user_gid],
-            privileged=True,  # Required for GPU access and benchmarking
+            privileged=True,  # validation-skip-privileged # Required for GPU access and benchmarking
             network_mode="host",  # Required for inter-process communication
             ipc_mode="host",  # Required for shared memory
             working_dir="/home/dlstreamer",
@@ -1269,12 +1269,18 @@ def test_proxy_pipelines(
                                                         fps_values.append(float(match.group(1)))
 
                                                 # Use Best Average FPS if available, otherwise use last FPS
-                                                final_fps = best_fps if best_fps is not None else (fps_values[-1] if fps_values else None)
+                                                final_fps = (
+                                                    best_fps
+                                                    if best_fps is not None
+                                                    else (fps_values[-1] if fps_values else None)
+                                                )
 
                                                 if final_fps is not None:
                                                     result.metrics["avg_fps"].value = final_fps
                                                     result.metrics["avg_fps"].unit = "fps"
-                                                    source = "Best Average FPS" if best_fps is not None else "last FPS value"
+                                                    source = (
+                                                        "Best Average FPS" if best_fps is not None else "last FPS value"
+                                                    )
                                                     logger.info(
                                                         f"Extracted avg_fps={final_fps} "
                                                         f"from {log_filename} ({source}, found "

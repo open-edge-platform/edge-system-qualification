@@ -7,7 +7,7 @@ import logging
 import os
 import re
 import shutil
-import subprocess  # nosec B404
+import subprocess  # nosec B404 # For benchmark telemetry (lscpu, intel_gpu_top)
 import sys
 import threading
 import time
@@ -258,11 +258,13 @@ def eval_dgpu_power(dgpu_file):
 
     # Convert 'GPU Power (W)' column to numeric, replacing N/A with NaN
     if "GPU Power (W)" in dgpu_power_df.columns:
-        dgpu_power_df["GPU Power (W)"] = pd.to_numeric(dgpu_power_df["GPU Power (W)"], errors='coerce')
+        dgpu_power_df["GPU Power (W)"] = pd.to_numeric(dgpu_power_df["GPU Power (W)"], errors="coerce")
 
         # Check if all values are NaN (all N/A values)
         if dgpu_power_df["GPU Power (W)"].isna().all():
-            logging.warning(f"All dGPU power values are N/A in {dgpu_file} - power monitoring may not be supported on this platform")
+            logging.warning(
+                f"All dGPU power values are N/A in {dgpu_file} - power monitoring may not be supported on this platform"
+            )
             return None
 
     return dgpu_power_df
@@ -530,10 +532,10 @@ def _select_best_dgpu(dgpu_candidates):
     sorted_candidates = sorted(
         dgpu_candidates,
         key=lambda x: (
-            -x['freq_avg'],           # Higher frequency is better (negate for DESC)
-            x['freq_stddev'],         # Lower stddev is better (ASC)
-            -x['utilization_avg']     # Higher utilization is better (negate for DESC)
-        )
+            -x["freq_avg"],  # Higher frequency is better (negate for DESC)
+            x["freq_stddev"],  # Lower stddev is better (ASC)
+            -x["utilization_avg"],  # Higher utilization is better (negate for DESC)
+        ),
     )
 
     best = sorted_candidates[0]
@@ -541,7 +543,7 @@ def _select_best_dgpu(dgpu_candidates):
     # Log selection details
     logging.info(f"Multiple dGPUs detected: {len(dgpu_candidates)} devices")
     for i, candidate in enumerate(sorted_candidates):
-        rank_label = "SELECTED" if i == 0 else f"Rank {i+1}"
+        rank_label = "SELECTED" if i == 0 else f"Rank {i + 1}"
         logging.info(
             f"  [{rank_label}] {candidate['device']}: "
             f"freq_avg={candidate['freq_avg']:.2f} GHz, "
@@ -584,13 +586,15 @@ def _eval_gpu_telemetry(out_result):
                 # Validate metrics before adding candidate
                 # Filter out invalid data: freq_avg <= 0.01 GHz (10 MHz) indicates no valid data
                 if freq_avg > 0.01:
-                    dgpu_candidates.append({
-                        "device": rd_name,
-                        "metrics": gpu_rst,
-                        "freq_avg": freq_avg,
-                        "freq_stddev": freq_stddev,
-                        "utilization_avg": utilization_avg
-                    })
+                    dgpu_candidates.append(
+                        {
+                            "device": rd_name,
+                            "metrics": gpu_rst,
+                            "freq_avg": freq_avg,
+                            "freq_stddev": freq_stddev,
+                            "utilization_avg": utilization_avg,
+                        }
+                    )
                     logging.debug(
                         f"Collected dGPU candidate {rd_name}: "
                         f"freq_avg={freq_avg:.2f}, freq_stddev={freq_stddev:.4f}, util={utilization_avg:.2f}%"
@@ -611,9 +615,7 @@ def _eval_gpu_telemetry(out_result):
             # Add metadata for visibility
             gpu_usage["dgpu_device_id"] = best_dgpu["device"]
             gpu_usage["dgpu_count"] = len(dgpu_candidates)
-            logging.info(
-                f"Selected dGPU: {best_dgpu['device']} (out of {len(dgpu_candidates)} available)"
-            )
+            logging.info(f"Selected dGPU: {best_dgpu['device']} (out of {len(dgpu_candidates)} available)")
     else:
         # No valid dGPU candidates found (all had invalid metrics)
         # This can happen when intel_gpu_top returns all zeros

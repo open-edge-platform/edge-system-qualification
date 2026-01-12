@@ -18,7 +18,7 @@ apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install OpenVINO inside the container
 if [ -f /home/dlstreamer/dlstreamer/scripts/install_dependencies/install_openvino.sh ]; then \
-   # shellcheck disable=SC1091
+   # shellcheck disable=SC1091 # DLStreamer install script path not available at static analysis time
    source /home/dlstreamer/dlstreamer/scripts/install_dependencies/install_openvino.sh && \
    ov_dir=$(find /opt/intel -maxdepth 1 -type d -name "openvino_*" | sort -r | head -n 1) && \
    if [ -n "$ov_dir" ]; then \

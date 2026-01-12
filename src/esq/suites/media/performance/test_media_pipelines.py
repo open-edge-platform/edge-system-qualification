@@ -385,7 +385,7 @@ def _run_media_container(
             environment=environment,
             user="root:root",  # Run as root for GPU access
             group_add=[render_gid, user_gid],
-            privileged=True,  # Required for GPU access and benchmarking
+            privileged=True,  # validation-skip-privileged # Required for GPU access and benchmarking
             network_mode="host",  # Required for inter-process communication
             ipc_mode="host",  # Required for shared memory
             working_dir="/home/dlstreamer",
@@ -702,19 +702,19 @@ def test_media_pipelines(
                     logger.info(
                         f"Device {device_id}: Type={device_info['device_type']}, Name={device_info['full_name']}"
                     )
-                    
+
                     # Use common utility to normalize device name
                     device_type = device_info.get("device_type")
                     canonical_name = normalize_device_name(device_id, device_type)
-                    
+
                     # If discrete GPU, add sequential index
                     if canonical_name == "dGPU":
                         canonical_name = f"dGPU.{dgpu_index}"
                         dgpu_index += 1
-                    
+
                     device_canonical_map[device_id] = canonical_name
                     logger.debug(f"Device {device_id} (Type={device_type}) mapped to {canonical_name}")
-                
+
                 for device_id, device_info in device_dict.items():
                     canonical_device_name = device_canonical_map[device_id]
 

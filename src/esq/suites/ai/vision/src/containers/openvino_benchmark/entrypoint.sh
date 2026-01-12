@@ -20,7 +20,7 @@ echo "[INFO] Using OpenVINO from: $OPENVINO_DIR"
 
 # Source OpenVINO environment
 if [ -f "$OPENVINO_DIR/setupvars.sh" ]; then
-	# shellcheck disable=SC1091
+	# shellcheck disable=SC1091 # OpenVINO path not available at static analysis time
 	source "$OPENVINO_DIR/setupvars.sh"
 else
     echo "[ERROR] OpenVINO setupvars.sh not found at: $OPENVINO_DIR/setupvars.sh"

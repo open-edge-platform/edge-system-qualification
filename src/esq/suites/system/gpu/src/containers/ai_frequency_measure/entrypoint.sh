@@ -6,7 +6,7 @@
 args=("$@")
 
 if [ -f /opt/intel/openvino/setupvars.sh ]; then
-	# shellcheck disable=SC1091
+	# shellcheck disable=SC1091 # OpenVINO path not available at static analysis time
 	source /opt/intel/openvino/setupvars.sh
 else
     echo "[WARNING] OpenVINO setupvars.sh not found in container. Did you mount it?"

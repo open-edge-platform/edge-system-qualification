@@ -1,16 +1,15 @@
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-import os
-import sys
 import csv
-import subprocess   #nosec B404
-import re
-import time
-import signal
-import shlex
-from pathlib import Path
 import logging
+import os
+import re
+import shlex
+import signal
+import subprocess  # nosec B404 # For GPU detection and OpenVINO benchmark execution
+import time
+from pathlib import Path
 
 CURR_DIR = os.path.dirname(os.path.abspath(__file__))
 OUTPUT_DIR = Path(f"{CURR_DIR}/output").resolve()
@@ -317,9 +316,10 @@ def is_intel_xeon():
         logging.error(f"Error reading /proc/cpuinfo: {e}")
         return False
 
+
 def get_device_ids_and_drm_info():
     result = {}
-    #if is_intel_xeon():
+    # if is_intel_xeon():
     #    return result
 
     lsgpu_result = subprocess.run(["lsgpu", "-n"], stdout=subprocess.PIPE, text=True)
@@ -372,6 +372,7 @@ def count_gpu_unit_count(drm_path, unit_name="VCS", duration=3):
 
     return vcs_count
 
+
 def get_device_id_by_gpu_index(index):
     lsgpu_result = subprocess.run(["lsgpu", "-n"], stdout=subprocess.PIPE, text=True)
     output = lsgpu_result.stdout
@@ -387,6 +388,7 @@ def get_device_id_by_gpu_index(index):
         return render_to_info[render]
     else:
         return None
+
 
 def get_ref_platform_and_value(my_gpu_info, model, precision, batch_size, device):
     contain_dgpu = False

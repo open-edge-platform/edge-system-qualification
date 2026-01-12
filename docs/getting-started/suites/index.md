@@ -16,11 +16,13 @@ Intel® ESQ provides a comprehensive collection of test suites to assess and qua
         - [Loss Prevention](#loss-prevention)
 - [Horizontal](#horizontal)
     - [Generative AI](#generative-ai)
-    - [Vision AI - Edge Workloads and Benchmarks Pipelines - Light](#vision-ai---edge-workloads-and-benchmarks-pipelines---light)
-    - [Vision AI - Verified Reference Blueprints](#vision-ai---verified-reference-blueprints)
-    - [Vision AI - OpenVINO](#vision-ai---openvino)
+    - [Vision AI](#vision-ai)
+        - [DL Streamer Analysis - Multi-Stream Pipelines With Multiple AI Stages](#dl-streamer-analysis---multi-stream-pipelines-with-multiple-ai-stages)
+        - [DL Streamer Analysis - Verified Reference Blueprints](#verified-reference-blueprints)
+        - [OpenVINO](#openvino)
     - [System GPU - OpenVINO](#system-gpu---openvino)
     - [System Memory - STREAM](#system-memory---stream)
+    - [Media Performance](#media-performance)
 
 
 ---
@@ -37,11 +39,12 @@ Quick reference of all available test suites and their profile names.
 | `profile.vertical.retail-asc` | Vertical | Retail Automated Self-Checkout | `esq run --profile profile.vertical.retail-asc` |
 | `profile.vertical.retail-lp` | Vertical | Retail Loss Prevention | `esq run --profile profile.vertical.retail-lp` |
 | `profile.suite.ai.gen` | Horizontal | Gen AI profile | `esq run --profile profile.suite.ai.gen` |
-| `profile.suite.ai.vision-light` | Horizontal | Vision AI profile - Edge Workloads and Benchmarks Pipelines - Light | `esq run --profile profile.suite.ai.vision-light` |
+| `profile.suite.ai.vision-light` | Horizontal | DL Streamer Analysis - Multi-Stream Pipelines With Multiple AI Stages | `esq run --profile profile.suite.ai.vision-light` |
 | `profile.suite.ai.vision-ov` | Horizontal | OpenVINO Benchmark - Measures raw inference performance using OpenVINO Runtime API | `esq run --profile profile.suite.ai.vision-ov` |
 | `profile.suite.ai.vision-vrb` | Horizontal | Vision AI profile - Verified Reference Blueprints | `esq run --profile profile.suite.ai.vision-vrb` |
 | `profile.suite.system.gpu-ov` | Horizontal | System GPU Performance using OpenVINO benchmark | `esq run --profile profile.suite.system.gpu-ov` |
 | `profile.suite.system.memory-stream` | Horizontal | System Memory Performance using STREAM benchmark | `esq run --profile profile.suite.system.memory-stream` |
+| `profile.suite.media.performance-pipelines` | Horizontal | Media Performance | `esq run --profile profile.suite.media.performance-pipelines` |
 
 **List all available profiles**:
 ```bash
@@ -239,7 +242,8 @@ esq run --profile profile.suite.ai.gen
 
 ---
 
-### Vision AI - Edge Workloads and Benchmarks Pipelines - Light
+### Vision AI
+#### DL Streamer Analysis - Multi-Stream Pipelines With Multiple AI Stages
 
 **Profile**: `profile.suite.ai.vision-light`
 
@@ -260,7 +264,7 @@ esq run --profile profile.suite.ai.vision-light
 
 ---
 
-### Vision AI - Verified Reference Blueprints
+#### Verified Reference Blueprints
 
 **Profile**: `profile.suite.ai.vision-vrb`
 
@@ -281,7 +285,7 @@ esq run --profile profile.suite.ai.vision-vrb
 
 ---
 
-### Vision AI - OpenVINO
+#### OpenVINO
 
 **Profile**: `profile.suite.ai.vision-ov`
 
@@ -355,4 +359,46 @@ esq run --profile profile.suite.system.gpu-ov
 **Run this profile**:
 ```bash
 esq run --profile profile.suite.system.memory-stream
+```
+
+### Media Performance
+**Profile**: `profile.suite.media.performance-pipelines`
+
+<details markdown="1">
+<summary><b>Test Cases</b> (click to expand)</summary>
+
+| Test ID | Test Case |
+|---------|-----------| 
+| MDA-DEC-001 | Media Decode 4Mbps H.264 1080p@30 (iGPU) |
+| MDA-DEC-002 | Media Decode 16Mbps H.264 4k@30 (iGPU) |
+| MDA-DEC-003 | Media Decode 4Mbps H.264 1080p@30 (dGPU) |
+| MDA-DEC-004 | Media Decode 16Mbps H.264 4k@30 (dGPU) |
+| MDA-DEC-005 | Media Decode 2Mbps H.265 1080p@30 (iGPU) |
+| MDA-DEC-006 | Media Decode 8Mbps H.265 4k@30 (iGPU) |
+| MDA-DEC-007 | Media Decode 2Mbps H.265 1080p@30 (dGPU)|
+| MDA-DEC-008 | Media Decode 8Mbps H.265 4k@30 (dGPU) |
+| MDA-COMP-001 | Media Decode + Compose 4Mbps H.264 1080p@30 (iGPU) |
+| MDA-COMP-002 | Media Decode + Compose 16Mbps H.264 4k@30 (iGPU) |
+| MDA-COMP-003 | Media Decode + Compose 2Mbps H.265 1080p@30 (iGPU) |
+| MDA-COMP-004 | Media Decode + Compose 8Mbps H.265 4k@30 (iGPU) |
+| MDA-COMP-005 | Media Decode + Compose 4Mbps H.264 1080p@30 (dGPU) |
+| MDA-COMP-006 | Media Decode + Compose 16Mbps H.264 4k@30 (dGPU) |
+| MDA-COMP-007 | Media Decode + Compose 2Mbps H.265 1080p@30 (dGPU) |
+| MDA-COMP-008 | Media Decode + Compose 8Mbps H.265 4k@30 (dGPU) |
+| MDA-ENC-001 | Media Encode 4Mbps H.264 1080p@30 (iGPU) |
+| MDA-ENC-002 | Media Encode 16Mbps H.264 4k@30 (iGPU) |
+| MDA-ENC-003 | Media Encode 4Mbps H.264 1080p@30 (dGPU) |
+| MDA-ENC-004 | Media Encode 16Mbps H.264 4k@30 (dGPU) |
+| MDA-ENC-005 | Media Encode 2Mbps H.265 1080p@30 (iGPU) |
+| MDA-ENC-006 | Media Encode 8Mbps H.265 4k@30 (iGPU) |
+| MDA-ENC-007 | Media Encode 2Mbps H.265 1080p@30 (dGPU) |
+| MDA-ENC-008 | Media Encode 8Mbps H.265 4k@30 (dGPU) |
+
+</details>
+
+<br>
+
+**Run this profile**:
+```bash
+esq run --profile profile.suite.media.performance-pipelines
 ```

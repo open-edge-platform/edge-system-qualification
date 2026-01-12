@@ -1084,10 +1084,22 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#vision-ai-edge-workloads-and-benchmarks-pipelines-light" class="md-nav__link">
+  <a href="#vision-ai" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Vision AI - Edge Workloads and Benchmarks Pipelines - Light
+        Vision AI
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Vision AI">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#dl-streamer-analysis-multi-stream-pipelines-with-multiple-ai-stages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DL Streamer Analysis - Multi-Stream Pipelines With Multiple AI Stages
       
     </span>
   </a>
@@ -1095,10 +1107,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#vision-ai-verified-reference-blueprints" class="md-nav__link">
+  <a href="#verified-reference-blueprints" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Vision AI - Verified Reference Blueprints
+        Verified Reference Blueprints
       
     </span>
   </a>
@@ -1106,13 +1118,18 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#vision-ai-openvino" class="md-nav__link">
+  <a href="#openvino" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Vision AI - OpenVINO
+        OpenVINO
       
     </span>
   </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -1132,6 +1149,17 @@
     <span class="md-ellipsis">
       
         System Memory - STREAM
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#media-performance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Media Performance
       
     </span>
   </a>
@@ -1198,11 +1226,15 @@
 </li>
 <li><a href="#horizontal">Horizontal</a><ul>
 <li><a href="#generative-ai">Generative AI</a></li>
-<li><a href="#vision-ai---edge-workloads-and-benchmarks-pipelines---light">Vision AI - Edge Workloads and Benchmarks Pipelines - Light</a></li>
-<li><a href="#vision-ai---verified-reference-blueprints">Vision AI - Verified Reference Blueprints</a></li>
-<li><a href="#vision-ai---openvino">Vision AI - OpenVINO</a></li>
+<li><a href="#vision-ai">Vision AI</a><ul>
+<li><a href="#dl-streamer-analysis---multi-stream-pipelines-with-multiple-ai-stages">DL Streamer Analysis - Multi-Stream Pipelines With Multiple AI Stages</a></li>
+<li><a href="#verified-reference-blueprints">DL Streamer Analysis - Verified Reference Blueprints</a></li>
+<li><a href="#openvino">OpenVINO</a></li>
+</ul>
+</li>
 <li><a href="#system-gpu---openvino">System GPU - OpenVINO</a></li>
 <li><a href="#system-memory---stream">System Memory - STREAM</a></li>
+<li><a href="#media-performance">Media Performance</a></li>
 </ul>
 </li>
 </ul>
@@ -1258,7 +1290,7 @@
 <tr>
 <td><code>profile.suite.ai.vision-light</code></td>
 <td>Horizontal</td>
-<td>Vision AI profile - Edge Workloads and Benchmarks Pipelines - Light</td>
+<td>DL Streamer Analysis - Multi-Stream Pipelines With Multiple AI Stages</td>
 <td><code>esq run --profile profile.suite.ai.vision-light</code></td>
 </tr>
 <tr>
@@ -1284,6 +1316,12 @@
 <td>Horizontal</td>
 <td>System Memory Performance using STREAM benchmark</td>
 <td><code>esq run --profile profile.suite.system.memory-stream</code></td>
+</tr>
+<tr>
+<td><code>profile.suite.media.performance-pipelines</code></td>
+<td>Horizontal</td>
+<td>Media Performance</td>
+<td><code>esq run --profile profile.suite.media.performance-pipelines</code></td>
 </tr>
 </tbody>
 </table>
@@ -1708,7 +1746,8 @@
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>esq<span class="w"> </span>run<span class="w"> </span>--profile<span class="w"> </span>profile.suite.ai.gen
 </span></code></pre></div></p>
 <hr />
-<h3 id="vision-ai-edge-workloads-and-benchmarks-pipelines-light">Vision AI - Edge Workloads and Benchmarks Pipelines - Light<a class="headerlink" href="#vision-ai-edge-workloads-and-benchmarks-pipelines-light" title="Permanent link">&para;</a></h3>
+<h3 id="vision-ai">Vision AI<a class="headerlink" href="#vision-ai" title="Permanent link">&para;</a></h3>
+<h4 id="dl-streamer-analysis-multi-stream-pipelines-with-multiple-ai-stages">DL Streamer Analysis - Multi-Stream Pipelines With Multiple AI Stages<a class="headerlink" href="#dl-streamer-analysis-multi-stream-pipelines-with-multiple-ai-stages" title="Permanent link">&para;</a></h4>
 <p><strong>Profile</strong>: <code>profile.suite.ai.vision-light</code></p>
 <p><strong>Test Cases</strong>:</p>
 <table>
@@ -1745,7 +1784,7 @@
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>esq<span class="w"> </span>run<span class="w"> </span>--profile<span class="w"> </span>profile.suite.ai.vision-light
 </span></code></pre></div></p>
 <hr />
-<h3 id="vision-ai-verified-reference-blueprints">Vision AI - Verified Reference Blueprints<a class="headerlink" href="#vision-ai-verified-reference-blueprints" title="Permanent link">&para;</a></h3>
+<h4 id="verified-reference-blueprints">Verified Reference Blueprints<a class="headerlink" href="#verified-reference-blueprints" title="Permanent link">&para;</a></h4>
 <p><strong>Profile</strong>: <code>profile.suite.ai.vision-vrb</code></p>
 <p><strong>Test Cases</strong>:</p>
 <table>
@@ -1782,7 +1821,7 @@
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>esq<span class="w"> </span>run<span class="w"> </span>--profile<span class="w"> </span>profile.suite.ai.vision-vrb
 </span></code></pre></div></p>
 <hr />
-<h3 id="vision-ai-openvino">Vision AI - OpenVINO<a class="headerlink" href="#vision-ai-openvino" title="Permanent link">&para;</a></h3>
+<h4 id="openvino">OpenVINO<a class="headerlink" href="#openvino" title="Permanent link">&para;</a></h4>
 <p><strong>Profile</strong>: <code>profile.suite.ai.vision-ov</code></p>
 <details>
 <summary><b>Test Cases</b> (click to expand)</summary>
@@ -1934,6 +1973,121 @@
 </table>
 <p><strong>Run this profile</strong>:
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>esq<span class="w"> </span>run<span class="w"> </span>--profile<span class="w"> </span>profile.suite.system.memory-stream
+</span></code></pre></div></p>
+<h3 id="media-performance">Media Performance<a class="headerlink" href="#media-performance" title="Permanent link">&para;</a></h3>
+<p><strong>Profile</strong>: <code>profile.suite.media.performance-pipelines</code></p>
+<details>
+<summary><b>Test Cases</b> (click to expand)</summary>
+<table>
+<thead>
+<tr>
+<th>Test ID</th>
+<th>Test Case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MDA-DEC-001</td>
+<td>Media Decode 4Mbps H.264 1080p@30 (iGPU)</td>
+</tr>
+<tr>
+<td>MDA-DEC-002</td>
+<td>Media Decode 16Mbps H.264 4k@30 (iGPU)</td>
+</tr>
+<tr>
+<td>MDA-DEC-003</td>
+<td>Media Decode 4Mbps H.264 1080p@30 (dGPU)</td>
+</tr>
+<tr>
+<td>MDA-DEC-004</td>
+<td>Media Decode 16Mbps H.264 4k@30 (dGPU)</td>
+</tr>
+<tr>
+<td>MDA-DEC-005</td>
+<td>Media Decode 2Mbps H.265 1080p@30 (iGPU)</td>
+</tr>
+<tr>
+<td>MDA-DEC-006</td>
+<td>Media Decode 8Mbps H.265 4k@30 (iGPU)</td>
+</tr>
+<tr>
+<td>MDA-DEC-007</td>
+<td>Media Decode 2Mbps H.265 1080p@30 (dGPU)</td>
+</tr>
+<tr>
+<td>MDA-DEC-008</td>
+<td>Media Decode 8Mbps H.265 4k@30 (dGPU)</td>
+</tr>
+<tr>
+<td>MDA-COMP-001</td>
+<td>Media Decode + Compose 4Mbps H.264 1080p@30 (iGPU)</td>
+</tr>
+<tr>
+<td>MDA-COMP-002</td>
+<td>Media Decode + Compose 16Mbps H.264 4k@30 (iGPU)</td>
+</tr>
+<tr>
+<td>MDA-COMP-003</td>
+<td>Media Decode + Compose 2Mbps H.265 1080p@30 (iGPU)</td>
+</tr>
+<tr>
+<td>MDA-COMP-004</td>
+<td>Media Decode + Compose 8Mbps H.265 4k@30 (iGPU)</td>
+</tr>
+<tr>
+<td>MDA-COMP-005</td>
+<td>Media Decode + Compose 4Mbps H.264 1080p@30 (dGPU)</td>
+</tr>
+<tr>
+<td>MDA-COMP-006</td>
+<td>Media Decode + Compose 16Mbps H.264 4k@30 (dGPU)</td>
+</tr>
+<tr>
+<td>MDA-COMP-007</td>
+<td>Media Decode + Compose 2Mbps H.265 1080p@30 (dGPU)</td>
+</tr>
+<tr>
+<td>MDA-COMP-008</td>
+<td>Media Decode + Compose 8Mbps H.265 4k@30 (dGPU)</td>
+</tr>
+<tr>
+<td>MDA-ENC-001</td>
+<td>Media Encode 4Mbps H.264 1080p@30 (iGPU)</td>
+</tr>
+<tr>
+<td>MDA-ENC-002</td>
+<td>Media Encode 16Mbps H.264 4k@30 (iGPU)</td>
+</tr>
+<tr>
+<td>MDA-ENC-003</td>
+<td>Media Encode 4Mbps H.264 1080p@30 (dGPU)</td>
+</tr>
+<tr>
+<td>MDA-ENC-004</td>
+<td>Media Encode 16Mbps H.264 4k@30 (dGPU)</td>
+</tr>
+<tr>
+<td>MDA-ENC-005</td>
+<td>Media Encode 2Mbps H.265 1080p@30 (iGPU)</td>
+</tr>
+<tr>
+<td>MDA-ENC-006</td>
+<td>Media Encode 8Mbps H.265 4k@30 (iGPU)</td>
+</tr>
+<tr>
+<td>MDA-ENC-007</td>
+<td>Media Encode 2Mbps H.265 1080p@30 (dGPU)</td>
+</tr>
+<tr>
+<td>MDA-ENC-008</td>
+<td>Media Encode 8Mbps H.265 4k@30 (dGPU)</td>
+</tr>
+</tbody>
+</table>
+</details>
+<p><br></p>
+<p><strong>Run this profile</strong>:
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>esq<span class="w"> </span>run<span class="w"> </span>--profile<span class="w"> </span>profile.suite.media.performance-pipelines
 </span></code></pre></div></p>
 
 

@@ -10,12 +10,13 @@ Consolidates telemetry.py from media/proxy containers.
 import logging
 import os
 import signal
-import subprocess  # nosec B404
+import subprocess  # nosec B404 # For system telemetry monitoring (top, intel_gpu_top)
 import time
 
 # Support both installed package and Docker container usage
 try:
     from sysagent.utils.core.process import run_command
+
     # For Popen cases, we need to use subprocess with proper validation
     # FW API doesn't expose Popen directly, so use container_utils wrapper
     from esq.utils.media.container_utils import secure_popen
@@ -103,7 +104,7 @@ class TelemetryCollector:
         signal.signal(signal.SIGUSR1, self.signal_handler)
 
         # Wait for GStreamer process PID file
-        device_src = "/tmp/gst_pid_"  # nosec
+        device_src = "/tmp/gst_pid_"
         while not os.path.exists(f"{device_src}{self.device}.txt"):
             time.sleep(1)
 
@@ -259,8 +260,9 @@ class TelemetryCollector:
                 # If frequency is suspiciously low (< 200 MHz), log warning
                 if freq_value > 0 and freq_value < 200:
                     # Log warning on first occurrence only (check if we've logged before)
-                    if not hasattr(self, '_low_freq_warned'):
+                    if not hasattr(self, "_low_freq_warned"):
                         import logging
+
                         logger = logging.getLogger(__name__)
                         logger.warning(
                             f"GPU frequency suspiciously low: {freq_value:.2f} MHz. "
@@ -435,5 +437,6 @@ class TelemetryCollector:
             if self.xpu_xmi_process and self.xpu_xmi_process.poll() is None:
                 self.xpu_xmi_process.terminate()
                 self.xpu_xmi_process.wait()
+
 
 Telemetry = TelemetryCollector

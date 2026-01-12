@@ -7,7 +7,7 @@ import os
 import re
 import shlex
 import shutil
-import subprocess as sp  # nosec B404
+import subprocess as sp  # nosec B404 # For AI benchmark execution and monitoring
 import sys
 import warnings
 from pathlib import Path
@@ -243,7 +243,14 @@ def TestStarter():
 
     ParseStableRuntime(get_file_abs_path("outlog"))
     # draw the data in one graph - pass dGPU metadata
-    draw_graph(cpu_merged_df_adjusted, igpu_usage_list_adjusted, dgpu_usage_list_adjusted, dgpu_power_list_adjusted, dgpu_device_id, dgpu_count)
+    draw_graph(
+        cpu_merged_df_adjusted,
+        igpu_usage_list_adjusted,
+        dgpu_usage_list_adjusted,
+        dgpu_power_list_adjusted,
+        dgpu_device_id,
+        dgpu_count,
+    )
 
 
 def extract_value(line):
@@ -345,7 +352,7 @@ def run_spr_ov_bcmk(bcmk_dir, model_path, exec_cores_per_socket=0, time=90):
 
             raw_out.append(result.stdout)
     except sp.CalledProcessError as ex:
-        logger.error(f"Execute benchmark app with model {model_name} on SPR platform Failed. ")
+        logger.error("Execute benchmark app on SPR platform Failed. ")
         logger.error(ex.returncode)
         logger.error(ex.output)
 
@@ -498,6 +505,7 @@ def ParseStableRuntime(file_path):
 
 def DataParser(output_folder):
     ParseStableRuntime(get_file_abs_path("outlog"))
+
 
 def draw_graph(cpu_df, igpu_df, dgpu_df, dgpu_power_df, dgpu_device_id=None, dgpu_count=0):
     # Initialize Metrics with default values including stability metrics
@@ -682,9 +690,12 @@ def draw_graph(cpu_df, igpu_df, dgpu_df, dgpu_power_df, dgpu_device_id=None, dgp
             logger.info(f"  Selected device: {dgpu_device_id}")
             if dgpu_count > 1:
                 logger.info("  Selection based on: highest avg frequency + lowest stddev (stability)")
-        logger.info(f"  dGPU metrics in summary: frequency_max={summary_df.at[0, 'frequency_max_dgpu']:.2f} GHz, "
-                   f"stddev={summary_df.at[0, 'frequency_stddev_dgpu']:.4f}, "
-                   f"utilization={summary_df.at[0, 'utilization_dgpu']:.2f}%")
+        logger.info(
+            f"  dGPU metrics in summary: frequency_max={summary_df.at[0, 'frequency_max_dgpu']:.2f} GHz, "
+            f"stddev={summary_df.at[0, 'frequency_stddev_dgpu']:.4f}, "
+            f"utilization={summary_df.at[0, 'utilization_dgpu']:.2f}%"
+        )
+
 
 def choose_model_4test():
     """
@@ -710,6 +721,7 @@ def choose_model_4test():
     # Default fallback (should rarely be used - test framework sets MODEL_NAME)
     logger.info("MODEL_NAME not set, defaulting to yolov5s")
     return "yolov5s"
+
 
 def main():
     output_folder = f"{OUTPUT_DIR}"

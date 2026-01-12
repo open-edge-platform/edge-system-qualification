@@ -11,7 +11,7 @@ needed for media benchmarking without the full framework overhead.
 For development/testing outside containers, use the full sysagent.utils.core.process module.
 """
 
-import subprocess  # nosec B404
+import subprocess  # nosec B404 # For container environment command execution
 import time
 from typing import Dict, List, Optional, Union
 
@@ -211,6 +211,7 @@ def secure_popen(
     Returns:
         subprocess.Popen: Process object for monitoring/control
     """
+    import os
     import shlex
 
     # Prepare command - always use list format for security

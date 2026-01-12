@@ -13,7 +13,7 @@ import multiprocessing
 import os
 import re
 import signal
-import subprocess  # nosec B404 - Popen needed for background pipeline execution
+import subprocess  # nosec B404 # Popen needed for background pipeline execution
 import time
 
 # Support both installed package and Docker container usage
@@ -322,12 +322,10 @@ class BaseDLBenchmark:
         # Only use unique filenames for VSaaS benchmark
         # VSaaS uses gvafpscounter which has state persistence issues across test runs
         # LPR/SmartNVR don't need this workaround
-        use_unique_filename = (
-            expected_stream_count is not None and
-            self.benchmark_name == "AI VSaaS Gateway Benchmark"
-        )
+        use_unique_filename = expected_stream_count is not None and self.benchmark_name == "AI VSaaS Gateway Benchmark"
         if use_unique_filename:
             import time as time_module
+
             timestamp = int(time_module.time() * 1000)  # Milliseconds
             unique_result_file = f"{self.result_file}.{timestamp}"
             self.logger.debug(f"Using unique result file for VSaaS: {unique_result_file}")

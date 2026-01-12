@@ -20,7 +20,7 @@ of direct subprocess calls to ensure consistency and security.
 import logging
 import os
 import shlex
-import subprocess  # nosec
+import subprocess  # nosec B404 # For secure process execution API
 import threading
 import time
 from enum import Enum

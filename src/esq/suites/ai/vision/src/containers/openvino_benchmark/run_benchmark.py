@@ -7,7 +7,7 @@ import logging
 import os
 import re
 import shlex
-import subprocess as sp  # nosec B404
+import subprocess as sp  # nosec B404 # For benchmark_app execution and telemetry
 import sys
 from itertools import product
 from pathlib import Path

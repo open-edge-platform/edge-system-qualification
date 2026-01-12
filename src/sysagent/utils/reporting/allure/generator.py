@@ -32,6 +32,71 @@ logger = logging.getLogger(__name__)
 ALLURE_DIR_NAME = "allure3"
 
 
+def _verify_allure_installation(allure_repo_dir: str, node_dir: str) -> bool:
+    """Verify that Allure CLI is properly installed and functional.
+
+    Args:
+        allure_repo_dir: Path to Allure repository
+        node_dir: Path to Node.js installation
+
+    Returns:
+        bool: True if Allure is properly installed and functional
+    """
+    from sysagent.utils.infrastructure import get_node_binary_paths
+
+    # Check if critical files exist
+    cli_dist_path = os.path.join(allure_repo_dir, "packages", "cli", "dist")
+    index_js_path = os.path.join(cli_dist_path, "index.js")
+
+    if not os.path.exists(index_js_path):
+        logger.debug(f"Allure CLI index.js not found at {index_js_path}")
+        return False
+
+    # Verify that 'yarn allure' command actually works
+    try:
+        node_bin, _, yarn_bin = get_node_binary_paths(node_dir)
+        node_dir_path = os.path.dirname(node_bin)
+        env = os.environ.copy()
+        env["PATH"] = f"{node_dir_path}{os.pathsep}{env.get('PATH', '')}"
+
+        result = run_command([yarn_bin, "allure", "--help"], cwd=allure_repo_dir, check=False, env=env, timeout=10)
+
+        if not result.success:
+            logger.debug(f"Allure CLI verification failed: {result.stderr}")
+            return False
+
+        logger.debug("Allure CLI verification successful")
+        return True
+
+    except Exception as e:
+        logger.debug(f"Allure CLI verification failed with exception: {e}")
+        return False
+
+
+def _cleanup_corrupted_allure(allure_repo_dir: str) -> None:
+    """Clean up corrupted or incomplete Allure installation.
+
+    Removes the entire allure3 directory to ensure a fresh start.
+    The installation process will re-download and rebuild from scratch.
+
+    Args:
+        allure_repo_dir: Path to Allure repository to remove
+    """
+    import shutil
+
+    logger.debug(f"Removing corrupted Allure installation at {allure_repo_dir}")
+
+    if not os.path.exists(allure_repo_dir):
+        logger.debug("Allure directory does not exist, nothing to clean")
+        return
+
+    try:
+        shutil.rmtree(allure_repo_dir)
+        logger.debug("Removed entire Allure directory for fresh reinstall")
+    except Exception as e:
+        logger.warning(f"Failed to remove Allure directory: {e}")
+
+
 def install_allure_cli_from_repo(node_dir: str, force_reinstall: bool = False) -> str:
     """
     Install Allure CLI from the repository with patching support
@@ -50,7 +115,7 @@ def install_allure_cli_from_repo(node_dir: str, force_reinstall: bool = False) -
     from sysagent.utils.config import get_thirdparty_dir
     from sysagent.utils.infrastructure import get_node_binary_paths
 
-    from .patch import _initialize_git_repository, _is_git_repository, apply_patch
+    from .patch import apply_patch
 
     # Get Node.js binary paths
     node_bin, _, yarn_bin = get_node_binary_paths(node_dir)
@@ -66,25 +131,36 @@ def install_allure_cli_from_repo(node_dir: str, force_reinstall: bool = False) -
     # Check if Allure3 repository is already built
     cli_dist_path = os.path.join(allure_repo_dir, "packages", "cli", "dist")
 
-    # If packages/cli/dist/index.js is created, assume Allure CLI is already installed
-    if os.path.exists(os.path.join(cli_dist_path, "index.js")) and not force_reinstall:
-        logger.debug(f"Allure CLI already installed at {allure_repo_dir}")
-        return allure_cmd
-    else:
-        logger.debug(f"Installing Allure CLI from repo at {allure_repo_dir}")
+    # Verify if Allure CLI is properly installed and functional (not just checking if folder exists)
+    if not force_reinstall and os.path.exists(allure_repo_dir):
+        logger.debug("Checking existing Allure installation...")
+        if _verify_allure_installation(allure_repo_dir, node_dir):
+            logger.debug("Allure CLI is already installed and functional")
+            return allure_cmd
+        else:
+            logger.debug("Existing Allure installation is corrupted or incomplete")
+            _cleanup_corrupted_allure(allure_repo_dir)
 
-    # Check if the repo directory exists
+    logger.debug("Installing Allure CLI from repository")
+
+    # Check if the repo directory exists, re-download if completely missing
     if not os.path.exists(allure_repo_dir) or not os.path.isdir(allure_repo_dir):
-        raise FileNotFoundError(
-            f"Allure3 repository not found at {allure_repo_dir}. Please run the download_github_repo function first."
-        )
+        logger.warning(f"Allure3 repository not found at {allure_repo_dir}")
+        logger.debug("Attempting to download Allure3 repository...")
+        try:
+            # Import here to avoid circular dependency
+            from sysagent.utils.infrastructure import download_github_repo
 
-    # Initialize or get the Git repository
-    if not _is_git_repository(allure_repo_dir):
-        # If it's not a valid git repository (downloaded via archive), initialize it
-        _initialize_git_repository(allure_repo_dir)
-    else:
-        logger.debug(f"Found existing Git repository at {allure_repo_dir}")
+            download_github_repo()
+
+            # Verify download succeeded
+            if not os.path.exists(allure_repo_dir) or not os.path.isdir(allure_repo_dir):
+                raise FileNotFoundError(f"Failed to download Allure3 repository to {allure_repo_dir}.")
+            logger.debug("Allure3 repository downloaded successfully")
+        except Exception as e:
+            raise FileNotFoundError(
+                f"Allure3 repository not found at {allure_repo_dir} and download failed: {e}. "
+            ) from e
 
     # Find all patch files in the patches directory
     # Always use sysagent core directory for allure3 patches (not extension packages)
@@ -128,19 +204,48 @@ def install_allure_cli_from_repo(node_dir: str, force_reinstall: bool = False) -
     allure_repo_relative = os.path.relpath(allure_repo_dir, os.getcwd())
     logger.debug(f"Installing dependencies in {allure_repo_relative}")
     try:
-        result = run_command([yarn_bin, "install"], cwd=allure_repo_dir, check=True, env=env)
+        result = run_command([yarn_bin, "install"], cwd=allure_repo_dir, check=False, env=env)
+
+        if not result.success:
+            logger.error(f"Dependency installation failed with exit code {result.returncode}")
+            if result.stdout:
+                logger.error(f"Install stdout:\n{result.stdout}")
+            if result.stderr:
+                logger.error(f"Install stderr:\n{result.stderr}")
+            logger.debug("Cleaning up failed installation...")
+            _cleanup_corrupted_allure(allure_repo_dir)
+            raise Exception(f"yarn install failed with exit code {result.returncode}")
+
         logger.debug("Dependencies installed successfully")
     except Exception as e:
-        logger.error(f"Failed to install dependencies: {str(e)}")
+        if "yarn install failed" not in str(e):
+            logger.error(f"Failed to install dependencies: {e}")
+            logger.debug("Cleaning up failed installation...")
+            _cleanup_corrupted_allure(allure_repo_dir)
         raise
 
     # Step 2: Build the project
     logger.debug("Building Allure3 project")
     try:
-        result = run_command([yarn_bin, "build"], cwd=allure_repo_dir, check=True, env=env)
+        result = run_command([yarn_bin, "build"], cwd=allure_repo_dir, check=False, env=env)
+
+        if not result.success:
+            # Log the actual build error output
+            logger.error(f"Allure3 build failed with exit code {result.returncode}")
+            if result.stdout:
+                logger.error(f"Build stdout:\n{result.stdout}")
+            if result.stderr:
+                logger.error(f"Build stderr:\n{result.stderr}")
+            logger.debug("Cleaning up failed build...")
+            _cleanup_corrupted_allure(allure_repo_dir)
+            raise Exception(f"yarn build failed with exit code {result.returncode}")
+
         logger.debug("Allure3 project built successfully")
     except Exception as e:
-        logger.error(f"Failed to build Allure3 project: {str(e)}")
+        if "yarn build failed" not in str(e):
+            logger.error(f"Failed to build Allure3 project: {e}")
+            logger.debug("Cleaning up failed build...")
+            _cleanup_corrupted_allure(allure_repo_dir)
         raise
 
     # Verify that 'yarn allure' works
@@ -151,8 +256,18 @@ def install_allure_cli_from_repo(node_dir: str, force_reinstall: bool = False) -
         logger.debug("Verified 'yarn allure' command works")
     except Exception as e:
         logger.error(f"Failed to verify 'yarn allure' command: {str(e)}")
+        logger.debug("Cleaning up failed installation...")
+        _cleanup_corrupted_allure(allure_repo_dir)
         raise
 
+    # Final verification that the installation is complete and functional
+    if not _verify_allure_installation(allure_repo_dir, node_dir):
+        logger.error("Allure CLI installation verification failed after build")
+        logger.debug("Cleaning up failed installation...")
+        _cleanup_corrupted_allure(allure_repo_dir)
+        raise RuntimeError("Allure CLI installation verification failed")
+
+    logger.debug("Allure CLI installed and verified successfully")
     return allure_cmd
 
 

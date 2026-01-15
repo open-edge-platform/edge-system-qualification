@@ -189,6 +189,30 @@ def format_system_summary(hardware_info: Dict[str, Any], software_info: Dict[str
     elif power.get("permission_issue"):
         lines.append("Power: Available (setup required for non-root access)")
 
+    # Network Information
+    network = hardware_info.get("network", {})
+    if network:
+        internet_connected = network.get("internet_connected", False)
+        restricted_access = network.get("restricted_access", False)
+        restriction_details = network.get("restriction_details", {})
+
+        if internet_connected:
+            if restricted_access:
+                lines.append("Network: Internet connected (Restricted)")
+                if restriction_details:
+                    # Derive blocked services from accessibility flags
+                    blocked_services = [
+                        service.replace("_accessible", "").capitalize()
+                        for service, accessible in restriction_details.items()
+                        if service.endswith("_accessible") and not accessible
+                    ]
+                    if blocked_services:
+                        lines.append(f"  Blocked: {', '.join(blocked_services)}")
+            else:
+                lines.append("Network: Internet connected (Open)")
+        else:
+            lines.append("Network: No internet connection")
+
     lines.append("")  # Empty line after system info
     return "\n".join(lines)
 
@@ -292,6 +316,10 @@ def generate_simple_report(system_info: Dict[str, Any]) -> str:
             # Convert Power info (pass through as-is)
             if "power" in hardware:
                 summary_hardware["power"] = hardware["power"]
+
+            # Convert Network info (pass through as-is)
+            if "network" in hardware:
+                summary_hardware["network"] = hardware["network"]
 
             # Convert OS info
             if "os" in software:

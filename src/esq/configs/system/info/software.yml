@@ -10,11 +10,16 @@ system_packages:
   - ffmpeg
 
 python_packages:
+  - openvino
   - optimum-intel
   - ultralytics
+  - huggingface-hub
+  - modelscope
+  - kagglehub
+  - datasets
+  - docker
   - nncf
   - py-libnuma
-  - huggingface-hub
   - openvino_tokenizers
   - transformers
   - pydub

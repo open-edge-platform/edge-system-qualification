@@ -10,7 +10,7 @@ from typing import Any, Dict
 import allure
 from sysagent.utils.config import ensure_dir_permissions
 from sysagent.utils.core import Result
-from sysagent.utils.infrastructure import DockerClient, download_file
+from sysagent.utils.infrastructure import DockerClient
 
 logger = logging.getLogger(__name__)
 
@@ -60,11 +60,14 @@ def prepare_assets(
     docker_image_tag: str,
     benchmark_docker_base_image: str,
     ovms_docker_base_image: str,
-    hf_dataset_url: str,
+    dataset_repo: str,
+    dataset_source: str,
+    dataset_filename: str,
     dataset_path: str,
     models_dir: str,
     thirdparty_dir: str,
     src_dir: str,
+    download_timeout: float = 300,
     docker_buildargs: Dict[str, str] = None,
 ) -> Dict[str, Any]:
     """
@@ -75,11 +78,14 @@ def prepare_assets(
         docker_image_tag: Docker image tag for OVMS
         benchmark_docker_base_image: Benchmark Docker base image
         ovms_docker_base_image: OVMS Docker base image
-        hf_dataset_url: Hugging Face dataset URL
+        dataset_repo: Dataset repository ID (HuggingFace or ModelScope format)
+        dataset_source: Dataset source ("huggingface" or "modelscope")
+        dataset_filename: Filename within the dataset repository
         dataset_path: Local dataset path
         models_dir: Directory for model files
         thirdparty_dir: Directory for third-party data
         src_dir: Source directory
+        download_timeout: Timeout for dataset download in seconds (default: 300)
         docker_buildargs: Docker build arguments
 
     Returns:
@@ -203,22 +209,32 @@ def prepare_assets(
     # Download dataset if not already present
     try:
         if not os.path.exists(dataset_path):
-            logger.info(f"Downloading dataset from: {hf_dataset_url}")
-            download_file(hf_dataset_url, dataset_path)
-            logger.info(f"Dataset downloaded to: {dataset_path}")
-        else:
-            logger.info(f"Dataset already exists: {dataset_path}")
+            logger.info(f"Downloading dataset from {dataset_source}: {dataset_repo}/{dataset_filename}")
+            os.makedirs(thirdparty_dir, exist_ok=True)
 
-        # Verify dataset file
-        if os.path.exists(dataset_path) and os.path.getsize(dataset_path) > 0:
-            preparation_results["dataset_path"] = dataset_path
-            preparation_results["dataset_size"] = os.path.getsize(dataset_path)
-        else:
-            raise RuntimeError(f"Dataset file is missing or empty: {dataset_path}")
+            from esq.utils.downloads import download_dataset_file
 
+            # Use the source based on decision made at test level
+            # source="modelscope" prevents fallback to HuggingFace (for restricted networks)
+            # source=None allows automatic fallback if primary source fails
+            download_source = dataset_source if dataset_source == "modelscope" else None
+
+            download_dataset_file(
+                dataset_id=dataset_repo,
+                filename=dataset_filename,
+                target_path=dataset_path,
+                timeout=download_timeout,
+                source=download_source,
+            )
+
+            logger.info(f"Dataset downloaded to {dataset_path}")
+        else:
+            logger.info(f"Dataset already exists at {dataset_path}")
+
+    except TimeoutError as e:
+        raise RuntimeError(f"Dataset download timed out after {download_timeout}s.") from e
     except Exception as e:
-        logger.error(f"Failed to prepare dataset: {e}")
-        raise
+        raise RuntimeError(f"Dataset download failed: {e}") from e
 
     logger.info("Asset preparation completed successfully")
 

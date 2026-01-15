@@ -153,7 +153,7 @@ def quantize_model_with_nncf(model, calibration_dataset, subset_size: int = 300)
         return quantized_model
 
     except ImportError:
-        logger.error("NNCF library not installed. Install with: pip install nncf")
+        logger.error("NNCF python library not installed")
         raise
     except Exception as e:
         logger.error(f"Failed to quantize model with NNCF: {e}")

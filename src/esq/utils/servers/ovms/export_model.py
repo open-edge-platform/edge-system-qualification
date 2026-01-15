@@ -743,10 +743,6 @@ def export_text_generation_model(
                 "Both tool_parser and reasoning_parser need to be set to gptoss when one of them is set to gptoss"
             )
 
-    # Prepare environment with PYTHONUNBUFFERED to prevent subprocess output buffering
-    env = os.environ.copy()
-    env["PYTHONUNBUFFERED"] = "1"
-
     ### Export model
     if os.path.isfile(os.path.join(source_model, "openvino_model.xml")) or os.path.isfile(
         os.path.join(source_model, "openvino_language_model.xml")
@@ -767,7 +763,7 @@ def export_text_generation_model(
             "--local-dir",
             os.path.join(model_repository_path, model_name),
         ]
-        result = run_command(hugging_face_cmd, timeout=export_timeout, stream_output=True, env=env)
+        result = run_command(hugging_face_cmd, timeout=export_timeout, stream_output=True)
         if result.timed_out:
             raise TimeoutError(f"Model download timed out after {export_timeout}s")
         if result.returncode != 0:
@@ -823,7 +819,7 @@ def export_text_generation_model(
 
             # Use secure run_command utility with streaming for real-time progress
             # stream_output=True enables real-time console output while capturing for error handling
-            result = run_command(optimum_command, timeout=export_timeout, stream_output=True, env=env)
+            result = run_command(optimum_command, timeout=export_timeout, stream_output=True)
             if result.timed_out:
                 cleanup_incomplete_model_export(llm_model_path)
                 raise TimeoutError(f"Export timed out after {export_timeout}s")
@@ -850,7 +846,7 @@ def export_text_generation_model(
                     llm_model_path,
                     source_model,
                 ]
-                result = run_command(convert_tokenizer_command, timeout=export_timeout, stream_output=True, env=env)
+                result = run_command(convert_tokenizer_command, timeout=export_timeout, stream_output=True)
                 if result.timed_out:
                     cleanup_incomplete_model_export(llm_model_path)
                     raise TimeoutError(f"Tokenizer export timed out after {export_timeout}s")
@@ -881,7 +877,7 @@ def export_text_generation_model(
                 "--local-dir",
                 os.path.join(draft_llm_model_path, draft_source_model),
             ]
-            result = run_command(hugging_face_cmd, timeout=export_timeout, stream_output=True, env=env)
+            result = run_command(hugging_face_cmd, timeout=export_timeout, stream_output=True)
             if result.timed_out:
                 raise TimeoutError(f"Draft model download timed out after {export_timeout}s")
             if result.returncode != 0:
@@ -904,7 +900,7 @@ def export_text_generation_model(
                     "--trust-remote-code",
                     draft_llm_model_path,
                 ]
-                result = run_command(optimum_command, timeout=export_timeout, stream_output=True, env=env)
+                result = run_command(optimum_command, timeout=export_timeout, stream_output=True)
                 if result.timed_out:
                     cleanup_incomplete_model_export(draft_llm_model_path)
                     raise TimeoutError(f"Draft model export timed out after {export_timeout}s")

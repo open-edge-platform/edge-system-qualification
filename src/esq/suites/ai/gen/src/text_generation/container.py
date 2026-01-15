@@ -118,7 +118,8 @@ def run_ovms_server_container(
 
         # Use docker_client.run_container method like original implementation
         # Note: Docker SDK has internal timeouts - for large models, container creation might take time
-        # The timeout parameter in run_container is for the container execution, not API calls. Use DockerClient timeout instead.
+        # The timeout parameter in run_container is for the container execution, not API calls.
+        # Use DockerClient timeout instead.
         container = docker_client.run_container(
             name=container_name,
             image=docker_image_tag,
@@ -296,7 +297,7 @@ def run_benchmark_container(
     model_precision: str,
     device_id: str,
     dataset_path: str,
-    hf_dataset_filename: str,
+    dataset_filename: str,
     ovms_port: int,
     test_num_prompts: int,
     test_request_rate: int,
@@ -316,7 +317,7 @@ def run_benchmark_container(
         model_precision: Model precision
         device_id: Device identifier
         dataset_path: Path to dataset file
-        hf_dataset_filename: Dataset filename
+        dataset_filename: Dataset filename within repository
         ovms_port: OVMS server port
         test_num_prompts: Number of prompts to test
         test_request_rate: Request rate
@@ -346,7 +347,7 @@ def run_benchmark_container(
 
     # Volume mounts - mount both dataset and models directory for local tokenizer access
     volumes = {
-        dataset_path: {"bind": f"/vllm-workspace/benchmarks/{hf_dataset_filename}", "mode": "ro"},
+        dataset_path: {"bind": f"/vllm-workspace/benchmarks/{dataset_filename}", "mode": "ro"},
         results_dir: {"bind": "/vllm-workspace/results", "mode": "rw"},
     }
 
@@ -397,7 +398,7 @@ def run_benchmark_container(
             f"--model {model_name_for_ovms} "  # Use actual OVMS model name (with suffix if quantized)
             f"{tokenizer_arg}"  # Use local tokenizer path if available, fallback to HuggingFace
             "--dataset-name sharegpt "
-            f"--dataset-path /vllm-workspace/benchmarks/{hf_dataset_filename} "
+            f"--dataset-path /vllm-workspace/benchmarks/{dataset_filename} "
             f"--request-rate {test_request_rate} "
             f"--max-concurrency {test_max_concurrent_requests} "
             f"--num-prompts {test_num_prompts} "

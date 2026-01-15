@@ -357,7 +357,7 @@ def run_multi_device_test(
                             qual_state = device_result.get("qualification_state", {})
                             num_streams = qual_state.get("num_streams", -1)
                             logger.debug(
-                                f"Device {device_id} failed: reading num_streams = {num_streams} from qualification_state"
+                                f"Device {device_id} failed: num_streams = {num_streams} from qualification_state"
                             )
 
                             local_failed_devices[device_id] = {

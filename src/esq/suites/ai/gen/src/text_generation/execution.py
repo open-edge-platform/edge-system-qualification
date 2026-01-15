@@ -31,6 +31,7 @@ def run_device_test(
     server_timeout: int,
     benchmark_timeout: int,
     export_timeout: int,
+    download_timeout: int,
     dataset_path: str,
     metrics: Optional[Dict[str, Metrics]] = None,
     configs: Optional[Dict] = None,
@@ -54,6 +55,7 @@ def run_device_test(
         server_timeout: Server startup timeout
         benchmark_timeout: Benchmark timeout
         export_timeout: Model export timeout
+        download_timeout: Model download timeout
         dataset_path: Path to dataset file
         metrics: Default metrics for the device
         configs: Test configuration dict (for quantization parameters)
@@ -74,6 +76,7 @@ def run_device_test(
 
     container_info = None
     export_duration = 0.0  # Track model export duration
+    download_duration = 0.0  # Track model download duration
     quantization_config = {}  # Track quantization parameters used
     server_startup_duration = 0.0  # Track server startup duration
     benchmark_duration = 0.0  # Track benchmark execution duration
@@ -93,15 +96,18 @@ def run_device_test(
             logger.info(
                 f"Exporting model {model_id} for {device_id} with {model_precision} to OpenVINO Model Server format"
             )
-            from esq.utils.models import export_ovms_model
+            from esq.utils.servers.ovms import export_ovms_model
 
-            export_status, export_duration, quantization_config, actual_model_name = export_ovms_model(
-                model_id_or_path=model_id,
-                models_dir=models_dir,
-                model_precision=model_precision,
-                device_id=device_id,
-                configs=configs,
-                export_timeout=export_timeout,
+            export_status, export_duration, download_duration, quantization_config, actual_model_name = (
+                export_ovms_model(
+                    model_id_or_path=model_id,
+                    models_dir=models_dir,
+                    model_precision=model_precision,
+                    device_id=device_id,
+                    configs=configs,
+                    export_timeout=export_timeout,
+                    download_timeout=download_timeout,
+                )
             )
 
             if not export_status:
@@ -111,12 +117,11 @@ def run_device_test(
                 logger.error(error_message)
                 raise RuntimeError(error_message)
 
-            logger.info(f"Model export duration: {export_duration:.2f} seconds")
-            logger.info(f"Actual model name for OVMS: {actual_model_name}")
+            logger.debug(f"Actual model name for OVMS: {actual_model_name}")
 
             # Validate that the exported model directory is ready for OVMS
             model_export_path = os.path.join(models_dir, actual_model_name)
-            from esq.utils.models.export_model import validate_openvino_model_export
+            from esq.utils.servers.ovms.export_model import validate_openvino_model_export
 
             if not validate_openvino_model_export(model_export_path, model_type="text_generation"):
                 error_message = (
@@ -131,12 +136,13 @@ def run_device_test(
         else:
             # Download and setup pre-quantized OpenVINO model from HuggingFace
             logger.info(f"Downloading and setting up pre-quantized OpenVINO model {model_id} from HuggingFace Hub")
-            from esq.utils.models import download_and_setup_prequantized_ovms_model
+            from esq.utils.servers.ovms import download_and_setup_prequantized_ovms_model
 
             setup_status = download_and_setup_prequantized_ovms_model(
                 model_id=model_id,
                 models_dir=models_dir,
                 device_id=device_id,
+                download_timeout=download_timeout,
             )
 
             if not setup_status:
@@ -150,7 +156,7 @@ def run_device_test(
             # Validate that the pre-quantized model directory is ready for OVMS
             # Pre-quantized models use versioned structure: models/{model_name}/1/
             model_export_path = os.path.join(models_dir, ovms_model_name, "1")
-            from esq.utils.models.export_model import validate_openvino_model_export
+            from esq.utils.servers.ovms.export_model import validate_openvino_model_export
 
             if not validate_openvino_model_export(model_export_path, model_type="text_generation"):
                 error_message = (
@@ -235,20 +241,21 @@ def run_device_test(
             },
         )
 
-        # Add model export duration to metadata if export occurred
-        if export_duration > 0:
-            result.metadata["model_export_duration_seconds"] = round(export_duration, 2)
-            logger.info(f"Added model export duration to results: {export_duration:.2f} seconds")
+        # Add model download duration to metadata (always track, even if 0)
+        result.metadata["model_download_duration_seconds"] = round(download_duration, 2)
+        logger.info(f"Added model download duration to results: {download_duration:.2f} seconds")
 
-        # Add server startup duration to metadata
-        if server_startup_duration > 0:
-            result.metadata["server_startup_duration_seconds"] = round(server_startup_duration, 2)
-            logger.info(f"Added server startup duration to results: {server_startup_duration:.2f} seconds")
+        # Add model export duration to metadata (always track, even if 0)
+        result.metadata["model_export_duration_seconds"] = round(export_duration, 2)
+        logger.info(f"Added model export duration to results: {export_duration:.2f} seconds")
 
-        # Add benchmark execution duration to metadata
-        if benchmark_duration > 0:
-            result.metadata["benchmark_duration_seconds"] = round(benchmark_duration, 2)
-            logger.info(f"Added benchmark execution duration to results: {benchmark_duration:.2f} seconds")
+        # Add server startup duration to metadata (always track, even if 0)
+        result.metadata["server_startup_duration_seconds"] = round(server_startup_duration, 2)
+        logger.info(f"Added server startup duration to results: {server_startup_duration:.2f} seconds")
+
+        # Add benchmark execution duration to metadata (always track, even if 0)
+        result.metadata["benchmark_duration_seconds"] = round(benchmark_duration, 2)
+        logger.info(f"Added benchmark execution duration to results: {benchmark_duration:.2f} seconds")
 
         # Add quantization configuration to metadata if quantization was performed
         # Flatten quantization_config into individual metadata fields for consistency
@@ -380,7 +387,7 @@ def run_benchmark_performance_test(
     from .container import run_benchmark_container
 
     # Extract dataset filename
-    hf_dataset_filename = os.path.basename(dataset_path)
+    dataset_filename = os.path.basename(dataset_path)
 
     try:
         # Run benchmark container
@@ -393,7 +400,7 @@ def run_benchmark_performance_test(
             model_precision=model_precision,
             device_id=device_id,
             dataset_path=dataset_path,
-            hf_dataset_filename=hf_dataset_filename,
+            dataset_filename=dataset_filename,
             ovms_port=port,
             test_num_prompts=test_num_prompts,
             test_request_rate=test_request_rate,

@@ -1118,17 +1118,22 @@ def collect_network_info() -> Dict[str, Any]:
     """
     Collect network interface information including addresses and statistics.
 
+    Also checks for network restrictions that may affect access to certain
+    services like HuggingFace.
+
     Returns:
         Dict containing network information
     """
     try:
+        from sysagent.utils.infrastructure.network import check_internet_connectivity, check_network_restrictions
+
         interfaces = psutil.net_if_addrs()
         stats = psutil.net_if_stats()
 
         network_info = {
             "interfaces": [],
             "default_gateway": None,
-            "internet_connected": _check_internet_connectivity(),
+            "internet_connected": check_internet_connectivity(),
         }
 
         for interface_name, addresses in interfaces.items():
@@ -1154,6 +1159,19 @@ def collect_network_info() -> Dict[str, Any]:
                 interface_info["addresses"].append(addr_info)
 
             network_info["interfaces"].append(interface_info)
+
+        # Check for network restrictions (e.g., blocked access to certain services)
+        # Only check if internet is connected
+        if network_info["internet_connected"]:
+            try:
+                is_restricted, restriction_details = check_network_restrictions(timeout=5.0)
+                network_info["restricted_access"] = is_restricted
+                network_info["restriction_details"] = restriction_details
+            except Exception as e:
+                logger.debug(f"Could not check network restrictions: {e}")
+                # Don't fail the entire collection if restriction check fails
+                network_info["restricted_access"] = False
+                network_info["restriction_details"] = {"error": str(e)}
 
         return network_info
 
@@ -1365,42 +1383,3 @@ def _detect_interface_type(interface_name: str, driver: str = None) -> str:
         return "usb"
 
     return "unknown"
-
-
-def _check_internet_connectivity() -> bool:
-    """
-    Check if the system has internet connectivity using HTTPS requests.
-
-    Uses multiple endpoints to handle different network environments,
-    including regions where certain services may be blocked.
-
-    Returns:
-        True if internet is accessible, False otherwise
-    """
-    import requests
-
-    # List of reliable endpoints to test connectivity
-    test_endpoints = [
-        "https://example.com",  # Global, minimal probe
-        "https://www.cloudflare.com/cdn-cgi/trace",  # Global, lightweight
-        "https://www.baidu.com",  # China-accessible
-    ]
-
-    for endpoint in test_endpoints:
-        try:
-            # Use HTTPS with proper TLS verification and short timeout
-            response = requests.get(
-                endpoint,
-                timeout=5,
-                verify=True,  # Enable TLS certificate verification
-                allow_redirects=True,
-            )
-            if response.status_code == 200:
-                logger.debug(f"Internet connectivity confirmed via {endpoint}")
-                return True
-        except requests.exceptions.RequestException:
-            # Continue to next endpoint if this one fails
-            continue
-
-    logger.debug("No internet connectivity detected from any test endpoint")
-    return False

@@ -54,12 +54,11 @@ def test_text_generation(
     server_timeout = configs.get("server_timeout", 600)
     benchmark_timeout = configs.get("benchmark_timeout", 600)
     export_timeout = configs.get("export_timeout", 1800)
+    download_timeout = configs.get("download_timeout", 18000)
     docker_client_timeout = configs.get("docker_client_timeout", 180)
-    hf_dataset_url = configs.get(
-        "hf_dataset_url",
-        "https://huggingface.co/datasets/anon8231489123/ShareGPT_Vicuna_unfiltered/resolve/main/ShareGPT_V3_unfiltered_cleaned_split.json",
-    )
-    hf_dataset_filename = hf_dataset_url.split("/")[-1]
+    hf_dataset_repo = configs.get("hf_dataset_repo", "anon8231489123/ShareGPT_Vicuna_unfiltered")
+    ms_dataset_repo = configs.get("ms_dataset_repo", "gliang1001/ShareGPT_V3_unfiltered_cleaned_split")
+    dataset_filename = configs.get("dataset_filename", "ShareGPT_V3_unfiltered_cleaned_split.json")
     docker_image_tag = f"{configs.get('container_image_name', 'genai-ovms')}:{configs.get('container_tag', 'latest')}"
     benchmark_docker_base_image = f"{configs.get('benchmark_container_image', 'vllm/vllm-openai:v0.9.2')}"
     ovms_docker_base_image = f"{configs.get('ovms_container_image', 'openvino/model_server:2025.3-gpu')}"
@@ -71,7 +70,7 @@ def test_text_generation(
     data_dir = os.path.join(core_data_dir, "data", "suites", "ai", "gen")
     models_dir = os.path.join(data_dir, "models")
     thirdparty_dir = os.path.join(data_dir, "thirdparty")
-    dataset_path = os.path.join(thirdparty_dir, hf_dataset_filename)
+    dataset_path = os.path.join(thirdparty_dir, dataset_filename)
 
     logger.info(f"Starting Text Generation Test: {test_display_name}")
 
@@ -117,6 +116,28 @@ def test_text_generation(
         cleanup()
 
         # Step 2: Prepare test using modular functions
+        # Determine which dataset repo to use based on user preference
+        from sysagent.utils.infrastructure.network import get_preferred_download_source
+
+        download_source = get_preferred_download_source(
+            source_type="dataset",
+            default="huggingface",
+            valid_sources=["huggingface", "modelscope"],
+        )
+
+        if download_source == "modelscope":
+            if not ms_dataset_repo:
+                error_msg = "ModelScope selected as download source but ModelScope dataset repository not configured."
+                logger.error(error_msg)
+                raise ValueError(error_msg)
+
+            dataset_repo = ms_dataset_repo
+            dataset_source = "modelscope"
+            logger.debug(f"Using ModelScope dataset: {dataset_repo}")
+        else:
+            dataset_repo = hf_dataset_repo
+            dataset_source = "huggingface"
+            logger.debug(f"Using HuggingFace dataset: {dataset_repo}")
         # Run asset preparation using modular function
         prepare_test(
             test_name=test_name,
@@ -125,11 +146,14 @@ def test_text_generation(
                 docker_image_tag=docker_image_tag,
                 benchmark_docker_base_image=benchmark_docker_base_image,
                 ovms_docker_base_image=ovms_docker_base_image,
-                hf_dataset_url=hf_dataset_url,
+                dataset_repo=dataset_repo,
+                dataset_source=dataset_source,
+                dataset_filename=dataset_filename,
                 dataset_path=dataset_path,
                 models_dir=models_dir,
                 thirdparty_dir=thirdparty_dir,
                 src_dir=src_dir,
+                download_timeout=download_timeout,
             ),
             configs=configs,
             name="Assets",
@@ -233,6 +257,7 @@ def test_text_generation(
                     server_timeout=server_timeout,
                     benchmark_timeout=benchmark_timeout,
                     export_timeout=export_timeout,
+                    download_timeout=download_timeout,
                     dataset_path=dataset_path,
                     metrics=default_metrics,
                     configs=configs,
@@ -262,29 +287,30 @@ def test_text_generation(
             results.metadata[f"Device {device_id} Mean TTFT (ms)"] = result.metadata.get("Mean TTFT (ms)", -1.0)
             results.metadata[f"Device {device_id} Mean TPOT (ms)"] = result.metadata.get("Mean TPOT (ms)", -1.0)
 
-            # Track per-device duration (includes export + benchmark time)
-            if "total_duration_seconds" in result.metadata:
-                results.metadata[f"Device {device_id} total_duration_seconds"] = result.metadata.get(
-                    "total_duration_seconds", 0.0
-                )
+            # Track per-device duration (includes export + benchmark time) - always with 2 decimal places
+            results.metadata[f"Device {device_id} total_duration_seconds"] = round(
+                result.metadata.get("total_duration_seconds", 0.0), 2
+            )
 
-            # Track per-device export duration
-            if "model_export_duration_seconds" in result.metadata:
-                results.metadata[f"Device {device_id} model_export_duration_seconds"] = result.metadata.get(
-                    "model_export_duration_seconds", 0.0
-                )
+            # Track per-device download duration - always with 2 decimal places
+            results.metadata[f"Device {device_id} model_download_duration_seconds"] = round(
+                result.metadata.get("model_download_duration_seconds", 0.0), 2
+            )
 
-            # Track per-device server startup duration
-            if "server_startup_duration_seconds" in result.metadata:
-                results.metadata[f"Device {device_id} server_startup_duration_seconds"] = result.metadata.get(
-                    "server_startup_duration_seconds", 0.0
-                )
+            # Track per-device export duration - always with 2 decimal places
+            results.metadata[f"Device {device_id} model_export_duration_seconds"] = round(
+                result.metadata.get("model_export_duration_seconds", 0.0), 2
+            )
 
-            # Track per-device benchmark execution duration
-            if "benchmark_duration_seconds" in result.metadata:
-                results.metadata[f"Device {device_id} benchmark_duration_seconds"] = result.metadata.get(
-                    "benchmark_duration_seconds", 0.0
-                )
+            # Track per-device server startup duration - always with 2 decimal places
+            results.metadata[f"Device {device_id} server_startup_duration_seconds"] = round(
+                result.metadata.get("server_startup_duration_seconds", 0.0), 2
+            )
+
+            # Track per-device benchmark execution duration - always with 2 decimal places
+            results.metadata[f"Device {device_id} benchmark_duration_seconds"] = round(
+                result.metadata.get("benchmark_duration_seconds", 0.0), 2
+            )
 
         # Process results using modular function
         process_device_results(

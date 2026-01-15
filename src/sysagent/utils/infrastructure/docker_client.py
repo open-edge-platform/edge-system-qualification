@@ -76,7 +76,7 @@ class DockerClient:
             timeout: Default timeout for Docker API calls in seconds (default: 300)
         """
         if docker is None:
-            raise ImportError("Docker package not available. Install with: pip install docker")
+            raise ImportError("Docker python package not available")
 
         self.client = docker.from_env(timeout=timeout)
         self._log_threads = {}  # container_name -> (thread, stop_event, logs)

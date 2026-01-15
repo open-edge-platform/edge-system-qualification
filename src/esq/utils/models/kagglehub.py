@@ -55,7 +55,7 @@ def download_kaggle_model(
         return Path(model_path)
 
     except ImportError:
-        logger.error("kagglehub library not installed. Install with: pip install kagglehub")
+        logger.error("kagglehub python library not installed")
         return None
     except Exception as e:
         logger.error(f"Failed to download Kaggle model {model_id}: {e}")

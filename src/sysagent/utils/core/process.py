@@ -172,10 +172,13 @@ class SecureProcessExecutor:
 
         try:
             if mode == ProcessExecutionMode.BACKGROUND:
+                logger.debug("Running command in background mode")
                 return self._run_background(cmd_list, cwd, safe_env)
             elif mode == ProcessExecutionMode.PIPE:
+                logger.debug("Running command with real-time output streaming")
                 return self._run_with_pipe(cmd_list, cwd, safe_env, effective_timeout)
             else:
+                logger.debug("Running command in standard capture mode")
                 return self._run_standard(
                     cmd_list, cwd, safe_env, effective_timeout, capture_output, text, input_data, check
                 )
@@ -263,27 +266,18 @@ class SecureProcessExecutor:
                 logger.warning(f"Potentially dangerous command detected: {pattern}")
 
     def _prepare_environment(self, env: Optional[Dict[str, str]]) -> Dict[str, str]:
-        """Prepare and sanitize environment variables."""
-        if self.security_config.sanitize_environment:
-            # Start with minimal safe environment
-            safe_env = {
-                "PATH": os.environ.get("PATH", "/usr/local/bin:/usr/bin:/bin"),
-                "HOME": os.environ.get("HOME", "/tmp"),
-                "USER": os.environ.get("USER", "unknown"),
-                "TERM": os.environ.get("TERM", "dumb"),
-                "LANG": os.environ.get("LANG", "C.UTF-8"),
-                "LC_ALL": "C.UTF-8",
-            }
+        """
+        Prepare environment variables for subprocess execution.
+        Args:
+            env: User-provided environment variables
+        """
+        # Start with a copy of the current environment to preserve all settings
+        safe_env = os.environ.copy()
 
-            # Add safe environment variables from current environment
-            safe_vars = ["TMPDIR", "TMP", "TEMP", "XDG_RUNTIME_DIR"]
-            for var in safe_vars:
-                if var in os.environ:
-                    safe_env[var] = os.environ[var]
-        else:
-            safe_env = os.environ.copy()
+        # Always ensure PYTHONUNBUFFERED is set to prevent output buffering
+        safe_env.setdefault("PYTHONUNBUFFERED", "1")
 
-        # Add user-provided environment variables
+        # Add/override with user-provided environment variables
         if env:
             # Validate environment variables
             for key, value in env.items():
@@ -352,9 +346,12 @@ class SecureProcessExecutor:
         self, cmd_list: List[str], cwd: Optional[str], env: Dict[str, str], timeout: float
     ) -> ProcessResult:
         """Execute command with real-time output streaming to console and logging."""
+        import select
+
         start_time = time.time()
         stdout_lines = []
         stderr_lines = []
+        last_timeout_check = start_time
 
         process = subprocess.Popen(
             cmd_list,
@@ -371,26 +368,45 @@ class SecureProcessExecutor:
             self._active_processes[process.pid] = process
 
         try:
-            # Read output in real-time
+            # Read output in real-time using select for non-blocking I/O
             while True:
+                # Check if process has finished
                 if process.poll() is not None:
                     break
 
-                # Check timeout
-                if time.time() - start_time > timeout:
+                # Check timeout every iteration (not just after output)
+                elapsed = time.time() - start_time
+                if elapsed > timeout:
+                    logger.debug(f"Timeout detected after {elapsed:.2f}s (limit: {timeout}s)")
+                    logger.debug(f"Sending SIGTERM to process {process.pid}")
                     process.terminate()
-                    process.wait(timeout=5)
+                    try:
+                        process.wait(timeout=5)
+                        logger.debug(f"Process {process.pid} terminated gracefully")
+                    except subprocess.TimeoutExpired:
+                        # Process didn't respond to terminate within 2 seconds
+                        # Forcefully kill it to prevent background execution
+                        logger.warning(f"Process {process.pid} didn't respond to SIGTERM after 2s, sending SIGKILL")
+                        process.kill()
+                        process.wait()  # Wait for kill to complete
+                        logger.debug(f"Process {process.pid} killed forcefully")
                     raise subprocess.TimeoutExpired(cmd_list, timeout)
 
-                # Read available output
-                if process.stdout:
-                    line = process.stdout.readline()
-                    if line:
-                        line_stripped = line.rstrip()
-                        stdout_lines.append(line_stripped)
-                        logger.info(line_stripped)
+                # Log timeout check progress every 5 seconds
+                current_time = time.time()
+                if current_time - last_timeout_check >= 5.0:
+                    last_timeout_check = current_time
 
-                time.sleep(0.01)  # Prevent busy waiting
+                # Use select to check if data is available (non-blocking with 0.1s timeout)
+                # This allows us to check the timeout more frequently
+                if process.stdout:
+                    ready, _, _ = select.select([process.stdout], [], [], 0.1)
+                    if ready:
+                        line = process.stdout.readline()
+                        if line:
+                            line_stripped = line.rstrip()
+                            stdout_lines.append(line_stripped)
+                            logger.info(line_stripped)
 
             # Get any remaining output
             stdout, stderr = process.communicate()

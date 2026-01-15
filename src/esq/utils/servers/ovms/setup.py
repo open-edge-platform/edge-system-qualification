@@ -2,16 +2,18 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-HuggingFace model utilities for text generation models.
+OVMS model setup utilities for text generation.
 
-This module handles downloading, exporting, and setting up HuggingFace models
-for OpenVINO Model Server (OVMS) format, including quantization support.
+This module handles exporting models to OpenVINO Model Server format and
+setting up pre-quantized models for OVMS deployment.
 """
 
+import hashlib
 import json
 import logging
 import os
 import shutil
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +25,7 @@ def export_ovms_model(
     device_id,
     configs=None,
     export_timeout=1800,
+    download_timeout=1800,
 ) -> tuple[bool, float, dict, str]:
     """
     Export model to OpenVINO Model Server format.
@@ -34,6 +37,10 @@ def export_ovms_model(
     Models with different quantization parameters are exported to separate directories
     to avoid conflicts and ensure correct configuration.
 
+    The export process now includes:
+    1. Download the model first (with dedicated timeout) to local cache
+    2. Export using the local cached model (avoiding repeated downloads)
+
     Args:
         model_id_or_path: Model identifier or path
         models_dir: Directory for models
@@ -41,18 +48,21 @@ def export_ovms_model(
         device_id: Target device
         configs: Optional configuration dict with quantization parameters
         export_timeout: Maximum time in seconds for model export (default: 1800)
+        download_timeout: Maximum time in seconds for model download (default: 1800)
 
     Returns:
-        tuple[bool, float, dict, str]: (success_status, export_duration_seconds, quantization_config, actual_model_name)
+        tuple[bool, float, float, dict, str]: (success_status, export_duration_seconds,
+            download_duration_seconds, quantization_config, actual_model_name)
             - success_status: True if export succeeded
-            - export_duration_seconds: Time taken for export in seconds
+            - export_duration_seconds: Time taken for export in seconds (including download)
+            - download_duration_seconds: Time taken for model download in seconds (0 if no download)
             - quantization_config: Dict with quantization parameters used (empty if no quantization)
             - actual_model_name: Actual model name used in OVMS config (with quantization suffix if applicable)
     """
-    import hashlib
-    import time
+    from esq.utils.downloads import download_model
 
-    export_start_time = time.time()
+    download_duration = 0.0  # Track model download duration separately
+    export_only_duration = 0.0  # Track actual export duration (excluding download)
     quantization_config = {}  # Track quantization parameters used
 
     config_path = os.path.join(models_dir, "config_all.json")
@@ -63,12 +73,40 @@ def export_ovms_model(
         os.makedirs(models_dir, exist_ok=True)
 
     try:
+        # Step 1: Download the model first if it's a HuggingFace model ID
+        # This ensures the model is in local cache before export
+        # Store the actual path to use for export
+        actual_model_path = model_id_or_path
+
+        if "/" in model_id_or_path and not os.path.exists(model_id_or_path):
+            try:
+                # Track download time separately
+                download_start = time.time()
+                logger.debug(f"Downloading model with timeout of {download_timeout} seconds...")
+                # Download model and get the actual path (may be HuggingFace or ModelScope cache)
+                actual_model_path = download_model(
+                    model_id=model_id_or_path,
+                    timeout=download_timeout,
+                )
+                download_duration = time.time() - download_start
+                logger.debug(f"Model downloaded to: {actual_model_path}")
+            except TimeoutError as timeout_error:
+                download_duration = time.time() - download_start
+                error_msg = f"Model download timeout after {download_duration:.2f} seconds (limit: {download_timeout}s)"
+                logger.error(error_msg)
+                raise RuntimeError(error_msg) from timeout_error
+            except Exception as download_error:
+                download_duration = time.time() - download_start
+                error_msg = f"Model download failed after {download_duration:.2f} seconds: {download_error}"
+                logger.error(error_msg)
+                raise RuntimeError(error_msg) from download_error
+
         # Use safe model name (replace / with _) for directory structure and MediaPipe config
         # This matches the behavior of pre-quantized models
         model_safe_name = model_id_or_path.replace("/", "_")
 
-        logger.info(f"Exporting model {model_id_or_path} to OpenVINO Model Server format at {models_dir}")
-        logger.info(f"Using safe model name: {model_safe_name}")
+        logger.debug(f"Exporting model {model_id_or_path} to OpenVINO Model Server format at {models_dir}")
+        logger.debug(f"Using safe model name: {model_safe_name}")
 
         # Determine default quantization parameters
         def get_default_quantization_params(model_id):
@@ -179,10 +217,6 @@ def export_ovms_model(
         model_safe_name_with_quant = f"{model_safe_name}{quant_suffix}"
         logger.info(f"Full model directory name: {model_safe_name_with_quant}")
 
-        # Note: The target device is handled by the export_text_generation_model function
-        # It updates the servable configuration dynamically without re-exporting the model
-        # So we don't need separate directories per device
-
         # Determine pipeline_type for HETERO devices
         # HETERO requires pipeline_type to be set for MODEL_DISTRIBUTION_POLICY
         pipeline_type = None
@@ -199,23 +233,26 @@ def export_ovms_model(
             "enable_prefix_caching": True,
             "dynamic_split_fuse": True,
             "max_num_batched_tokens": None,
-            "max_num_seqs": "2048",  # Set 256 if want to align with pre-quantized models
-            "cache_size": 2,  # Reduced from 2GB to 1GB for HETERO stability if needed
+            "max_num_seqs": "2048",
+            "cache_size": 2,
             "draft_source_model": None,
             "draft_model_name": None,
             "max_prompt_len": None,
-            "prompt_lookup_decoding": False,  # Add missing parameter
+            "prompt_lookup_decoding": False,
         }
+
+        # Start timing export AFTER download completes (to exclude download time)
+        export_only_start_time = time.time()
 
         logger.info(f"Running model export with timeout of {export_timeout} seconds...")
         logger.info("Export progress will be shown below:")
         logger.info("=" * 80)
 
         try:
-            from esq.utils.models.export_model import export_text_generation_model
+            from .export_model import export_text_generation_model
 
             export_text_generation_model(
-                source_model=model_id_or_path,
+                source_model=actual_model_path,  # Use actual path (may be from ModelScope cache)
                 model_name=model_safe_name_with_quant,
                 model_repository_path=models_dir,
                 precision=model_precision,
@@ -231,7 +268,7 @@ def export_ovms_model(
 
             # Final validation check to ensure model is properly exported
             model_export_path = os.path.join(models_dir, model_safe_name_with_quant)
-            from esq.utils.models.export_model import cleanup_incomplete_model_export, validate_openvino_model_export
+            from .export_model import cleanup_incomplete_model_export, validate_openvino_model_export
 
             if not validate_openvino_model_export(model_export_path, model_type="text_generation"):
                 logger.error(f"Post-export validation failed for: {model_export_path}")
@@ -240,35 +277,57 @@ def export_ovms_model(
                     f"Model export validation failed: required OpenVINO model files missing in {model_export_path}"
                 )
 
-        except TimeoutError:
-            raise
-        except ValueError:
-            raise
-        except Exception as e:
-            # Ensure cleanup on unexpected errors
+        except TimeoutError as timeout_error:
+            export_only_duration = time.time() - export_only_start_time
+            error_msg = f"Model export timeout after {export_only_duration:.2f} seconds (limit: {export_timeout}s)"
+            logger.error(error_msg)
+            # Cleanup incomplete export
             model_export_path = os.path.join(models_dir, model_safe_name_with_quant)
-            from esq.utils.models.export_model import cleanup_incomplete_model_export
+            from .export_model import cleanup_incomplete_model_export
 
             cleanup_incomplete_model_export(model_export_path)
-            raise RuntimeError(f"Export failed: {str(e)}") from e
+            raise RuntimeError(error_msg) from timeout_error
+        except ValueError:
+            export_only_duration = time.time() - export_only_start_time
+            # Cleanup on validation errors
+            model_export_path = os.path.join(models_dir, model_safe_name_with_quant)
+            from .export_model import cleanup_incomplete_model_export
 
-        export_duration = time.time() - export_start_time
-        logger.debug(f"Model export completed in {export_duration:.2f} seconds")
+            cleanup_incomplete_model_export(model_export_path)
+            raise
+        except Exception as e:
+            export_only_duration = time.time() - export_only_start_time
+            # Ensure cleanup on unexpected errors
+            model_export_path = os.path.join(models_dir, model_safe_name_with_quant)
+            from .export_model import cleanup_incomplete_model_export
 
-        return True, export_duration, quantization_config, model_safe_name_with_quant
-    except Exception as e:
-        export_duration = time.time() - export_start_time
-        # Include detailed error message in the exception
-        raise RuntimeError(f"OVMS model export failed: {str(e)}") from e
+            cleanup_incomplete_model_export(model_export_path)
+            error_msg = f"Model export failed after {export_only_duration:.2f} seconds: {str(e)}"
+            logger.error(error_msg)
+            raise RuntimeError(error_msg) from e
+
+        # Calculate export-only duration (excluding download)
+        export_only_duration = time.time() - export_only_start_time
+        total_duration = download_duration + export_only_duration
+        logger.info(
+            f"Model export completed in {export_only_duration:.2f} seconds "
+            f"(download: {download_duration:.2f}s, total: {total_duration:.2f}s)"
+        )
+
+        return True, export_only_duration, download_duration, quantization_config, model_safe_name_with_quant
+    except Exception:
+        # Exception already has detailed error message from inner handlers
+        raise
 
 
 def download_and_setup_prequantized_ovms_model(
     model_id: str,
     models_dir: str,
     device_id: str,
+    download_timeout: float = 1800,
 ) -> bool:
     """
-    Download and setup a pre-quantized OpenVINO model from HuggingFace for OVMS.
+    Download and setup a pre-quantized OpenVINO model for OVMS.
 
     This function handles models that are already in OpenVINO IR format with quantization
     applied (e.g., OpenVINO/DeepSeek-R1-Distill-Qwen-1.5B-int4-ov).
@@ -281,15 +340,15 @@ def download_and_setup_prequantized_ovms_model(
               └── openvino_model.bin
 
     Args:
-        model_id: HuggingFace model ID (e.g., "OpenVINO/DeepSeek-R1-Distill-Qwen-1.5B-int4-ov")
+        model_id: Model ID (e.g., "OpenVINO/DeepSeek-R1-Distill-Qwen-1.5B-int4-ov")
         models_dir: Base directory for models
         device_id: Target device ID (CPU, GPU, etc.)
+        download_timeout: Maximum time in seconds for model download (default: 1800)
 
     Returns:
         bool: True if successful, raises RuntimeError otherwise
     """
-
-    from huggingface_hub import snapshot_download
+    from esq.utils.downloads import download_model
 
     config_path = os.path.join(models_dir, "config_all.json")
 
@@ -297,9 +356,8 @@ def download_and_setup_prequantized_ovms_model(
         # Create models directory if it doesn't exist
         os.makedirs(models_dir, exist_ok=True)
 
-        # Download model from HuggingFace Hub
-        # The model will be downloaded to a temporary location first
-        logger.info(f"Downloading pre-quantized model {model_id} from HuggingFace Hub to {models_dir}")
+        # Download model using unified downloader (supports HuggingFace and ModelScope)
+        logger.info(f"Downloading pre-quantized model {model_id} to {models_dir}")
 
         # Use a safe model name for the directory (replace / with _)
         model_safe_name = model_id.replace("/", "_")
@@ -311,14 +369,16 @@ def download_and_setup_prequantized_ovms_model(
         if os.path.exists(model_version_path) and os.path.exists(model_xml_path):
             logger.info(f"Model {model_id} already exists at {model_version_path}, skipping download")
         else:
-            # Download the model to a temporary directory first
+            # Download the model to a temporary directory first using unified downloader
             temp_download_dir = os.path.join(models_dir, f".tmp_{model_safe_name}")
 
             logger.info(f"Downloading model {model_id} to temporary location: {temp_download_dir}")
-            snapshot_download(
-                repo_id=model_id,
+
+            # Use unified downloader that supports both HuggingFace and ModelScope
+            download_model(
+                model_id=model_id,
                 local_dir=temp_download_dir,
-                local_dir_use_symlinks=False,
+                timeout=download_timeout,
             )
             logger.info(f"Model {model_id} downloaded successfully")
 

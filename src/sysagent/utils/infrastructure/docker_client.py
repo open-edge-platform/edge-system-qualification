@@ -696,13 +696,9 @@ class DockerClient:
                     existing = self.client.containers.list(all=True, filters={"name": f"^{name}$"})
                     for ex in existing:
                         logger.info(f"Found existing container '{name}' (status: {ex.status}), removing it first.")
-                        try:
-                            if ex.status == "running":
-                                ex.stop(timeout=5)
-                            ex.remove(force=True)
-                            logger.info(f"Removed existing container '{name}'.")
-                        except Exception as e:
-                            logger.warning(f"Failed to remove existing container '{name}': {e}")
+                        # Use shared cleanup method for consistent handling
+                        self.cleanup_container(name)
+                        logger.debug(f"Removed existing container '{name}'.")
                 except Exception as e:
                     logger.warning(f"Error checking/removing existing container '{name}': {e}")
 
@@ -974,10 +970,14 @@ class DockerClient:
             logger.error(f"Failed to remove container {container_name}: {e}")
             raise
 
-    def cleanup_container(self, container_name, timeout=10):
+    def cleanup_container(self, container_name, timeout=15):
         """
-        Stop log streaming, stop and remove a container in any state.
+        Stop log streaming and remove a container in any state.
         This method handles containers that may be created, running, stopped, or failed.
+
+        Args:
+            container_name: Name of the container to cleanup
+            timeout: Maximum time to wait for ongoing removal to complete (seconds)
         """
         logger.debug(f"Cleaning up container: {container_name}")
 
@@ -994,6 +994,21 @@ class DockerClient:
             container_status = container.status
             logger.debug(f"Container {container_name} status: {container_status}")
 
+            # If container is already being removed, wait for it to complete
+            if container_status == "removing":
+                logger.debug(
+                    f"Container {container_name} already being removed, waiting up to {timeout}s for completion"
+                )
+                wait_start = time.time()
+                while time.time() - wait_start < timeout:
+                    if not self.container_exists(container_name):
+                        logger.debug(f"Container {container_name} removal completed")
+                        return
+                    time.sleep(0.5)
+                logger.debug(
+                    f"Container {container_name} still exists after {timeout}s wait, proceeding with force removal"
+                )
+
             # Force remove the container regardless of its state
             # This handles containers in created, running, stopped, exited, or failed states
             logger.debug(f"Forcefully removing container: {container_name} (status: {container_status})")
@@ -1002,16 +1017,36 @@ class DockerClient:
 
         except docker.errors.NotFound:
             logger.debug(f"Container {container_name} not found during cleanup (already removed)")
+        except docker.errors.APIError as e:
+            # Check if this is a "removal already in progress" error (409 Conflict)
+            if e.status_code == 409 and "is already in progress" in str(e):
+                logger.debug(
+                    f"Container {container_name} removal already in progress, waiting for completion (up to {timeout}s)"
+                )
+                wait_start = time.time()
+                while time.time() - wait_start < timeout:
+                    if not self.container_exists(container_name):
+                        logger.debug(f"Container {container_name} removal completed")
+                        return
+                    time.sleep(0.5)
+                logger.debug(
+                    f"Container {container_name} cleanup timed out after {timeout}s, "
+                    f"but removal may still be in progress"
+                )
+            else:
+                # Other API errors - try alternative cleanup
+                logger.warning(f"Error during container cleanup: {e}")
+                try:
+                    logger.debug(f"Attempting alternative cleanup for container: {container_name}")
+                    self.client.api.remove_container(container_name, force=True)
+                    logger.debug(f"Successfully removed container using API: {container_name}")
+                except Exception as api_error:
+                    if "is already in progress" in str(api_error):
+                        logger.debug(f"Container {container_name} removal already in progress (alternative)")
+                    else:
+                        logger.warning(f"Alternative cleanup also failed for {container_name}: {api_error}")
         except Exception as e:
-            logger.warning(f"Error during container cleanup: {e}")
-            # Try alternative cleanup approach
-            try:
-                logger.debug(f"Attempting alternative cleanup for container: {container_name}")
-                # Use low-level API for forced removal
-                self.client.api.remove_container(container_name, force=True)
-                logger.debug(f"Successfully removed container using API: {container_name}")
-            except Exception as api_error:
-                logger.warning(f"Alternative cleanup also failed for {container_name}: {api_error}")
+            logger.warning(f"Unexpected error during container cleanup: {e}")
 
         logger.info(f"Cleanup completed for container: {container_name}")
 
@@ -1031,20 +1066,16 @@ class DockerClient:
     def cleanup_containers_by_name_pattern(self, name_pattern: str, timeout=10):
         """
         Cleanup containers that match a specific name pattern.
-        Handles containers in any state (created, running, stopped, exited, failed).
+        Uses the shared cleanup_container method for consistent handling.
 
         Args:
             name_pattern (str): Pattern to match in container names
-            timeout (int): Timeout for stopping containers (unused, kept for compatibility)
+            timeout (int): Timeout parameter (passed to cleanup_container)
         """
         try:
             logger.info(f"Cleaning up containers matching pattern: '{name_pattern}'")
             all_containers = self.client.containers.list(all=True)
-            matching_containers = []
-
-            for container in all_containers:
-                if container.name and name_pattern in container.name:
-                    matching_containers.append(container)
+            matching_containers = [c for c in all_containers if c.name and name_pattern in c.name]
 
             if not matching_containers:
                 logger.debug(f"No containers found matching pattern: '{name_pattern}'")
@@ -1053,27 +1084,7 @@ class DockerClient:
             logger.info(f"Found {len(matching_containers)} containers matching pattern '{name_pattern}'")
 
             for container in matching_containers:
-                try:
-                    container_status = container.status
-                    logger.debug(
-                        f"Removing container: {container.name} ({container.id[:12]}, status: {container_status})"
-                    )
-
-                    # Force remove regardless of state - this handles created, running, stopped, exited states
-                    container.remove(force=True)
-                    logger.debug(f"Successfully removed container: {container.name}")
-
-                except docker.errors.NotFound:
-                    logger.debug(f"Container {container.name} not found (already removed)")
-                except Exception as cleanup_error:
-                    logger.warning(f"Failed to remove container {container.name}: {cleanup_error}")
-                    # Try alternative approach with API
-                    try:
-                        logger.debug(f"Attempting API removal for container: {container.name}")
-                        self.client.api.remove_container(container.id, force=True)
-                        logger.debug(f"Successfully removed container via API: {container.name}")
-                    except Exception as api_error:
-                        logger.warning(f"API removal also failed for {container.name}: {api_error}")
+                self.cleanup_container(container.name, timeout=timeout)
 
         except Exception as e:
             logger.warning(f"Failed to cleanup containers by pattern '{name_pattern}': {e}")

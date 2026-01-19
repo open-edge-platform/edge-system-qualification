@@ -94,13 +94,7 @@ def cleanup_stale_containers(docker_client, docker_container_prefix: str) -> Non
     stale_containers = docker_client.client.containers.list(all=True, filters={"name": f"{docker_container_prefix}*"})
     logger.debug(f"Stale containers found: {[container.name for container in stale_containers]}")
     for container in stale_containers:
-        try:
-            logger.info(f"Removing container {container.name}...")
-            container.remove(force=True)
-        except docker.errors.NotFound:
-            logger.warning(f"Container {container.name} was already removed.")
-        except Exception as e:
-            logger.error(f"Error removing container {container.name}: {e}")
+        docker_client.cleanup_container(container.name)
 
 
 def cleanup_thread_pool(thread_pool=None) -> None:
@@ -255,6 +249,165 @@ def update_device_metrics(
                 logger.warning(f"Failed to update metrics for {dev_id}: {e}")
         else:
             logger.debug(f"No result file found for {dev_id} at {result_file}")
+
+
+def read_device_result(
+    device_id: str, results_dir: str, num_sockets: int = 1, aggregate_multi_socket: bool = True
+) -> Dict[str, Any]:
+    """
+    Read device result from standardized result files.
+
+    Handles both single-device and multi-socket CPU scenarios with consistent run_id scheme:
+    - run_id=1: Socket 0 or single-device
+    - run_id=2+: Additional sockets (multi-socket CPU only)
+
+    Args:
+        device_id: Device identifier
+        results_dir: Directory containing result files
+        num_sockets: Number of CPU sockets (default: 1)
+        aggregate_multi_socket: If True, aggregate multi-socket results (default: True)
+
+    Returns:
+        Dictionary with device results including metadata, or error state if reading fails
+    """
+    is_multisocket = device_id == "CPU" and num_sockets > 1
+
+    if is_multisocket and aggregate_multi_socket:
+        # Multi-socket aggregation: read from run_id=1, 2, ...
+        all_socket_fps = []
+        total_streams = 0
+        aggregated_fps_list = []
+        max_duration = 0.0
+        max_fps_counter_duration = 0.0
+        all_successful = True
+
+        logger.debug(f"[{device_id}] Reading multi-socket results from {num_sockets} sockets")
+
+        for socket_idx in range(num_sockets):
+            socket_run_id = 1 + socket_idx
+            socket_path = os.path.join(results_dir, f"total_streams_result_{socket_run_id}_{device_id}.json")
+
+            if not os.path.exists(socket_path):
+                logger.warning(f"[{device_id}] Missing socket {socket_idx} result at {socket_path}")
+                all_successful = False
+                all_socket_fps.append(0)
+                continue
+
+            try:
+                with open(socket_path, "r") as f:
+                    socket_data = json.load(f)
+
+                if device_id not in socket_data:
+                    logger.warning(f"[{device_id}] No {device_id} data in socket {socket_idx} result")
+                    all_successful = False
+                    all_socket_fps.append(0)
+                    continue
+
+                socket_device_data = socket_data[device_id]
+                socket_meta = socket_device_data.get("metadata", {})
+                socket_fps_list = socket_meta.get("per_stream_fps_list", [])
+
+                socket_per_stream_fps = socket_meta.get("per_stream_fps", 0)
+                socket_num_streams = socket_meta.get("num_streams", 0)
+
+                # Handle case where per_stream_fps_list is empty but we have valid per_stream_fps
+                if not socket_fps_list and socket_num_streams > 0 and socket_per_stream_fps > 0:
+                    # Reconstruct FPS list using per_stream_fps value
+                    socket_fps_list = [socket_per_stream_fps] * socket_num_streams
+                    logger.debug(
+                        f"[{device_id}] Socket {socket_idx}: Reconstructed FPS list from per_stream_fps "
+                        f"({socket_num_streams} x {socket_per_stream_fps})"
+                    )
+
+                logger.debug(
+                    f"[{device_id}] Socket {socket_idx}: {socket_num_streams} streams, "
+                    f"{socket_per_stream_fps} FPS, fps_list={socket_fps_list}"
+                )
+
+                all_socket_fps.append(socket_per_stream_fps)
+                aggregated_fps_list.extend(socket_fps_list)
+                total_streams += socket_num_streams
+                max_duration = max(max_duration, socket_device_data.get("analysis_duration", 0.0))
+                max_fps_counter_duration = max(max_fps_counter_duration, socket_meta.get("fps_counter_duration", 0.0))
+
+            except Exception as e:
+                logger.warning(f"[{device_id}] Failed to read socket {socket_idx} result: {e}")
+                all_successful = False
+                all_socket_fps.append(0)
+
+        logger.debug(
+            f"[{device_id}] Aggregation: all_successful={all_successful}, "
+            f"total_streams={total_streams}, aggregated_fps_list_len={len(aggregated_fps_list)}"
+        )
+
+        if not all_successful or not aggregated_fps_list:
+            return {
+                "per_stream_fps": 0,
+                "num_streams": 0,
+                "error": "Failed to read multi-socket results",
+            }
+
+        # Return aggregated result
+        total_fps = sum(aggregated_fps_list)
+        avg_per_stream_fps = total_fps / len(aggregated_fps_list) if aggregated_fps_list else 0.0
+
+        return {
+            "per_stream_fps": min(all_socket_fps),  # Use minimum for conservative estimate
+            "num_streams": total_streams,
+            "metadata": {
+                "parse_source": "average",
+                "fps_counter_duration": max_fps_counter_duration,
+                "per_stream_fps_list": aggregated_fps_list,
+                "num_streams": len(aggregated_fps_list),
+                "per_stream_fps": avg_per_stream_fps,
+                "total_fps": total_fps,
+            },
+            "analysis_duration": max_duration,
+            "analysis_status": "success",
+        }
+    else:
+        # Single-device or non-aggregated read: use run_id=1
+        result_path = os.path.join(results_dir, f"total_streams_result_1_{device_id}.json")
+
+        if not os.path.exists(result_path):
+            logger.warning(f"Result file not found: {result_path}")
+            return {
+                "per_stream_fps": 0,
+                "num_streams": 0,
+                "error": "Result file not found",
+            }
+
+        try:
+            with open(result_path, "r") as f:
+                result_data = json.load(f)
+
+            if device_id not in result_data:
+                logger.warning(f"No {device_id} data in result file")
+                return {
+                    "per_stream_fps": 0,
+                    "num_streams": 0,
+                    "error": "Device not found in result",
+                }
+
+            device_data = result_data[device_id]
+            metadata = device_data.get("metadata", {})
+
+            return {
+                "per_stream_fps": metadata.get("per_stream_fps", 0),
+                "num_streams": metadata.get("num_streams", 0),
+                "metadata": metadata,
+                "analysis_status": device_data.get("analysis_status", "unknown"),
+                "analysis_duration": device_data.get("analysis_duration", 0.0),
+                "main_process_exit_code": device_data.get("main_process_exit_code", 0),
+                "result_process_exit_code": device_data.get("result_process_exit_code", 0),
+            }
+        except Exception as e:
+            logger.error(f"Failed to read result file {result_path}: {e}")
+            return {
+                "per_stream_fps": 0,
+                "num_streams": 0,
+                "error": f"Failed to read result: {str(e)}",
+            }
 
 
 def wait_for_containers(containers: List[docker.models.containers.Container]) -> None:

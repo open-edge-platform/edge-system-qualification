@@ -25,8 +25,40 @@ logger = logging.getLogger(__name__)
 
 
 def get_cpu_socket_numa_info(num_sockets: int = 1) -> List[Dict[str, Any]]:
-    """Get CPU socket and NUMA node information for multi-socket systems."""
+    """Get CPU socket and NUMA node information for multi-socket systems.
+
+    For systems with insufficient NUMA nodes (e.g., 1-socket system testing dual-socket scenario),
+    generates simulated NUMA configuration for testing purposes.
+    """
     num_of_numa_nodes = list(numa.info.numa_hardware_info()["node_cpu_info"].keys())
+
+    # Handle insufficient NUMA nodes - simulate configuration for testing
+    if len(num_of_numa_nodes) < num_sockets:
+        logger.warning(
+            f"System has {len(num_of_numa_nodes)} NUMA node(s) but {num_sockets} socket(s) requested. "
+            f"Generating simulated NUMA configuration for testing."
+        )
+        # Create simulated socket configurations with evenly distributed CPUs
+        available_cpus = (
+            numa.info.node_to_cpus(num_of_numa_nodes[0]) if num_of_numa_nodes else list(range(os.cpu_count()))
+        )
+        cpus_per_socket = max(1, len(available_cpus) // num_sockets)
+
+        cpu_socket = []
+        for i in range(num_sockets):
+            start_cpu = i * cpus_per_socket
+            end_cpu = start_cpu + cpus_per_socket if i < num_sockets - 1 else len(available_cpus)
+            socket_cpus = available_cpus[start_cpu:end_cpu]
+
+            # Remove 2 CPUs if we have enough, to avoid overloading
+            if len(socket_cpus) > 2:
+                socket_cpus = socket_cpus[:-2]
+
+            cpu_socket.append({"nodes": [num_of_numa_nodes[0]] if num_of_numa_nodes else [0], "cpu_ids": socket_cpus})
+
+        return cpu_socket
+
+    # Normal path: sufficient NUMA nodes available
     bucket_size = int(len(num_of_numa_nodes) / num_sockets)
 
     bucket = []
@@ -185,6 +217,7 @@ def run_concurrent_analysis(
     target_fps: float,
     num_sockets: int = 1,
     container_config: Dict[str, Any] = None,
+    base_run_id: int = 1,
 ) -> None:
     """
     Run analysis on multiple devices/configurations simultaneously.
@@ -194,31 +227,59 @@ def run_concurrent_analysis(
         pipeline: Pipeline string to use for the benchmark
         pipeline_params: Dictionary of pipeline parameters
         num_sockets: Number of CPU sockets for multi-socket systems
+        container_config: Container configuration with available images (optional)
+        base_run_id: Base run ID for result file naming (default: 1)
+                     - run_id=0: Reserved for qualification_state storage only (no actual execution)
+                     - run_id=1: Primary execution (single device or socket 1 in multi-socket)
+                     - run_id=2+: Additional sockets in multi-socket CPU scenarios
+
+                     Standard practice: Always use base_run_id >= 1 for actual container execution.
+                     The qualification state is separately saved to run_id=0 after execution completes.
+                     - Use 0 only for qualification state storage (reserved)
+                     - For multi-socket: run_id = base_run_id + socket_index
+                       Example: base_run_id=1 → socket 0: run_id=1, socket 1: run_id=2
+                     - For single-device: run_id = base_run_id
+
+    Result File Naming Convention:
+        - total_streams_result_0_{device_id}.json: Qualification state (reserved)
+        - total_streams_result_1_{device_id}.json: Socket 0 or single-device results
+        - total_streams_result_2_{device_id}.json: Socket 1 results (multi-socket only)
+        - And so on for additional sockets
     """
-    logger.debug(f"Running concurrent analysis with tasks: {analysis_tasks}")
+    # Log concise summary of analysis tasks
+    task_summary = ", ".join(
+        f"{dev_id}:{data.get('qualification_state', {}).get('num_streams', 0)} streams"
+        for dev_id, data in analysis_tasks.items()
+    )
+    logger.debug(f"Running concurrent analysis (run_id={base_run_id}): {task_summary}")
     containers = []
 
     for device_id, data in analysis_tasks.items():
         qual_state = data.get("qualification_state", {})
         num_streams = qual_state.get("num_streams", 0)
-        logger.info(f"[{device_id}] Running with {num_streams} streams")
+        logger.info(f"[{device_id}] Running with {num_streams} streams (base_run_id={base_run_id})")
         # Handle special case for multi-socket CPU
         if device_id == "CPU" and num_sockets > 1:
             numa_info = get_cpu_socket_numa_info(num_sockets=num_sockets)
             # Divide streams evenly across sockets
             total_streams = num_streams
             streams_per_socket = total_streams // num_sockets if total_streams is not None else None
-            logger.info(
-                f"[{device_id}] Multi-socket CPU: Dividing {total_streams} total streams "
-                f"across {num_sockets} sockets ({streams_per_socket} streams per socket)"
-            )
-            for i, numa_node in enumerate(numa_info):
+
+            # Skip multi-socket execution if streams are insufficient (less than num_sockets)
+            # Fall back to single-socket execution to avoid invalid 0-stream containers
+            if streams_per_socket is None or streams_per_socket < 1:
+                logger.warning(
+                    f"[{device_id}] Insufficient streams ({total_streams}) for multi-socket execution "
+                    f"across {num_sockets} sockets. Falling back to single-socket execution."
+                )
+                # Run on first socket only with all streams
+                numa_node = numa_info[0]
                 cpus = ",".join(map(str, numa_node["cpu_ids"]))
                 mems = ",".join(map(str, numa_node["nodes"]))
 
                 container = run_benchmark_container(
                     docker_client=docker_client,
-                    run_id=i,
+                    run_id=base_run_id,  # Use base_run_id for single socket
                     device_id=device_id,
                     device_dict=device_dict,
                     pipeline=pipeline,
@@ -231,14 +292,43 @@ def run_concurrent_analysis(
                     target_fps=target_fps,
                     cpuset_cpus=cpus,
                     cpuset_mems=mems,
-                    num_streams=streams_per_socket,
+                    num_streams=total_streams,  # Use all streams on single socket
                     container_config=container_config,
                 )
                 containers.append(container)
+            else:
+                # Normal multi-socket execution with sufficient streams
+                logger.info(
+                    f"[{device_id}] Multi-socket CPU: Dividing {total_streams} total streams "
+                    f"across {num_sockets} sockets ({streams_per_socket} streams per socket)"
+                )
+                for i, numa_node in enumerate(numa_info):
+                    cpus = ",".join(map(str, numa_node["cpu_ids"]))
+                    mems = ",".join(map(str, numa_node["nodes"]))
+
+                    container = run_benchmark_container(
+                        docker_client=docker_client,
+                        run_id=base_run_id + i,  # Use base_run_id + socket index
+                        device_id=device_id,
+                        device_dict=device_dict,
+                        pipeline=pipeline,
+                        pipeline_params=pipeline_params,
+                        docker_image_tag_analyzer=docker_image_tag_analyzer,
+                        docker_container_prefix=docker_container_prefix,
+                        data_dir=data_dir,
+                        container_mnt_dir=container_mnt_dir,
+                        pipeline_timeout=pipeline_timeout,
+                        target_fps=target_fps,
+                        cpuset_cpus=cpus,
+                        cpuset_mems=mems,
+                        num_streams=streams_per_socket,
+                        container_config=container_config,
+                    )
+                    containers.append(container)
         else:
             container = run_benchmark_container(
                 docker_client=docker_client,
-                run_id=0,
+                run_id=base_run_id,  # Use base_run_id directly
                 device_id=device_id,
                 device_dict=device_dict,
                 pipeline=pipeline,
@@ -256,191 +346,3 @@ def run_concurrent_analysis(
             containers.append(container)
 
     wait_for_containers(containers)
-
-
-def confirm_steady_state_concurrent_analysis(
-    docker_client,
-    device_dict: Dict[str, Any],
-    qualified_devices: Dict[str, Any],
-    pipeline: str,
-    pipeline_params: Dict[str, Dict[str, str]],
-    docker_image_tag_analyzer: str,
-    docker_container_prefix: str,
-    data_dir: str,
-    container_mnt_dir: str,
-    pipeline_timeout: int,
-    results_dir: str,
-    target_fps: float,
-    num_sockets: int = 1,
-    confirmation_threshold: int = 2,
-    container_config: Dict[str, Any] = None,
-) -> bool:
-    """
-    Run final concurrent analysis with all qualified devices and verify steady-state stability.
-
-    This function ensures that the final concurrent metrics are stable by running multiple
-    confirmation runs. If devices cannot consistently achieve target FPS, it reduces stream
-    counts (only downward) and retries until a stable configuration is found.
-
-    Args:
-        docker_client: Docker client instance
-        device_dict: Dictionary containing device information
-        qualified_devices: Dictionary of qualified devices with their configurations
-        pipeline: Pipeline configuration string
-        pipeline_params: Pipeline parameters dictionary
-        docker_image_tag_analyzer: Docker image tag for analyzer
-        docker_container_prefix: Prefix for container names
-        data_dir: Data directory path
-        container_mnt_dir: Container mount directory
-        pipeline_timeout: Timeout for pipeline execution
-        results_dir: Directory for result files
-        target_fps: Target FPS threshold
-        num_sockets: Number of CPU sockets
-        confirmation_threshold: Number of consecutive successful runs required (default: 2)
-        container_config: Container configuration with available images
-
-    Returns:
-        True if steady-state confirmed, False otherwise
-    """
-    if len(qualified_devices) <= 1:
-        logger.info("Only one device qualified - skipping steady-state confirmation")
-        return True
-
-    logger.info(
-        f"Running steady-state confirmation with {len(qualified_devices)} qualified devices "
-        f"(confirmation threshold: {confirmation_threshold})"
-    )
-
-    # Track confirmation attempts for each device
-    device_confirmation_counts = {device_id: 0 for device_id in qualified_devices.keys()}
-    max_reduction_attempts = 10  # Maximum number of stream reduction attempts
-    reduction_attempt = 0
-
-    while reduction_attempt < max_reduction_attempts:
-        # Check if all devices have been confirmed
-        if all(count >= confirmation_threshold for count in device_confirmation_counts.values()):
-            logger.info(
-                f"Steady-state confirmed for all {len(qualified_devices)} devices after "
-                f"{reduction_attempt} reduction attempts"
-            )
-            return True
-
-        # Run concurrent analysis with current stream configurations
-        logger.info(
-            f"Running confirmation attempt (reduction iteration {reduction_attempt + 1}/{max_reduction_attempts})"
-        )
-
-        run_concurrent_analysis(
-            docker_client=docker_client,
-            device_dict=device_dict,
-            analysis_tasks=qualified_devices,
-            pipeline=pipeline,
-            pipeline_params=pipeline_params,
-            docker_image_tag_analyzer=docker_image_tag_analyzer,
-            docker_container_prefix=docker_container_prefix,
-            data_dir=data_dir,
-            container_mnt_dir=container_mnt_dir,
-            pipeline_timeout=pipeline_timeout,
-            target_fps=target_fps,
-            num_sockets=num_sockets,
-            container_config=container_config,
-        )
-
-        # Parse results and check if devices met target FPS
-        devices_needing_reduction = []
-
-        for device_id in qualified_devices.keys():
-            result_file = os.path.join(results_dir, f"total_streams_result_0_{device_id}.json")
-
-            if not os.path.exists(result_file):
-                logger.warning(f"Result file not found for {device_id}: {result_file}")
-                device_confirmation_counts[device_id] = 0
-                devices_needing_reduction.append(device_id)
-                continue
-
-            try:
-                with open(result_file, "r") as f:
-                    result_data = json.load(f)
-
-                if device_id not in result_data:
-                    logger.warning(f"Device {device_id} not found in result file")
-                    device_confirmation_counts[device_id] = 0
-                    devices_needing_reduction.append(device_id)
-                    continue
-
-                device_data = result_data[device_id]
-                metadata = device_data.get("metadata", {})
-                per_stream_fps = metadata.get("per_stream_fps", 0)
-                num_streams = metadata.get("num_streams", 0)
-
-                # Check if device achieved target FPS
-                if per_stream_fps >= target_fps:
-                    device_confirmation_counts[device_id] += 1
-                    logger.info(
-                        f"[{device_id}] Confirmation {device_confirmation_counts[device_id]}/{confirmation_threshold}: "
-                        f"{num_streams} streams at {per_stream_fps:.2f} FPS (target: {target_fps:.2f})"
-                    )
-
-                    # Update qualified devices metadata with confirmed metrics
-                    if "metadata" in qualified_devices[device_id]:
-                        qualified_devices[device_id]["metadata"].update(metadata)
-                else:
-                    # Reset confirmation count and mark for reduction
-                    current_count = device_confirmation_counts[device_id]
-                    if current_count > 0:
-                        logger.debug(
-                            f"[{device_id}] Failed to achieve target FPS: {per_stream_fps:.2f} < {target_fps:.2f} "
-                            f"(resetting confirmation count from {current_count} to 0)"
-                        )
-                    else:
-                        logger.debug(
-                            f"[{device_id}] Failed to achieve target FPS: {per_stream_fps:.2f} < {target_fps:.2f}"
-                        )
-                    device_confirmation_counts[device_id] = 0
-                    devices_needing_reduction.append(device_id)
-
-            except Exception as e:
-                logger.error(f"Failed to parse results for {device_id}: {e}")
-                device_confirmation_counts[device_id] = 0
-                devices_needing_reduction.append(device_id)
-
-        # If all devices are confirmed, we're done
-        if not devices_needing_reduction:
-            logger.info("All devices confirmed - steady-state achieved")
-            return True
-
-        # Reduce streams for devices that didn't meet target FPS
-        logger.info(f"Reducing streams for devices: {devices_needing_reduction}")
-
-        for device_id in devices_needing_reduction:
-            qual_state = qualified_devices[device_id].get("qualification_state", {})
-            current_streams = qual_state.get("num_streams", 1)
-
-            # Reduce by 1 stream (only downward adjustment)
-            new_streams = max(1, current_streams - 1)
-
-            if new_streams == current_streams:
-                logger.warning(
-                    f"[{device_id}] Already at minimum streams (1) - cannot reduce further. "
-                    "Steady-state may not be achievable."
-                )
-                continue
-
-            logger.info(
-                f"[{device_id}] Reducing streams from {current_streams} to {new_streams} to find stable configuration"
-            )
-
-            # Update qualification state with new stream count
-            qualified_devices[device_id]["qualification_state"]["num_streams"] = new_streams
-
-            # Reset confirmation count for this device since we changed configuration
-            device_confirmation_counts[device_id] = 0
-
-        reduction_attempt += 1
-
-    # Max reduction attempts reached
-    logger.warning(
-        f"Failed to achieve steady-state after {max_reduction_attempts} reduction attempts. "
-        "Using last known configuration."
-    )
-    return False

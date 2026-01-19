@@ -202,7 +202,7 @@ def run_dlstreamer_analyzer_container(
             logger.error(error_message)
             raise RuntimeError(error_message)
 
-        logger.info(f"Container {container_name} started successfully")
+        logger.debug(f"Container {container_name} started successfully")
         docker_client.start_log_streaming(container, container_name)
 
         return container

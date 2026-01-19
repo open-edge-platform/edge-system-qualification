@@ -26,7 +26,7 @@ def process_device_results(device_list: list, qualified_devices: Dict[str, Any],
     for dev_id, dev_data in qualified_devices.items():
         # Only update with devices that have passed qualification
         if dev_data.get("pass", False):
-            # Extract metrics from nested metadata structure (source of truth)
+            # Extract metrics from metadata (already populated from qualification_state by analysis.py)
             device_metadata = dev_data.get("metadata", {})
             latest_streams = device_metadata.get("num_streams", 0)
             latest_fps = device_metadata.get("per_stream_fps", 0)
@@ -224,11 +224,14 @@ def finalize_device_metrics(
     # Update aggregate streams_max if it exists (for both single and multi-device scenarios)
     if "streams_max" in results.metrics:
         # Only sum positive values (skip -1 errors and 0 failures)
-        total_streams = sum(
-            dev_data.get("metadata", {}).get("num_streams", 0)
-            for dev_id, dev_data in qualified_devices.items()
-            if dev_data.get("pass", False) and dev_data.get("metadata", {}).get("num_streams", 0) > 0
-        )
+        total_streams = 0
+        for dev_id, dev_data in qualified_devices.items():
+            if dev_data.get("pass", False):
+                device_metadata = dev_data.get("metadata", {})
+                device_streams = device_metadata.get("num_streams", 0)
+
+                if device_streams > 0:
+                    total_streams += device_streams
 
         results.metrics["streams_max"].value = total_streams
         if len(device_list) > 1:

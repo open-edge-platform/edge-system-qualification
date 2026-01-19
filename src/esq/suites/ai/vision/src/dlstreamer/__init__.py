@@ -5,7 +5,6 @@
 
 from .analysis import parse_device_result_file
 from .concurrent import (
-    confirm_steady_state_concurrent_analysis,
     get_cpu_socket_numa_info,
     run_benchmark_container,
     run_concurrent_analysis,
@@ -41,7 +40,6 @@ __all__ = [
     "prepare_baseline",
     "prepare_estimate_num_streams_for_device",
     # Concurrent and benchmarking
-    "confirm_steady_state_concurrent_analysis",
     "get_cpu_socket_numa_info",
     "run_benchmark_container",
     "run_concurrent_analysis",

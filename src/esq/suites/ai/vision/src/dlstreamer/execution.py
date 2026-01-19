@@ -5,13 +5,13 @@
 
 import json
 import logging
+import os
 import time
 from typing import Any, Dict
 
 from sysagent.utils.core import Metrics, Result, get_metric_name_for_device
 from sysagent.utils.system.ov_helper import get_openvino_device_type
 
-from .concurrent import confirm_steady_state_concurrent_analysis
 from .preparation import get_device_specific_docker_image
 from .qualification import qualify_device
 from .results import (
@@ -130,6 +130,19 @@ def run_device_test(
             max_streams_above_baseline=max_streams_above_baseline,
             container_config=container_config,
         )
+
+        # After qualification, re-read the result file to get complete data including metadata
+        device_result_file = os.path.join(results_dir, f"total_streams_result_0_{device_id}.json")
+        if os.path.exists(device_result_file):
+            try:
+                with open(device_result_file, "r") as f:
+                    result_data = json.load(f)
+                if device_id in result_data:
+                    device_result = result_data[device_id]
+                    logger.debug(f"Loaded qualification result for {device_id}: {json.dumps(device_result, indent=2)}")
+            except Exception as e:
+                logger.warning(f"Failed to read qualification result file for {device_id}: {e}")
+
         final_results[device_id] = device_result
 
         if is_qualified:
@@ -141,15 +154,29 @@ def run_device_test(
             logger.warning(f"[{device_id}] ✗ FAILED qualification. Continuing with next device.")
 
         logger.debug(f"Updating final Result after benchmark: {json.dumps(final_results, indent=2)}")
-        # Update metrics and metadata if pass and per stream FPS is available
-        # Read from metadata structure for measurements, qualification_state for qualification results
-        metadata = device_result.get("metadata", {})
+
+        # Determine status, num_streams, and per_stream_fps based on qualification result
+        # Check 'pass' field first (definitive qualification result)
+        device_passed = device_result.get("pass", False)
         qual_state = device_result.get("qualification_state", {})
-        if is_qualified and metadata.get("per_stream_fps", 0) > 0:
+        metadata = device_result.get("metadata", {})
+
+        if device_passed and is_qualified:
+            # Device qualified successfully
+            # For single-device or first device: use qualification_state values
+            # These will be updated later during concurrent analysis for multi-device scenarios
             status = True
-            num_streams = metadata.get("num_streams", -1)
-            per_stream_fps = metadata.get("per_stream_fps", 0)
+            num_streams = qual_state.get("num_streams", -1)
+            per_stream_fps = qual_state.get("per_stream_fps", 0)
+
+            # If metadata exists (from concurrent measurement), use those values instead
+            if metadata and metadata.get("num_streams", -1) > 0:
+                num_streams = metadata.get("num_streams", num_streams)
+                per_stream_fps = metadata.get("per_stream_fps", per_stream_fps)
+
+            logger.info(f"Device {device_id} qualified: {num_streams} streams at {per_stream_fps:.2f} FPS")
         else:
+            # Device failed qualification
             status = False
             # Read num_streams from qualification_state to distinguish:
             # -1 = pipeline errors/timeouts, 0 = ran but didn't meet target FPS
@@ -159,7 +186,8 @@ def run_device_test(
             if "error_reason" in device_result:
                 result.metadata["error"] = device_result["error_reason"]
             logger.debug(
-                f"Device {device_id} failed qualification: num_streams from qualification_state = {num_streams}"
+                f"Device {device_id} failed qualification: num_streams = {num_streams}, "
+                f"reason: {device_result.get('error_reason', 'Unknown')}"
             )
 
         result.metrics.update(
@@ -338,16 +366,31 @@ def run_multi_device_test(
 
                         # Check 'pass' field to determine if device qualified
                         if device_result.get("pass", False):
-                            # Extract num_streams from result metadata for logging
-                            device_metadata = device_result.get("metadata", {})
-                            device_streams = device_metadata.get("num_streams", -1)
-                            stream_fps = device_metadata.get("per_stream_fps", 0.0)
+                            # Extract num_streams from qualification_state (total streams, not per-socket)
+                            # For multi-socket, qualification_state stores both:
+                            # - num_streams: total requested streams for binary search (e.g., 3)
+                            # - actual_streams_run: actual streams that ran after division (e.g., 2 from 1+1)
+                            qual_state = device_result.get("qualification_state", {})
+                            device_streams = qual_state.get("num_streams", -1)
+                            actual_streams = qual_state.get(
+                                "actual_streams_run", device_streams
+                            )  # Use actual if available
+                            stream_fps = qual_state.get("per_stream_fps", 0.0)
 
                             # Keep full result with qualification_state for multi-device concurrent analysis
                             local_qualified_devices[device_id] = device_result
-                            logger.info(
-                                f"Device {device_id} qualified with {device_streams} streams at {stream_fps:.2f} FPS"
-                            )
+
+                            # Display actual streams for clarity (especially important for multi-socket)
+                            if actual_streams != device_streams:
+                                logger.info(
+                                    f"Device {device_id} qualified with {device_streams} total streams "
+                                    f"({actual_streams} actual after division) at {stream_fps:.2f} FPS"
+                                )
+                            else:
+                                logger.info(
+                                    f"Device {device_id} qualified with {device_streams} streams "
+                                    f"at {stream_fps:.2f} FPS"
+                                )
                         else:
                             error_reason = device_result.get("error_reason", "Device failed qualification")
                             logger.error(f"Device {device_id} failed qualification: {error_reason}")
@@ -425,27 +468,8 @@ def run_multi_device_test(
             }
             continue
 
-    # After all devices qualified, confirm steady-state with concurrent analysis
-    steady_state_confirmed = confirm_steady_state_concurrent_analysis(
-        docker_client=docker_client,
-        device_dict=device_dict,
-        qualified_devices=local_qualified_devices,
-        pipeline=pipeline,
-        pipeline_params=pipeline_params,
-        docker_image_tag_analyzer=docker_image_tag_analyzer,
-        docker_container_prefix=docker_container_prefix,
-        data_dir=data_dir,
-        container_mnt_dir=container_mnt_dir,
-        pipeline_timeout=pipeline_timeout,
-        results_dir=results_dir,
-        target_fps=target_fps,
-        num_sockets=num_sockets,
-        confirmation_threshold=steady_state_confirmation_threshold,
-        container_config=container_config,
-    )
-
-    if not steady_state_confirmed:
-        logger.debug("Steady-state not fully confirmed but proceeding with last known stable configuration")
+    # Qualification already captured complete metadata including per_stream_fps_list
+    logger.info("Updating results with complete metadata")
 
     # Build final result with all device metrics
     final_result = Result.from_test_config(
@@ -470,6 +494,47 @@ def run_multi_device_test(
     )
 
     # Store structured device data in extended_metadata for analysis and visualization
+    # Merge concurrent run metadata (run_id=1+) into qualified devices for complete extended_metadata
+    from .utils import read_device_result
+
+    for dev_id in local_qualified_devices.keys():
+        # Preserve the qualified num_streams from qualification_state before merging
+        qual_state = local_qualified_devices[dev_id].get("qualification_state", {})
+        qualified_num_streams = qual_state.get("num_streams", -1)
+        qualified_per_stream_fps = qual_state.get("per_stream_fps", 0.0)
+
+        # Read results using centralized utility
+        result = read_device_result(
+            device_id=dev_id, results_dir=results_dir, num_sockets=num_sockets, aggregate_multi_socket=True
+        )
+
+        if "error" not in result:
+            # Successfully read result - merge into qualified devices
+            if "metadata" in result:
+                local_qualified_devices[dev_id]["metadata"] = result["metadata"]
+
+            for key in ["analysis_status", "analysis_duration", "main_process_exit_code", "result_process_exit_code"]:
+                if key in result:
+                    local_qualified_devices[dev_id][key] = result[key]
+
+            logger.info(
+                f"Merged results for {dev_id}: "
+                f"{result.get('num_streams', 0)} streams, "
+                f"avg FPS {result.get('per_stream_fps', 0.0):.2f}"
+            )
+        else:
+            # Failed to read result - generate synthetic data
+            logger.warning(f"Failed to read results for {dev_id}: {result['error']}. Using synthetic metadata.")
+            local_qualified_devices[dev_id]["metadata"] = {
+                "parse_source": "synthetic",
+                "fps_counter_duration": 0.0,
+                "per_stream_fps_list": [qualified_per_stream_fps] * qualified_num_streams,
+                "num_streams": qualified_num_streams,
+                "per_stream_fps": qualified_per_stream_fps,
+                "total_fps": qualified_per_stream_fps * qualified_num_streams,
+            }
+
+    # Process results for all devices
     # Remove internal qualification_state from qualified devices for clean final results
     clean_qualified_devices = {
         dev_id: {k: v for k, v in dev_data.items() if k != "qualification_state"}

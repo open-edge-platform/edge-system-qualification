@@ -22,6 +22,7 @@ def parse_device_result_file(device_id: str, results_dir: str) -> Dict[str, Any]
     Returns:
         Dictionary with parsed device results
     """
+    # Read from run_id=0 (qualification state) which contains qualified results with complete metadata
     result_file = os.path.join(results_dir, f"total_streams_result_0_{device_id}.json")
 
     default_result = {
@@ -45,19 +46,31 @@ def parse_device_result_file(device_id: str, results_dir: str) -> Dict[str, Any]
         if device_id in data:
             device_data = data[device_id]
 
-            # Return complete device data including all metadata from FPS counter
-            # This includes: parse_source, fps_counter_duration, per_stream_fps_list,
-            # num_streams, per_stream_fps, total_fps, etc.
+            # Extract qualification state with complete metadata
+            qual_state = device_data.get("qualification_state", {})
+            metadata = qual_state.get("metadata", {})
+
+            # Return complete device data from qualification state
             result = {
                 "pass": device_data.get("pass", False),
             }
 
-            # Include all fields from device_data EXCEPT internal/redundant ones
+            # Include all fields from device_data EXCEPT internal ones
             # Exclude: device_id (already the key), status (redundant with pass),
-            #          qualification_state (internal binary search tracking)
+            #          qualification_state (will extract metadata from it separately)
             for key, value in device_data.items():
                 if key not in ["device_id", "status", "qualification_state"]:
                     result[key] = value
+
+            # Add metadata from qualification_state if available
+            if metadata:
+                result["metadata"] = metadata
+            else:
+                # Fallback: construct metadata from qualification_state basic fields
+                result["metadata"] = {
+                    "num_streams": qual_state.get("num_streams", -1),
+                    "per_stream_fps": qual_state.get("per_stream_fps", 0.0),
+                }
 
             return result
         else:

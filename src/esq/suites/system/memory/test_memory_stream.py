@@ -7,7 +7,6 @@ System Memory Performance Test using STREAM benchmark.
 
 import logging
 import os
-import shutil
 from dataclasses import is_dataclass
 from pathlib import Path
 import allure
@@ -85,8 +84,11 @@ def test_memory_stream(
     test_dir = os.path.dirname(os.path.abspath(__file__))
     docker_dir = os.path.join(test_dir, test_container_path)
 
-    # Use test suite directory for results instead of container directory
-    mem_results = os.path.join(test_dir, "results", test_id)
+    # Use esq_data folder for results (consistent with other suites)
+    core_data_dir_tainted = os.environ.get("CORE_DATA_DIR", os.path.join(os.getcwd(), "esq_data"))
+    core_data_dir = "".join(c for c in core_data_dir_tainted)
+    data_dir = os.path.join(core_data_dir, "data", "system", "memory")
+    mem_results = os.path.join(data_dir, "results", test_id)
     os.makedirs(mem_results, exist_ok=True)
 
     # Ensure directories have correct permissions
@@ -492,14 +494,6 @@ def test_memory_stream(
         )
         logger.error(error_msg, exc_info=True)
         logger.debug(f"Summary context - Results dir: {mem_results}, Operation: {operation}")
-
-    # Clean up test-specific results directory
-    try:
-        if os.path.exists(mem_results):
-            shutil.rmtree(mem_results, ignore_errors=True)
-            logger.debug(f"Cleaned up results directory: {mem_results}")
-    except Exception as cleanup_error:
-        logger.warning(f"Failed to cleanup results directory: {cleanup_error}")
 
     if test_failed:
         pytest.fail(failure_message)

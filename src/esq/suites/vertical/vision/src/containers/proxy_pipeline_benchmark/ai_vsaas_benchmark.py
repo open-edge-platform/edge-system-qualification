@@ -46,6 +46,7 @@ class AIVSaaSBenchmark(BaseProxyPipelineBenchmark):
 
         if device_type == "iGPU":
             if self.VDBOX == 1:
+                # Reference values from i5-12400 benchmarking (1 VDBox)
                 self.config = {
                     "ref_stream_list": [10, 4],
                     "ref_gpu_freq_list": [858.21, 991.32],
@@ -54,9 +55,13 @@ class AIVSaaSBenchmark(BaseProxyPipelineBenchmark):
                     "models": ["yolov5s-416", "yolov5m-416"],
                     "enc_flag": "rate-control=cbr bitrate=2000 target-usage=7",
                     "preproc_backend": "pre-process-backend=va-surface-sharing scale-method=fast",
+                    "max_binary_search_start": 6,
                 }
             else:
                 if self.is_MTL:
+                    # Reference values from MTL 165H benchmarking (for CSV comparison reports)
+                    # Note: Binary search uses max_binary_search_start to cap initial high value
+                    # to prevent timeout issues, while keeping full ref values for reporting
                     self.config = {
                         "ref_stream_list": [18, 19, 5],
                         "ref_gpu_freq_list": [1421.87, 1419.27, 852.81],
@@ -65,6 +70,9 @@ class AIVSaaSBenchmark(BaseProxyPipelineBenchmark):
                         "models": ["yolov5s-416", "yolov5m-416", "yolov5m-416+efficientnet-b0"],
                         "enc_flag": "rate-control=cbr bitrate=2000 target-usage=7",
                         "preproc_backend": "pre-process-backend=va-surface-sharing scale-method=fast",
+                        # Cap binary search starting point to avoid timeout on slower platforms
+                        # Binary search starts at min(ref_stream, max_binary_search_start)
+                        "max_binary_search_start": 8,
                     }
                 else:
                     self.config = {
@@ -75,6 +83,7 @@ class AIVSaaSBenchmark(BaseProxyPipelineBenchmark):
                         "models": ["yolov5s-416", "yolov5m-416", "yolov5m-416+efficientnet-b0"],
                         "enc_flag": "rate-control=cbr bitrate=2000 target-usage=7",
                         "preproc_backend": "pre-process-backend=va-surface-sharing scale-method=fast",
+                        "max_binary_search_start": 8,
                     }
         elif device_type == "dGPU":
             self.config = {
@@ -85,6 +94,7 @@ class AIVSaaSBenchmark(BaseProxyPipelineBenchmark):
                 "models": ["yolov5s-416", "yolov5m-416", "yolov5m-416+efficientnet-b0"],
                 "enc_flag": "rate-control=cbr bitrate=2000 target-usage=7",
                 "preproc_backend": "pre-process-backend=va-surface-sharing scale-method=fast",
+                "max_binary_search_start": 12,  # dGPU can handle higher starting point
             }
         elif device_type == "CPU":
             self.config = {
@@ -95,6 +105,7 @@ class AIVSaaSBenchmark(BaseProxyPipelineBenchmark):
                 "models": ["yolov5s-416", "yolov5m-416", "yolov5m-416+efficientnet-b0"],
                 "enc_flag": "bitrate=2000 speed-preset=superfast",
                 "preproc_backend": "",
+                "max_binary_search_start": 10,  # CPU has many cores, can start higher
             }
         else:
             # NPU or unknown device - not supported as primary device
@@ -194,10 +205,19 @@ class AIVSaaSBenchmark(BaseProxyPipelineBenchmark):
             else:
                 gst_cmd += f"! gvametaconvert format=json json-indent=4 source={video_src} add-empty-results=true ! gvametapublish method=file file-path=/dev/null "
 
-            # Use individual counters but aggregate them properly in parsing
-            # For dual-model combinations, use lower starting-frame to get faster FPS measurements
-            # since these workloads take longer to warm up and may not reach 1000 frames quickly
-            starting_frame = 300 if cls_model_name else 1000
+            # Use lower starting-frame for complex pipelines to prevent hang/timeout issues
+            # - Dual-model combinations: Always use 300 (original fix for A750)
+            # - High stream count (>5): Use 300 as iGPU may struggle with many concurrent streams
+            # - Single-model with encode storage: Use 500 (encode adds latency)
+            # - Simple single-model: Use 1000 (original behavior)
+            if cls_model_name:
+                starting_frame = 300  # Dual-model warmup takes longer
+            elif stream > 5:
+                starting_frame = 300  # High stream count on iGPU needs faster feedback
+            elif device_type != "CPU" and not cls_model_name:
+                starting_frame = 500  # Single-model with encode storage adds latency
+            else:
+                starting_frame = 1000  # CPU or simple cases
             gst_cmd += f"! gvafpscounter starting-frame={starting_frame} ! fakesink async=false sync=false "
 
         self.logger.debug(f"GStreamer command: {gst_cmd}")

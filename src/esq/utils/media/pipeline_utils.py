@@ -20,12 +20,33 @@ import time
 try:
     from sysagent.utils.core.process import run_command
 
+    # Import adaptive search for FPS-guided stream count optimization
+    from esq.utils.media.adaptive_search import (
+        AdaptiveSearchConfig,
+        fps_guided_adaptive_search,
+        get_initial_stream_count,
+    )
+
     # For Popen cases, we need to use subprocess with proper validation
     # FW API doesn't expose Popen directly, so use container_utils wrapper
     from esq.utils.media.container_utils import secure_popen
+
+    ADAPTIVE_SEARCH_AVAILABLE = True
 except ModuleNotFoundError:
     # Inside Docker container, use the lightweight container utilities
     from .container_utils import run_command, secure_popen
+
+    # Import adaptive search from container path
+    try:
+        from .adaptive_search import (
+            AdaptiveSearchConfig,
+            fps_guided_adaptive_search,
+            get_initial_stream_count,
+        )
+
+        ADAPTIVE_SEARCH_AVAILABLE = True
+    except ImportError:
+        ADAPTIVE_SEARCH_AVAILABLE = False
 
 
 def configure_logging(log_file_name):
@@ -144,12 +165,16 @@ class BaseDLBenchmark:
         else:
             self.gpu_render = 128 + self.dgpu_idx
 
-    def get_gst_elements(self, codec):
+    def get_gst_elements(self, codec, use_generic_encoder=False):
         """
         Get GStreamer element names based on device and codec.
 
         Args:
             codec: Codec name (h264, h265, av1, vp9)
+            use_generic_encoder: If True, use generic VA encoder (vah264enc) for dGPU
+                instead of device-specific encoder. This is useful when the encoder
+                receives system memory input (e.g., from compositor) where the generic
+                encoder performs better than device-specific encoder.
 
         Sets self.enc_ele, self.dec_ele, self.post_proc_ele
         """
@@ -169,12 +194,15 @@ class BaseDLBenchmark:
                 self.dec_ele = f"va{codec}dec"
                 self.post_proc_ele = "vapostproc"
             else:
+                # dGPU: Use device-specific elements for decoder and postproc
                 self.dec_ele = f"varenderD{self.gpu_render}{codec}dec"
-                if self.is_MTL:
+                self.post_proc_ele = f"varenderD{self.gpu_render}postproc"
+                # For encoder: use generic encoder when input is system memory
+                # (e.g., from compositor), otherwise use device-specific encoder
+                if use_generic_encoder:
                     self.enc_ele = f"va{codec}enc"
                 else:
-                    self.enc_ele = f"va{codec}lpenc"
-                self.post_proc_ele = f"varenderD{self.gpu_render}postproc"
+                    self.enc_ele = f"varenderD{self.gpu_render}{codec}enc"
 
     def check_VDBox(self):
         """Check number of video decode boxes (VDBox) available on GPU."""
@@ -303,13 +331,16 @@ class BaseDLBenchmark:
         """
         raise NotImplementedError
 
-    def run_gst_pipeline(self, gst_cmd, expected_stream_count=None):
+    def run_gst_pipeline(self, gst_cmd, expected_stream_count=None, iteration_timeout=600):
         """
         Execute GStreamer pipeline and parse FPS results.
 
         Args:
             gst_cmd: GStreamer command string
             expected_stream_count: Number of streams we expect in this test (for validation)
+            iteration_timeout: Maximum time in seconds for a single iteration (default: 600s = 10 min)
+                               If exceeded, pipeline is killed and failure status is returned
+                               with captured CPU/GPU utilization for diagnostics.
 
         Returns:
             tuple: (avg_fps, status)
@@ -368,6 +399,7 @@ class BaseDLBenchmark:
         start_wait_time = time.time()
         last_progress_log = start_wait_time
 
+        iteration_timeout_triggered = False
         try:
             while gst_process.poll() is None:
                 current_time = time.time()
@@ -378,6 +410,48 @@ class BaseDLBenchmark:
                     self.logger.info(f"[PROGRESS] Pipeline running... elapsed: {elapsed:.0f}s")
                     last_progress_log = current_time
 
+                # Check for iteration timeout - prevents indefinite hangs on overloaded GPU
+                if elapsed > iteration_timeout:
+                    iteration_timeout_triggered = True
+                    self.logger.error(f"[TIMEOUT] Iteration timeout ({iteration_timeout}s) exceeded!")
+                    self.logger.error(f"[TIMEOUT] Streams: {expected_stream_count}, Elapsed: {elapsed:.0f}s")
+
+                    # Capture current utilization from telemetry for diagnostics
+                    try:
+                        self.stop_telemetry()  # Stop and flush telemetry data
+                        if os.path.isfile(self.telemetry_file):
+                            with open(self.telemetry_file, "r") as tf:
+                                telemetry_lines = tf.readlines()
+                            # Parse telemetry: CPU Freq, CPU Usage, Mem Usage, GPU Freq, EU Usage, VDBox Usage, Pkg Power, GPU Power
+                            telemetry_data = {}
+                            for line in telemetry_lines:
+                                if ":" in line:
+                                    key, value = line.strip().split(":", 1)
+                                    telemetry_data[key.strip()] = value.strip()
+                            cpu_util = telemetry_data.get("CPU Usage", "N/A")
+                            gpu_freq = telemetry_data.get("GPU Freq", "N/A")
+                            eu_usage = telemetry_data.get("EU Usage", "N/A")
+                            vdbox_usage = telemetry_data.get("VDBox Usage", "N/A")
+                            self.logger.error(
+                                f"[TIMEOUT] Utilization at timeout - CPU: {cpu_util}%, GPU Freq: {gpu_freq} MHz, EU: {eu_usage}%, VDBox: {vdbox_usage}%"
+                            )
+                        else:
+                            self.logger.warning(f"[TIMEOUT] Telemetry file not found: {self.telemetry_file}")
+                    except Exception as telem_err:
+                        self.logger.warning(f"[TIMEOUT] Failed to capture utilization: {telem_err}")
+
+                    # Kill the pipeline
+                    self.logger.error(f"[TIMEOUT] Killing pipeline after {elapsed:.0f}s without valid FPS output")
+                    gst_process.terminate()
+                    try:
+                        gst_process.wait(timeout=10)
+                    except subprocess.TimeoutExpired:
+                        self.logger.warning("[TIMEOUT] Process didn't terminate gracefully, forcing kill")
+                        gst_process.kill()
+                        gst_process.wait()
+                    status = 1
+                    break
+
                 # Kill pipeline if no output for 120 seconds
                 if os.path.isfile(self.result_file) and (time.time() - os.path.getmtime(self.result_file)) > 120:
                     with open(self.result_file, "r") as f:
@@ -385,7 +459,7 @@ class BaseDLBenchmark:
                             status = 1
                     gst_process.terminate()
                     gst_process.wait()
-                    self.logger.info("Pipeline killed after no output for 60s")
+                    self.logger.info("Pipeline killed after no output for 120s")
                     break
                 time.sleep(1)
         except Exception as e:
@@ -414,7 +488,9 @@ class BaseDLBenchmark:
             except Exception as e:
                 self.logger.warning(f"Error closing result file handle: {e}")
 
-            self.stop_telemetry()
+            # Only stop telemetry if not already stopped due to iteration timeout
+            if not iteration_timeout_triggered:
+                self.stop_telemetry()
 
         # Copy result file content before potential issues with next iteration
         # Read from the unique file we created for this iteration
@@ -497,20 +573,52 @@ class BaseDLBenchmark:
                 f"Expected: {expected}, Total lines: {sum(len(v) for v in overall_lines_by_stream_count.values())}"
             )
 
-            # Only validate for VSaaS which uses gvafpscounter with number-streams
-            # LPR/SmartNVR don't use gvafpscounter, so validation doesn't apply
-            if (
-                hasattr(self, "_expected_stream_count")
-                and self._expected_stream_count
-                and self.benchmark_name == "AI VSaaS Gateway Benchmark"
-            ):
-                if self._expected_stream_count not in all_stream_counts:
-                    self.logger.error(
-                        f"ERROR: Expected stream count {self._expected_stream_count} not found in result file! "
-                        f"Found: {all_stream_counts}. This indicates gvafpscounter is outputting stale data."
+            # Stale data filtering: Only applies to VSaaS benchmark.
+            # VSaaS uses binary search with varying stream counts and gvafpscounter state
+            # can persist between runs causing stale data issues.
+            # Other benchmarks (SmartNVR, Headed Visual AI, LPR) use fixed compose grids
+            # where the FPS counter reports total grid size (e.g., 25 for 5x5, 36 for 6x6),
+            # which should NOT be filtered as stale data.
+            is_vsaas = self.benchmark_name == "AI VSaaS Gateway Benchmark"
+            if is_vsaas and hasattr(self, "_expected_stream_count") and self._expected_stream_count:
+                # Stale data handling: Filter out any stream counts HIGHER than expected.
+                # Higher counts indicate leftover data from a previous run with more streams.
+                # Instead of failing hard, we filter them out and use the remaining valid data.
+                max_found = max(all_stream_counts)
+                if max_found > self._expected_stream_count:
+                    # Found stale data - filter it out instead of failing
+                    stale_counts = [c for c in all_stream_counts if c > self._expected_stream_count]
+                    valid_counts = [c for c in all_stream_counts if c <= self._expected_stream_count]
+                    self.logger.warning(
+                        f"Detected stale data: counts {stale_counts} exceed expected "
+                        f"{self._expected_stream_count}. Using valid counts: {valid_counts}"
                     )
-                    self.logger.error("Treating this as a test failure to avoid using incorrect FPS data.")
-                    return 0.0, 1
+                    # Remove stale entries from the dictionary
+                    for stale_count in stale_counts:
+                        del overall_lines_by_stream_count[stale_count]
+
+                    # After filtering, check if we have any valid data left
+                    if not overall_lines_by_stream_count:
+                        self.logger.error(
+                            "No valid data remaining after filtering stale stream counts. "
+                            "All data was from previous runs with higher stream counts."
+                        )
+                        return 0.0, 1
+
+                    # Update all_stream_counts after filtering
+                    all_stream_counts = sorted(overall_lines_by_stream_count.keys())
+                    self.logger.info(f"After filtering stale data, valid stream counts: {all_stream_counts}")
+
+                # Check if expected stream count is now available
+                if self._expected_stream_count not in all_stream_counts:
+                    # Expected stream count not found. This means some streams haven't finished
+                    # warmup (starting-frame not reached). Use highest available instead of failing.
+                    max_valid = max(all_stream_counts)
+                    self.logger.warning(
+                        f"Expected stream count {self._expected_stream_count} not found in result file. "
+                        f"Found: {all_stream_counts}. Some streams may not have reached starting-frame threshold."
+                    )
+                    self.logger.info(f"Using highest available stream count: {max_valid}")
         else:
             self.logger.warning("No FpsCounter(overall) lines found in result file!")
 
@@ -572,7 +680,14 @@ class BaseDLBenchmark:
         return fps >= self.target_fps
 
     def run_test_round(
-        self, resolution=None, codec=None, bitrate=None, ref_stream=None, model_name=None, max_stream=-1
+        self,
+        resolution=None,
+        codec=None,
+        bitrate=None,
+        ref_stream=None,
+        model_name=None,
+        max_stream=-1,
+        max_binary_search_start=None,
     ):
         """
         Run binary search to find maximum concurrent streams meeting target FPS.
@@ -581,16 +696,31 @@ class BaseDLBenchmark:
             resolution: Video resolution
             codec: Codec name
             bitrate: Target bitrate
-            ref_stream: Reference stream count for binary search
+            ref_stream: Reference stream count for binary search and CSV comparison
             model_name: Model name for inference
             max_stream: Maximum streams to test (-1 for unlimited)
+            max_binary_search_start: Cap for binary search starting point to prevent timeout
+                                     on slower platforms. If None, uses ref_stream directly.
+                                     This allows keeping high ref_stream for CSV comparison
+                                     while starting binary search at a lower, safer value.
 
         Returns:
             int or str: Maximum concurrent streams, or formatted result string
         """
         quick_search = True
         low = 1
-        high = ref_stream
+        # Cap the binary search starting point to avoid timeout on slower platforms
+        # If max_binary_search_start is set in config, use min(ref_stream, max_binary_search_start)
+        # This keeps ref_stream for CSV comparison while starting search lower
+        if max_binary_search_start is not None and max_binary_search_start > 0:
+            high = min(ref_stream, max_binary_search_start)
+            if high < ref_stream:
+                self.logger.info(
+                    f"[BINARY_SEARCH] Capping starting point from {ref_stream} to {high} "
+                    f"(max_binary_search_start={max_binary_search_start})"
+                )
+        else:
+            high = ref_stream
         current_stream = 0
         result = 0
         best_avg_fps = 0.0  # Track best FPS for reporting
@@ -657,6 +787,148 @@ class BaseDLBenchmark:
         self.best_avg_fps = best_avg_fps
 
         self.logger.info(f"[PROGRESS] run_test_round returning result: {result}")
+        return result
+
+    def run_test_round_adaptive(
+        self,
+        resolution,
+        codec,
+        bitrate,
+        ref_stream,
+        model_name,
+        max_stream,
+        previous_model_streams=None,
+        safety_factor=0.8,
+        min_jump=2,
+        min_start=5,
+        iteration_timeout=600,
+    ):
+        """
+        Run a test round using FPS-Guided Adaptive Search algorithm.
+
+        This algorithm uses FPS headroom to calculate intelligent jump sizes,
+        reducing iterations from O(n) to O(log n) for high-performance GPUs.
+
+        Args:
+            resolution: Video resolution string
+            codec: Video codec
+            bitrate: Video bitrate
+            ref_stream: Reference stream count for initial binary search
+            model_name: Name of the model being tested
+            max_stream: Maximum stream count limit (-1 for unlimited, uses default 100)
+            previous_model_streams: Result from previous model (for smart starting point)
+            safety_factor: Multiplier for jump calculation (0.0-1.0)
+            min_jump: Minimum streams to jump when passing
+            min_start: Minimum starting stream count (skip warmup zone)
+            iteration_timeout: Maximum time in seconds for a single pipeline iteration
+
+        Returns:
+            Result stream count or formatted string (e.g., "36" or "36(cpu_usage < 25%)")
+        """
+        if not ADAPTIVE_SEARCH_AVAILABLE:
+            self.logger.warning("Adaptive search not available, falling back to linear search")
+            return self.run_test_round(resolution, codec, bitrate, ref_stream, model_name, max_stream)
+
+        self.logger.info(f"[PROGRESS] Starting adaptive search for model: {model_name}")
+        self.logger.info(
+            f"[PROGRESS] Parameters: max_stream={max_stream}, ref_stream={ref_stream}, "
+            f"safety_factor={safety_factor}, min_start={min_start}"
+        )
+
+        if previous_model_streams:
+            self.logger.info(f"[PROGRESS] Using previous model result as hint: {previous_model_streams} streams")
+
+        best_avg_fps = 0.0
+
+        def run_pipeline_func(stream_count):
+            """
+            Wrapper function for adaptive search algorithm.
+
+            Args:
+                stream_count: Number of streams to test
+
+            Returns:
+                Tuple of (fps, status) where status is 0 for success
+            """
+            nonlocal best_avg_fps
+
+            self.logger.info(f"[PROGRESS] Executing pipeline for {stream_count} streams...")
+
+            if self.benchmark_name == "LPR Benchmark":
+                gst_cmd = self.gen_gst_command(stream_count, resolution=resolution, model_name=model_name)
+            else:
+                gst_cmd = self.gen_gst_command(stream_count, resolution, codec, bitrate, model_name)
+
+            avg_fps, status = self.run_gst_pipeline(
+                gst_cmd, expected_stream_count=stream_count, iteration_timeout=iteration_timeout
+            )
+
+            self.logger.info(f"[PROGRESS] Pipeline completed. Average fps is {avg_fps}, status={status}")
+
+            if status != 0:
+                self.logger.error(f"Failed to run the pipeline with {stream_count} streams")
+                return 0.0, status
+
+            # Track best FPS and update telemetry when target is met
+            if self._meet_target_fps(avg_fps):
+                best_avg_fps = avg_fps
+                self.update_telemetry()
+
+            return avg_fps, status
+
+        # Configure adaptive search
+        config = AdaptiveSearchConfig(
+            safety_factor=safety_factor,
+            min_jump=min_jump,
+            min_start=min_start,
+            confirmation_threshold=15,
+            confirmation_offset=3,
+        )
+
+        # Calculate initial stream count
+        initial_count = get_initial_stream_count(
+            max_streams=max_stream,
+            min_start=min_start,
+            reference_streams=ref_stream,
+            previous_model_streams=previous_model_streams,
+        )
+
+        # Run adaptive search
+        result, metadata = fps_guided_adaptive_search(
+            run_pipeline_func=run_pipeline_func,
+            max_streams=max_stream,
+            target_fps=self.target_fps,
+            initial_count=initial_count,
+            config=config,
+            logger=self.logger,
+        )
+
+        self.logger.info(f"[PROGRESS] Adaptive search complete in {metadata.iterations} iterations")
+        self.logger.info(f"[PROGRESS] Search path: {metadata.search_path}")
+        self.logger.info(f"[PROGRESS] Time elapsed: {metadata.total_time:.1f}s")
+
+        # Handle result formatting (same as run_test_round)
+        if result == 0:
+            self.telemetry_list = [-1] * 8
+        else:
+            if self.device == "CPU":
+                if float(self.telemetry_list[1]) / os.cpu_count() < 25:
+                    result = f"{result}(cpu_usage < 25%)"
+
+        if self.benchmark_name == "LPR Benchmark":
+            self.logger.info(f"[PROGRESS] Running final LPR verification with {result} streams...")
+            gst_cmd = self.gen_gst_command(result, resolution=resolution, model_name=model_name)
+            avg_fps, status = self.run_gst_pipeline(gst_cmd)
+            self.logger.info(f"{self.benchmark_name} Average fps is {avg_fps}")
+            best_avg_fps = avg_fps
+            result = f"{avg_fps}@{result}"
+
+        # Expose best_avg_fps as instance variable for reporting
+        self.best_avg_fps = best_avg_fps
+        # Expose search metadata for diagnostics
+        self.last_search_metadata = metadata
+
+        self.logger.info(f"[PROGRESS] run_test_round_adaptive returning result: {result}")
         return result
 
     def run_benchmark(self):

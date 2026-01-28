@@ -447,6 +447,7 @@ def _run_proxy_pipeline_container(
     config_file: str = None,
     round_num: int = 1,
     fps: int = 30,
+    timeout: int = 7200,
 ):
     """
     Run proxy pipeline benchmark container using DockerClient.
@@ -467,6 +468,8 @@ def _run_proxy_pipeline_container(
         config_file: Optional config file path
         round_num: Round number for multiple iterations
         fps: Target FPS for benchmark
+        timeout: Container execution timeout in seconds (default: 7200 = 2 hours)
+                 If exceeded, container is stopped and test fails with timeout error.
 
     Returns:
         dict: Container execution result with keys: exit_code, container_logs_text, etc.
@@ -525,6 +528,13 @@ def _run_proxy_pipeline_container(
         "ROUND": str(round_num),
         "FPS": str(fps),
     }
+
+    # Pass search algorithm to container ("adaptive" or "linear")
+    # Default to "adaptive" for faster convergence; override in profile for debugging
+    search_algorithm = configs.get("search_algorithm", "adaptive")
+    environment["SEARCH_ALGORITHM"] = search_algorithm
+    if search_algorithm == "adaptive":
+        logger.info("FPS-Guided Adaptive Search enabled for this test")
 
     # Create Docker-compatible X authority file (required for xvimagesink/compositor)
     xauth_file = "/tmp/.docker.xauth"
@@ -689,6 +699,7 @@ def _run_proxy_pipeline_container(
             detach=True,  # Required for batch mode
             remove=False,  # Keep container for cleanup in finally block
             attach_logs=True,  # Attach logs to Allure report
+            timeout=timeout,  # Container-level timeout from profile config
         )
 
         exit_code = result.get("container_info", {}).get("exit_code", 1)
@@ -1066,6 +1077,10 @@ def test_proxy_pipelines(
                         configs_with_paths = {**configs, "_models_path": models_path, "_videos_path": videos_path}
 
                         container_name = f"{configs.get('container_image', 'proxy_pl_bm_runner')}_{suite_name}"
+                        # Get timeout from profile config (default 7200s = 2 hours)
+                        container_timeout = int(configs.get("timeout", 7200))
+                        logger.debug(f"Container timeout set to {container_timeout}s from profile config")
+
                         container_result = _run_proxy_pipeline_container(
                             docker_client=docker_client,
                             container_name=container_name,
@@ -1079,6 +1094,7 @@ def test_proxy_pipelines(
                             config_file=None,
                             round_num=1,
                             fps=30,
+                            timeout=container_timeout,
                         )
 
                         # Check if container execution failed

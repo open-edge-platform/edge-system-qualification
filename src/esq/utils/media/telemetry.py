@@ -438,5 +438,4 @@ class TelemetryCollector:
                 self.xpu_xmi_process.terminate()
                 self.xpu_xmi_process.wait()
 
-
 Telemetry = TelemetryCollector

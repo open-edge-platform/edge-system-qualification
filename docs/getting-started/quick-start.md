@@ -50,7 +50,7 @@ sudo bash -c "$(wget -qLO - https://raw.githubusercontent.com/open-edge-platform
 Install essential system packages:
 
 ```bash
-sudo apt update && sudo apt install -y curl git
+sudo apt update && sudo apt install -y curl git libgl1
 ```
 
 ### 3. Docker Engine

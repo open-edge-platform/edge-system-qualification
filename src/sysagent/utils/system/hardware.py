@@ -251,6 +251,85 @@ def collect_cpu_info(openvino_cpu=None) -> Dict[str, Any]:
         return {"error": str(e)}
 
 
+def get_render_device_mapping() -> Dict[str, Dict[str, str]]:
+    """
+    Map DRM render nodes to PCI devices by reading sysfs.
+
+    Returns:
+        Dict mapping render device names (e.g., 'renderD128') to device info
+        containing PCI slot name, driver, vendor/device IDs, etc.
+        Example: {
+            'renderD128': {
+                'pci_slot': '0000:00:02.0',
+                'driver': 'i915',
+                'vendor_id': '8086',
+                'device_id': '7d67'
+            },
+            'renderD129': {...}
+        }
+    """
+    render_map = {}
+    drm_class_path = "/sys/class/drm"
+
+    if not os.path.exists(drm_class_path):
+        logger.debug("DRM class path does not exist, no render devices available")
+        return render_map
+
+    try:
+        # List all render devices
+        for entry in os.listdir(drm_class_path):
+            if not entry.startswith("render"):
+                continue
+
+            render_device = entry  # e.g., renderD128
+            device_uevent_path = os.path.join(drm_class_path, entry, "device", "uevent")
+
+            if not os.path.exists(device_uevent_path):
+                logger.debug(f"No uevent file for {render_device}")
+                continue
+
+            # Read uevent file to get PCI information
+            device_info = {}
+            try:
+                with open(device_uevent_path, "r") as f:
+                    for line in f:
+                        line = line.strip()
+                        if "=" in line:
+                            key, value = line.split("=", 1)
+                            device_info[key] = value
+
+                # Extract key information
+                pci_slot = device_info.get("PCI_SLOT_NAME", "")
+                driver = device_info.get("DRIVER", "")
+                pci_id = device_info.get("PCI_ID", "")
+
+                if pci_slot and pci_id:
+                    # Parse PCI_ID (format: vendor:device, e.g., "8086:7D67")
+                    vendor_id, device_id = pci_id.lower().split(":")
+
+                    # Extract render device number (e.g., 128 from renderD128)
+                    render_num = render_device.replace("renderD", "")
+
+                    render_map[render_device] = {
+                        "render_device": render_device,
+                        "render_num": render_num,
+                        "pci_slot": pci_slot,
+                        "driver": driver,
+                        "vendor_id": vendor_id,
+                        "device_id": device_id,
+                    }
+
+                    logger.debug(f"Mapped {render_device} -> PCI {pci_slot} (driver={driver}, {vendor_id}:{device_id})")
+
+            except (IOError, ValueError) as e:
+                logger.debug(f"Failed to read uevent for {render_device}: {e}")
+
+    except Exception as e:
+        logger.warning(f"Error mapping render devices: {e}")
+
+    return render_map
+
+
 def collect_gpu_info(pci_devices, openvino_gpu=None) -> dict:
     """
     Collect GPU information from PCI devices and OpenVINO devices.
@@ -339,6 +418,9 @@ def collect_gpu_info(pci_devices, openvino_gpu=None) -> dict:
 
     gpu_info = {"devices": [], "discrete_count": 0, "integrated_count": 0}
 
+    # Get render device mapping
+    render_device_map = get_render_device_mapping()
+
     # Get GPU devices from PCI (VGA compatible controller and Display controller)
     pci_gpus = []
     for dev in pci_devices:
@@ -417,6 +499,13 @@ def collect_gpu_info(pci_devices, openvino_gpu=None) -> dict:
             pci_norm_map[norm] = pci_gpu
             logger.debug(f"GPU PCI device normalized:  {pci_gpu.get('pci_slot', 'Unknown')} -> {norm}")
 
+    # Build render device map by PCI slot for quick lookup
+    render_by_pci_slot = {}
+    for render_name, render_info in render_device_map.items():
+        pci_slot = render_info.get("pci_slot")
+        if pci_slot:
+            render_by_pci_slot[pci_slot] = render_info
+
     # Match OpenVINO devices with PCI devices and build final GPU list
     all_gpus = []
     matched_norms = set()
@@ -436,6 +525,14 @@ def collect_gpu_info(pci_devices, openvino_gpu=None) -> dict:
 
             # Add canonical GPU info from table
             add_canonical_gpu_info(gpu_device, pci_device.get("device_id"))
+
+            # Add render device info if available
+            pci_slot = pci_device.get("pci_slot")
+            if pci_slot and pci_slot in render_by_pci_slot:
+                render_info = render_by_pci_slot[pci_slot]
+                gpu_device["render_device"] = render_info.get("render_device")
+                gpu_device["render_num"] = render_info.get("render_num")
+                logger.debug(f"Matched render device {render_info.get('render_device')} to GPU at {pci_slot}")
 
             all_gpus.append(gpu_device)
             matched_norms.add(norm)
@@ -464,6 +561,14 @@ def collect_gpu_info(pci_devices, openvino_gpu=None) -> dict:
 
             # Add canonical GPU info from table
             add_canonical_gpu_info(gpu_device, pci_device.get("device_id"))
+
+            # Add render device info if available
+            pci_slot = pci_device.get("pci_slot")
+            if pci_slot and pci_slot in render_by_pci_slot:
+                render_info = render_by_pci_slot[pci_slot]
+                gpu_device["render_device"] = render_info.get("render_device")
+                gpu_device["render_num"] = render_info.get("render_num")
+                logger.debug(f"Matched render device {render_info.get('render_device')} to GPU at {pci_slot}")
 
             all_gpus.append(gpu_device)
             logger.debug(f"ℹ️ Added PCI-only GPU device: {pci_device.get('pci_slot', 'Unknown')}")

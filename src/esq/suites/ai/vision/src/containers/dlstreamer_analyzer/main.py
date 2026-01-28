@@ -585,33 +585,36 @@ def get_baseline_stream_analysis(baseline_pipeline=None, result_pipeline=None, p
         "status": "error",
     }
 
+    # Open stdout files BEFORE try block so they remain open for entire subprocess duration
+    # Files must stay open until subprocesses complete, otherwise FPS counter stops writing
+    fp_baseline = open(baseline_pipeline_path, "w", buffering=1)  # Line buffering for real-time output
+    fp_result = open(baseline_result_path, "w", buffering=1)  # Line buffering for real-time output
+
     try:
         # Start baseline pipeline with new session for proper cleanup
         logger.debug(f"Starting baseline pipeline with log output to {baseline_pipeline_path}")
-        with open(baseline_pipeline_path, "w") as fp:
-            pipeline_cmd = shlex.split(baseline_pipeline)
-            main_process = subprocess.Popen(
-                pipeline_cmd,
-                stdout=fp,
-                stderr=subprocess.PIPE,
-                cwd=MNT_DIR,
-                env=env_pipeline,
-                start_new_session=True,  # Enable process group termination
-            )
+        pipeline_cmd = shlex.split(baseline_pipeline)
+        main_process = subprocess.Popen(
+            pipeline_cmd,
+            stdout=fp_baseline,
+            stderr=subprocess.PIPE,
+            cwd=MNT_DIR,
+            env=env_pipeline,
+            start_new_session=True,  # Enable process group termination
+        )
 
         time.sleep(5)
 
         # Start result pipeline with new session for proper cleanup
         logger.debug(f"Starting baseline result pipeline with log output to {baseline_result_path}")
-        with open(baseline_result_path, "w") as fp:
-            result_pipeline_cmd = shlex.split(result_pipeline)
-            pipeline_process = subprocess.Popen(
-                result_pipeline_cmd,
-                stdout=fp,
-                stderr=subprocess.PIPE,
-                env=env_result,
-                start_new_session=True,  # Enable process group termination
-            )
+        result_pipeline_cmd = shlex.split(result_pipeline)
+        pipeline_process = subprocess.Popen(
+            result_pipeline_cmd,
+            stdout=fp_result,
+            stderr=subprocess.PIPE,
+            env=env_result,
+            start_new_session=True,  # Enable process group termination
+        )
 
         # Wait for result pipeline to complete
         try:
@@ -717,6 +720,19 @@ def get_baseline_stream_analysis(baseline_pipeline=None, result_pipeline=None, p
 
         result_info.update({"status": "error"})
         return result_info
+    finally:
+        # Close file handles after subprocesses complete
+        # This ensures all buffered output is flushed before files are closed
+        try:
+            if fp_baseline:
+                fp_baseline.close()
+        except Exception as e:
+            logger.debug(f"Error closing baseline stdout file: {e}")
+        try:
+            if fp_result:
+                fp_result.close()
+        except Exception as e:
+            logger.debug(f"Error closing result stdout file: {e}")
 
 
 def get_n_stream_analysis_per_device(
@@ -783,37 +799,34 @@ def get_n_stream_analysis_per_device(
         "status": "error",
     }
 
+    # Open stdout files BEFORE try block so they remain open for entire subprocess duration
+    # Files must stay open until subprocesses complete, otherwise FPS counter stops writing
+    fp_pipeline = open(streams_pipeline_path, "w", buffering=1)  # Line buffering for real-time output
+    fp_result = open(streams_result_path, "w", buffering=1)  # Line buffering for real-time output
+
     try:
         # Start the main pipeline process with new session for proper cleanup
-        # Create and immediately flush the pipeline stdout file to ensure it exists
-        with open(streams_pipeline_path, "w") as fp:
-            fp.flush()  # Ensure file is created on disk
-            os.fsync(fp.fileno())  # Force write to disk
-
-        # Reopen for actual pipeline output
-        with open(streams_pipeline_path, "w") as fp:
-            pipeline_cmd = shlex.split(multi_pipeline)
-            main_process = subprocess.Popen(
-                pipeline_cmd,
-                stdout=fp,
-                stderr=subprocess.PIPE,
-                cwd=MNT_DIR,
-                env=env_pipeline,
-                start_new_session=True,  # Enable process group termination
-            )
+        pipeline_cmd = shlex.split(multi_pipeline)
+        main_process = subprocess.Popen(
+            pipeline_cmd,
+            stdout=fp_pipeline,
+            stderr=subprocess.PIPE,
+            cwd=MNT_DIR,
+            env=env_pipeline,
+            start_new_session=True,  # Enable process group termination
+        )
 
         time.sleep(5)
 
         # Start the result pipeline process with new session for proper cleanup
-        with open(streams_result_path, "w") as fp:
-            result_pipeline_cmd = shlex.split(result_pipeline)
-            pipeline_process = subprocess.Popen(
-                result_pipeline_cmd,
-                stdout=fp,
-                stderr=subprocess.PIPE,
-                env=env_result,
-                start_new_session=True,  # Enable process group termination
-            )
+        result_pipeline_cmd = shlex.split(result_pipeline)
+        pipeline_process = subprocess.Popen(
+            result_pipeline_cmd,
+            stdout=fp_result,
+            stderr=subprocess.PIPE,
+            env=env_result,
+            start_new_session=True,  # Enable process group termination
+        )
 
         # Wait for result pipeline to complete
         timeout_occurred = False
@@ -956,6 +969,19 @@ def get_n_stream_analysis_per_device(
 
         result_info.update({"status": "error"})
         return result_info
+    finally:
+        # Close file handles after subprocesses complete
+        # This ensures all buffered output is flushed before files are closed
+        try:
+            if fp_pipeline:
+                fp_pipeline.close()
+        except Exception as e:
+            logger.debug(f"Error closing pipeline stdout file: {e}")
+        try:
+            if fp_result:
+                fp_result.close()
+        except Exception as e:
+            logger.debug(f"Error closing result stdout file: {e}")
 
 
 def baseline_streams_analysis(

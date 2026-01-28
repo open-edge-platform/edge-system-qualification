@@ -78,21 +78,19 @@ params:
   target_fps: 10
   pipeline_params:
     DECODE_ELEMENTS:
-      gpu_integrated: "qtdemux ! h264parse ! vah264dec ! vapostproc ! 'video/x-raw(memory:VAMemory)'"
-      gpu_discrete: "qtdemux ! h264parse ! varenderD{RENDER_DEVICE_NUM}h264dec ! varenderD{RENDER_DEVICE_NUM}postproc ! video/x-raw(memory:VAMemory)"
-      gpu_discrete_primary: "qtdemux ! h264parse ! vah264dec ! vapostproc ! 'video/x-raw(memory:VAMemory)'"
+      cpu: "qtdemux ! h264parse ! avdec_h264 ! 'video/x-raw'"
+      igpu: "qtdemux ! h264parse ! va${RENDER_DEVICE}h264dec ! va${RENDER_DEVICE}postproc ! 'video/x-raw(memory:VAMemory)'"
+      dgpu: "qtdemux ! h264parse ! va${RENDER_DEVICE}h264dec ! va${RENDER_DEVICE}postproc ! video/x-raw(memory:VAMemory)"
       npu: "qtdemux ! h264parse ! vah264dec ! vapostproc ! 'video/x-raw(memory:VAMemory)'"
     INFERENCE_ELEMENTS:
       cpu: "pre-process-backend={PRE_PROCESS_BACKEND} model-instance-id=odmode ie-config=CPU_THROUGHPUT_STREAMS=2 nireq=2"
-      gpu_integrated: "pre-process-backend={PRE_PROCESS_BACKEND} model-instance-id=odmode ie-config=GPU_THROUGHPUT_STREAMS=2 nireq=2"
-      gpu_discrete: "pre-process-backend={PRE_PROCESS_BACKEND} model-instance-id=odmode"
-      gpu_discrete_primary: "pre-process-backend={PRE_PROCESS_BACKEND} model-instance-id=odmode"
+      igpu: "pre-process-backend={PRE_PROCESS_BACKEND} model-instance-id=odmode ie-config=GPU_THROUGHPUT_STREAMS=2 nireq=2"
+      dgpu: "pre-process-backend={PRE_PROCESS_BACKEND} model-instance-id=odmode"
       npu: "pre-process-backend={PRE_PROCESS_BACKEND} model-instance-id=odmode nireq=4"
     PRE_PROCESS_BACKEND:
       cpu: "opencv"
-      gpu_integrated: "va-surface-sharing"
-      gpu_discrete: "va-surface-sharing"
-      gpu_discrete_primary: "va-surface-sharing"
+      igpu: "va-surface-sharing"
+      dgpu: "va-surface-sharing"
       npu: "va-surface-sharing"
     VIDEO_RAW_TYPE:
       default: "'video/x-raw(memory:VAMemory)'"

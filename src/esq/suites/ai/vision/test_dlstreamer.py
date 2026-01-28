@@ -72,11 +72,8 @@ def test_dlstreamer(
         f"{configs.get('docker_image_tag_utils', 'latest')}",
     )
     docker_container_prefix = configs.get("docker_container_prefix", "test-dlstreamer")
-    consecutive_success_threshold = configs.get("consecutive_success_threshold", 1)
-    consecutive_failure_threshold = configs.get("consecutive_failure_threshold", 1)
     consecutive_timeout_threshold = configs.get("consecutive_timeout_threshold", 2)
-    steady_state_confirmation_threshold = configs.get("steady_state_confirmation_threshold", 2)
-    max_streams_above_baseline = configs.get("max_streams_above_baseline", 3)
+    max_streams_above_baseline = configs.get("max_streams_above_baseline", 1)
 
     # Setup
     test_dir = os.path.dirname(os.path.abspath(__file__))
@@ -188,8 +185,6 @@ def test_dlstreamer(
                 "target_fps": target_fps,
                 "pipeline": pipeline,
                 "pipeline_params": pipeline_params,
-                "consecutive_success_threshold": consecutive_success_threshold,
-                "consecutive_failure_threshold": consecutive_failure_threshold,
                 "max_streams_above_baseline": max_streams_above_baseline,
                 "type": "baseline_streams",
             }
@@ -372,8 +367,6 @@ def test_dlstreamer(
                 "Devices": devices,
                 "Device List": device_list,
                 "Target FPS": target_fps,
-                "Consecutive Success Threshold": consecutive_success_threshold,
-                "Consecutive Failure Threshold": consecutive_failure_threshold,
                 "Max Streams Above Baseline": max_streams_above_baseline,
                 "Timeout (s)": timeout,
                 "Display Name": test_display_name,
@@ -402,10 +395,7 @@ def test_dlstreamer(
             "target_fps": target_fps,
             "pipeline": pipeline,
             "pipeline_params": pipeline_params,
-            "consecutive_success_threshold": consecutive_success_threshold,
-            "consecutive_failure_threshold": consecutive_failure_threshold,
             "consecutive_timeout_threshold": consecutive_timeout_threshold,
-            "steady_state_confirmation_threshold": steady_state_confirmation_threshold,
             "max_streams_above_baseline": max_streams_above_baseline,
             "devices": sorted(devices),  # Sort to ensure consistent cache key
             "device_list": sorted(device_list),  # Include actual detected devices
@@ -431,10 +421,7 @@ def test_dlstreamer(
                 results_dir=results_dir,
                 target_fps=target_fps,
                 num_sockets=num_sockets,
-                consecutive_success_threshold=consecutive_success_threshold,
-                consecutive_failure_threshold=consecutive_failure_threshold,
                 consecutive_timeout_threshold=consecutive_timeout_threshold,
-                steady_state_confirmation_threshold=steady_state_confirmation_threshold,
                 max_streams_above_baseline=max_streams_above_baseline,
                 baseline_streams=baseline_streams,
                 container_config=container_config,

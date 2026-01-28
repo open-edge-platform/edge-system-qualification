@@ -7,25 +7,22 @@ import logging
 import re
 from uuid import uuid4
 
-from sysagent.utils.system.ov_helper import get_available_devices, get_openvino_device_type
-
 logger = logging.getLogger(__name__)
 
 
-def get_device_type_key(device_id: str, device_dict=None, has_igpu=None):
+def get_device_type_key(device_id: str, device_dict=None):
     """
     Centralized function to determine device type key for parameter mapping.
 
     Args:
         device_id: Device ID to use for parameter lookup
         device_dict: Dictionary containing device information (optional)
-        has_igpu: Boolean indicating if system has iGPU (optional, will be detected if not provided)
 
     Returns:
-        String type key for parameter mapping with variants for indexed GPUs:
-        - "igpu" or "igpu_indexed" (iGPU with dGPU present)
-        - "dgpu", "dgpu_primary" (single dGPU), or "dgpu_indexed" (multiple dGPUs)
-        - "cpu", "npu", etc.
+        String type key for parameter mapping:
+        - "igpu" for integrated GPU
+        - "dgpu" for discrete GPU
+        - "cpu", "npu", etc. for other device types
     """
     # Get device type from device_dict if available
     device_type = None
@@ -35,37 +32,12 @@ def get_device_type_key(device_id: str, device_dict=None, has_igpu=None):
     device_type_key = device_type.lower() if device_type else ""
     device_id_key = device_id.lower()
 
-    # Detect if integrated GPU is present in the system (if not provided)
-    if has_igpu is None and "gpu" in device_id_key:
-        has_igpu = False
-        all_system_devices = get_available_devices()
-        for dev_id in all_system_devices:
-            if dev_id.upper().startswith("GPU"):
-                dev_type = get_openvino_device_type(dev_id)
-                if dev_type and "integrated" in dev_type.lower():
-                    has_igpu = True
-                    break
-
-    # Determine type_key for mapping with indexed variants
+    # Determine type_key for mapping - simplified without indexed variants
     if "gpu" in device_id_key:
         if "integrated" in device_type_key:
-            # iGPU: check if indexed (GPU.0) vs non-indexed (GPU)
-            if "." in device_id:
-                return "igpu_indexed"  # iGPU with dGPU present → GPU.0
-            else:
-                return "igpu"  # iGPU alone → GPU
+            return "igpu"
         elif "discrete" in device_type_key:
-            # dGPU: distinguish primary, indexed, or regular
-            if "." in device_id:
-                # Indexed dGPU (GPU.0, GPU.1, etc.)
-                device_num = int(device_id.split(".")[-1])
-                if device_num == 0 and not has_igpu:
-                    return "dgpu_indexed"  # First dGPU in multi-dGPU system (no iGPU)
-                else:
-                    return "dgpu"  # dGPU with iGPU present (GPU.1, GPU.2, etc.)
-            else:
-                # Non-indexed dGPU (GPU)
-                return "dgpu_primary"  # Single dGPU without iGPU
+            return "dgpu"
         else:
             return "gpu"
     elif "cpu" in device_id_key:
@@ -341,10 +313,7 @@ def resolve_pipeline_placeholders(pipeline, pipeline_params=None, device_id="CPU
               cpu: "cpu_value"
               npu: "npu_value"
               igpu: "igpu_value"
-              igpu_indexed: "igpu_indexed_value"
               dgpu: "dgpu_value"
-              dgpu_primary: "dgpu_primary_value"
-              dgpu_indexed: "dgpu_indexed_value"
               overrides:
                 DEVICE_PROPERTY_NAME:
                   "property_value": "override_value"
@@ -357,8 +326,7 @@ def resolve_pipeline_placeholders(pipeline, pipeline_params=None, device_id="CPU
 
     Reserved placeholders:
         - ${DEVICE_ID}: Replaced with the device_id parameter
-        - ${RENDER_DEVICE_NUM}: For discrete GPUs, calculated from device ID
-        - ${HAS_IGPU}: Boolean indicating if integrated GPU is present in system
+        - ${RENDER_DEVICE}: For GPUs, full render device name (e.g., "renderD128")
 
     Note: ${PIPELINE_ID} is handled separately in build_multi_pipeline_with_devices
     and build_baseline_pipeline functions, not here.
@@ -384,20 +352,9 @@ def resolve_pipeline_placeholders(pipeline, pipeline_params=None, device_id="CPU
     else:
         effective_device_id = device_id
 
-    # Detect if integrated GPU is available in the system
-    has_igpu = False
-    all_system_devices = get_available_devices()
-    for dev_id in all_system_devices:
-        if dev_id.upper().startswith("GPU"):
-            dev_type = get_openvino_device_type(dev_id)
-            if dev_type and "integrated" in dev_type.lower():
-                has_igpu = True
-                logger.debug(f"Integrated GPU detected: {dev_id}")
-                break
-
-    # Get type_key using enhanced function
-    type_key = get_device_type_key(effective_device_id, device_dict, has_igpu)
-    logger.debug(f"Resolving placeholders for {device_id}: type_key={type_key}, has_igpu={has_igpu}")
+    # Get type_key for device
+    type_key = get_device_type_key(effective_device_id, device_dict)
+    logger.debug(f"Resolving placeholders for {device_id}: type_key={type_key}")
 
     # Get device properties from OpenVINO
     from sysagent.utils.system.ov_helper import get_openvino_device_properties
@@ -405,30 +362,76 @@ def resolve_pipeline_placeholders(pipeline, pipeline_params=None, device_id="CPU
     device_properties = get_openvino_device_properties(effective_device_id)
     all_properties = device_properties.get("all_properties", {})
 
-    # Compute RENDER_DEVICE_NUM for discrete GPUs
-    render_device_num = ""
-    if "dgpu" in type_key:
-        base_render_num = 128
-        device_num = 0
+    # Get RENDER_DEVICE from system hardware cache for GPU devices
+    render_device = ""
+    if effective_device_id.upper().startswith("GPU"):
         try:
-            if "." in effective_device_id:
-                device_num = int(effective_device_id.split(".")[-1])
-            render_device_num = str(base_render_num + device_num)
-            logger.debug(f"Discrete GPU: device_num={device_num}, render={render_device_num}")
+            from sysagent.utils.system import SystemInfoCache
+
+            system_info = SystemInfoCache()
+            hardware_info = system_info.get_hardware_info()
+            gpu_devices = hardware_info.get("gpu", {}).get("devices", [])
+
+            # Find the GPU device matching the OpenVINO device_id
+            for gpu in gpu_devices:
+                gpu_ov = gpu.get("openvino", {})
+                gpu_device_name = gpu_ov.get("device_name", "")
+
+                # Match by device name (e.g., "GPU.0", "GPU.1")
+                if gpu_device_name == effective_device_id:
+                    cached_render_device = gpu.get("render_device")
+                    if cached_render_device:
+                        render_device = cached_render_device
+                        logger.debug(
+                            f"Using cached render device for {effective_device_id}: "
+                            f"{render_device} (from hardware cache)"
+                        )
+                        break
+
+            # Fallback to old calculation if not found in cache
+            if not render_device and "dgpu" in type_key:
+                base_render_num = 128
+                device_num = 0
+                try:
+                    if "." in effective_device_id:
+                        device_num = int(effective_device_id.split(".")[-1])
+                    render_device = f"renderD{base_render_num + device_num}"
+                    logger.warning(
+                        f"Render device not in cache, using fallback calculation: "
+                        f"{render_device} for {effective_device_id}"
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to extract device number from {effective_device_id}: {e}")
+                    render_device = f"renderD{base_render_num}"
+
         except Exception as e:
-            logger.warning(f"Failed to extract device number from {effective_device_id}: {e}")
-            render_device_num = str(base_render_num)
+            logger.warning(f"Failed to get render device from hardware cache: {e}")
+            # Fallback to old calculation
+            if "dgpu" in type_key:
+                base_render_num = 128
+                device_num = 0
+                try:
+                    if "." in effective_device_id:
+                        device_num = int(effective_device_id.split(".")[-1])
+                    render_device = f"renderD{base_render_num + device_num}"
+                except Exception:
+                    render_device = f"renderD{base_render_num}"
+
+    # For renderD128, use empty string to fall back to generic vah265dec element
+    # since varenderD128h265dec element doesn't exist
+    if render_device == "renderD128":
+        logger.debug(f"Using empty RENDER_DEVICE for {effective_device_id} (renderD128 → generic vah265dec)")
+        render_device = ""
 
     # Initialize replacements with reserved placeholders
     replacements = {
-        "RENDER_DEVICE_NUM": render_device_num,
-        "HAS_IGPU": "true" if has_igpu else "false",
+        "RENDER_DEVICE": render_device,
     }
 
     # Resolve all pipeline_params placeholders
     for placeholder, mapping in pipeline_params.items():
         # Skip reserved placeholders
-        if placeholder in ("DEVICE_ID", "RENDER_DEVICE_NUM", "HAS_IGPU"):
+        if placeholder in ("DEVICE_ID", "RENDER_DEVICE"):
             continue
 
         if not isinstance(mapping, dict):
@@ -447,18 +450,11 @@ def resolve_pipeline_placeholders(pipeline, pipeline_params=None, device_id="CPU
                 resolved_type_key = available_type_keys[0]
                 logger.debug(f"'{placeholder}': single type key found → using '{resolved_type_key}'")
 
-            # If placeholder has multiple type keys, try to match based on global type_key category
+            # If placeholder has multiple type keys, use global type_key if available
             elif len(available_type_keys) > 1:
-                # Check if global type_key is in the mapping
                 if type_key in available_type_keys:
                     resolved_type_key = type_key
-                # Otherwise, try to find matching category (e.g., dgpu matches dgpu_primary, dgpu_indexed)
-                else:
-                    for available_key in available_type_keys:
-                        if "gpu" in type_key and "gpu" in available_key:
-                            resolved_type_key = available_key
-                            logger.debug(f"'{placeholder}': GPU category match → using '{resolved_type_key}'")
-                            break
+                    logger.debug(f"'{placeholder}': type key match → using '{resolved_type_key}'")
 
         # Single-device mode: Check property-based overrides first
         if not is_multi_stage:
@@ -498,7 +494,7 @@ def resolve_pipeline_placeholders(pipeline, pipeline_params=None, device_id="CPU
         """
         import re
 
-        pattern = r"\{([A-Z0-9_]+)\}"
+        pattern = r"\$\{([A-Z0-9_]+)\}"
         skip_placeholders = {"PIPELINE_ID", "DEVICE_ID"}  # Handled elsewhere
         depth = 0
 
@@ -511,11 +507,11 @@ def resolve_pipeline_placeholders(pipeline, pipeline_params=None, device_id="CPU
 
             if nested_key in skip_placeholders:
                 logger.debug(f"Skipping nested placeholder '{nested_key}' (handled elsewhere)")
-                val = val.replace(f"{{{nested_key}}}", f"RESERVED_{nested_key}")
+                val = val.replace(f"${{{nested_key}}}", f"RESERVED_{nested_key}")
                 continue
 
             nested_val = replacements.get(nested_key, "")
-            val = val.replace(f"{{{nested_key}}}", nested_val)
+            val = val.replace(f"${{{nested_key}}}", nested_val)
             depth += 1
 
         if depth == max_depth and re.search(pattern, val):

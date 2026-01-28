@@ -36,20 +36,14 @@ params:
       default: "qtdemux ! h264parse ! avdec_h264 ! 'video/x-raw'"
       cpu: "qtdemux ! h264parse ! avdec_h264 ! 'video/x-raw'"
       npu: "qtdemux ! h264parse ! vah264dec ! vapostproc ! 'video/x-raw(memory:VAMemory)'"
-      igpu: "qtdemux ! h264parse ! vah264dec ! vapostproc ! 'video/x-raw(memory:VAMemory)'"
-      igpu_indexed: "qtdemux ! h264parse ! vah264dec ! vapostproc ! 'video/x-raw(memory:VAMemory)'"
-      dgpu: "qtdemux ! h264parse ! varenderD{RENDER_DEVICE_NUM}h264dec ! varenderD{RENDER_DEVICE_NUM}postproc ! video/x-raw(memory:VAMemory)"
-      dgpu_primary: "qtdemux ! h264parse ! vah264dec ! vapostproc ! 'video/x-raw(memory:VAMemory)'"
-      dgpu_indexed: "qtdemux ! h264parse ! varenderD{RENDER_DEVICE_NUM}h264dec ! varenderD{RENDER_DEVICE_NUM}postproc ! video/x-raw(memory:VAMemory)"
+      igpu: "qtdemux ! h264parse ! va${RENDER_DEVICE}h264dec ! va${RENDER_DEVICE}postproc ! 'video/x-raw(memory:VAMemory)'"
+      dgpu: "qtdemux ! h264parse ! va${RENDER_DEVICE}h264dec ! va${RENDER_DEVICE}postproc ! video/x-raw(memory:VAMemory)"
     INFERENCE_ELEMENTS:
       default: "pre-process-backend=opencv model-instance-id=odmode ie-config=CPU_THROUGHPUT_STREAMS=2 nireq=2"
       cpu: "pre-process-backend=opencv model-instance-id=odmode ie-config=CPU_THROUGHPUT_STREAMS=2 nireq=2"
       npu: "pre-process-backend=va-surface-sharing model-instance-id=odmode nireq=4"
       igpu: "pre-process-backend=va-surface-sharing model-instance-id=odmode ie-config=GPU_THROUGHPUT_STREAMS=2 nireq=2"
-      igpu_indexed: "pre-process-backend=va-surface-sharing model-instance-id=odmode ie-config=GPU_THROUGHPUT_STREAMS=2 nireq=2"
       dgpu: "pre-process-backend=va-surface-sharing model-instance-id=odmode"
-      dgpu_primary: "pre-process-backend=va-surface-sharing model-instance-id=odmode"
-      dgpu_indexed: "pre-process-backend=va-surface-sharing model-instance-id=odmode"
     SINK_ELEMENT:
       default: "fakesink sync=false"
 

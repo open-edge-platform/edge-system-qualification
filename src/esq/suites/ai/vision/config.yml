@@ -67,44 +67,23 @@ tests:
     params:
       - display_name: "DL Streamer - Default"
         # =============================================================================
-        # Binary Search Qualification Thresholds
+        # Binary Search Qualification Parameters
         # =============================================================================
         # These parameters control the intelligent binary search algorithm used to find
         # the maximum number of streams each device can handle while maintaining target FPS.
         #
-        # consecutive_success_threshold: 1
-        #   - Number of consecutive successful runs (FPS >= target) before trying higher streams
-        #   - Lower values explore higher stream counts more aggressively
-        #   - Higher values ensure more stable results before increasing load
-        #   - Default: 1
-        #
-        # consecutive_failure_threshold: 1
-        #   - Number of consecutive FPS-based failures (FPS > 0 but < target) before reducing streams
-        #   - Applies when device is running but underperforming
-        #   - Lower values retreat quickly from marginal configurations
-        #   - Higher values give more chances to achieve target FPS
-        #   - Default: 1
-        #
         # consecutive_timeout_threshold: 2
-        #   - Number of consecutive timeout failures before reducing streams (below baseline only)
+        #   - Number of consecutive timeout failures before reducing streams
         #   - Timeout = pipeline analysis exceeds timeout limit or returns 0 FPS
-        #   - Only applies when testing BELOW baseline streams (conservative approach)
         #   - Prevents getting stuck on configurations that consistently timeout
         #   - Default: 2
         #
-        # steady_state_confirmation_threshold: 2
-        #   - Number of consecutive successful runs required to confirm steady-state stability
-        #   - Used for final verification when all devices run concurrently
-        #   - If any device cannot consistently achieve target FPS, its streams are reduced
-        #   - Higher values ensure more reliable long-term performance
-        #   - Default: 2
-        #
-        # max_streams_above_baseline: 3
+        # max_streams_above_baseline: 1
         #   - Maximum number of streams to explore above baseline per device
-        #   - For multi-socket CPU: applies per socket (e.g., 2 sockets × 3 = 6 additional streams)
+        #   - For multi-socket CPU: applies per socket (e.g., 2 sockets × 1 = 2 additional streams)
         #   - Limits exploration to prevent excessive testing time
         #   - Conservative approach: baseline + limited increment
-        #   - Default: 3
+        #   - Default: 1
         # =============================================================================
         assets:
           # Video assets
@@ -174,36 +153,37 @@ tests:
             ! queue
         pipeline_params:
         # ========================================================================
-        # Pipeline Parameter Structure (Consistent Format)
+        # Pipeline Parameter Structure (Simplified Format)
         # ========================================================================
         # All pipeline parameters follow this structure:
         #   PARAMETER_NAME:
         #     default: "default_value"              # Fallback if no type match
         #     cpu: "cpu_specific_value"            # CPU device value
         #     npu: "npu_specific_value"            # NPU device value
-        #     igpu: "igpu_value"                   # iGPU without dGPU (single GPU system)
-        #     igpu_indexed: "igpu_idx"             # iGPU with dGPU present (GPU.0)
-        #     dgpu: "dgpu_value"                   # dGPU with iGPU present (GPU.1, GPU.2)
-        #     dgpu_primary: "dgpu_pri"             # Single dGPU without iGPU (GPU)
-        #     dgpu_indexed: "dgpu_idx"             # Multi-dGPU without iGPU (GPU.0, GPU.1)
-        #     overrides:                            # Device-specific overrides
+        #     igpu: "igpu_value"                   # Integrated GPU
+        #     dgpu: "dgpu_value"                   # Discrete GPU
+        #     overrides:                            # Device-specific overrides (optional)
         #       DEVICE_PROPERTY_NAME:               # OpenVINO device property
         #         "property_value": "override"     # Override for specific property value
+        #
+        # Dynamic Placeholders:
+        #   ${RENDER_DEVICE}: Resolved from hardware cache to render device name
+        #                     (e.g., "renderD128" → "" for generic, "renderD129" → "renderD129")
         # ========================================================================
           DECODE_ELEMENTS:
             cpu: "parsebin ! avdec_h264 ! 'video/x-raw'"
-            gpu_integrated: "parsebin ! vah264dec ! vapostproc ! 'video/x-raw(memory:VAMemory)'"
-            gpu_discrete: "parsebin ! varenderD{RENDER_DEVICE_NUM}h264dec ! {VIDEO_RAW_TYPE}"
+            igpu: "parsebin ! va${RENDER_DEVICE}h264dec ! vapostproc ! 'video/x-raw(memory:VAMemory)'"
+            dgpu: "parsebin ! va${RENDER_DEVICE}h264dec ! va${RENDER_DEVICE}postproc ! 'video/x-raw(memory:VAMemory)'"
             npu: "parsebin ! vah264dec ! 'video/x-raw(memory:VAMemory)'"
           INFERENCE_ELEMENTS:
             cpu: "pre-process-backend={PRE_PROCESS_BACKEND}"
-            gpu_integrated: "pre-process-backend={PRE_PROCESS_BACKEND} model-instance-id=inst0"
-            gpu_discrete: "pre-process-backend={PRE_PROCESS_BACKEND}"
+            igpu: "pre-process-backend={PRE_PROCESS_BACKEND} model-instance-id=inst0"
+            dgpu: "pre-process-backend={PRE_PROCESS_BACKEND}"
             npu: "pre-process-backend={PRE_PROCESS_BACKEND}"
           PRE_PROCESS_BACKEND:
             cpu: "ie"
-            gpu_integrated: "va-surface-sharing"
-            gpu_discrete: "va-surface-sharing"
+            igpu: "va-surface-sharing"
+            dgpu: "va-surface-sharing"
             npu: "va"
           VIDEO_RAW_TYPE:
             default: "'video/x-raw(memory:VAMemory)'"

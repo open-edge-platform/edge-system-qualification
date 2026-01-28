@@ -40,10 +40,7 @@ def run_device_test(
     results_dir: str,
     target_fps: float,
     num_sockets: int,
-    consecutive_success_threshold: int,
-    consecutive_failure_threshold: int,
     consecutive_timeout_threshold: int,
-    steady_state_confirmation_threshold: int,
     max_streams_above_baseline: int,
     qualified_devices: Dict[str, Any],
     metrics=None,
@@ -81,7 +78,6 @@ def run_device_test(
             "status": False,
         },
     )
-    logger.debug(f"Initial Result template: {json.dumps(result.to_dict(), indent=2)}")
 
     logger.debug(f"Baseline streams for device {device_id}: {json.dumps(baseline_streams, indent=2)}")
 
@@ -124,8 +120,6 @@ def run_device_test(
             pipeline_timeout=pipeline_timeout,
             results_dir=results_dir,
             num_sockets=num_sockets,
-            consecutive_success_threshold=consecutive_success_threshold,
-            consecutive_failure_threshold=consecutive_failure_threshold,
             consecutive_timeout_threshold=consecutive_timeout_threshold,
             max_streams_above_baseline=max_streams_above_baseline,
             container_config=container_config,
@@ -252,10 +246,7 @@ def run_multi_device_test(
     results_dir: str,
     target_fps: float,
     num_sockets: int,
-    consecutive_success_threshold: int,
-    consecutive_failure_threshold: int,
     consecutive_timeout_threshold: int,
-    steady_state_confirmation_threshold: int,
     max_streams_above_baseline: int,
     baseline_streams: Dict[str, Any],
     container_config: Dict[str, Any],
@@ -290,10 +281,7 @@ def run_multi_device_test(
         results_dir: Directory for result files
         target_fps: Target FPS threshold
         num_sockets: Number of CPU sockets
-        consecutive_success_threshold: Success threshold for binary search
-        consecutive_failure_threshold: Failure threshold for binary search
         consecutive_timeout_threshold: Timeout threshold for binary search
-        steady_state_confirmation_threshold: Confirmation threshold for steady-state
         max_streams_above_baseline: Maximum streams to explore above baseline
         baseline_streams: Dictionary of baseline stream information per device
         container_config: Container configuration with available images
@@ -340,10 +328,7 @@ def run_multi_device_test(
             results_dir=results_dir,
             target_fps=target_fps,
             num_sockets=num_sockets,
-            consecutive_success_threshold=consecutive_success_threshold,
-            consecutive_failure_threshold=consecutive_failure_threshold,
             consecutive_timeout_threshold=consecutive_timeout_threshold,
-            steady_state_confirmation_threshold=steady_state_confirmation_threshold,
             max_streams_above_baseline=max_streams_above_baseline,
             qualified_devices=local_qualified_devices,
             metrics=default_metrics,
@@ -479,8 +464,6 @@ def run_multi_device_test(
             "Devices": devices,
             "Device List": device_list,
             "Target FPS": target_fps,
-            "Consecutive Success Threshold": consecutive_success_threshold,
-            "Consecutive Failure Threshold": consecutive_failure_threshold,
             "Max Streams Above Baseline": max_streams_above_baseline,
             "Timeout (s)": timeout,
             "Display Name": test_display_name,

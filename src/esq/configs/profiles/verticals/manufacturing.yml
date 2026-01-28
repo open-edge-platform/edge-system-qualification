@@ -47,20 +47,14 @@ params:
       default: "decodebin ! videoconvert"
       cpu: "decodebin ! videoconvert"
       npu: "parsebin ! vah264dec ! 'video/x-raw(memory:VAMemory)'"
-      igpu: "parsebin ! vah264dec ! vapostproc ! 'video/x-raw(memory:VAMemory)'"
-      igpu_indexed: "parsebin ! vah264dec ! vapostproc ! 'video/x-raw(memory:VAMemory)'"
-      dgpu: "parsebin ! varenderD{RENDER_DEVICE_NUM}h264dec ! 'video/x-raw(memory:VAMemory)'"
-      dgpu_primary: "parsebin ! vah264dec ! 'video/x-raw(memory:VAMemory)'"
-      dgpu_indexed: "parsebin ! varenderD{RENDER_DEVICE_NUM}h264dec ! 'video/x-raw(memory:VAMemory)'"
+      igpu: "parsebin ! va${RENDER_DEVICE}h264dec ! va${RENDER_DEVICE}postproc ! 'video/x-raw(memory:VAMemory)'"
+      dgpu: "parsebin ! va${RENDER_DEVICE}h264dec ! 'video/x-raw(memory:VAMemory)'"
     INFERENCE_ELEMENTS:
       default: "pre-process-backend=opencv model-instance-id=inst0"
       cpu: "pre-process-backend=opencv model-instance-id=inst0"
       npu: "pre-process-backend=va"
       igpu: "pre-process-backend=va-surface-sharing model-instance-id=inst0"
-      igpu_indexed: "pre-process-backend=va-surface-sharing model-instance-id=inst0"
       dgpu: "pre-process-backend=va-surface-sharing"
-      dgpu_primary: "pre-process-backend=va-surface-sharing"
-      dgpu_indexed: "pre-process-backend=va-surface-sharing"
     SINK_ELEMENT:
       default: "fakesink sync=true"
 

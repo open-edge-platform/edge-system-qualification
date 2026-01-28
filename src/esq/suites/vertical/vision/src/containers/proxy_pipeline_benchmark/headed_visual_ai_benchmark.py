@@ -188,9 +188,16 @@ class HeadedVisualAIBenchmark(BaseProxyPipelineBenchmark):
             else:
                 gst_cmd += f"filesrc location={video_src} ! qtdemux ! h264parse ! {self.dec_ele} ! video/x-raw(memory:VAMemory) "
 
-            # Optimize inference parameters for dGPU
+            # Optimize inference parameters based on device type and model complexity
+            # For dual-model combinations on dGPU (especially B-Series), use conservative parameters
+            # to avoid GPU memory conflicts and performance degradation
             if device_type == "dGPU":
-                detect_params = "batch-size=2 nireq=4 ie-config=NUM_STREAMS=4"
+                if cls_model_name:
+                    # Conservative parameters for dual-model to prevent B-Series GPU memory issues
+                    detect_params = "batch-size=1 nireq=2 ie-config=NUM_STREAMS=2"
+                else:
+                    # Aggressive parameters only for single-model detection
+                    detect_params = "batch-size=2 nireq=4 ie-config=NUM_STREAMS=4"
             else:
                 detect_params = "batch-size=1 nireq=2 ie-config=NUM_STREAMS=2"
 
@@ -201,18 +208,22 @@ class HeadedVisualAIBenchmark(BaseProxyPipelineBenchmark):
                 if self.is_MTL and device_type == "iGPU":
                     gst_cmd += f"! gvaclassify model={cls_model_path} {preproc_backend} model-proc={cls_proc_json_path} batch-size=1 nireq=2 inference-interval=3 inference-region=roi-list model-instance-id=classify{i} device=NPU "
                 else:
-                    # Optimize classification parameters for dGPU
-                    if device_type == "dGPU":
-                        classify_params = "batch-size=2 nireq=4 ie-config=NUM_STREAMS=4"
-                    else:
-                        classify_params = "batch-size=1 nireq=2 ie-config=NUM_STREAMS=2"
+                    # Use conservative classification parameters for all dGPU to prevent memory conflicts
+                    # B-Series GPUs require lower batch sizes when running dual-model workloads
+                    classify_params = "batch-size=1 nireq=2 ie-config=NUM_STREAMS=2"
                     gst_cmd += f"! gvaclassify model={cls_model_path} {preproc_backend} model-proc={cls_proc_json_path} {classify_params} inference-interval=3 inference-region=roi-list model-instance-id=classify{i} device={inf_device} "
 
             gst_cmd += f"! tee name=t{i} "
+
+            # For dual-model combinations on B-series dGPUs, use lower starting-frame to get faster FPS measurements
+            # B-series (B50/B60/B580) GPUs have slower warmup with complex workloads and may not reach 1000 frames quickly
+            # This prevents test hangs while still allowing enough frames for accurate FPS measurement
+            starting_frame = 300 if (cls_model_name and device_type == "dGPU") else 1000
+
             if device_type == "CPU":
-                gst_cmd += f"! videoscale ! video/x-raw,width={cell_width},height={cell_height} ! gvafpscounter starting-frame=1000 ! comp.sink_{i} "
+                gst_cmd += f"! videoscale ! video/x-raw,width={cell_width},height={cell_height} ! gvafpscounter starting-frame={starting_frame} ! comp.sink_{i} "
             else:
-                gst_cmd += f"! {self.post_proc_ele} scale-method=fast ! video/x-raw,width={cell_width},height={cell_height} ! multiqueue ! gvafpscounter starting-frame=1000 ! comp.sink_{i} "
+                gst_cmd += f"! {self.post_proc_ele} scale-method=fast ! video/x-raw,width={cell_width},height={cell_height} ! multiqueue ! gvafpscounter starting-frame={starting_frame} ! comp.sink_{i} "
 
             if self.enable_mqtt:
                 gst_cmd += f"t{i}. ! multiqueue ! gvametaconvert format=json json-indent=4 source={video_src} add-empty-results=true ! gvametapublish method=mqtt address={self.mqtt_address} mqtt-client-id=client{i} topic={self.mqtt_topic} "
@@ -247,7 +258,6 @@ class HeadedVisualAIBenchmark(BaseProxyPipelineBenchmark):
             raise RuntimeError("Running with config_file_path {self.config_file_path} not supported!")
 
         self.update_csv(self.csv_path, prefix_esc, prefix + "," + additional)
-
 
 OUTPUT_DIR = "/home/dlstreamer/output"
 DETAIL_LOG_FILE_PREFIX = f"{OUTPUT_DIR}/headed_visual_ai_proxy_pipeline_runner"

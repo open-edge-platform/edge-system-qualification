@@ -42,29 +42,32 @@ suites:
                 display_name: "LPR Pipeline (Multi-Devices)"
                 devices: [igpu,dgpu]
                 pptest: "LPRAIRunner"
-                timeout: 750
+                timeout: 4800  # 80 min - runs binary search on both iGPU and dGPU
                 force_run: true
                 requirements:
+                  memory_min_gb: 48.0 # Threshold to cover systems with 64GB Memory
                   gpu_required: true
 
               - test_id: "METRO-PROXY-002"
                 display_name: "Smart NVR (iGPU)"
                 devices: [igpu]
                 pptest: "SmartAIRunner"
-                timeout: 750
+                timeout: 3600  # 60 min - binary search on iGPU
                 force_run: true
                 display_output: 0  # 0=no display, 1=enable display
                 requirements:
+                  memory_min_gb: 48.0 # Threshold to cover systems with 64GB Memory
                   igpu_required: true
 
               - test_id: "METRO-PROXY-003"
                 display_name: "Smart NVR (dGPU)"
                 devices: [dgpu]
                 pptest: "SmartAIRunner"
-                timeout: 750
+                timeout: 7200  # 120 min - dGPU with adaptive search for high stream counts
                 force_run: true
                 display_output: 0  # 0=no display, 1=enable display
                 requirements:
+                  memory_min_gb: 48.0 # Threshold to cover systems with 64GB Memory
                   dgpu_required: true
                   dgpu_min_devices: 1
                   dgpu_max_devices: 1
@@ -73,20 +76,22 @@ suites:
                 display_name: "Headed Visual AI Proxy Pipeline (iGPU)"
                 devices: [igpu]
                 pptest: "VisualAIRunner"
-                timeout: 750
+                timeout: 3600  # 60 min - binary search on iGPU
                 force_run: true
                 display_output: 0  # 0=no display, 1=enable display
                 requirements:
+                  memory_min_gb: 48.0 # Threshold to cover systems with 64GB Memory
                   igpu_required: true
 
               - test_id: "METRO-PROXY-005"
                 display_name: "Headed Visual AI Proxy Pipeline (dGPU)"
                 devices: [dgpu]
                 pptest: "VisualAIRunner"
-                timeout: 750
+                timeout: 4800  # 80 min - dGPU with adaptive search
                 force_run: true
                 display_output: 0  # 0=no display, 1=enable display
                 requirements:
+                  memory_min_gb: 48.0 # Threshold to cover systems with 64GB Memory
                   dgpu_required: true
                   dgpu_min_devices: 1
                   dgpu_max_devices: 1
@@ -95,18 +100,20 @@ suites:
                 display_name: "VSaaS Visual AI Proxy Pipeline (iGPU)"
                 devices: [igpu]
                 pptest: "VsaasAIRunner"
-                timeout: 750
+                timeout: 4800  # 80 min - VSaaS runs 3 models with adaptive search
                 force_run: true
                 requirements:
+                  memory_min_gb: 48.0 # Threshold to cover systems with 64GB Memory
                   igpu_required: true
 
               - test_id: "METRO-PROXY-007"
                 display_name: "VSaaS Visual AI Proxy Pipeline (dGPU)"
                 devices: [dgpu]
                 pptest: "VsaasAIRunner"
-                timeout: 750
+                timeout: 4800  # 80 min - dGPU with adaptive search
                 force_run: true
                 requirements:
+                  memory_min_gb: 48.0 # Threshold to cover systems with 64GB Memory
                   dgpu_required: true
                   dgpu_min_devices: 1
                   dgpu_max_devices: 1

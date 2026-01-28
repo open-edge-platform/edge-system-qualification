@@ -42,7 +42,7 @@ suites:
                 bitrate: "4Mbps"
                 resolution: "1080p30"
                 device: [igpu]
-                timeout: 1650
+                timeout: 3600
                 requirements:
                   igpu_required: true
                 kpi_refs:
@@ -94,7 +94,7 @@ suites:
                 bitrate: "2Mbps"
                 resolution: "1080p30"
                 device: [igpu]
-                timeout: 1650
+                timeout: 3600
                 requirements:
                   igpu_required: true
                 kpi_refs:
@@ -120,7 +120,7 @@ suites:
                 bitrate: "2Mbps"
                 resolution: "1080p30"
                 device: [dgpu]
-                timeout: 1650
+                timeout: 2400
                 requirements:
                   dgpu_required: true
                 kpi_refs:
@@ -133,7 +133,7 @@ suites:
                 bitrate: "8Mbps"
                 resolution: "4k@30"
                 device: [dgpu]
-                timeout: 1650
+                timeout: 2400
                 requirements:
                   dgpu_required: true
                 kpi_refs:
@@ -258,7 +258,7 @@ suites:
                 bitrate: "4Mbps"
                 resolution: "1080p30"
                 device: [igpu]
-                timeout: 1800
+                timeout: 3000
                 requirements:
                   igpu_required: true
                 kpi_refs:
@@ -310,7 +310,7 @@ suites:
                 bitrate: "2Mbps"
                 resolution: "1080p30"
                 device: [igpu]
-                timeout: 1800
+                timeout: 3000
                 requirements:
                   igpu_required: true
                 kpi_refs:

@@ -12,6 +12,7 @@ import allure
 import pandas as pd
 import pytest
 from esq.utils.genutils import plot_grouped_bar_chart
+from esq.utils.media import detect_display_settings, determine_display_output
 from esq.utils.media.validation import detect_platform_type
 from sysagent.utils.config import ensure_dir_permissions
 from sysagent.utils.core import Metrics, Result
@@ -518,8 +519,13 @@ def _run_proxy_pipeline_container(
             config_basename = os.path.basename(config_file)
             volumes[config_file] = {"bind": f"/home/dlstreamer/{config_basename}", "mode": "ro"}
 
-    # Prepare environment
-    display = os.environ.get("DISPLAY", ":0")
+    # Auto-detect display settings using shared utility
+    display, display_available = detect_display_settings(logger)
+    if not display_available:
+        logger.warning(
+            "No X11 display detected. Will auto-fallback to fakesink (headless mode). "
+            "Set DISPLAY environment variable for display output."
+        )
     environment = {
         "DISPLAY": display,
         "DEVICES_LIST": " ".join(device_dict.keys()),
@@ -658,7 +664,14 @@ def _run_proxy_pipeline_container(
     logger.debug(f"Normalized devices for benchmark: {list(device_dict.keys())} → {device_args}")
 
     # Display output: 0=fakesink (no display), 1=xvimagesink (display enabled)
-    display_output = str(configs.get("display_output", 0))
+    # Use shared determine_display_output() for auto-fallback when display not available
+    config_display_output = configs.get("display_output")
+    display_enabled = determine_display_output(
+        config_display_output=config_display_output,
+        display_available=display_available,
+        logger=logger
+    )
+    display_output = "1" if display_enabled else "0"
     is_mtl = "true" if platform_info.get("is_mtl", False) else "false"
     has_igpu = "true" if platform_info.get("has_igpu", False) else "false"
     cfg_file_arg = config_file if config_file and config_file != "none" else "none"

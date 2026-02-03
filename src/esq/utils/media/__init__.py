@@ -10,6 +10,7 @@ This package provides common utilities shared between media and proxy pipeline t
 - Validation and pre-checks
 - Platform identification and matching
 - GPU topology detection
+- X11 display detection and Docker volume/environment setup
 """
 
 # Use relative imports to support both installed package and Docker container usage
@@ -22,6 +23,14 @@ from .validation import (
     detect_platform_type,
     get_render_device,
     normalize_device_name,
+)
+
+# X11 display utilities for container-based tests
+from .container_utils import (
+    detect_display_settings,
+    get_x11_volumes,
+    get_x11_environment,
+    determine_display_output,
 )
 
 # Host-only utilities - only available when sysagent is installed (not in containers)
@@ -46,6 +55,11 @@ __all__ = [
     "detect_platform_type",
     "get_render_device",
     "normalize_device_name",
+    # X11 display utilities
+    "detect_display_settings",
+    "get_x11_volumes",
+    "get_x11_environment",
+    "determine_display_output",
 ]
 
 # Add host-only utilities to __all__ if available

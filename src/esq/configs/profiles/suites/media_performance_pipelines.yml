@@ -24,7 +24,7 @@ params:
   image_tag: "1.0"
   dockerfile_name: "Dockerfile"
   base_image: "intel/dlstreamer:2025.1.2-ubuntu24"
-  display_output: 0  # 0=headless (fakesink), 1=display enabled (xvimagesink) - default headless for CI
+  display_output: 1  # 0=headless (fakesink), 1=display enabled (xvimagesink) - default headless for CI
   skip_container_execution: False  # Set to true to skip container run and use existing CSV results (for quick testing)
   force_run: true
 
@@ -147,7 +147,7 @@ suites:
                 resolution: "1080p30"
                 device: [igpu]
                 timeout: 1800
-                display_output: 0  # Enable display output for compose tests
+                display_output: 1  # Enable display output for compose tests
                 requirements:
                   igpu_required: true
                 kpi_refs:
@@ -161,7 +161,7 @@ suites:
                 resolution: "4k@30"
                 device: [igpu]
                 timeout: 1800
-                display_output: 0  # Enable display output for compose tests
+                display_output: 1  # Enable display output for compose tests
                 requirements:
                   igpu_required: true
                 kpi_refs:
@@ -175,7 +175,7 @@ suites:
                 resolution: "1080p30"
                 device: [dgpu]
                 timeout: 1800
-                display_output: 0  # Enable display output for compose tests
+                display_output: 1  # Enable display output for compose tests
                 requirements:
                   dgpu_required: true
                 kpi_refs:
@@ -189,7 +189,7 @@ suites:
                 resolution: "4k@30"
                 device: [dgpu]
                 timeout: 1800
-                display_output: 0  # Enable display output for compose tests
+                display_output: 1  # Enable display output for compose tests
                 requirements:
                   dgpu_required: true
                 kpi_refs:
@@ -203,7 +203,7 @@ suites:
                 resolution: "1080p30"
                 device: [igpu]
                 timeout: 1800
-                display_output: 0  # Enable display output for compose tests
+                display_output: 1  # Enable display output for compose tests
                 requirements:
                   igpu_required: true
                 kpi_refs:
@@ -217,7 +217,7 @@ suites:
                 resolution: "4k@30"
                 device: [igpu]
                 timeout: 1800
-                display_output: 0  # Enable display output for compose tests
+                display_output: 1  # Enable display output for compose tests
                 requirements:
                   igpu_required: true
                 kpi_refs:
@@ -231,7 +231,7 @@ suites:
                 resolution: "1080p30"
                 device: [dgpu]
                 timeout: 1800
-                display_output: 0  # Enable display output for compose tests
+                display_output: 1  # Enable display output for compose tests
                 requirements:
                   dgpu_required: true
                 kpi_refs:
@@ -245,7 +245,7 @@ suites:
                 resolution: "4k@30"
                 device: [dgpu]
                 timeout: 1800
-                display_output: 0  # Enable display output for compose tests
+                display_output: 1  # Enable display output for compose tests
                 requirements:
                   dgpu_required: true
                 kpi_refs:

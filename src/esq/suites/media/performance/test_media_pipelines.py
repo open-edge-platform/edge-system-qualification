@@ -11,6 +11,12 @@ import allure
 import pandas as pd
 import pytest
 from esq.utils.genutils import plot_grouped_bar_chart
+from esq.utils.media import (
+    detect_display_settings,
+    get_x11_volumes,
+    get_x11_environment,
+    determine_display_output,
+)
 from esq.utils.media.validation import detect_platform_type
 from sysagent.utils.config import ensure_dir_permissions
 from sysagent.utils.core import Metrics, Result
@@ -295,10 +301,22 @@ def _run_media_container(
         str(videos_path.resolve()): {"bind": "/home/dlstreamer/sample_video", "mode": "rw"},
     }
 
-    # Prepare environment variables
-    environment = {
-        "DISPLAY": os.environ.get("DISPLAY", ":0"),
-    }
+    # Auto-detect display settings using shared utility
+    host_display, display_available = detect_display_settings(logger)
+
+    # Determine display_output setting with auto-fallback using shared utility
+    config_display_output = configs.get("display_output", None)
+    display_output_enabled = determine_display_output(
+        config_display_output, display_available, logger
+    )
+
+    # Mount X11 volumes for display output (sockets and .Xauthority)
+    if display_output_enabled:
+        x11_volumes = get_x11_volumes(host_display, logger)
+        volumes.update(x11_volumes)
+
+    # Prepare environment variables using shared utility
+    environment = get_x11_environment(host_display, display_output_enabled)
 
     # Prepare container devices for GPU access
     container_devices = []
@@ -352,7 +370,10 @@ def _run_media_container(
     logger.debug(f"Normalized bitrate for container: {bitrate} → {bitrate_normalized} kbps")
 
     # Display output: 0=fakesink (no display), 1=xvimagesink (display enabled)
-    display_output = str(configs.get("display_output", 0))
+    # Use the auto-detected display_output_enabled value determined earlier
+    display_output = "1" if display_output_enabled else "0"
+    logger.debug(f"Display output setting: {display_output} (DISPLAY={host_display})")
+
     is_mtl = "true" if platform_info.get("is_mtl", False) else "false"
     has_igpu = "true" if platform_info.get("has_igpu", False) else "false"
 

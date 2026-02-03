@@ -54,7 +54,7 @@ suites:
                 pptest: "SmartAIRunner"
                 timeout: 3600  # 60 min - binary search on iGPU
                 force_run: true
-                display_output: 0  # 0=no display, 1=enable display
+                display_output: 1  # 0=no display, 1=enable display
                 requirements:
                   memory_min_gb: 48.0 # Threshold to cover systems with 64GB Memory
                   igpu_required: true
@@ -65,7 +65,7 @@ suites:
                 pptest: "SmartAIRunner"
                 timeout: 7200  # 120 min - dGPU with adaptive search for high stream counts
                 force_run: true
-                display_output: 0  # 0=no display, 1=enable display
+                display_output: 1  # 0=no display, 1=enable display
                 requirements:
                   memory_min_gb: 48.0 # Threshold to cover systems with 64GB Memory
                   dgpu_required: true
@@ -78,7 +78,7 @@ suites:
                 pptest: "VisualAIRunner"
                 timeout: 3600  # 60 min - binary search on iGPU
                 force_run: true
-                display_output: 0  # 0=no display, 1=enable display
+                display_output: 1  # 0=no display, 1=enable display
                 requirements:
                   memory_min_gb: 48.0 # Threshold to cover systems with 64GB Memory
                   igpu_required: true
@@ -89,7 +89,7 @@ suites:
                 pptest: "VisualAIRunner"
                 timeout: 4800  # 80 min - dGPU with adaptive search
                 force_run: true
-                display_output: 0  # 0=no display, 1=enable display
+                display_output: 1  # 0=no display, 1=enable display
                 requirements:
                   memory_min_gb: 48.0 # Threshold to cover systems with 64GB Memory
                   dgpu_required: true

@@ -182,6 +182,21 @@ class MediaBenchmark(BaseDLBenchmark):
                 self.post_proc_ele = "vaapipostproc"
                 os.environ["GST_VAAPI_DRM_DEVICE"] = "/dev/dri/renderD128"
 
+    def dgpu_specified(self, codec):
+        """Set dGPU-specific GStreamer elements.
+
+        The container uses the vaapi plugin (vaapih264enc, vaapih265enc) not the
+        va plugin (vah264enc, varenderD129h264enc). For dGPU, we must use vaapi
+        elements and set GST_VAAPI_DRM_DEVICE to the correct render device.
+        """
+        if self.device.startswith("dGPU"):
+            self.enc_ele = f"vaapi{codec}enc"
+            self.dec_ele = f"vaapi{codec}dec"
+            self.post_proc_ele = "vaapipostproc"
+            # Set the render device for dGPU (renderD129 for first dGPU, etc.)
+            os.environ["GST_VAAPI_DRM_DEVICE"] = f"/dev/dri/renderD{self.gpu_render}"
+            self.logger.info(f"dGPU using vaapi elements with GST_VAAPI_DRM_DEVICE=/dev/dri/renderD{self.gpu_render}")
+
     def gen_gst_command(self, stream, resolution=None, codec=None, bitrate=None, model_name=None):
         video_src = f"/home/dlstreamer/sample_video/car_{resolution}30_120s_{codec}.mp4"
         if self.enc_ele.startswith("vaapi"):
@@ -197,6 +212,8 @@ class MediaBenchmark(BaseDLBenchmark):
             gst_cmd += "compositor name=comp_0 "
             for i in range(stream):
                 gst_cmd += f"sink_{i}::xpos={i % compose_size * cell_width} sink_{i}::ypos={i // compose_size * cell_height} sink_{i}::alpha=1 "
+            # Get DISPLAY from environment variable (default :0 for backward compatibility)
+            display_env = os.environ.get("DISPLAY", ":0")
             if self.monitor_num == 0:
                 if self.device == "CPU":
                     gst_cmd += f"! video/x-raw,format=I420,width={self.resolution_dict[resolution]['width']},height={self.resolution_dict[resolution]['height']} "
@@ -205,13 +222,13 @@ class MediaBenchmark(BaseDLBenchmark):
                 else:
                     gst_cmd += "! fakesink async=false sync=false "
             elif self.monitor_num == 1:
-                gst_cmd += "! xvimagesink display=:0 async=false sync=false "
+                gst_cmd += f"! xvimagesink display={display_env} async=false sync=false "
             else:
-                gst_cmd += "! xvimagesink display=:0 async=false sync=false "
+                gst_cmd += f"! xvimagesink display={display_env} async=false sync=false "
                 gst_cmd += "compositor name=comp_1 "
                 for i in range(stream):
                     gst_cmd += f"sink_{i}::xpos={i % compose_size * cell_width} sink_{i}::ypos={i // compose_size * cell_height} sink_{i}::alpha=1 "
-                gst_cmd += "! xvimagesink display=:0 async=false sync=false "
+                gst_cmd += f"! xvimagesink display={display_env} async=false sync=false "
 
         for i in range(stream):
             if self.task == "Encode":
@@ -315,6 +332,7 @@ class MediaBenchmark(BaseDLBenchmark):
 
             self.get_gst_elements(codec)
             self.igpu_specified(codec)
+            self.dgpu_specified(codec)
 
             # Filter resolutions if specified
             resolutions_to_test = [filter_resolution] if filter_resolution else self.resolutions

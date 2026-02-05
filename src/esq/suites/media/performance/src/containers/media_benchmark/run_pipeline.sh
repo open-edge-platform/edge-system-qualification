@@ -6,6 +6,31 @@
 device=$1
 gst_cmd=$2
 
+gst_pid=""
+
+# Cleanup function to ensure child processes are terminated
+# This prevents orphaned gst-launch-1.0 processes when bash is killed
+cleanup() {
+    if [ -n "$gst_pid" ] && kill -0 "$gst_pid" 2>/dev/null; then
+        # First try graceful termination (SIGTERM)
+        kill -TERM "$gst_pid" 2>/dev/null
+        # Wait briefly for graceful shutdown
+        sleep 0.5
+        # If still running, force kill (SIGKILL)
+        if kill -0 "$gst_pid" 2>/dev/null; then
+            kill -KILL "$gst_pid" 2>/dev/null
+        fi
+    fi
+    rm -f /tmp/gst_pid_"${device}".txt
+}
+
+# Trap signals to ensure cleanup happens when this script is terminated
+# SIGTERM (15) - normal termination request from Python process.terminate()
+# SIGINT (2) - Ctrl+C
+# SIGHUP (1) - terminal disconnect
+# EXIT - script exit (including normal completion)
+trap cleanup SIGTERM SIGINT SIGHUP EXIT
+
 # Source OpenVINO environment (use symlink for version independence)
 if [ -f /opt/intel/openvino/setupvars.sh ]; then
     # shellcheck disable=SC1091 # OpenVINO path not available at static analysis time
@@ -33,4 +58,4 @@ gst_pid=$!
 
 echo $gst_pid > /tmp/gst_pid_"${device}".txt
 wait $gst_pid
-rm /tmp/gst_pid_"${device}".txt
+# Cleanup is handled by trap on EXIT

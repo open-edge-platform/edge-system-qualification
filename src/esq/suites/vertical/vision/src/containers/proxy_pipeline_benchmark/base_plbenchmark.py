@@ -8,7 +8,14 @@ import time
 # Add consolidated utilities to path
 sys.path.insert(0, "/home/dlstreamer")
 
-from esq_utils.media.pipeline_utils import BaseDLBenchmark, configure_logging
+from esq_utils.media.pipeline_utils import (
+    BaseDLBenchmark,
+    configure_logging,
+    get_memory_based_max_streams,
+    log_memory_status,
+    check_available_memory,
+    PSUTIL_AVAILABLE,
+)
 
 
 class BaseProxyPipelineBenchmark(BaseDLBenchmark):
@@ -233,6 +240,14 @@ class BaseProxyPipelineBenchmark(BaseDLBenchmark):
             )
 
     def run_benchmark(self):
+        # Log memory status at benchmark start
+        self.logger.info("=" * 80)
+        self.logger.info("[BENCHMARK] Starting benchmark execution")
+        log_memory_status(self.logger, prefix="[START] ")
+
+        # Determine if running on iGPU (shares system RAM) or dGPU
+        is_igpu = not self.device.startswith("dGPU")
+
         # Use generic encoder for dGPU since compositor outputs system memory
         use_generic_enc = self.device.startswith("dGPU")
         self.get_gst_elements("h264", use_generic_encoder=use_generic_enc)
@@ -245,6 +260,23 @@ class BaseProxyPipelineBenchmark(BaseDLBenchmark):
         else:
             max_stream = self.config["compose_size"] ** 2
             iteration_timeout = 600  # 10 minutes default
+
+        # Apply memory-based max stream limit to prevent OOM (applies to all devices)
+        # iGPU shares system RAM so uses more conservative limits, but dGPU also consumes
+        # system RAM for decode buffers, so memory limits apply to all devices
+        if PSUTIL_AVAILABLE:
+            memory_based_max = get_memory_based_max_streams(is_igpu=is_igpu, logger=self.logger)
+            if max_stream == -1:
+                # Unlimited mode - apply memory-based cap
+                max_stream = memory_based_max
+                self.logger.info(f"[MEMORY] Applied memory-based limit: max_stream={max_stream}")
+            elif max_stream > memory_based_max:
+                # Cap to memory-based limit
+                self.logger.warning(
+                    f"[MEMORY] Reducing max_stream from {max_stream} to {memory_based_max} "
+                    f"based on available memory"
+                )
+                max_stream = memory_based_max
 
         # Get max_binary_search_start from config (optional parameter to cap binary search starting point)
         max_binary_search_start = self.config.get("max_binary_search_start", None)
@@ -264,6 +296,8 @@ class BaseProxyPipelineBenchmark(BaseDLBenchmark):
             self.logger.info(f"  iteration_timeout: {iteration_timeout}s")
             if max_stream == -1:
                 self.logger.info("  max_stream: unlimited (will use default 100)")
+            else:
+                self.logger.info(f"  max_stream: {max_stream}")
             self.logger.info("=" * 80)
 
         # Track previous model result for adaptive search warm-start

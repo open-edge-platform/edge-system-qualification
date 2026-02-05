@@ -10,6 +10,7 @@ This package provides common utilities shared between media and proxy pipeline t
 - Validation and pre-checks
 - Platform identification and matching
 - GPU topology detection
+- Memory monitoring and OOM prevention
 - X11 display detection and Docker volume/environment setup
 """
 
@@ -25,6 +26,14 @@ from .validation import (
     normalize_device_name,
 )
 
+# Memory utilities for OOM prevention
+from .memory_utils import (
+    get_memory_based_max_streams,
+    check_available_memory,
+    log_memory_status,
+    get_memory_info,
+    PSUTIL_AVAILABLE,
+)
 # X11 display utilities for container-based tests
 from .container_utils import (
     detect_display_settings,
@@ -55,6 +64,12 @@ __all__ = [
     "detect_platform_type",
     "get_render_device",
     "normalize_device_name",
+    # Memory utilities
+    "get_memory_based_max_streams",
+    "check_available_memory",
+    "log_memory_status",
+    "get_memory_info",
+    "PSUTIL_AVAILABLE",
     # X11 display utilities
     "detect_display_settings",
     "get_x11_volumes",

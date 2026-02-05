@@ -8,6 +8,7 @@ Consolidates base_dlbenchmark.py and benchmark_log.py from media/proxy container
 """
 
 import fcntl
+import gc
 import logging
 import multiprocessing
 import os
@@ -25,6 +26,14 @@ try:
         AdaptiveSearchConfig,
         fps_guided_adaptive_search,
         get_initial_stream_count,
+    )
+
+    # Import memory utilities for OOM prevention
+    from esq.utils.media.memory_utils import (
+        get_memory_based_max_streams,
+        check_available_memory,
+        log_memory_status,
+        PSUTIL_AVAILABLE,
     )
 
     # For Popen cases, we need to use subprocess with proper validation
@@ -47,6 +56,27 @@ except ModuleNotFoundError:
         ADAPTIVE_SEARCH_AVAILABLE = True
     except ImportError:
         ADAPTIVE_SEARCH_AVAILABLE = False
+
+    # Import memory utilities from container path
+    try:
+        from .memory_utils import (
+            get_memory_based_max_streams,
+            check_available_memory,
+            log_memory_status,
+            PSUTIL_AVAILABLE,
+        )
+    except ImportError:
+        # Fallback stubs if memory_utils not available in container
+        PSUTIL_AVAILABLE = False
+
+        def get_memory_based_max_streams(is_igpu: bool = True, logger=None) -> int:
+            return 100  # Default max when memory info unavailable
+
+        def check_available_memory(min_available_gb: float = 4.0, logger=None) -> bool:
+            return True  # Assume OK if we can't check
+
+        def log_memory_status(logger, prefix: str = "") -> None:
+            pass
 
 
 def configure_logging(log_file_name):
@@ -282,7 +312,7 @@ class BaseDLBenchmark:
         self.tele_process.start()
 
     def stop_telemetry(self):
-        """Stop telemetry collection process."""
+        """Stop telemetry collection process and clean up any orphaned subprocesses."""
         if self.tele_process.is_alive():
             try:
                 self.logger.info(f"[PROGRESS] Sending SIGUSR1 to telemetry process (PID: {self.tele_process.pid})...")
@@ -306,6 +336,54 @@ class BaseDLBenchmark:
                 self.tele_process.join(timeout=1)
         else:
             self.logger.info("[PROGRESS] Telemetry process already stopped")
+
+        # Clean up any orphaned telemetry subprocesses (top, intel_gpu_top, xpu-smi)
+        # These can become orphans if the telemetry process dies unexpectedly
+        self._cleanup_orphan_telemetry_processes()
+
+    def _cleanup_orphan_telemetry_processes(self):
+        """
+        Clean up orphaned telemetry monitoring processes.
+
+        When the telemetry multiprocessing.Process dies unexpectedly,
+        its child subprocesses (top, intel_gpu_top, xpu-smi) can become
+        orphans and accumulate memory. This function finds and terminates them.
+        """
+        if not PSUTIL_AVAILABLE:
+            return
+
+        try:
+            import psutil
+
+            current_pid = os.getpid()
+
+            # Look for orphaned monitoring processes that might be lingering
+            # These are telemetry subprocesses that may have been orphaned
+            telemetry_process_names = ["top", "intel_gpu_top", "xpu-smi"]
+
+            for proc in psutil.process_iter(["pid", "name", "ppid"]):
+                try:
+                    proc_info = proc.info
+                    proc_name = proc_info.get("name", "")
+                    proc_ppid = proc_info.get("ppid", 0)
+
+                    # Only clean up processes whose parent is init (1) - true orphans
+                    # or our own process (in case telemetry process died mid-iteration)
+                    if proc_name in telemetry_process_names and proc_ppid in [1, current_pid]:
+                        self.logger.warning(
+                            f"[CLEANUP] Found orphaned telemetry process: {proc_name} (PID: {proc_info['pid']}, PPID: {proc_ppid})"
+                        )
+                        try:
+                            proc.terminate()
+                            proc.wait(timeout=2)
+                        except psutil.NoSuchProcess:
+                            pass
+                        except psutil.TimeoutExpired:
+                            proc.kill()
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    pass
+        except Exception as e:
+            self.logger.debug(f"[CLEANUP] Error during orphan process cleanup: {e}")
 
     def update_telemetry(self):
         """Read telemetry results from file."""
@@ -665,6 +743,10 @@ class BaseDLBenchmark:
             # No valid FPS measurements found
             self.logger.warning("No FPS measurements found in result file")
 
+        # Explicit garbage collection after each pipeline run to release memory
+        # This helps prevent memory accumulation during multi-iteration searches
+        gc.collect()
+
         return avg_fps, status
 
     def _meet_target_fps(self, fps):
@@ -734,6 +816,13 @@ class BaseDLBenchmark:
                     break
 
             self.logger.info(f"Start to run the pipeline with {current_stream} streams")
+
+            # Dynamic memory check before each iteration to prevent OOM
+            if not check_available_memory(min_available_gb=4.0, logger=self.logger):
+                self.logger.warning(
+                    f"[MEMORY] Insufficient memory to test {current_stream} streams, stopping search early"
+                )
+                break
 
             if self.benchmark_name == "LPR Benchmark":
                 gst_cmd = self.gen_gst_command(current_stream, resolution=resolution, model_name=model_name)
@@ -851,6 +940,13 @@ class BaseDLBenchmark:
                 Tuple of (fps, status) where status is 0 for success
             """
             nonlocal best_avg_fps
+
+            # Dynamic memory check before each iteration to prevent OOM
+            if not check_available_memory(min_available_gb=4.0, logger=self.logger):
+                self.logger.warning(
+                    f"[MEMORY] Insufficient memory to test {stream_count} streams, aborting iteration"
+                )
+                return 0.0, 1  # Return failure status to stop search
 
             self.logger.info(f"[PROGRESS] Executing pipeline for {stream_count} streams...")
 

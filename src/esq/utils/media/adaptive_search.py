@@ -14,6 +14,7 @@ Key Features:
 - Phase 2: Binary search refinement for precise boundary finding
 - Reference-based initialization for faster convergence
 - Configurable safety factors and jump parameters
+- Memory monitoring to track potential leaks during search
 """
 
 import logging
@@ -26,6 +27,26 @@ DEFAULT_SAFETY_FACTOR = 0.8
 DEFAULT_MIN_JUMP = 2
 DEFAULT_MIN_START = 5  # Skip GPU warmup zone
 DEFAULT_MAX_STREAMS_UNLIMITED = 100  # Default max when -1 (unlimited) is specified
+
+# Try to import psutil for memory monitoring during search
+try:
+    import psutil
+
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    PSUTIL_AVAILABLE = False
+
+
+def _get_memory_usage_gb() -> float:
+    """Get current memory usage in GB. Returns 0 if psutil unavailable."""
+    if not PSUTIL_AVAILABLE:
+        return 0.0
+    try:
+        mem = psutil.virtual_memory()
+        return (mem.total - mem.available) / (1024**3)
+    except Exception:
+        return 0.0
+
 
 @dataclass
 class AdaptiveSearchConfig:
@@ -77,6 +98,12 @@ class SearchMetadata:
 
     final_fps: float = 0.0
     """FPS achieved at optimal stream count."""
+
+    peak_memory_gb: float = 0.0
+    """Peak memory usage during search (GB)."""
+
+    memory_samples: List[float] = field(default_factory=list)
+    """Memory usage samples at each iteration (GB used)."""
 
 
 def calculate_adaptive_jump(
@@ -227,6 +254,11 @@ def fps_guided_adaptive_search(
     current = max(initial_count, config.min_start)
     best_fps = 0.0
 
+    # Track initial memory for leak detection
+    initial_memory_gb = _get_memory_usage_gb()
+    if PSUTIL_AVAILABLE:
+        logger.info(f"[ADAPTIVE] Initial memory usage: {initial_memory_gb:.1f} GB")
+
     logger.info(
         f"[ADAPTIVE] Starting search: target={target_fps} FPS, max={effective_max}, "
         f"initial={current}, safety={config.safety_factor}"
@@ -240,6 +272,12 @@ def fps_guided_adaptive_search(
         metadata.iterations += 1
         metadata.phase1_iterations += 1
 
+        # Sample memory before pipeline execution
+        current_memory_gb = _get_memory_usage_gb()
+        metadata.memory_samples.append(current_memory_gb)
+        if current_memory_gb > metadata.peak_memory_gb:
+            metadata.peak_memory_gb = current_memory_gb
+
         fps, status = run_pipeline_func(current)
 
         step_info = {
@@ -248,6 +286,7 @@ def fps_guided_adaptive_search(
             "fps": fps,
             "status": status,
             "passed": fps >= target_fps and status == 0,
+            "memory_gb": current_memory_gb,
         }
         metadata.search_path.append(step_info)
 
@@ -345,6 +384,12 @@ def fps_guided_adaptive_search(
         metadata.iterations += 1
         metadata.phase2_iterations += 1
 
+        # Sample memory before pipeline execution
+        current_memory_gb = _get_memory_usage_gb()
+        metadata.memory_samples.append(current_memory_gb)
+        if current_memory_gb > metadata.peak_memory_gb:
+            metadata.peak_memory_gb = current_memory_gb
+
         mid = (low + high) // 2
         fps, status = run_pipeline_func(mid)
 
@@ -354,6 +399,7 @@ def fps_guided_adaptive_search(
             "fps": fps,
             "status": status,
             "passed": fps >= target_fps and status == 0,
+            "memory_gb": current_memory_gb,
         }
         metadata.search_path.append(step_info)
 
@@ -368,10 +414,29 @@ def fps_guided_adaptive_search(
         else:
             high = mid
 
-    # Finalize metadata
+    # Finalize metadata with final memory sample
+    final_memory_gb = _get_memory_usage_gb()
+    metadata.memory_samples.append(final_memory_gb)
+    if final_memory_gb > metadata.peak_memory_gb:
+        metadata.peak_memory_gb = final_memory_gb
+
     metadata.total_time = time.time() - start_time
     metadata.optimal_count = low
     metadata.final_fps = best_fps
+
+    # Log memory trend to detect leaks
+    if PSUTIL_AVAILABLE and metadata.memory_samples:
+        memory_delta = final_memory_gb - initial_memory_gb
+        logger.info(
+            f"[ADAPTIVE] Memory: initial={initial_memory_gb:.1f}GB, "
+            f"final={final_memory_gb:.1f}GB, delta={memory_delta:+.1f}GB, "
+            f"peak={metadata.peak_memory_gb:.1f}GB"
+        )
+        if memory_delta > 2.0:
+            logger.warning(
+                f"[ADAPTIVE] Significant memory increase detected: {memory_delta:.1f}GB "
+                f"over {metadata.iterations} iterations. Possible memory leak."
+            )
 
     logger.info(
         f"[ADAPTIVE] Search complete: {low} streams @ {best_fps:.1f} FPS in "

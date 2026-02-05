@@ -52,6 +52,8 @@ COPY --chown=dlstreamer:dlstreamer utils/media/pipeline_utils.py ./esq_utils/med
 COPY --chown=dlstreamer:dlstreamer utils/media/telemetry.py ./esq_utils/media/
 COPY --chown=dlstreamer:dlstreamer utils/media/validation.py ./esq_utils/media/
 COPY --chown=dlstreamer:dlstreamer utils/media/container_utils.py ./esq_utils/media/
+COPY --chown=dlstreamer:dlstreamer utils/media/memory_utils.py ./esq_utils/media/
+COPY --chown=dlstreamer:dlstreamer utils/media/adaptive_search.py ./esq_utils/media/
 
 # Copy benchmark scripts from container directory
 COPY --chown=dlstreamer:dlstreamer suites/media/performance/src/containers/media_benchmark/gst_loop_mp4.sh .

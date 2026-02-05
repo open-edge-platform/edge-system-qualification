@@ -710,7 +710,7 @@ def _run_proxy_pipeline_container(
             working_dir="/home/dlstreamer",
             mode="batch",
             detach=True,  # Required for batch mode
-            remove=False,  # Keep container for cleanup in finally block
+            remove=True,  # Remove container after completion to free resources
             attach_logs=True,  # Attach logs to Allure report
             timeout=timeout,  # Container-level timeout from profile config
         )

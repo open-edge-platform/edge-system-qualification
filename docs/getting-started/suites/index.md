@@ -78,7 +78,7 @@ Generative AI test on text generation
 | Entry | AES-GEN-001 | Gen AI LLM Serving Benchmark - DeepSeek-R1-Distill-Qwen-1.5B INT4 | >= 10.0 tokens/sec |
 | Mainstream | AES-GEN-001 | Gen AI LLM Serving Benchmark - Phi-4-mini-reasoning 3.8B INT4 | >= 10.0 tokens/sec |
 | Efficiency Optimized | AES-GEN-001 | Gen AI LLM Serving Benchmark - DeepSeek-R1-Distill-Qwen-7B INT4 | >= 10.0 tokens/sec |
-| Scalable Performance | AES-GEN-001 | Gen AI LLM Serving Benchmark - Qwen3-32B INT4 | >= 10.0 tokens/sec  |
+| Scalable Performance | AES-GEN-001 | Gen AI LLM Serving Benchmark - DeepSeek-R1-Distill-Qwen-14B INT4 | >= 10.0 tokens/sec  |
 | Scalable Performance Graphics Media | AES-GEN-001 | Gen AI LLM Serving Benchmark - Phi-4-mini-reasoning 3.8B INT4<br>Gen AI LLM Serving Benchmark - DeepSeek-R1-Distill-Qwen-14B INT4<br>Gen AI LLM Serving Benchmark - Qwen3-32B INT4 | >= 10.0 tokens/sec |
 
 

@@ -24,6 +24,7 @@ from .pytest_config import (
     create_profile_pytest_args,
     create_pytest_args,
     run_pytest,
+    run_pytest_with_venv,
     validate_pytest_args,
 )
 from .system_validator import (
@@ -47,6 +48,7 @@ __all__ = [
     "create_profile_pytest_args",
     "create_pytest_args",
     "run_pytest",
+    "run_pytest_with_venv",
     "cleanup_pytest_cache",
     "validate_pytest_args",
     "add_test_paths_to_args",

@@ -455,9 +455,25 @@ def pytest_itemcollected(item):
 
 # Session tracking hooks
 def pytest_sessionstart(session):
-    """Initialize test session counters."""
+    """
+    Initialize test session counters and configure logging.
+
+    This hook runs at the start of every pytest session, including when running
+    in isolated venvs, ensuring consistent logging configuration across all contexts.
+    """
     session.tests_run = 0
     session.total_tests = 0
+
+    # Suppress unwanted third-party loggers
+    # This ensures clean log output in both isolated venv and integrated package contexts
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
+    logging.getLogger("docker.auth").setLevel(logging.WARNING)
+    logging.getLogger("docker.utils").setLevel(logging.WARNING)
+    logging.getLogger("filelock").setLevel(logging.WARNING)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("docker").setLevel(logging.WARNING)
+
+    logger.debug("Suppressed third-party loggers for clean test output")
 
 
 def pytest_collection_modifyitems(session, config, items):

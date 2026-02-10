@@ -72,11 +72,11 @@ tests:
         # These parameters control the intelligent binary search algorithm used to find
         # the maximum number of streams each device can handle while maintaining target FPS.
         #
-        # consecutive_timeout_threshold: 2
+        # consecutive_timeout_threshold: 4
         #   - Number of consecutive timeout failures before reducing streams
         #   - Timeout = pipeline analysis exceeds timeout limit or returns 0 FPS
         #   - Prevents getting stuck on configurations that consistently timeout
-        #   - Default: 2
+        #   - Default: 4
         #
         # max_streams_above_baseline: 1
         #   - Maximum number of streams to explore above baseline per device
@@ -145,7 +145,7 @@ tests:
         # Consecutive threshold parameters for intelligent binary search qualification
         # consecutive_success_threshold: 1  # Number of consecutive successes before trying higher streams
         # consecutive_failure_threshold: 2  # Number of consecutive FPS-based failures (>0 FPS but below target) before trying lower streams
-        # consecutive_timeout_threshold: 2  # Number of consecutive timeout failures (below baseline only) before trying lower streams
+        # consecutive_timeout_threshold: 4  # Number of consecutive timeout failures (below baseline only) before trying lower streams
         pipeline: |
           filesrc location=./videos/1192116-hd_1920_1080_15fps_30s.mp4
             ! ${DECODE_ELEMENTS}

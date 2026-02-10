@@ -86,6 +86,7 @@ def init_core_logging(debug: bool = False) -> logging.Logger:
     logging.getLogger("urllib3").setLevel(logging.WARNING)
     logging.getLogger("docker.auth").setLevel(logging.WARNING)
     logging.getLogger("docker.utils").setLevel(logging.WARNING)
+    logging.getLogger("docker").setLevel(logging.WARNING)
     logging.getLogger("filelock").setLevel(logging.WARNING)
     logging.getLogger("httpx").setLevel(logging.WARNING)
 

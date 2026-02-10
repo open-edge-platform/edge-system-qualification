@@ -72,7 +72,7 @@ def test_dlstreamer(
         f"{configs.get('docker_image_tag_utils', 'latest')}",
     )
     docker_container_prefix = configs.get("docker_container_prefix", "test-dlstreamer")
-    consecutive_timeout_threshold = configs.get("consecutive_timeout_threshold", 2)
+    consecutive_timeout_threshold = configs.get("consecutive_timeout_threshold", 4)
     max_streams_above_baseline = configs.get("max_streams_above_baseline", 1)
 
     # Setup

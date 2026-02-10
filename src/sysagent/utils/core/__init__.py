@@ -9,6 +9,7 @@ This package contains core functionality for the framework including:
 - KPI validation and metrics
 - Shared state management
 - Secure process execution
+- Virtual environment management
 """
 
 # Import from local modules
@@ -33,11 +34,21 @@ from .process import (
     run_git_command, configure_security, cleanup_processes
 )
 
+# Import virtual environment management utilities
+from .venv import (
+    VenvManager,
+    get_venv_manager,
+    setup_suite_venv,
+    get_suite_python_executable,
+    run_pytest_in_suite_venv
+)
+
 # Make sub-modules available
 from . import cache
 from . import result  
 from . import kpi
 from . import process
+from . import venv
 
 __all__ = [
     # Cache functionality
@@ -76,9 +87,17 @@ __all__ = [
     'configure_security',
     'cleanup_processes',
     
+    # Virtual environment management
+    'VenvManager',
+    'get_venv_manager',
+    'setup_suite_venv',
+    'get_suite_python_executable',
+    'run_pytest_in_suite_venv',
+    
     # Sub-modules
     'cache',
     'result',
     'kpi',
-    'process'
+    'process',
+    'venv'
 ]

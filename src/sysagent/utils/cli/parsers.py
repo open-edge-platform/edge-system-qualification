@@ -188,7 +188,10 @@ For available profiles, use: {cli_name} list
         "--data", action="store_true", help="Clean entire data directory (models, videos, test data, etc.)"
     )
     additional_group.add_argument(
-        "--all", "-a", action="store_true", help="Clean all directories (equivalent to --cache --thirdparty --data)"
+        "--venvs", action="store_true", help="Clean isolated virtual environments for test suites"
+    )
+    additional_group.add_argument(
+        "--all", "-a", action="store_true", help="Clean all directories (equivalent to --cache --thirdparty --data --venvs)"
     )
 
     # Group for specific directory cleaning only (without touching results/logs)
@@ -201,6 +204,9 @@ For available profiles, use: {cli_name} list
     )
     specific_group.add_argument(
         "--data-only", action="store_true", help="Clean only the data directory (do not clean results/logs)"
+    )
+    specific_group.add_argument(
+        "--venvs-only", action="store_true", help="Clean only virtual environments (do not clean results/logs)"
     )
 
     # Report command

@@ -1,0 +1,3 @@
+# Text Generation Test Suite Requirements
+# This file specifies Python dependencies for the text generation test suite
+# that differ from or extend the main project requirements

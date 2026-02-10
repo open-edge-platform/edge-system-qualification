@@ -121,10 +121,12 @@ def main() -> int:
                 clean_cache=args.cache,
                 clean_thirdparty=args.thirdparty,
                 clean_data=args.data,
+                clean_venvs=args.venvs,
                 clean_all=args.all,
                 cache_only=args.cache_only,
                 thirdparty_only=args.thirdparty_only,
                 data_only=args.data_only,
+                venvs_only=args.venvs_only,
                 verbose=verbose,
                 debug=debug,
             )

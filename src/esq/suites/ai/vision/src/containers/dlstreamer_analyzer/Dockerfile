@@ -1,9 +1,7 @@
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-# FROM intel/dlstreamer:2025.0.1.3-ubuntu24
-FROM intel/dlstreamer:2025.1.2-ubuntu24
-# FROM intel/dlstreamer:2025.1.2-ubuntu22
+FROM intel/dlstreamer:2025.2.0-ubuntu24
 
 USER root
 

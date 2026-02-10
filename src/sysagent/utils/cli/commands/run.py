@@ -22,14 +22,12 @@ from sysagent.utils.config import filter_profile_by_tier, get_suite_directory, l
 from sysagent.utils.core import shared_state
 from sysagent.utils.logging import setup_command_logging
 from sysagent.utils.reporting import CoreResultsSummaryGenerator, TestSummaryTableGenerator
-from sysagent.utils.system import SystemInfoCache
 from sysagent.utils.testing import (
     add_test_paths_to_args,
     cleanup_pytest_cache,
     create_profile_pytest_args,
     create_pytest_args,
     run_pytest,
-    validate_pytest_args,
 )
 
 # Import will be done dynamically to avoid circular imports
@@ -170,7 +168,6 @@ def run_tests(
 
     setup_command_logging("run", verbose=verbose, debug=debug, data_dir=data_dir)
     os.environ["CORE_DATA_DIR"] = data_dir
-    system_info_cache = SystemInfoCache(os.path.join(data_dir, "cache"))
 
     if no_cache:
         os.environ["CORE_NO_CACHE"] = "1"
@@ -189,7 +186,7 @@ def run_tests(
         # Option 1: If a profile name is provided, load the profile configuration
         if profile_name:
             result_code, tests_ran = _run_profile_tests(
-                profile_name, pytest_args, skip_system_check, data_dir, parsed_filters
+                profile_name, pytest_args, skip_system_check, data_dir, verbose, debug, parsed_filters
             )
 
         # Option 2: If a suite name is provided, run the specified suite
@@ -227,7 +224,13 @@ def run_tests(
 
 
 def _run_profile_tests(
-    profile_name: str, pytest_args: List[str], skip_system_check: bool, data_dir: str, filters: Dict[str, Any] = None
+    profile_name: str,
+    pytest_args: List[str],
+    skip_system_check: bool,
+    data_dir: str,
+    verbose: bool = False,
+    debug: bool = False,
+    filters: Dict[str, Any] = None,
 ) -> tuple:
     """Run tests for a specific profile.
 
@@ -282,6 +285,8 @@ def _run_profile_tests(
             pytest_args,
             skip_system_check,
             data_dir,
+            verbose,
+            debug,
             filters if current_profile_name == profile_name else None,  # Only apply filters to requested profile
         )
 
@@ -304,7 +309,13 @@ def _run_profile_tests(
 
 
 def _run_single_profile(
-    profile_name: str, pytest_args: List[str], skip_system_check: bool, data_dir: str, filters: Dict[str, Any] = None
+    profile_name: str,
+    pytest_args: List[str],
+    skip_system_check: bool,
+    data_dir: str,
+    verbose: bool = False,
+    debug: bool = False,
+    filters: Dict[str, Any] = None,
 ) -> tuple:
     """Run a single profile without dependency resolution.
 
@@ -370,11 +381,23 @@ def _run_single_profile(
         logger.error(f"No suites remaining after tier filtering for profile: {profile_name}")
         return 1, False
 
-    # Collect test paths from profile suites
-    test_paths = _collect_test_paths_from_suites(profile_suites)
+    # Get profile-level venv config (may be None)
+    profile_venv_config = profile_configs.get("params", {}).get("venv")
 
-    if test_paths:
-        pytest_args = add_test_paths_to_args(pytest_args, test_paths)
+    # Collect test paths grouped by venv configuration
+    venv_groups = _collect_test_paths_from_suites(profile_suites, profile_venv_config)
+
+    if not venv_groups:
+        logger.warning(f"No test files found for profile: {profile_name}")
+        return 1, False
+
+    # Flatten all test paths for initial validation
+    all_test_paths = []
+    for test_paths, _, _ in venv_groups.values():
+        all_test_paths.extend(test_paths)
+
+    if all_test_paths:
+        pytest_args = add_test_paths_to_args(pytest_args, all_test_paths)
     else:
         logger.warning(f"No test files found for profile: {profile_name}")
 
@@ -382,13 +405,72 @@ def _run_single_profile(
     if shared_state.INTERRUPT_OCCURRED:
         logger.warning("Interrupt detected before running profile")
 
-    logger.info(f"Running pytest with args: {pytest_args}")
-    try:
-        exit_code = run_pytest(pytest_args)
-        return exit_code, True
-    except KeyboardInterrupt:
-        logger.warning("Test execution interrupted by user. Stopping all tests.")
-        return 130, True
+    logger.info(f"Running pytest for profile {profile_name}")
+
+    # Run tests for each venv configuration group
+    overall_exit_code = 0
+
+    for venv_key, (test_paths, venv_config, suite_path) in venv_groups.items():
+        if not test_paths:
+            continue
+
+        venv_enabled = venv_config.get("enabled", False)
+        requirements_file_rel = venv_config.get("requirements_file")
+        python_version = venv_config.get("python_version")
+        venv_timeout = venv_config.get("timeout", 7200.0)
+
+        # Log venv group info
+        if venv_enabled:
+            logger.info(f"Running {len(test_paths)} test(s) with venv (requirements: {requirements_file_rel})")
+        else:
+            logger.info(f"Running {len(test_paths)} test(s) without venv")
+
+        # Create pytest args for this group
+        group_pytest_args = create_pytest_args(data_dir, verbose, debug)
+        group_pytest_args = add_test_paths_to_args(group_pytest_args, test_paths)
+
+        try:
+            if venv_enabled:
+                if not requirements_file_rel:
+                    logger.warning("Venv enabled but no requirements_file specified, running without venv")
+                    exit_code = run_pytest(group_pytest_args)
+                else:
+                    # Resolve requirements file path relative to suite directory
+                    requirements_file = os.path.join(suite_path, requirements_file_rel)
+
+                    if not os.path.exists(requirements_file):
+                        logger.error(f"Requirements file not found: {requirements_file}")
+                        overall_exit_code = 1
+                        continue
+
+                    logger.info(f"Running tests in isolated venv with requirements from: {requirements_file}")
+                    logger.info(f"Venv timeout configured: {venv_timeout}s ({venv_timeout / 3600:.2f} hours)")
+
+                    # Run pytest with venv
+                    from sysagent.utils.testing.pytest_config import run_pytest_with_venv
+
+                    exit_code = run_pytest_with_venv(
+                        pytest_args=group_pytest_args,
+                        suite_path=suite_path,
+                        requirements_file=requirements_file,
+                        data_dir=data_dir,
+                        python_version=python_version,
+                        force=False,
+                        timeout=venv_timeout,
+                    )
+            else:
+                # Run pytest normally without venv
+                exit_code = run_pytest(group_pytest_args)
+
+            # Track worst exit code
+            if exit_code != 0:
+                overall_exit_code = exit_code
+
+        except KeyboardInterrupt:
+            logger.warning("Test execution interrupted by user. Stopping all tests.")
+            return 130, True
+
+    return overall_exit_code, True
 
 
 def _run_suite_tests(suite_name: str, sub_suite_name: str, test_name: str, pytest_args: List[str]) -> tuple:
@@ -729,37 +811,104 @@ def _run_single_profile_in_batch(profile, data_dir: str, verbose: bool, debug: b
         logger.debug(f"No suites remaining after tier filtering for profile: {profile_name}")
         return 1
 
-    # Create pytest args and collect test paths
-    profile_pytest_args = create_profile_pytest_args(data_dir, profile_name, verbose, debug)
-    test_paths = _collect_test_paths_from_suites(profile_suites)
+    # Get profile-level venv config (may be None)
+    profile_venv_config = profile_configs.get("params", {}).get("venv")
 
-    if test_paths:
-        profile_pytest_args = add_test_paths_to_args(profile_pytest_args, test_paths)
+    # Collect test paths grouped by venv configuration
+    venv_groups = _collect_test_paths_from_suites(profile_suites, profile_venv_config)
 
-    if not validate_pytest_args(profile_pytest_args):
+    if not venv_groups:
         logger.error(f"No tests found for profile: {profile_name}")
         return 1
 
     if shared_state.INTERRUPT_OCCURRED:
         logger.warning("Interrupt detected before running profile single profile in batch")
 
-    # Run the tests
-    try:
-        logger.info(f"Running pytest for profile {profile_name}")
-        result = run_pytest(profile_pytest_args)
-        if result == 0:
-            logger.info(f"Profile passed: {profile_name}")
+    # Run tests for each venv configuration group
+    overall_result = 0
+
+    for venv_key, (test_paths, venv_config, suite_path) in venv_groups.items():
+        if not test_paths:
+            continue
+
+        venv_enabled = venv_config.get("enabled", False)
+        requirements_file_rel = venv_config.get("requirements_file")
+        python_version = venv_config.get("python_version")
+        venv_timeout = venv_config.get("timeout", 7200.0)
+
+        # Log venv group info
+        if venv_enabled:
+            logger.info(f"Running {len(test_paths)} test(s) with venv (requirements: {requirements_file_rel})")
         else:
-            logger.error(f"Profile failed: {profile_name}")
-        return result
-    except KeyboardInterrupt:
-        logger.warning("Test execution interrupted by user. Stopping all tests.")
-        return 130
+            logger.info(f"Running {len(test_paths)} test(s) without venv")
+
+        # Create pytest args for this group
+        profile_pytest_args = create_profile_pytest_args(data_dir, profile_name, verbose, debug)
+        profile_pytest_args = add_test_paths_to_args(profile_pytest_args, test_paths)
+
+        try:
+            if venv_enabled:
+                if not requirements_file_rel:
+                    logger.warning("Venv enabled but no requirements_file specified, running without venv")
+                    result = run_pytest(profile_pytest_args)
+                else:
+                    # Resolve requirements file path relative to suite directory
+                    requirements_file = os.path.join(suite_path, requirements_file_rel)
+
+                    if not os.path.exists(requirements_file):
+                        logger.error(f"Requirements file not found: {requirements_file}")
+                        overall_result = 1
+                        continue
+
+                    logger.info(f"Running tests in isolated venv with requirements from: {requirements_file}")
+                    logger.info(f"Venv timeout configured: {venv_timeout}s ({venv_timeout / 3600:.2f} hours)")
+
+                    # Run pytest with venv
+                    from sysagent.utils.testing.pytest_config import run_pytest_with_venv
+
+                    result = run_pytest_with_venv(
+                        pytest_args=profile_pytest_args,
+                        suite_path=suite_path,
+                        requirements_file=requirements_file,
+                        data_dir=data_dir,
+                        python_version=python_version,
+                        force=False,
+                        timeout=venv_timeout,
+                    )
+            else:
+                # Run pytest normally without venv
+                result = run_pytest(profile_pytest_args)
+
+            # Track worst result
+            if result != 0:
+                overall_result = result
+
+        except KeyboardInterrupt:
+            logger.warning("Test execution interrupted by user. Stopping all tests.")
+            return 130
+
+    # Log final result
+    if overall_result == 0:
+        logger.info(f"Profile passed: {profile_name}")
+    else:
+        logger.error(f"Profile failed: {profile_name}")
+
+    return overall_result
 
 
-def _collect_test_paths_from_suites(suites) -> List[str]:
-    """Collect test file paths from suite configurations."""
-    test_paths = []
+def _collect_test_paths_from_suites(suites, profile_venv_config=None) -> Dict[str, tuple]:
+    """Collect test file paths from suite configurations, grouped by venv configuration.
+
+    Returns:
+        Dict mapping venv config key to tuple of (test_paths, venv_config, suite_path)
+        The venv config key is a tuple of (enabled, requirements_file, python_version, timeout)
+    """
+    from sysagent.utils.config import get_suite_directory
+
+    # Dictionary to group tests by venv configuration
+    # Key: (enabled, requirements_file, python_version, timeout)
+    # Value: (test_paths, venv_config_dict, suite_path)
+    venv_groups = {}
 
     for suite in suites:
         suite_name = suite.get("name")
@@ -775,17 +924,63 @@ def _collect_test_paths_from_suites(suites) -> List[str]:
                 logger.warning(f"Sub-suite folder not found: {sub_suite_path}")
                 continue
 
+            # Get venv config for this sub_suite (with fallback to profile-level config)
+            venv_config = _get_venv_config_for_subsuite(sub_suite, profile_venv_config)
+
+            # Create venv config key for grouping
+            venv_key = (
+                venv_config.get("enabled", False),
+                venv_config.get("requirements_file"),
+                venv_config.get("python_version"),
+                venv_config.get("timeout", 7200.0),
+            )
+
+            # Initialize group if not exists
+            if venv_key not in venv_groups:
+                venv_groups[venv_key] = ([], venv_config, os.path.join(suite_path, sub_suite_name))
+
+            # Collect test paths for this sub_suite
             tests_config = sub_suite.get("tests", {})
             for test_name, test_config in tests_config.items():
                 test_file = f"{test_name}.py"
                 test_path = os.path.join(sub_suite_path, test_file)
                 if os.path.exists(test_path):
-                    test_paths.append(test_path)
-                    logger.info(f"Adding test: {test_path}")
+                    venv_groups[venv_key][0].append(test_path)
+                    logger.debug(f"Adding test to venv group {venv_key}: {test_path}")
                 else:
                     logger.warning(f"Test file not found: {test_path}")
 
-    return test_paths
+    return venv_groups
+
+
+def _get_venv_config_for_subsuite(sub_suite: Dict[str, Any], profile_venv_config: Dict[str, Any]) -> Dict[str, Any]:
+    """Get venv configuration for a sub_suite, with fallback to profile-level config.
+
+    Args:
+        sub_suite: Sub-suite configuration dictionary
+        profile_venv_config: Profile-level venv configuration (can be None)
+
+    Returns:
+        Dict with venv configuration (enabled, requirements_file, python_version, timeout)
+    """
+    # Check if sub_suite has its own venv config (under params.venv for consistency)
+    subsuite_params = sub_suite.get("params", {})
+    subsuite_venv = subsuite_params.get("venv")
+
+    if subsuite_venv is not None:
+        # Sub-suite has its own venv config - use it
+        return {
+            "enabled": subsuite_venv.get("enabled", False),
+            "requirements_file": subsuite_venv.get("requirements_file"),
+            "python_version": subsuite_venv.get("python_version"),
+            "timeout": subsuite_venv.get("timeout", 7200.0),
+        }
+    elif profile_venv_config:
+        # No sub-suite config, use profile-level config
+        return profile_venv_config
+    else:
+        # No venv config at all - disabled by default
+        return {"enabled": False, "requirements_file": None, "python_version": None, "timeout": 7200.0}
 
 
 def _determine_final_exit_code(data_dir: str, pytest_exit_code: int) -> int:

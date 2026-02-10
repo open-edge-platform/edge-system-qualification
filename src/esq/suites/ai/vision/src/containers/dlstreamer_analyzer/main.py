@@ -654,12 +654,30 @@ def get_baseline_stream_analysis(baseline_pipeline=None, result_pipeline=None, p
         # Clean up main process using robust termination
         main_terminated = terminate_process_safely(main_process, "baseline main pipeline", timeout=3)
         result_info["main_process_exit_code"] = main_process.returncode
+        logger.debug(f"Baseline main pipeline exit code: {main_process.returncode}")
 
         if main_process.returncode is not None and main_process.returncode not in [0, -15]:  # -15 is SIGTERM
             stderr_output = main_process.stderr.read().decode() if main_process.stderr else "No stderr"
 
+            # Check for critical failure exit codes
+            # For baseline analysis, all crashes are critical failures since there's no binary search
+            # -6 = SIGABRT (abort/memory corruption), -11 = SIGSEGV (segfault), -4 = SIGILL (illegal instruction)
+            critical_failure_codes = [-4, -6, -11]
+            if main_process.returncode in critical_failure_codes:
+                error_msg = (
+                    f"Baseline main pipeline crashed with critical exit code {main_process.returncode} "
+                    f"(signal {abs(main_process.returncode)}): {stderr_output}"
+                )
+                logger.error(error_msg)
+                result_info.update(
+                    {
+                        "status": "main_failed",
+                        "error_reason": error_msg,
+                    }
+                )
+                return result_info
             # Check for non-critical GStreamer cleanup issues (exit code -9 with GStreamer warnings)
-            if main_process.returncode == -9 and "GStreamer-WARNING" in stderr_output:
+            elif main_process.returncode == -9 and "GStreamer-WARNING" in stderr_output:
                 logger.warning("Detected GStreamer issue (SIGKILL -9) - non-critical if results collected")
             # Check for segmentation fault or longjmp errors
             elif "Segmentation fault" in stderr_output or "longjmp causes uninitialized stack frame" in stderr_output:
@@ -866,12 +884,47 @@ def get_n_stream_analysis_per_device(
             # Clean up main process using robust termination
             main_terminated = terminate_process_safely(main_process, "multi-stream main pipeline", timeout=3)
             result_info["main_process_exit_code"] = main_process.returncode
+            logger.debug(f"Multi-stream main pipeline exit code: {main_process.returncode}")
 
             if main_process.returncode is not None and main_process.returncode not in [0, -15]:  # -15 is SIGTERM
                 stderr_output = main_process.stderr.read().decode() if main_process.stderr else "No stderr"
 
+                # Check for resource exhaustion exit codes (memory corruption, segfault)
+                # These indicate insufficient resources for the stream count, similar to timeout
+                # -6 = SIGABRT (abort/memory corruption), -11 = SIGSEGV (segfault)
+                resource_exhaustion_codes = [-6, -11]
+                if main_process.returncode in resource_exhaustion_codes:
+                    error_msg = (
+                        f"Main pipeline crashed with exit code {main_process.returncode} "
+                        f"(signal {abs(main_process.returncode)}) due to resource exhaustion: {stderr_output}"
+                    )
+                    logger.warning(error_msg)
+                    # Use 'resource_exhaustion' status - allows binary search to continue with lower stream counts
+                    # Handled similarly to timeout but distinguishable in logs
+                    result_info.update(
+                        {
+                            "status": "resource_exhaustion",
+                            "error_reason": error_msg,
+                        }
+                    )
+                    return result_info
+                # Check for critical failure exit codes (illegal instruction)
+                # -4 = SIGILL (illegal instruction) - indicates actual code/hardware incompatibility
+                elif main_process.returncode == -4:
+                    error_msg = (
+                        f"Main pipeline crashed with critical exit code {main_process.returncode} "
+                        f"(signal {abs(main_process.returncode)}): {stderr_output}"
+                    )
+                    logger.error(error_msg)
+                    result_info.update(
+                        {
+                            "status": "main_failed",
+                            "error_reason": error_msg,
+                        }
+                    )
+                    return result_info
                 # Check for non-critical GStreamer cleanup issues (exit code -9 with GStreamer warnings)
-                if main_process.returncode == -9 and "GStreamer-WARNING" in stderr_output:
+                elif main_process.returncode == -9 and "GStreamer-WARNING" in stderr_output:
                     logger.warning("Detected GStreamer issue (SIGKILL -9) - non-critical if results collected")
                 # Check for segmentation fault or longjmp errors
                 elif (

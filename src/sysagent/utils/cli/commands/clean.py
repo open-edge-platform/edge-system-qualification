@@ -22,10 +22,12 @@ def clean_data_dir(
     clean_cache: bool = False,
     clean_thirdparty: bool = False,
     clean_data: bool = False,
+    clean_venvs: bool = False,
     clean_all: bool = False,
     cache_only: bool = False,
     thirdparty_only: bool = False,
     data_only: bool = False,
+    venvs_only: bool = False,
     verbose: bool = False,
     debug: bool = False
 ) -> int:
@@ -36,10 +38,12 @@ def clean_data_dir(
         clean_cache: Whether to clean the cache directory as well (in addition to results)
         clean_thirdparty: Whether to clean the thirdparty directory as well (in addition to results)
         clean_data: Whether to clean the entire data directory as well (in addition to results)
+        clean_venvs: Whether to clean isolated virtual environments (in addition to results)
         clean_all: Whether to clean all directories (equivalent to setting all other clean flags to True)
         cache_only: Whether to clean only the cache directory (skip results/logs cleaning)
         thirdparty_only: Whether to clean only the thirdparty directory (skip results/logs cleaning) 
         data_only: Whether to clean only the data directory (skip results/logs cleaning)
+        venvs_only: Whether to clean only virtual environments (skip results/logs cleaning)
         verbose: Whether to show more detailed output
         debug: Whether to show debug level logs
         
@@ -57,7 +61,7 @@ def clean_data_dir(
         setup_command_logging("clean", verbose=verbose, debug=debug)
         
         # Check if any "only" options are specified
-        only_options = cache_only or thirdparty_only or data_only
+        only_options = cache_only or thirdparty_only or data_only or venvs_only
         cleaned_items = []
         
         if only_options:
@@ -76,6 +80,11 @@ def clean_data_dir(
                 logger.info("Cleaning only data directory")
                 _clean_application_data_directory(data_dir)
                 cleaned_items.append("application data")
+            
+            if venvs_only:
+                logger.info("Cleaning only virtual environments")
+                _clean_venvs_directory(data_dir)
+                cleaned_items.append("virtual environments")
                 
         else:
             # Default behavior: clean results/logs + any additional specified directories
@@ -85,7 +94,8 @@ def clean_data_dir(
                 clean_cache = True
                 clean_thirdparty = True
                 clean_data = True
-                logger.info("Cleaning all directories (cache, thirdparty, and data)")
+                clean_venvs = True
+                logger.info("Cleaning all directories (cache, thirdparty, data, and venvs)")
             
             # Clean standard directories (results, logs, reports)
             _clean_logs_directory(data_dir)
@@ -109,6 +119,10 @@ def clean_data_dir(
             if clean_data:
                 _clean_application_data_directory(data_dir)
                 cleaned_items.append("application data")
+            
+            if clean_venvs:
+                _clean_venvs_directory(data_dir)
+                cleaned_items.append("virtual environments")
         
         # Show specific success message based on what was cleaned
         if len(cleaned_items) == 1:
@@ -255,3 +269,20 @@ def _clean_application_data_directory(data_dir: str):
             logger.debug(f"Recreated empty data directory")
         except Exception as e:
             logger.error(f"Error removing data directory {app_data_dir}: {e}")
+
+
+def _clean_venvs_directory(data_dir: str):
+    """Clean all isolated virtual environments."""
+    try:
+        from sysagent.utils.core.venv import get_venv_manager
+        
+        logger.info("Cleaning virtual environments")
+        manager = get_venv_manager(data_dir)
+        success_count, failure_count = manager.cleanup_all_venvs()
+        
+        if failure_count > 0:
+            logger.warning(f"Failed to clean {failure_count} virtual environment(s)")
+        else:
+            logger.info(f"Successfully cleaned {success_count} virtual environment(s)")
+    except Exception as e:
+        logger.error(f"Error cleaning virtual environments: {e}")

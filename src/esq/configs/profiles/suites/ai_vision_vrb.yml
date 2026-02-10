@@ -21,6 +21,13 @@ params:
     os_type:
       - "linux"
     docker_required: true
+  # Optional: Isolated virtual environment configuration
+  # When enabled, tests will run in an isolated venv with specific dependencies
+  venv:
+    enabled: false  # Set to true to enable isolated venv for this test suite
+    requirements_file: "src/dlstreamer/requirements.txt"  # Relative to suite directory
+    python_version: null  # Optional: specify Python version (e.g., "3.10", "3.11")
+    timeout: 7200  # Maximum execution time in seconds
   assets:
     - id: "yolo11n"
       type: "model"
@@ -62,7 +69,7 @@ params:
       sha256: "824db3e19e1e0a71caba8370606413b2bcd0d9339fb4c5b9535d4c3f2091095a"
       path: "./labels/preproc-aspect-ratio.json"
   target_fps: 14.95
-  consecutive_timeout_threshold: 2 
+  consecutive_timeout_threshold: 4 
   pipeline: |
     filesrc location=./videos/6891009-apple_1080p15.mp4
       ! ${DECODE_ELEMENTS}

@@ -23,51 +23,47 @@ logger = logging.getLogger(__name__)
 
 
 def get_device_specific_docker_image(
-    device_id: str, container_config: dict, fallback_image: str, device_dict: dict = None
+    device_id: str, container_config: dict, default_image: str, device_dict: dict = None
 ) -> str:
     """
     Get the appropriate Docker image for a specific device.
+    Uses device type mapping to select device-specific images when available.
 
     Args:
-        device_id: The device ID to check (e.g., 'dgpu', 'GPU.1', 'CPU')
+        device_id: The device ID to check (e.g., 'dgpu', 'GPU.1', 'CPU', 'NPU')
         container_config: Container configuration with available images
-        fallback_image: Default image to use if device-specific image not available
+        default_image: Default image to use if no device-specific image exists
         device_dict: Dictionary containing device information (optional)
 
     Returns:
         Docker image tag appropriate for the device
     """
-    # Check if the device is a dGPU device
-    is_dgpu_device = False
-    is_npu_device = False
+    # Determine device type for image selection
+    device_type_key = None
 
-    if device_dict and device_id in device_dict:
-        # Check device type from device_dict for discrete GPUs
-        device_type = device_dict[device_id].get("device_type", "")
-        is_dgpu_device = "discrete" in device_type.lower()
+    # Check if this is an NPU device
+    if device_id.upper().startswith("NPU"):
+        device_type_key = "npu"
+    # Check if this is a discrete GPU device
+    elif device_id.upper().startswith("GPU") and device_dict:
+        # Look up device info from device_dict to check if it's discrete
+        device_info = device_dict.get(device_id, {})
+        device_type = device_info.get("device_type", "")
+        if "discrete" in device_type.lower():
+            device_type_key = "dgpu"
 
-    else:
-        # Fallback to device_id pattern matching
-        is_dgpu_device = device_id == "dgpu" or device_id.lower().startswith("dgpu") or "dgpu" in device_id.lower()
-    
-    # Check for NPU device ID patterns (both upper and lower case)
-    if device_id.lower() == "npu" or device_id.lower().startswith("npu") or "npu" in device_id.lower():
-        is_npu_device = True
-    if is_dgpu_device and "dgpu_analyzer_image" in container_config:
-        image_name = container_config["dgpu_analyzer_image"]
-        logger.debug(f"Using dGPU-specific Docker image for device {device_id}: {image_name}")
-        return image_name
-    elif is_npu_device and "npu_analyzer_image" in container_config:
-        image_name = container_config["npu_analyzer_image"]
-        logger.debug(f"Using NPU-specific Docker image for device {device_id}: {image_name}")
-        return image_name
-    elif "analyzer_image" in container_config:
-        image_name = container_config["analyzer_image"]
-        logger.debug(f"Using standard Docker image for device {device_id}: {image_name}")
-        return image_name
-    else:
-        logger.warning(f"No device-specific image found for {device_id}, using fallback: {fallback_image}")
-        return fallback_image
+    # Look up device-specific image in container_config
+    if device_type_key:
+        image_key = f"{device_type_key}_analyzer_image"
+        if image_key in container_config:
+            image_name = container_config[image_key]
+            logger.debug(f"Using {device_type_key.upper()}-specific Docker image for {device_id}: {image_name}")
+            return image_name
+
+    # Use default analyzer image for all other devices
+    image_name = container_config.get("analyzer_image", default_image)
+    logger.debug(f"Using default Docker image for {device_id}: {image_name}")
+    return image_name
 
 
 def prepare_assets(
@@ -113,52 +109,41 @@ def prepare_assets(
     # Prepare Docker images for DL Streamer analyzer
     container_config = {}
 
-    # Build standard Docker image
-    logger.info(f"Building standard Docker image: {docker_image_tag_analyzer}")
-    build_analyzer_result = docker_client.build_image(
-        path=f"{src_dir}/containers/dlstreamer_analyzer", tag=docker_image_tag_analyzer, extract_packages=True
-    )
-    if not build_analyzer_result.get("image_id"):
-        pytest.fail(f"Failed to build Docker image: {docker_image_tag_analyzer}")
-    else:
-        logger.info(f"Standard Docker image built successfully: {docker_image_tag_analyzer}")
+    # Define device-specific image variants to build
+    # Each entry: (device_suffix, dockerfile_name, description)
+    # To add new device support: add entry here and create corresponding Dockerfile.{name}
+    # To remove device support: remove entry from this list
+    device_variants = [
+        (None, "Dockerfile", "standard"),  # Default image (no suffix)
+        ("dgpu", "Dockerfile.dgpu", "dGPU-specific"),
+        ("npu", "Dockerfile.npu", "NPU-specific"),
+    ]
 
-    container_config["analyzer_image"] = docker_image_tag_analyzer
-    container_config["analyzer_image_id"] = build_analyzer_result.get("image_id", "")
+    # Build all Docker image variants
+    base_image_name = docker_image_tag_analyzer.split(":")[0]
+    for device_suffix, dockerfile, description in device_variants:
+        # Generate image tag (with or without device suffix)
+        if device_suffix:
+            image_tag = f"{base_image_name}-{device_suffix}:latest"
+            config_key = f"{device_suffix}_analyzer_image"
+        else:
+            image_tag = docker_image_tag_analyzer
+            config_key = "analyzer_image"
 
-    # Build dGPU-specific Docker image
-    dgpu_image_tag = f"{docker_image_tag_analyzer.split(':')[0]}-dgpu:latest"
-    logger.info(f"Building dGPU-specific Docker image with enhanced system packages: {dgpu_image_tag}")
-    build_dgpu_result = docker_client.build_image(
-        path=f"{src_dir}/containers/dlstreamer_analyzer",
-        tag=dgpu_image_tag,
-        dockerfile="Dockerfile.dgpu",
-        extract_packages=True,
-    )
-    if not build_dgpu_result.get("image_id"):
-        pytest.fail(f"Failed to build dGPU Docker image: {dgpu_image_tag}")
-    else:
-        logger.info(f"dGPU Docker image built successfully: {dgpu_image_tag}")
+        logger.info(f"Building {description} Docker image: {image_tag}")
+        build_result = docker_client.build_image(
+            path=f"{src_dir}/containers/dlstreamer_analyzer",
+            tag=image_tag,
+            dockerfile=dockerfile,
+            extract_packages=True,
+        )
 
-    container_config["dgpu_analyzer_image"] = dgpu_image_tag
-    container_config["dgpu_analyzer_image_id"] = build_dgpu_result.get("image_id", "")
+        if not build_result.get("image_id"):
+            pytest.fail(f"Failed to build {description} Docker image: {image_tag}")
 
-    # Build NPU-specific Docker image
-    npu_image_tag = f"{docker_image_tag_analyzer.split(':')[0]}-npu:latest"
-    logger.info(f"Building NPU-specific Docker image with enhanced system packages: {npu_image_tag}")
-    build_npu_result = docker_client.build_image(
-        path=f"{src_dir}/containers/dlstreamer_analyzer",
-        tag=npu_image_tag,
-        dockerfile="Dockerfile.npu",
-        extract_packages=True,
-    )
-    if not build_npu_result.get("image_id"):
-        pytest.fail(f"Failed to build NPU Docker image: {npu_image_tag}")
-    else:
-        logger.info(f"NPU Docker image built successfully: {npu_image_tag}")
-
-    container_config["npu_analyzer_image"] = npu_image_tag
-    container_config["npu_analyzer_image_id"] = build_npu_result.get("image_id", "")
+        logger.info(f"{description.capitalize()} Docker image built successfully: {image_tag}")
+        container_config[config_key] = image_tag
+        container_config[f"{config_key}_id"] = build_result.get("image_id", "")
 
     # Prepare Docker image for DL Streamer utils
     build_utils_result = docker_client.build_image(

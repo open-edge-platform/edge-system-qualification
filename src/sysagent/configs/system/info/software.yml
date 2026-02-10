@@ -5,11 +5,14 @@
 # This file defines which packages to track for system information collection
 
 system_packages:
-  - intel-fw-npu
-  - intel-level-zero-npu
   - intel-driver-compiler-npu
+  - intel-fw-npu
   - intel-gsc
+  - intel-level-zero-npu
   - intel-media-va-driver-non-free
+  - intel-opencl-icd
+  - libdrm-intel1
+  - libze-intel-gpu1
 
 python_packages:
   - docker

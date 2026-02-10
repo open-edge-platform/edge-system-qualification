@@ -316,15 +316,16 @@ def qualify_device(
                 )
                 return True
 
-            # Failure at or below last successful - check if it's a timeout or other failure
-            if current_analysis_status == "timeout":
-                # Timeout at or below last successful - increment counter and binary search lower
+            # Failure at or below last successful - check if it's a timeout/resource exhaustion or other failure
+            if current_analysis_status in ["timeout", "resource_exhaustion"]:
+                # Timeout or resource exhaustion at or below last successful - increment counter and binary search lower
                 consecutive_timeouts += 1
-
+                
+                failure_type = "Resource exhaustion" if current_analysis_status == "resource_exhaustion" else "Timeout"
                 logger.warning(
-                    f"[{device_id}] Timeout at {requested_num_streams} streams "
+                    f"[{device_id}] {failure_type} at {requested_num_streams} streams "
                     f"(last successful: {last_successful_streams}, baseline: {initial_streams}), "
-                    f"consecutive timeouts: {consecutive_timeouts}/{consecutive_timeout_threshold}"
+                    f"consecutive failures: {consecutive_timeouts}/{consecutive_timeout_threshold}"
                 )
 
                 # Calculate next stream count via binary search
@@ -381,9 +382,10 @@ def qualify_device(
                         return True
                     else:
                         # Search exhausted with no successful config - fail device
+                        failure_type = "resource exhaustion" if current_analysis_status == "resource_exhaustion" else "timeout"
                         error_reason = (
-                            f"Pipeline timeout at {requested_num_streams} streams "
-                            f"(baseline: {initial_streams}) after {consecutive_timeouts} consecutive timeouts. "
+                            f"Pipeline {failure_type} at {requested_num_streams} streams "
+                            f"(baseline: {initial_streams}) after {consecutive_timeouts} consecutive failures. "
                             f"Binary search exhausted with no successful configuration."
                         )
                         logger.error(f"[{device_id}] {error_reason}. Device disqualified.")
@@ -393,10 +395,11 @@ def qualify_device(
                         _save_device_result(device_result_path, device_id, device_data)
                         return False
 
-                # If consecutive timeout threshold reached and we have a last successful config, converge
+                # If consecutive failure threshold reached and we have a last successful config, converge
                 if consecutive_timeouts >= consecutive_timeout_threshold and last_successful_streams > 0:
+                    failure_type = "resource exhaustion" if current_analysis_status == "resource_exhaustion" else "timeout"
                     logger.warning(
-                        f"[{device_id}] Consecutive timeout threshold reached ({consecutive_timeouts}/"
+                        f"[{device_id}] Consecutive {failure_type} threshold reached ({consecutive_timeouts}/"
                         f"{consecutive_timeout_threshold}), converging to last successful configuration: "
                         f"{last_successful_streams} streams at {last_successful_fps:.2f} FPS"
                     )
@@ -435,16 +438,17 @@ def qualify_device(
 
                 # Continue binary search to lower stream count
                 current_num_streams = next_streams
+                failure_type = "resource exhaustion" if current_analysis_status == "resource_exhaustion" else "timeout"
                 logger.info(
                     f"[{device_id}] Continuing binary search to lower streams: {current_num_streams} "
                     f"(range: {min_streams}-{max_streams}), "
-                    f"consecutive timeouts: {consecutive_timeouts}/{consecutive_timeout_threshold}"
+                    f"consecutive failures ({failure_type}): {consecutive_timeouts}/{consecutive_timeout_threshold}"
                 )
                 # Skip to next iteration to test with lower streams
                 time.sleep(2)
                 continue
             else:
-                # Non-timeout failure (parse_failed, main_failed, result_failed, error, etc.)
+                # Non-timeout/non-resource-exhaustion failure (parse_failed, main_failed, result_failed, error, etc.)
                 error_reason = (
                     f"Analysis failed at {current_num_streams} streams (baseline: {initial_streams}) "
                     f"with {current_fps:.2f} FPS due to '{current_analysis_status}'"

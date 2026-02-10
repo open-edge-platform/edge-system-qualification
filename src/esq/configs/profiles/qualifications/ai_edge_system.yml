@@ -73,7 +73,7 @@ params:
       sha256: "824db3e19e1e0a71caba8370606413b2bcd0d9339fb4c5b9535d4c3f2091095a"
       path: "./labels/preproc-aspect-ratio.json"
   target_fps: 14.95
-  consecutive_timeout_threshold: 2 
+  consecutive_timeout_threshold: 4 
   pipeline: |
     filesrc location=./videos/6891009-apple_1080p15.mp4
       ! ${DECODE_ELEMENTS}
@@ -116,6 +116,9 @@ suites:
   - name: "ai"
     sub_suites:
       - name: "gen"
+        params:
+          venv:
+            enabled: false
         tests:
           test_text_generation:
             params:
@@ -301,6 +304,12 @@ suites:
 
 
       - name: "vision"
+        params:
+          venv:
+            enabled: false
+            requirements_file: "src/dlstreamer/requirements.txt"
+            python_version: null
+            timeout: 7200
         tests:
           test_dlstreamer:
             params:

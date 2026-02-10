@@ -20,6 +20,13 @@ params:
     os_type:
       - "linux"
     docker_required: true
+  # Optional: Isolated virtual environment configuration
+  # When enabled, tests will run in an isolated venv with specific dependencies
+  venv:
+    enabled: false  # Set to true to enable isolated venv for this test suite
+    requirements_file: "src/text_generation/requirements.txt"  # Relative to suite directory
+    python_version: null  # Optional: specify Python version (e.g., "3.10", "3.11")
+    timeout: 7200  # Maximum execution time in seconds
 
 suites:
   - name: "ai"

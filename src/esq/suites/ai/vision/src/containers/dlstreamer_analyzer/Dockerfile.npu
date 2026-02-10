@@ -1,9 +1,7 @@
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-# FROM intel/dlstreamer:2025.0.1.3-ubuntu24
 FROM intel/dlstreamer:2025.2.0-ubuntu24
-# FROM intel/dlstreamer:2025.1.2-ubuntu22
 
 USER root
 
@@ -18,10 +16,12 @@ RUN apt-get update \
         gir1.2-gst-plugins-base-1.0 \
     && rm -rf /var/lib/apt/lists/*
 
+# Update NPU drivers to latest version
 RUN curl -O https://raw.githubusercontent.com/open-edge-platform/edge-developer-kit-reference-scripts/49473c01212ee84c53b0cff75581d0c9b6201794/npu_installer.sh 
 RUN chmod +x ./npu_installer.sh 
 # Create udev directory for container environment and run installer (ignore udev reload failures)
 RUN mkdir -p /etc/udev/rules.d && ./npu_installer.sh || true
+
 # Copy main.py and make it executable
 COPY main.py /app/main.py
 RUN chmod +x /app/main.py && \

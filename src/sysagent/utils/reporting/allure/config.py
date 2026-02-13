@@ -18,6 +18,54 @@ from typing import Dict, Optional
 logger = logging.getLogger(__name__)
 
 
+def _is_placeholder_value(value: str) -> bool:
+    """
+    Check if a DMI value is a placeholder or meaningless string.
+
+    Args:
+        value: DMI string to check
+
+    Returns:
+        bool: True if value is a placeholder/meaningless
+    """
+    if not value or not isinstance(value, str):
+        return True
+
+    # Convert to lowercase for case-insensitive comparison
+    value_lower = value.lower().strip()
+
+    # List of placeholder patterns
+    placeholders = [
+        "to be filled by o.e.m.",
+        "to be filled by o.e.m",
+        "to be filled by oem",
+        "system product name",
+        "system version",
+        "default string",
+        "sku",
+        "sku number",
+        "family",
+        "unknown",
+        "not specified",
+        "n/a",
+        "none",
+    ]
+
+    # Check exact matches
+    if value_lower in placeholders:
+        return True
+
+    # Check if value is only dots (e.g., "............", "....................")
+    if value.strip(".") == "":
+        return True
+
+    # Check if value is only asterisks
+    if value.strip("*") == "":
+        return True
+
+    return False
+
+
 def update_allure_config(
     allure_config_path: str,
     allure_repo_dir: str,
@@ -41,9 +89,7 @@ def update_allure_config(
     """
     # Copy the configuration file to the project directory
     project_config_path = os.path.join(allure_repo_dir, "allurerc.mjs")
-    logger.debug(
-        f"Copying Allure config from {allure_config_path} to {project_config_path}"
-    )
+    logger.debug(f"Copying Allure config from {allure_config_path} to {project_config_path}")
 
     try:
         shutil.copy2(allure_config_path, project_config_path)
@@ -59,32 +105,22 @@ def update_allure_config(
             logger.debug(f"Setting custom report name: {report_name}")
             if "name:" in config_content:
                 # Replace existing name
-                config_content = re.sub(
-                    r'name:\s*"[^"]*"', f'name: "{report_name}"', config_content
-                )
+                config_content = re.sub(r'name:\s*"[^"]*"', f'name: "{report_name}"', config_content)
             else:
                 # Add name before plugins if it doesn't exist
-                config_content = config_content.replace(
-                    "plugins:", f'name: "{report_name}",\n  plugins:'
-                )
+                config_content = config_content.replace("plugins:", f'name: "{report_name}",\n  plugins:')
             config_modified = True
 
         # Update the allureVersion if report_version is provided
         if report_version:
-            logger.debug(
-                f"Setting allureVersion to specified version: {report_version}"
-            )
+            logger.debug(f"Setting allureVersion to specified version: {report_version}")
             # Replace allureVersion in the awesome plugin options
             allure_version_pattern = r'(allureVersion:\s*)"[^"]*"'
             if re.search(allure_version_pattern, config_content):
-                config_content = re.sub(
-                    allure_version_pattern, rf'\1"{report_version}"', config_content
-                )
+                config_content = re.sub(allure_version_pattern, rf'\1"{report_version}"', config_content)
                 config_modified = True
             else:
-                logger.warning(
-                    "Could not find allureVersion field in config file to update"
-                )
+                logger.warning("Could not find allureVersion field in config file to update")
 
         # Write the modified config file back if any changes were made
         if config_modified:
@@ -117,14 +153,18 @@ def generate_final_report_filename(app_name: str, system_info: Dict) -> str:
     # Construct final filename with format
     filename_parts = [f"{app_name}_report"]
 
-    # Add system and product information
-    if system_info.get("vendor") and system_info.get("product"):
-        system_product = f"{system_info['vendor']}_{system_info['product']}"
+    # Add system and product information (only if both are valid)
+    vendor = system_info.get("vendor", "").strip()
+    product = system_info.get("product", "").strip()
+
+    # Only include vendor/product if they have meaningful values
+    if vendor and product:
+        system_product = f"{vendor}_{product}"
         filename_parts.append(system_product)
-    elif system_info.get("vendor"):
-        filename_parts.append(system_info["vendor"])
-    elif system_info.get("product"):
-        filename_parts.append(system_info["product"])
+    elif vendor:
+        filename_parts.append(vendor)
+    elif product:
+        filename_parts.append(product)
 
     # Add CPU brand
     if system_info.get("cpu_brand"):
@@ -172,28 +212,21 @@ def get_comprehensive_system_info_for_filename() -> Dict:
 
             # Get vendor from system section
             if "system" in dmi_info and dmi_info["system"].get("vendor"):
-                system_info["vendor"] = normalize_filename_component(
-                    dmi_info["system"]["vendor"]
-                )
-            else:
-                system_info["vendor"] = "unknown"
+                vendor_raw = dmi_info["system"]["vendor"]
+                if not _is_placeholder_value(vendor_raw):
+                    # Preserve "Intel" in vendor name - use preserve_intel=True
+                    system_info["vendor"] = normalize_filename_component(vendor_raw, preserve_intel=True)
 
             # Get product name from system section (updated field name)
             if "system" in dmi_info and dmi_info["system"].get("product_name"):
-                system_info["product"] = normalize_filename_component(
-                    dmi_info["system"]["product_name"]
-                )
-            else:
-                system_info["product"] = "unknown"
+                product_raw = dmi_info["system"]["product_name"]
+                if not _is_placeholder_value(product_raw):
+                    system_info["product"] = normalize_filename_component(product_raw, preserve_intel=False)
 
         # Get CPU brand information
         if "cpu" in hw_info:
             cpu_info = hw_info["cpu"]
-            cpu_brand = (
-                cpu_info.get("brand_raw")
-                or cpu_info.get("brand", "")
-                or cpu_info.get("model", "")
-            )
+            cpu_brand = cpu_info.get("brand_raw") or cpu_info.get("brand", "") or cpu_info.get("model", "")
             if cpu_brand:
                 # Normalize CPU brand for filename
                 system_info["cpu_brand"] = normalize_cpu_brand(cpu_brand)
@@ -258,9 +291,7 @@ def cleanup_old_final_reports(report_dir: str, debug: bool = False) -> None:
             try:
                 os.remove(old_report)
                 if debug:
-                    logger.debug(
-                        f"Removed old final report: {os.path.basename(old_report)}"
-                    )
+                    logger.debug(f"Removed old final report: {os.path.basename(old_report)}")
             except Exception as e:
                 logger.warning(f"Failed to remove old report {old_report}: {e}")
 
@@ -337,13 +368,14 @@ def normalize_cpu_brand(cpu_brand: str) -> str:
     return cpu_clean if cpu_clean else "unknown"
 
 
-def normalize_filename_component(component: str) -> str:
+def normalize_filename_component(component: str, preserve_intel: bool = False) -> str:
     """
     Normalize a filename component by removing problematic characters and spaces.
-    Excludes "Intel" references since reports are always for Intel products.
+    Optionally excludes "Intel" references for non-vendor components.
 
     Args:
         component: Original component string
+        preserve_intel: If True, keep "Intel" in the string (for vendor names)
 
     Returns:
         str: Normalized component
@@ -351,8 +383,11 @@ def normalize_filename_component(component: str) -> str:
     if not component:
         return "unknown"
 
-    # Remove Intel branding first
-    cleaned = re.sub(r"\bIntel\b", "", component, flags=re.IGNORECASE)
+    # Remove Intel branding only if not preserving it (e.g., for vendor names)
+    if not preserve_intel:
+        cleaned = re.sub(r"\bIntel\b", "", component, flags=re.IGNORECASE)
+    else:
+        cleaned = component
 
     # Replace spaces and problematic characters with underscores
     cleaned = re.sub(r"[^\w\-.]", "_", cleaned)
@@ -388,17 +423,21 @@ def normalize_intel_gpu_name(gpu_name: str) -> str:
         flags=re.IGNORECASE,
     )
     gpu_clean = re.sub(r"\(R\)|\(TM\)|\(C\)", "", gpu_clean)
-    gpu_clean = re.sub(
-        r"\(dGPU\)|\(iGPU\)|\bGraphics\b", "", gpu_clean, flags=re.IGNORECASE
-    )
+    gpu_clean = re.sub(r"\(dGPU\)|\(iGPU\)|\bGraphics\b", "", gpu_clean, flags=re.IGNORECASE)
 
     # Remove extra whitespace
     gpu_clean = " ".join(gpu_clean.split())
 
+    # Extract content from brackets first (e.g., "DG2 [Arc A770]" -> "Arc A770")
+    bracket_match = re.search(r"\[([^\]]+)\]", gpu_clean)
+    if bracket_match:
+        gpu_clean = bracket_match.group(1).strip()
+
     # Extract generic GPU information (flexible for any GPU model)
     # Look for common GPU patterns: Arc, Iris, Xe, UHD, HD, etc.
+    # Note: Exclude "Arc" prefix for brevity (e.g., B580 instead of arc_b580)
     gpu_patterns = [
-        (r"(Arc).*?([A-Z]?\d+\w*)", r"\1_\2"),  # Arc A770 -> arc_a770
+        (r"Arc\s*(?:Pro\s*)?([A-Z]?\d+\w*)", r"\1"),  # Arc B580 / Arc Pro B60 -> b580 / b60
         (r"(Iris).*?(Xe|Pro).*?(\d+\w*)?", r"\1_\2"),  # Iris Xe -> iris_xe
         (r"(UHD|HD).*?(\d+\w*)", r"\1_\2"),  # UHD Graphics 770 -> uhd_770
         (r"(Xe).*?(\w+)", r"\1_\2"),  # Xe variants -> xe_variant
@@ -408,9 +447,7 @@ def normalize_intel_gpu_name(gpu_name: str) -> str:
         match = re.search(pattern, gpu_clean, re.IGNORECASE)
         if match:
             # Apply the replacement pattern
-            gpu_clean = re.sub(
-                pattern, replacement, gpu_clean, flags=re.IGNORECASE
-            ).lower()
+            gpu_clean = re.sub(pattern, replacement, gpu_clean, flags=re.IGNORECASE).lower()
             break
     else:
         # If no specific pattern matches, apply general normalization

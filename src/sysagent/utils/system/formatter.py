@@ -56,6 +56,22 @@ def format_system_summary(hardware_info: Dict[str, Any], software_info: Dict[str
     cpu = hardware_info.get("cpu", {})
     if cpu.get("brand"):
         lines.append(f"CPU: {cpu['brand']}")
+        # Add generation info (detailed multi-line format)
+        gen_info = cpu.get("generation_info", {})
+        if gen_info:
+            codename = gen_info.get("codename", "Unknown")
+            generation = gen_info.get("generation", "Unknown")
+            product_collection = gen_info.get("product_collection", "Unknown")
+            segment = gen_info.get("segment", "Unknown")
+            is_supported = gen_info.get("is_supported", False)
+            support_status = "Supported" if is_supported else "Not Supported"
+
+            # Display each generation detail on separate line for clarity
+            lines.append(f"  Codename: {codename}")
+            lines.append(f"  Generation: {generation}")
+            lines.append(f"  Product Collection: {product_collection}")
+            lines.append(f"  Segment: {segment}")
+            lines.append(f"  Support Status: {support_status}")
         if cpu.get("logical_cores") and cpu["logical_cores"] != "Unknown":
             lines.append(f"  Logical Cores: {cpu['logical_cores']}")
         if cpu.get("frequency_mhz") and cpu["frequency_mhz"] != "Unknown":
@@ -249,6 +265,7 @@ def generate_simple_report(system_info: Dict[str, Any]) -> str:
                     "brand": cpu.get("brand", "Unknown"),
                     "logical_cores": cpu.get("logical_count", cpu.get("count", "Unknown")),
                     "frequency_mhz": cpu.get("frequency", {}).get("max", 0),
+                    "generation_info": cpu.get("generation_info", {}),
                 }
 
             # Convert Memory info

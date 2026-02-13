@@ -12,7 +12,7 @@ import atexit
 import sys
 
 from sysagent.utils.cli.commands import get_command_function
-from sysagent.utils.cli.parsers import create_argument_parser
+from sysagent.utils.cli.parsers import get_argument_parser
 from sysagent.utils.core.dependencies import get_dependency_manager
 from sysagent.utils.infrastructure import download_github_repo
 from sysagent.utils.logging import cleanup_logging, configure_logging
@@ -51,7 +51,7 @@ def main() -> int:
             os.environ["SYSAGENT_CLI_PACKAGE"] = cli_command
 
     # Create and parse arguments
-    parser = create_argument_parser()
+    parser = get_argument_parser()
     args = parser.parse_args()
 
     # Handle verbose/debug/force flags - check both global and subcommand usage
@@ -103,10 +103,11 @@ def main() -> int:
                 skip_system_check=args.skip_system_check,
                 no_cache=args.no_cache,
                 filters=args.filter,
-                run_all_profiles=args.all,
-                qualification_only=args.qualification_only,
+                run_all_profiles=getattr(args, "all", False),
+                qualification_only=getattr(args, "qualification_only", False),
                 force=force,
                 no_mask=args.no_mask,
+                set_prompt=getattr(args, "set_prompt", None),
                 extra_args=[],  # Placeholder for any future extra args
             )
         elif args.command == "info":

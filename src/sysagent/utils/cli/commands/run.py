@@ -35,47 +35,6 @@ from sysagent.utils.testing import (
 logger = logging.getLogger(__name__)
 
 
-def _prompt_skip_vertical_profiles(force: bool = False, vertical_profile_names: list = None) -> bool:
-    """
-    Prompt user whether to skip vertical profiles, with 'N' as default.
-
-    Args:
-        force: If True, skip prompt and return False (don't skip vertical profiles)
-        vertical_profile_names: List of vertical profile names that would be skipped
-
-    Returns:
-        bool: True if user wants to skip vertical profiles, False otherwise
-    """
-    if force:
-        return False
-
-    if vertical_profile_names:
-        print("═" * 70)
-        print("Default: Run qualification and vertical profiles")
-        print("Option:  Run qualification profiles only (skip vertical profiles)")
-        print("Tip: Use --all flag to perform full system performance benchmarking")
-        print()
-        print("Vertical profiles:")
-        for profile_name in sorted(vertical_profile_names):
-            print(f"  - {profile_name}")
-        print("═" * 70)
-        print()
-
-    try:
-        response = input("Skip vertical profiles? [N/y or press Enter for default]: ").strip().lower()
-        if response == "y" or response == "yes":
-            return True
-        else:
-            # Default behavior (empty input or 'n') - don't skip vertical profiles
-            return False
-    except KeyboardInterrupt:
-        logger.info("Interrupted by user during prompt. Exiting.")
-        raise
-    except EOFError:
-        logger.info("EOF encountered, using default option (not skipping vertical profiles)")
-        return False
-
-
 def run_tests(
     profile_name: str = None,
     suite_name: str = None,
@@ -87,14 +46,20 @@ def run_tests(
     skip_system_check: bool = False,
     no_cache: bool = False,
     filters: List[str] = None,
-    run_all_profiles: bool = False,
-    qualification_only: bool = False,
     force: bool = False,
     no_mask: bool = False,
+    set_prompt: List[str] = None,
     extra_args: List[str] = None,
+    run_all_profiles: bool = None,
+    qualification_only: bool = None,
 ) -> int:
     """
-    Run tests based on a profile or specific suite/test.
+    Run tests based on profiles, suites, or specific test cases.
+
+    Generic sysagent behavior:
+    - Default run (no flags): Runs all profile types (qualifications, suites, verticals)
+    - Specific profile (-p): Runs specified profile
+    - Suite/test run: Runs specified suite/test
 
     Args:
         profile_name: Profile name to run
@@ -107,17 +72,32 @@ def run_tests(
         skip_system_check: Whether to skip system requirement validation
         no_cache: Whether to run tests without using cached results
         filters: List of filter expressions in format "key=value" to filter tests
-        run_all_profiles: Whether to run all profile types.
-                          If False, only qualification and vertical profiles are run by default
-                          with an opt-out prompt for vertical profiles.
-        qualification_only: Whether to run qualification profiles only (skips vertical and suite profiles)
-        force: Whether to skip interactive prompts and use default behavior
+        force: Whether to skip interactive prompts (ignored in generic sysagent)
         no_mask: Whether to disable masking of data in system information
+        set_prompt: List of prompt overrides (ignored in generic sysagent)
         extra_args: Additional pytest arguments to pass
+        run_all_profiles: Whether to run all profile types. Ignored in generic sysagent.
+        qualification_only: Whether to run only qualification profiles. Ignored in generic sysagent.
 
     Returns:
         int: Exit code (0 for success, non-zero for failure)
+
+    Execution Flow:
+        1. If profile_name specified: Run that profile
+        2. If suite_name specified: Run that suite
+        3. Otherwise: Run all profiles (no filtering, no prompts)
     """
+    # Parse prompt overrides from CLI
+    prompt_overrides = {}
+    if set_prompt:
+        for override in set_prompt:
+            if "=" in override:
+                prompt_name, answer = override.split("=", 1)
+                prompt_overrides[prompt_name.strip()] = answer.strip()
+                logger.info(f"CLI prompt override: {prompt_name.strip()}={answer.strip()}")
+            else:
+                logger.warning(f"Invalid --set-prompt format: {override} (expected PROMPT=ANSWER)")
+
     if no_mask:
         os.environ["CORE_MASK_DATA"] = "false"
 
@@ -183,20 +163,25 @@ def run_tests(
     interrupt_occurred = False
 
     try:
-        # Option 1: If a profile name is provided, load the profile configuration
+        # Option 1: If a profile name is provided, run that specific profile (no prompt)
         if profile_name:
             result_code, tests_ran = _run_profile_tests(
-                profile_name, pytest_args, skip_system_check, data_dir, verbose, debug, parsed_filters
+                profile_name, pytest_args, skip_system_check, data_dir, verbose, debug, parsed_filters, force
             )
 
-        # Option 2: If a suite name is provided, run the specified suite
+        # Option 2: If a suite name is provided, run that specific suite (no prompt)
         elif suite_name:
             result_code, tests_ran = _run_suite_tests(suite_name, sub_suite_name, test_name, pytest_args)
 
-        # Option 3: Run all profiles if no specific profile or suite is provided
+        # Option 3: Default run behavior - runs all profiles (generic sysagent)
         else:
             result_code, tests_ran = _run_all_profiles(
-                skip_system_check, data_dir, verbose, debug, run_all_profiles, qualification_only, force
+                skip_system_check,
+                data_dir,
+                verbose,
+                debug,
+                force,
+                prompt_overrides,
             )
 
     except KeyboardInterrupt:
@@ -231,8 +216,12 @@ def _run_profile_tests(
     verbose: bool = False,
     debug: bool = False,
     filters: Dict[str, Any] = None,
+    force: bool = False,
 ) -> tuple:
     """Run tests for a specific profile.
+
+    Args:
+        force: Whether to skip interactive prompts
 
     Returns:
         tuple: (exit_code, tests_ran) where tests_ran indicates if pytest actually executed
@@ -256,6 +245,15 @@ def _run_profile_tests(
     if profile_name not in all_profiles_dict:
         logger.error(f"Profile not found: {profile_name}")
         return 1, False
+
+    # Check profile type - only run system validation for qualification profiles
+    profile_config = all_profiles_dict[profile_name]
+    profile_labels = profile_config.get("params", {}).get("labels", {})
+    profile_type = profile_labels.get("type", "")
+
+    # Generic sysagent: No CPU validation (package-specific implementations handle this)
+    # ESQ overrides the entire run command with its own CPU validation logic
+    logger.debug(f"Running profile: {profile_name} (type: {profile_type})")
 
     # Expand profile with dependencies (dependencies first, then the profile)
     try:
@@ -521,21 +519,22 @@ def _run_all_profiles(
     data_dir: str,
     verbose: bool,
     debug: bool,
-    run_all_profiles: bool = False,
-    qualification_only: bool = False,
     force: bool = False,
+    prompt_overrides: dict = None,
 ) -> tuple:
-    """Run all available profiles or qualification+vertical profiles by default with opt-out prompt.
+    """Run all available profiles - generic sysagent behavior without prompts or CPU validation.
+
+    Generic behavior: No prompts, no CPU validation checks.
+    Always runs all profile types (qualifications, suites, verticals).
+    Package-specific implementations (e.g., ESQ) should override the entire run command.
 
     Args:
-        skip_system_check: Whether to skip system requirement validation
+        skip_system_check: Whether to skip system requirement validation (ignored - always skipped)
         data_dir: Data directory path
         verbose: Whether to enable verbose output
         debug: Whether to enable debug output
-        run_all_profiles: If False (default), run qualification and vertical profiles with opt-out prompt.
-                          If True, run all profile types (qualifications, suites, verticals) without prompt.
-        qualification_only: If True, run qualification profiles only (skips vertical and suite profiles)
-        force: Whether to skip interactive prompts and use default behavior
+        force: Ignored (no prompts in generic implementation)
+        prompt_overrides: Ignored (no prompts in generic implementation)
 
     Returns:
         tuple: (exit_code, tests_ran) where tests_ran indicates if any pytest actually executed
@@ -563,49 +562,11 @@ def _run_all_profiles(
                     complete_profiles_dict[profile_name] = configs
                     complete_profile_items_map[profile_name] = (profile_type, profile)
 
-    # Determine whether to skip vertical profiles
-    skip_vertical_profiles = False
+    # Simplified generic behavior: no prompts, no CPU validation, no filtering
+    # Package-specific implementations (e.g., ESQ) should override this command
+    logger.info("Running all profile types (qualifications, suites, verticals)")
 
-    if run_all_profiles:
-        # --all option: run all profiles without any prompts
-        include_all_types = True
-        skip_vertical_profiles = False
-        logger.info("Running all profile types (qualifications, verticals, suites)")
-    elif qualification_only:
-        # --qualification-only option: run qualification profiles only without prompts
-        include_all_types = False
-        skip_vertical_profiles = True
-        logger.info("Running qualification profiles only")
-    else:
-        # Default behavior: run qualification + vertical with opt-out prompt for vertical
-        include_all_types = False
-
-        # Collect vertical profile names before prompting
-        vertical_profile_names = []
-        for profile_type, profiles in all_profiles.items():
-            for profile in profiles:
-                configs = profile.get("configs")
-                if configs:
-                    profile_name = configs.get("name")
-                    if profile_name:
-                        params = configs.get("params", {})
-                        labels = params.get("labels", {})
-                        profile_label_type = labels.get("type", "")
-                        is_vertical = profile_type == "verticals" or profile_label_type == "vertical"
-                        if is_vertical:
-                            vertical_profile_names.append(profile_name)
-
-        try:
-            skip_vertical_profiles = _prompt_skip_vertical_profiles(force, vertical_profile_names)
-        except KeyboardInterrupt:
-            sys.exit(1)
-
-        if skip_vertical_profiles:
-            logger.info("Running qualification profiles only (vertical profiles skipped by user)")
-        else:
-            logger.info("Running qualification and vertical profiles")
-
-    # First pass: collect requested profiles based on filter
+    # First pass: collect all available profiles
     requested_profile_names = []
 
     for profile_type, profiles in all_profiles.items():
@@ -614,34 +575,10 @@ def _run_all_profiles(
             if configs:
                 profile_name = configs.get("name")
                 if profile_name:
-                    # Apply filtering logic based on run mode
-                    if include_all_types:
-                        # Include all profile types
-                        requested_profile_names.append(profile_name)
-                    else:
-                        # Default mode: include qualification + vertical (unless user opted out)
-                        params = configs.get("params", {})
-                        labels = params.get("labels", {})
-                        profile_label_type = labels.get("type", "")
-
-                        is_qualification = profile_type == "qualifications" or profile_label_type == "qualification"
-                        is_vertical = profile_type == "verticals" or profile_label_type == "vertical"
-
-                        if is_qualification:
-                            requested_profile_names.append(profile_name)
-                        elif is_vertical and not skip_vertical_profiles:
-                            requested_profile_names.append(profile_name)
-                        else:
-                            logger.debug(f"Skipping profile: {profile_name} (type: {profile_type})")
+                    requested_profile_names.append(profile_name)
 
     if not requested_profile_names:
-        if run_all_profiles:
-            logger.error("No profiles found")
-        else:
-            if skip_vertical_profiles:
-                logger.error("No qualification profiles found. Use --all to run all profile types.")
-            else:
-                logger.error("No qualification or vertical profiles found. Use --all to run all profile types.")
+        logger.error("No profiles found")
         return 1, False
 
     # Second pass: expand each requested profile with its dependencies

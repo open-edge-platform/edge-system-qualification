@@ -27,9 +27,7 @@ def update_allure_title_with_metrics():
     """
     import allure
 
-    def _update(
-        configs: Dict[str, Any], results: Any, metrics: Optional[List[str]] = None
-    ) -> None:
+    def _update(configs: Dict[str, Any], results: Any, metrics: Optional[List[str]] = None) -> None:
         """
         Update Allure test title with metric information.
 
@@ -258,9 +256,7 @@ def _cleanup_old_final_reports(report_dir: str, debug: bool = False) -> None:
             try:
                 os.remove(filepath)
                 if debug:
-                    logger.debug(
-                        f"Removed old final report: {os.path.basename(filepath)}"
-                    )
+                    logger.debug(f"Removed old final report: {os.path.basename(filepath)}")
             except OSError as e:
                 if debug:
                     logger.debug(f"Could not remove old final report {filepath}: {e}")
@@ -300,11 +296,7 @@ def _normalize_cpu_brand(cpu_brand: str) -> str:
                     (r"(\d+)th\s+gen", lambda m: f"gen{m.group(1)}"),
                     (
                         r"(\d{4,5})[a-z]*",
-                        lambda m: (
-                            f"gen{str(m.group(1))[0:2]}"
-                            if len(m.group(1)) >= 4
-                            else f"gen{m.group(1)[0]}"
-                        ),
+                        lambda m: f"gen{str(m.group(1))[0:2]}" if len(m.group(1)) >= 4 else f"gen{m.group(1)[0]}",
                     ),
                 ]
 
@@ -411,12 +403,12 @@ def _normalize_intel_gpu_name(gpu_name: str) -> str:
 
     # Intel GPU patterns
     if "intel" in name:
-        # Intel Arc series
+        # Intel Arc series (exclude "Arc" prefix for brevity)
         arc_match = re.search(r"arc\s*([a-z]?)(\d+)", name)
         if arc_match:
             series = arc_match.group(1) or ""
             model = arc_match.group(2)
-            return f"intel_arc{series}{model}"
+            return f"{series}{model}"  # Just model ID (e.g., b580, a770)
 
         # Intel Iris series
         if "iris" in name:

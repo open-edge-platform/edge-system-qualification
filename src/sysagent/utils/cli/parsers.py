@@ -7,18 +7,62 @@ Argument parser setup for CLI commands.
 Contains the main argument parser configuration and all subparsers
 for different CLI commands, keeping argument definitions centralized.
 Uses dynamic app name instead of hardcoded values.
+
+This module provides the generic sysagent parser. Package-specific implementations
+(like ESQ) can override this by implementing their own create_argument_parser() function.
 """
 
 import argparse
+import logging
 
 from sysagent.utils.config import get_dist_version
 from sysagent.utils.config.config_loader import get_cli_aware_project_name
+
+logger = logging.getLogger(__name__)
 
 
 def get_cli_name() -> str:
     """Get the CLI command name dynamically based on the project name."""
     project_name = get_cli_aware_project_name()
     return project_name.lower()
+
+
+def get_argument_parser() -> argparse.ArgumentParser:
+    """
+    Get the argument parser with package-specific override support.
+
+    Dynamically checks if current CLI package has a custom parser implementation,
+    then falls back to generic sysagent parser.
+
+    Returns:
+        Configured argument parser
+    """
+    # Get current CLI package name (e.g., 'esq', 'test-esq', 'sysagent')
+    cli_name = get_cli_name()
+
+    # Skip override check if running sysagent itself
+    if cli_name != "sysagent":
+        # Try to dynamically import parser from current CLI package
+        try:
+            # Convert CLI name to package name (e.g., 'test-esq' -> 'test_esq')
+            package_name = cli_name.replace("-", "_")
+            parser_module = f"{package_name}.utils.cli.parsers"
+
+            # Dynamic import of package-specific parser
+            import importlib
+
+            module = importlib.import_module(parser_module)
+            if hasattr(module, "create_argument_parser"):
+                logger.debug(f"Using {package_name}-specific argument parser")
+                return module.create_argument_parser()
+        except ImportError:
+            logger.debug(f"No custom parser found for '{cli_name}', using sysagent default")
+        except Exception as e:
+            logger.debug(f"Failed to load {cli_name} parser, using sysagent default: {e}")
+
+    # Fall back to sysagent default parser
+    logger.debug(f"Using generic sysagent argument parser for '{cli_name}'")
+    return create_argument_parser()
 
 
 def create_argument_parser() -> argparse.ArgumentParser:
@@ -49,34 +93,29 @@ def create_argument_parser() -> argparse.ArgumentParser:
     # Run command
     run_parser = subparsers.add_parser(
         "run",
-        help="Run tests (qualification profiles by default, specific profile, or individual tests)",
+        help="Run tests (all profiles by default, or specific profile)",
         description=f"""
-Run tests using one of four main patterns:
+Run tests using one of three main patterns:
 
 USAGE PATTERNS:
-  1. Run qualification and vertical profiles with opt-out prompt (default):
+  1. Run all profiles (default):
      {cli_name} run
+     • Runs all profile types (qualifications, suites, verticals)
+     • Generic behavior - no prompts or filtering
 
-  2. Run qualification profiles only (no prompt):
-     {cli_name} run --qualification-only
-
-  3. Run all available profiles:
-     {cli_name} run --all
-
-  4. Run a specific profile:
+  2. Run a specific profile:
      {cli_name} run -p PROFILE_NAME
+     • Runs the specified profile only
 
-  5. Run with filters:
+  3. Run with filters:
      {cli_name} run -p PROFILE_NAME --filter test_id=T0069
      {cli_name} run -p PROFILE_NAME --filter display_name="CPU Test"
      {cli_name} run -p PROFILE_NAME --filter test_id=T0069 --filter devices=cpu
 
 EXAMPLES:
-  {cli_name} run                                      # Run qualification + vertical profiles (with opt-out prompt)
-  {cli_name} run --force                              # Skip prompt, use default (include vertical profiles)
-  {cli_name} run --qualification-only                 # Run qualification profiles only (no vertical/suite profiles)
-  {cli_name} run --all                                # Run all profile types
-  {cli_name} run -p profile.suite.ai.vision           # Run specific profile
+  {cli_name} run                                      # All profiles (default)
+  {cli_name} run -p profile.suite.ai.vision           # Specific profile
+  {cli_name} run -p profile.suite.ai.vision --filter test_id=T0001  # Filtered test
 
 For available profiles, use: {cli_name} list
         """,
@@ -85,18 +124,6 @@ For available profiles, use: {cli_name} list
 
     # Main execution options (grouped for clarity)
     execution_group = run_parser.add_argument_group("EXECUTION OPTIONS")
-    execution_group.add_argument(
-        "--all",
-        "-a",
-        action="store_true",
-        help=("Run all profile types. By default, qualification and vertical profiles are run with an opt-out prompt."),
-    )
-    execution_group.add_argument(
-        "--qualification-only",
-        "-qo",
-        action="store_true",
-        help="Run qualification profiles only (skips vertical and suite profiles without prompting)",
-    )
     execution_group.add_argument(
         "--profile", "-p", metavar="PROFILE_NAME", help="Run a specific profile (e.g., profile.suite.ai-vision)"
     )
@@ -124,7 +151,20 @@ For available profiles, use: {cli_name} list
         "--filter",
         action="append",
         metavar="KEY=VALUE",
-        help="Filter tests by parameter values (e.g., --filter test_id=T0069 --filter display_name='CPU Test'). Can be used multiple times for multiple filters.",
+        help=(
+            "Filter tests by parameter values (e.g., --filter test_id=T0069 --filter display_name='CPU Test'). "
+            "Can be used multiple times for multiple filters."
+        ),
+    )
+    advanced_group.add_argument(
+        "--set-prompt",
+        action="append",
+        metavar="PROMPT=ANSWER",
+        help=(
+            "Override specific prompt answers for CI automation "
+            "(e.g., --set-prompt vertical_profiles=y --set-prompt platform_validation=n). "
+            "Use with prompt names: 'vertical_profiles', 'platform_validation'."
+        ),
     )
 
     # Add common options to run command
@@ -133,7 +173,7 @@ For available profiles, use: {cli_name} list
     )
     run_parser.add_argument("--debug", "-d", action="store_true", help="Display debug output with full traceback")
     run_parser.add_argument(
-        "--force", "-f", action="store_true", help="Skip interactive prompts and use default behavior"
+        "--force", "-f", action="store_true", help="Skip interactive prompts and use default answers from configuration"
     )
     run_parser.add_argument(
         "--no-mask",
@@ -191,7 +231,10 @@ For available profiles, use: {cli_name} list
         "--venvs", action="store_true", help="Clean isolated virtual environments for test suites"
     )
     additional_group.add_argument(
-        "--all", "-a", action="store_true", help="Clean all directories (equivalent to --cache --thirdparty --data --venvs)"
+        "--all",
+        "-a",
+        action="store_true",
+        help="Clean all directories (equivalent to --cache --thirdparty --data --venvs)",
     )
 
     # Group for specific directory cleaning only (without touching results/logs)

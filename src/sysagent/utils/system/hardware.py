@@ -17,6 +17,7 @@ from typing import Any, Dict, Optional
 import cpuinfo
 import psutil
 
+from .cpu import detect_cpu_generation_and_segment
 from .ov_helper import collect_openvino_devices
 from .pci_helper import get_pci_devices
 from .power import collect_power_info
@@ -243,6 +244,28 @@ def collect_cpu_info(openvino_cpu=None) -> Dict[str, Any]:
         # Add extended CPU features detection
         extended_features = _detect_cpu_features(cpu_info_data)
         cpu_info.update(extended_features)
+
+        # Add CPU generation and segment detection for Intel processors
+        if "Intel" in cpu_info.get("vendor_id", ""):
+            try:
+                cpu_detection = detect_cpu_generation_and_segment(
+                    family=cpu_info.get("family", 0),
+                    model=cpu_info.get("model", 0),
+                    stepping=cpu_info.get("stepping", 0),
+                    brand=cpu_info.get("brand", ""),
+                    core_count=cpu_info.get("count", 0),
+                )
+                cpu_info["generation_info"] = cpu_detection
+                logger.debug(f"Detected Intel CPU: {cpu_detection}")
+            except Exception as e:
+                logger.warning(f"Failed to detect CPU generation/segment: {e}")
+                cpu_info["generation_info"] = {
+                    "codename": "Unknown",
+                    "series": "unknown",
+                    "generation": "Unknown",
+                    "segment": "unknown",
+                    "is_supported": False,
+                }
 
         return cpu_info
 

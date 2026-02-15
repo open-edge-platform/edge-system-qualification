@@ -12,6 +12,12 @@ from esq.suites.ai.gen.src.text_generation.preparation import prepare_assets
 # Import Text Generation modular utilities
 from esq.suites.ai.gen.src.text_generation.utils import cleanup_stale_containers, sort_devices_by_priority
 
+# Import reference data utilities
+from esq.utils.references import (
+    add_reference_data_to_result,
+    attach_reference_data_to_allure,
+)
+
 # Import from sysagent utilities
 from sysagent.utils.core import Metrics, Result, get_metric_name_for_device
 from sysagent.utils.infrastructure import DockerClient
@@ -370,6 +376,29 @@ def test_text_generation(
             logger.info(f"Test completed - Duration: {results.metadata.get('total_duration_seconds', 0):.2f} seconds")
             if "model_export_duration_seconds" in results.metadata:
                 logger.info(f"Model export duration: {results.metadata['model_export_duration_seconds']:.2f} seconds")
+
+        # Add verified reference data if available in configs
+        try:
+            reference_data = configs.get("verified_reference_data", {}).get("gen_ai", [])
+            if reference_data and results:
+                logger.info("Processing verified reference data for Gen AI test")
+                # Add to result extended metadata (filtered by generation and model)
+                add_reference_data_to_result(
+                    result=results,
+                    reference_data=reference_data,
+                    data_key="verified_reference_data",
+                    filter_by_generation=True,
+                    model_filter=model_id,  # Filter by the specific model being tested
+                )
+                # Attach to Allure report
+                attach_reference_data_to_allure(
+                    reference_data=reference_data,
+                    attachment_name="Gen AI - Verified Reference Data",
+                    filter_by_generation=True,
+                    model_filter=model_id,  # Filter by the specific model being tested
+                )
+        except Exception as ref_data_error:
+            logger.warning(f"Failed to process verified reference data: {ref_data_error}")
 
         # Step 4: Validate test results (always run to populate validation_results)
         try:

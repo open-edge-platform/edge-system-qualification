@@ -23,6 +23,12 @@ from esq.suites.ai.vision.src.dlstreamer.utils import (
     update_metrics_to_error_state,
 )
 
+# Import reference data utilities
+from esq.utils.references import (
+    add_reference_data_to_result,
+    attach_reference_data_to_allure,
+)
+
 # Import from sysagent utilities
 from sysagent.utils.core import Metrics, Result, get_metric_name_for_device
 from sysagent.utils.infrastructure import DockerClient
@@ -573,6 +579,27 @@ def test_dlstreamer(
             validation_results = {"skipped": True, "skip_reason": "Validation failed due to test errors"}
 
     finally:
+        # Add verified reference data if available in configs
+        try:
+            reference_data = configs.get("verified_reference_data", {}).get("vision_ai", [])
+            if reference_data and results is not None:
+                logger.info("Processing verified reference data for Vision AI test")
+                # Add to result extended metadata (filtered by generation)
+                add_reference_data_to_result(
+                    result=results,
+                    reference_data=reference_data,
+                    data_key="verified_reference_data",
+                    filter_by_generation=True,
+                )
+                # Attach to Allure report
+                attach_reference_data_to_allure(
+                    reference_data=reference_data,
+                    attachment_name="Vision AI - Verified Reference Data",
+                    filter_by_generation=True,
+                )
+        except Exception as ref_data_error:
+            logger.warning(f"Failed to process verified reference data: {ref_data_error}")
+
         # Step 5: Always summarize test results, regardless of test outcome
         try:
             if results is not None:

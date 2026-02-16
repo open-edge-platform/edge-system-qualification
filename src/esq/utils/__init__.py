@@ -8,14 +8,16 @@ This package contains AI and model-specific utilities that extend the core sysag
 - models: Model batch processing, YOLO, OpenVINO, KaggleHub, media resources
 - downloads: Model and dataset downloading from HuggingFace and ModelScope
 - servers: Server-specific utilities (OVMS, etc.)
+- references: Verified reference data handling and filtering
 """
 
 # Import ESQ-specific packages
-from . import downloads, models, servers
+from . import downloads, models, references, servers
 
 __all__ = [
     # Modules
     "models",
     "downloads",
     "servers",
+    "references",
 ]

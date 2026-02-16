@@ -81,8 +81,23 @@ UNSUPPORTED_GENERATIONS = [
     "Core (Yonah)",  # Enhanced Pentium M (2006) - First "Intel Core" branding
     "Pentium",  # Pentium 4, Pentium D, Pentium M, Pentium III, Pentium II, Pentium Pro, Pentium Gold, Pentium Silver
     "Celeron",  # All Celeron processors (entry-level)
+    # Specific Celeron series (older generations)
+    "Celeron J-series",  # Celeron J-series (desktop, 2013-2021): J1xxx-J6xxx (Bay Trail through Elkhart Lake)
+    "Celeron N-series",  # Celeron N-series (mobile, 4-digit, 2013-2021): N2xxx-N6xxx
+    "Celeron G-series",  # Celeron G-series (desktop, 2011-2022): Gxxx-G6xxx (Sandy Bridge through Alder Lake)
+    # Specific Pentium series (older generations)
+    "Pentium Silver J-series",  # Pentium Silver J-series (desktop, 2017-2019): J4xxx-J5xxx (Apollo Lake, Gemini Lake)
+    "Pentium Silver N-series",  # Pentium Silver N-series (mobile, 2020-2021): N5xxx-N6xxx (Jasper Lake)
+    "Pentium Gold G-series",  # Pentium Gold G-series (desktop, 2017-2022): Gxxxx-G7xxx (Kaby Lake throughlder Lake)
     # Entry-level processors
-    {"codename": "Alder Lake-N", "product_collection": "N-series"},  # Alder Lake-N only
+    {
+        "codename": "Alder Lake-N",
+        "product_collection": "N-series",
+    },  # Alder Lake-N (2022): Intel N-series (N305, N200, N100, N97, N95, N50)
+    {
+        "codename": "Alder Lake-N",
+        "product_collection": "Atom",
+    },  # Alder Lake-N (2022): Atom x7000 E-suffix (x7425E, x7213E, x7211E)
     # Atom X-series (Embedded/IoT) - legacy products before x7000
     "Atom x6000",  # Elkhart Lake
     "Atom x5000",  # Apollo Lake
@@ -119,6 +134,20 @@ UNSUPPORTED_GENERATIONS = [
     "Legacy Xeon W",  # Fallback for unidentified Xeon W
     "Tiger Lake",  # Generic Tiger Lake processors (also covers non-W Tiger Lake)
     "Xeon W",  # Generic Xeon W processors not matched above
+    # ============================================================================
+    # XEON 6 (2024+) - PARTIAL SUPPORT
+    # ============================================================================
+    # Xeon 6 is Intel's current-generation server/workstation processor line
+    # Launched: April 2024 (replaces "Xeon Scalable" branding)
+    # Product Collection: "Xeon 6"
+    # Microarchitectures:
+    #   - Granite Rapids (P-cores): SUPPORTED - Server (6XXXP) and Workstation (678X, 677X)
+    #   - Sierra Forest (E-cores): UNSUPPORTED - Server (6XXXE) - efficiency cores
+    # SUPPORT POLICY:
+    #   - Granite Rapids P-cores: QUALIFIED for ESQ testing (AI edge workloads)
+    #   - Sierra Forest E-cores: NOT QUALIFIED (designed for cloud density workloads)
+    # ============================================================================
+    {"codename": "Sierra Forest"},  # Xeon 6 E-core processors (6XXXE models) - NOT supported for edge AI qualification
     # Xeon Scalable - Server product collection (4th Gen and older)
     # Using tuple format for scalability: (generation, product_collection)
     # This allows blocking specific product collections within a generation

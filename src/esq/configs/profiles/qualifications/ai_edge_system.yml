@@ -31,6 +31,167 @@ params:
     os_type:
       - "linux"
     docker_required: true
+  # Verified reference data for Gen AI and Vision AI tests
+  # This data will be filtered by CPU generation and attached to test results
+  verified_reference_data:
+    gen_ai:
+      # Column mappings for CSV headers (human-readable labels)
+      columns:
+        device_sku: "Device SKU"
+        type: "Type"
+        model: "AI Model"
+        precision: "Precision"
+        batch_size: "Batch Size"
+        throughput_tokens_per_sec: "Throughput (Tokens/s)"
+        first_token_latency_ms: "1st Token Latency (ms)"
+        perf_per_watt: "Perf/W"
+      # Reference data entries
+      data:
+        - device_sku: "Intel Core i9 273PQE (12 Cores)"
+          type: "CPU"
+          model: "DeepSeek-R1-Distill-Qwen-7B"
+          precision: "INT4"
+          batch_size: 1
+          throughput_tokens_per_sec: 14
+          first_token_latency_ms: 4589
+          perf_per_watt: "N/A"
+        - device_sku: "Intel Core Ultra 7 255H"
+          type: "iGPU"
+          model: "DeepSeek-R1-Distill-Qwen-7B"
+          precision: "INT4"
+          batch_size: 1
+          throughput_tokens_per_sec: 15.6
+          first_token_latency_ms: 528
+          perf_per_watt: 0.75
+        - device_sku: "Intel Core Ultra 7 255H"
+          type: "NPU"
+          model: "Phi3-mini-4k-instruct"
+          precision: "INT4"
+          batch_size: 1
+          throughput_tokens_per_sec: 15
+          first_token_latency_ms: 2620
+          perf_per_watt: 1.04
+        - device_sku: "Intel Core Ultra Series 3 X7 358H"
+          type: "iGPU"
+          model: "DeepSeek-R1-Distill-Qwen-7B"
+          precision: "INT4"
+          batch_size: 1
+          throughput_tokens_per_sec: 26
+          first_token_latency_ms: 200
+          perf_per_watt: 0.59
+        - device_sku: "Intel Core Ultra Series 3 X7 358H"
+          type: "NPU"
+          model: "DeepSeek-R1-Distill-Qwen-7B"
+          precision: "INT4"
+          batch_size: 1
+          throughput_tokens_per_sec: 21
+          first_token_latency_ms: 10306
+          perf_per_watt: 1.96
+        - device_sku: "Intel Xeon 6730P (32 Cores at 2.5GHz)"
+          type: "CPU"
+          model: "Qwen3-32B"
+          precision: "INT4"
+          batch_size: 1
+          throughput_tokens_per_sec: 10.39
+          first_token_latency_ms: 4473
+          perf_per_watt: 0.03
+        - device_sku: "Intel Xeon 6761P (64 Cores at 2.5GHz)"
+          type: "CPU"
+          model: "Qwen3-32B"
+          precision: "INT4"
+          batch_size: 1
+          throughput_tokens_per_sec: 11.96
+          first_token_latency_ms: 2706
+          perf_per_watt: 0.04
+        - device_sku: "Intel Xeon 678X (48 Cores at 2.4GHz)"
+          type: "CPU"
+          model: "DeepSeek-R1-Distill-Qwen-14B"
+          precision: "INT4"
+          batch_size: 1
+          throughput_tokens_per_sec: 19.5
+          first_token_latency_ms: 1479.39
+          perf_per_watt: "N/A"
+        - device_sku: "Intel ARC B50"
+          type: "dGPU"
+          model: "DeepSeek-R1-Distill-Qwen-14B"
+          precision: "INT4"
+          batch_size: 1
+          throughput_tokens_per_sec: 25
+          first_token_latency_ms: 418
+          perf_per_watt: "N/A"
+        - device_sku: "Intel ARC B60"
+          type: "dGPU"
+          model: "DeepSeek-R1-Distill-Qwen-32B"
+          precision: "INT4"
+          batch_size: 1
+          throughput_tokens_per_sec: 44
+          first_token_latency_ms: 237.7
+          perf_per_watt: "N/A"
+    vision_ai:
+      # Column mappings for CSV headers (human-readable labels)
+      columns:
+        device_sku: "Device SKU"
+        type: "Type"
+        precision: "Precision"
+        batch_size: "Batch Size"
+        no_of_streams: "No. of Streams"
+        power_per_stream: "Power/Stream"
+      # Reference data entries
+      data:
+        - device_sku: "Intel Core Ultra 7 255H"
+          type: "CPU"
+          precision: "INT8"
+          batch_size: 8
+          no_of_streams: 8
+          power_per_stream: 49.64
+        - device_sku: "Intel Core Ultra 7 255H"
+          type: "iGPU"
+          precision: "INT8"
+          batch_size: 8
+          no_of_streams: 19
+          power_per_stream: 27.04
+        - device_sku: "Intel Core Ultra 7 255H"
+          type: "NPU"
+          precision: "INT8"
+          batch_size: 1
+          no_of_streams: 10
+          power_per_stream: 18.52
+        - device_sku: "Intel Core Ultra Series 3 X7 358H"
+          type: "CPU"
+          precision: "INT8"
+          batch_size: 8
+          no_of_streams: 8
+          power_per_stream: 0.14
+        - device_sku: "Intel Core Ultra Series 3 X7 358H"
+          type: "iGPU"
+          precision: "INT8"
+          batch_size: 8
+          no_of_streams: 44
+          power_per_stream: 1.18
+        - device_sku: "Intel Xeon 6730P (32 Cores at 2.5GHz)"
+          type: "CPU"
+          precision: "INT8"
+          batch_size: 8
+          no_of_streams: 20
+          power_per_stream: "N/A"
+        - device_sku: "Intel Xeon 6761P (64 Cores at 2.5GHz)"
+          type: "CPU"
+          precision: "INT8"
+          batch_size: 8
+          no_of_streams: 31
+          power_per_stream: "N/A"
+        - device_sku: "Intel ARC B50"
+          type: "dGPU"
+          precision: "INT8"
+          batch_size: 8
+          no_of_streams: 24
+          power_per_stream: "N/A"
+        - device_sku: "Intel ARC B60"
+          type: "dGPU"
+          precision: "INT8"
+          batch_size: 8
+          no_of_streams: 36
+          power_per_stream: "N/A"
   # Vision AI global params
   assets:
     - id: "yolo11n"

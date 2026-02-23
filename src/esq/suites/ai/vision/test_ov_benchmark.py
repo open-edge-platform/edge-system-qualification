@@ -421,7 +421,7 @@ def test_ov_benchmark(
     dockerfile_name = configs.get("dockerfile_name", "Dockerfile")
     docker_image_tag = f"{configs.get('container_image', 'openvino_bm_runner')}:{configs.get('image_tag', '1.0')}"
     timeout = int(configs.get("timeout", 300))
-    base_image = configs.get("base_image", "intel/dlstreamer:2025.1.2-ubuntu24")
+    base_image = configs.get("base_image", "intel/dlstreamer:2025.2.0-ubuntu24")
     devices = configs.get("devices", "igpu")
     model = configs.get("model", "resnet-50-tf")
     precision = configs.get("precision", "INT8")

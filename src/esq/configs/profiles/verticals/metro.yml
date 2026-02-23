@@ -16,6 +16,7 @@ params:
     - "profile.suite.system.gpu-ov"
     - "profile.suite.ai.vision-ov"
     - "profile.suite.media.performance-pipelines"
+    - "profile.suite.ai.vision-va"
   requirements:
     # Hardware requirements
     cpu_min_cores: 4

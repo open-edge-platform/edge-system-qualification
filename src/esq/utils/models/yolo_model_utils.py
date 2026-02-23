@@ -47,7 +47,19 @@ YOLO_MODELS = {
     "yolov8m": "YOLOv8",
     "yolov8l": "YOLOv8",
     "yolov8x": "YOLOv8",
+    # YOLOv11 models (latest)
+    "yolov11n": "YOLOv11",  # Nano - smallest, fastest
+    "yolo11n": "YOLOv11",  # Alias without 'v'
+    "yolov11s": "YOLOv11",  # Small
+    "yolo11s": "YOLOv11",  # Alias without 'v'
+    "yolov11m": "YOLOv11",  # Medium
+    "yolo11m": "YOLOv11",  # Alias without 'v'
+    "yolov11l": "YOLOv11",  # Large
+    "yolo11l": "YOLOv11",  # Alias without 'v'
+    "yolov11x": "YOLOv11",  # Extra large
+    "yolo11x": "YOLOv11",  # Alias without 'v'
 }
+
 
 def download_yolo_model(model_id: str, models_dir: Optional[str] = None) -> Optional[Path]:
     """
@@ -78,6 +90,12 @@ def download_yolo_model(model_id: str, models_dir: Optional[str] = None) -> Opti
     # Normalize model ID - Ultralytics doesn't recognize dash variants
     # yolo-v5s → yolov5s, yolo-v8s → yolov8s
     ultralytics_model_id = model_id.replace("-", "")
+
+    # YOLOv11 models use 'yolo11n' format (without 'v') in Ultralytics
+    # yolov11n → yolo11n, yolov11s → yolo11s, etc.
+    if ultralytics_model_id.startswith("yolov11"):
+        ultralytics_model_id = ultralytics_model_id.replace("yolov11", "yolo11")
+
     logger.debug(f"Normalized model ID for Ultralytics: {model_id} → {ultralytics_model_id}")
 
     # Use CORE_DATA_DIR structure: esq_data/data/vertical/metro/temp for Ultralytics downloads
@@ -158,6 +176,7 @@ def download_yolo_model(model_id: str, models_dir: Optional[str] = None) -> Opti
         # NOTE: Do NOT clean up .pt files here - they are needed by export_yolo_model()
         # The export function will handle cleanup after it's done using the weights
 
+
 def export_yolo_model(
     model_id: str,
     models_dir: Optional[Union[str, Path]] = None,
@@ -231,9 +250,15 @@ def export_yolo_model(
 
     # Determine weights path (use provided path or fallback to Ultralytics cache)
     if weights_path is None:
+        # Normalize model ID for Ultralytics cache lookup
+        # YOLOv11 models use 'yolo11n' format (without 'v') in Ultralytics
+        cache_model_id = model_id
+        if cache_model_id.startswith("yolov11"):
+            cache_model_id = cache_model_id.replace("yolov11", "yolo11")
+
         # Check standard Ultralytics cache location
         cache_dir = Path.home() / ".cache" / "ultralytics"
-        weights_path = cache_dir / f"{model_id}.pt"
+        weights_path = cache_dir / f"{cache_model_id}.pt"
         logger.debug(f"Using Ultralytics cache location: {weights_path}")
 
     # Verify model weights exist

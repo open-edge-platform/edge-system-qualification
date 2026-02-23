@@ -77,6 +77,7 @@ def create_pytest_args(
     # Base pytest arguments
     pytest_args = [
         "-v",  # Always use verbose pytest output
+        "--import-mode=importlib",  # Use importlib import mode to avoid import mismatch
         f"--alluredir={os.path.join(data_dir, 'results', 'allure')}",
     ]
 
@@ -241,6 +242,7 @@ def create_profile_pytest_args(
     # Base pytest arguments for profile
     pytest_args = [
         "-v",  # Always use verbose pytest output
+        "--import-mode=importlib",  # Use importlib import mode to avoid import mismatch
         f"--alluredir={os.path.join(data_dir, 'results', 'allure')}",
     ]
 

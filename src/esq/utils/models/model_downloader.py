@@ -52,8 +52,12 @@ MODEL_REGISTRY = {
     # YOLO models (requires Ultralytics export)
     "yolo-v5s": "yolo",
     "yolov5s": "yolo",
+    "yolo-v5m": "yolo",
+    "yolov5m": "yolo",
     "yolo-v8s": "yolo",
     "yolov8s": "yolo",
+    "yolo-v11n": "yolo",
+    "yolov11n": "yolo",
     # CLIP models (requires Hugging Face + conversion)
     "clip-vit-base-patch16": "clip",
 }

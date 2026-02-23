@@ -25,6 +25,12 @@ from .validation import (
     get_render_device,
     normalize_device_name,
 )
+from .memory_utils import (
+    check_available_memory,
+    get_memory_based_max_streams,
+    get_memory_info,
+    log_memory_status,
+)
 
 # Memory utilities for OOM prevention
 from .memory_utils import (

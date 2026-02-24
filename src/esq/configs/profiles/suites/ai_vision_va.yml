@@ -1,0 +1,109 @@
+# Copyright (C) 2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+#
+# Video Analytics (VA) Suite Profile
+#
+# Multi-stage video analytics pipelines with detection, tracking, and classification.
+# Supports heterogeneous compute modes (CPU/iGPU/dGPU/NPU combinations).
+#
+# Pipeline Weights:
+#   - Light: YOLO11n + ResNet-50 (H265, single classification)
+#   - Medium: YOLOv5m + ResNet-50 + MobileNet-v2 (H265, dual classification)
+#   - Heavy: YOLO11m + ResNet-v1-50 + MobileNet-v2 (H265, dual classification, longer warmup)
+#
+# Device Selection:
+#   - Xeon platforms: CPU testing (Modes 0)
+#   - Client platforms: iGPU/dGPU/NPU testing (Modes 1-8, skip CPU)
+#
+# Compute Modes:
+#   - Mode 0: CPU/CPU/CPU (all stages on CPU)
+#   - Mode 1: dGPU/dGPU/dGPU (all stages on dGPU)
+#   - Mode 2: iGPU/iGPU/iGPU (all stages on iGPU)
+#   - Mode 3: iGPU/iGPU/NPU (decode+detect on iGPU, classify on NPU)
+#   - Mode 4: iGPU/NPU/NPU (decode on iGPU, detect+classify on NPU)
+#   - Mode 5: dGPU/dGPU/NPU (decode+detect on dGPU, classify on NPU)
+#   - Mode 6: dGPU/NPU/NPU (decode on dGPU, detect+classify on NPU)
+#   - Mode 7: iGPU + NPU concurrent (GPU and NPU pipelines run simultaneously)
+#   - Mode 8: dGPU + NPU concurrent (GPU and NPU pipelines run simultaneously)
+
+name: "profile.suite.ai.vision-va"
+description: "Video Analytics (VA) Suite - Multi-stage pipelines with detection, tracking, and classification"
+version: "1.1.0"
+
+params:
+  labels:
+    profile_display_name: "Vision AI"
+    group: "ai.vision"
+    type: "suite"
+    display_status: false
+  
+  requirements:
+    # Hardware requirements
+    cpu_min_cores: 4
+    memory_min_gb: 8.0
+    storage_total_min_gb: 64.0
+    storage_min_gb: 15.0  # Free storage for test execution and models
+    # Software requirements
+    os_type:
+      - "linux"
+    docker_required: true
+
+  # Container configuration
+  container_image: "video_analytics_bm"
+  image_tag: "1.0"
+  base_image: "intel/dlstreamer:2025.2.0-ubuntu24"
+  dockerfile_name: "Dockerfile"
+  
+  # Test execution settings
+  timeout: 600  # 10 minutes for comprehensive benchmark
+  target_fps: 30
+  force_run: false  # Set to true to re-run even if cached results exist
+
+suites:
+  - name: "ai"
+    sub_suites:
+      - name: "vision"
+
+        tests:
+          # =============================================================================
+          # Video Analytics Pipeline Tests
+          # =============================================================================
+          # All VA tests are routed through test_video_analytics.py which delegates
+          # to specific implementations in src/va/ directory
+          #
+          # =============================================================================
+          # VA Light Pipeline - YOLO11n + ResNet-50
+          # =============================================================================
+          # Lightweight pipeline: H265, YOLO11n detection, ResNet-50 classification
+          # Video: 18856748-bears_1920_1080_30fps_30s.h265
+          test_video_analytics:
+            params:
+              # VA Light - All available devices
+              - test: "test_va_light"
+                test_id: "VSN-LIGHT-001"
+                display_name: "VA Light - All Available Devices"
+                devices: [cpu, igpu, dgpu, npu]
+
+              # =============================================================================
+              # VA Medium Pipeline - YOLOv5m + ResNet-50 + MobileNet-v2
+              # =============================================================================
+              # Medium-weight pipeline: H265, YOLOv5m detection, dual classification
+              # Video: 18856748-bears_1920_1080_30fps_30s.h265
+              - test: "test_va_medium"
+                test_id: "VSN-MEDIUM-001"
+                display_name: "VA Medium - All Available Devices"
+                devices: [cpu, igpu, dgpu, npu]
+                timeout: 900  # Extended timeout for heavier pipeline
+
+              # =============================================================================
+              # VA Heavy Pipeline - YOLO11m + ResNet-v1-50 + MobileNet-v2
+              # =============================================================================
+              # Heavy-weight pipeline: H265, YOLO11m detection, dual classification
+              # Video: 18856748-bears_1920_1080_30fps_30s.h265
+              # Uses higher starting-frame for FPS counter (2000 for longer warmup)
+              - test: "test_va_heavy"
+                test_id: "VSN-HEAVY-001"
+                display_name: "VA Heavy - All Available Devices"
+                devices: [cpu, igpu, dgpu, npu]
+                timeout: 1200  # Extended timeout for heaviest pipeline

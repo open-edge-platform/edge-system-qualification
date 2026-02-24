@@ -30,7 +30,6 @@ MIN_AVAILABLE_MEMORY_GB = 4.0  # Minimum available memory to continue scaling
 MEMORY_SAFETY_MARGIN = 0.8  # Use only 80% of available memory for streams
 DEFAULT_MAX_STREAMS_UNLIMITED = 100  # Default max when memory info unavailable
 
-
 def get_memory_info() -> Tuple[float, float, float]:
     """
     Get system memory information.

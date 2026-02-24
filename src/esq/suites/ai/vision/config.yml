@@ -62,6 +62,55 @@ kpi:
     description: "Maximum number of concurrent video streams on NPU"
     default_value: -1
 
+  # Video Analytics (VA) KPIs
+  va_max_streams:
+    name: "VA Maximum Streams"
+    type: "numeric"
+    validation:
+      operator: "gte"
+      reference: 5
+      enabled: true
+    unit: "streams"
+    severity: "normal"
+    description: "Maximum number of concurrent video analytics streams in VA pipeline"
+    default_value: -1
+
+  va_avg_fps:
+    name: "VA Average FPS"
+    type: "numeric"
+    validation:
+      operator: "gte"
+      reference: 25.0
+      enabled: false
+    unit: "fps"
+    severity: "normal"
+    description: "Average frames per second in video analytics pipeline"
+    default_value: 0.0
+
+  va_gpu_freq_mhz:
+    name: "VA GPU Frequency"
+    type: "numeric"
+    validation:
+      operator: "gte"
+      reference: 0
+      enabled: false
+    unit: "MHz"
+    severity: "normal"
+    description: "GPU frequency during VA pipeline execution"
+    default_value: 0.0
+
+  va_pkg_power_w:
+    name: "VA Package Power"
+    type: "numeric"
+    validation:
+      operator: "lte"
+      reference: 150
+      enabled: false
+    unit: "W"
+    severity: "normal"
+    description: "Package power consumption during VA pipeline execution"
+    default_value: 0.0
+
 tests:
   test_dlstreamer:
     params:

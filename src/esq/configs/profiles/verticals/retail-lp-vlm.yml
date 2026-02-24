@@ -1,0 +1,36 @@
+# Copyright (C) 2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+name: "profile.vertical.retail-lp-vlm"
+description: "Loss Prevention Visual Language Model Test Suite"
+version: "1.0.0"
+params:
+  labels:
+    profile_display_name: "Retail"
+    group: "retail"
+    type: "vertical"
+    display_status: false
+  requirements:
+    # Hardware requirements
+    memory_min_gb: 12.0
+    storage_total_min_gb: 100.0
+    storage_min_gb: 20.0  # Free storage for models, videos, and containers
+    # Software requirements
+    os_type:
+      - "linux"
+    docker_required: true
+
+suites:
+  - name: "vertical"
+    sub_suites:
+      - name: "retail"
+        tests:
+          test_lp_vlm:
+            params:
+              - test_id: "LP-VLM-001"
+                display_name: "Loss Prevention VLM"
+                devices: [cpu]
+                timeout: 3600  # 60 minutes
+                camera_stream: "camera_to_workload_vlm.json"
+                commit_id: "2205dc9"  # Loss Prevention repository commit to checkout
+              

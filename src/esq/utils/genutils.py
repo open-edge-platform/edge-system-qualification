@@ -1191,53 +1191,87 @@ def filter_csv_by_columns(
     return results
 
 
-def download_file_from_url(url: str, output_path: Path, timeout: int = 600) -> bool:
+def download_file_from_url(url: str, output_path: Path, timeout: int = 600, max_retries: int = 3) -> bool:
     """
-    Download a file from URL with progress tracking.
+    Download a file from URL with progress tracking and retry mechanism.
+
+    Implements automatic retry with exponential backoff to handle transient
+    network failures (connection errors, timeouts, etc.).
 
     Args:
         url: URL to download from
         output_path: Path to save the downloaded file
         timeout: Download timeout in seconds
+        max_retries: Maximum number of retry attempts (default: 3)
 
     Returns:
         bool: True if download successful
     """
-    try:
-        logger.info(f"Downloading from: {url}")
-        response = requests.get(url, stream=True, timeout=timeout, allow_redirects=True)
-        response.raise_for_status()
+    from esq.utils.downloads.retry_utils import RETRYABLE_EXCEPTIONS
 
-        total_size = int(response.headers.get("content-length", 0))
-        output_path.parent.mkdir(parents=True, exist_ok=True)
+    delay = 2.0  # Initial retry delay in seconds
+    last_exception = None
 
-        with open(output_path, "wb") as f:
-            if total_size == 0:
-                f.write(response.content)
+    for attempt in range(1, max_retries + 1):
+        try:
+            logger.info(f"Downloading from: {url} (attempt {attempt}/{max_retries})")
+            response = requests.get(url, stream=True, timeout=timeout, allow_redirects=True)
+            response.raise_for_status()
+
+            total_size = int(response.headers.get("content-length", 0))
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+
+            with open(output_path, "wb") as f:
+                if total_size == 0:
+                    f.write(response.content)
+                else:
+                    downloaded = 0
+                    chunk_size = 8192
+                    for chunk in response.iter_content(chunk_size=chunk_size):
+                        if chunk:
+                            f.write(chunk)
+                            downloaded += len(chunk)
+                            progress = (downloaded / total_size) * 100
+                            print(f"\rProgress: {progress:.1f}%", end="", flush=True)
+                    print()  # New line after progress
+
+            logger.info(f"Downloaded successfully: {output_path} ({output_path.stat().st_size} bytes)")
+            return True
+
+        except RETRYABLE_EXCEPTIONS as e:
+            last_exception = e
+
+            # Don't retry non-transient HTTP errors (4xx except 429 Rate Limit)
+            if isinstance(e, requests.exceptions.HTTPError):
+                if hasattr(e, 'response') and e.response is not None:
+                    status_code = e.response.status_code
+                    if 400 <= status_code < 500 and status_code != 429:
+                        logger.error(f"Failed to download {url} - HTTP {status_code} (non-retryable): {e}")
+                        if output_path.exists():
+                            output_path.unlink()
+                        return False
+
+            # Clean up partial download
+            if output_path.exists():
+                output_path.unlink()
+
+            if attempt < max_retries:
+                logger.warning(f"Download failed: {e}. Retrying in {delay:.1f}s...")
+                import time
+                time.sleep(delay)
+                delay *= 2.0  # Exponential backoff
             else:
-                downloaded = 0
-                chunk_size = 8192
-                for chunk in response.iter_content(chunk_size=chunk_size):
-                    if chunk:
-                        f.write(chunk)
-                        downloaded += len(chunk)
-                        progress = (downloaded / total_size) * 100
-                        print(f"\rProgress: {progress:.1f}%", end="", flush=True)
-                print()  # New line after progress
+                logger.error(f"Failed to download {url} after {max_retries} attempts: {e}")
+                return False
 
-        logger.info(f"Downloaded successfully: {output_path} ({output_path.stat().st_size} bytes)")
-        return True
+        except Exception as e:
+            logger.error(f"Unexpected error downloading {url}: {e}")
+            if output_path.exists():
+                output_path.unlink()
+            return False
 
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Failed to download {url}: {e}")
-        if output_path.exists():
-            output_path.unlink()
-        return False
-    except Exception as e:
-        logger.error(f"Unexpected error downloading {url}: {e}")
-        if output_path.exists():
-            output_path.unlink()
-        return False
+    # Should not reach here, but for safety
+    return False
 
 def extract_zip_archive(zip_path: Path, extract_to: Path, search_dir: Optional[str] = None) -> bool:
     """

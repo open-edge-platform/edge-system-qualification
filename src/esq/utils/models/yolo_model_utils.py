@@ -451,24 +451,53 @@ def download_test_image(image_name: str = "car.png", output_dir: Optional[Union[
         return image_path
 
     logger.info(f"Downloading test image: {image_name}")
-    try:
-        response = requests.get(image_url, timeout=300)
-        response.raise_for_status()
-        content = response.content
 
-        # Validate we got image data, not HTML error page
-        if len(content) < 1000 and b"<!DOCTYPE html>" in content[:500]:
-            raise RuntimeError(f"Received HTML page instead of image from {image_url}")
+    # Use retry mechanism for transient network failures
+    import time
 
-        with open(image_path, "wb") as out_file:
-            out_file.write(content)
+    max_retries = 3
+    delay = 2.0
 
-        logger.info(f"Successfully downloaded {image_name} to: {image_path}")
-        return image_path
+    for attempt in range(1, max_retries + 1):
+        try:
+            logger.debug(f"Download attempt {attempt}/{max_retries}")
+            response = requests.get(image_url, timeout=300)
+            response.raise_for_status()
+            content = response.content
 
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Failed to download test image {image_name}: {e}")
-        return None
-    except Exception as e:
-        logger.error(f"Unexpected error downloading {image_name}: {e}", exc_info=True)
-        return None
+            # Validate we got image data, not HTML error page
+            if len(content) < 1000 and b"<!DOCTYPE html>" in content[:500]:
+                raise RuntimeError(f"Received HTML page instead of image from {image_url}")
+
+            with open(image_path, "wb") as out_file:
+                out_file.write(content)
+
+            logger.info(f"Successfully downloaded {image_name} to: {image_path}")
+            return image_path
+
+        except (requests.exceptions.RequestException, ConnectionError, TimeoutError, OSError) as e:
+            # Don't retry non-transient HTTP errors
+            if isinstance(e, requests.exceptions.HTTPError):
+                if hasattr(e, 'response') and e.response is not None:
+                    status_code = e.response.status_code
+                    if 400 <= status_code < 500 and status_code != 429:
+                        logger.error(f"Download failed with HTTP {status_code} (non-retryable): {e}")
+                        return None
+
+            # Clean up partial download
+            if image_path.exists():
+                image_path.unlink()
+
+            if attempt < max_retries:
+                logger.warning(f"Download failed: {e}. Retrying in {delay:.1f}s...")
+                time.sleep(delay)
+                delay *= 2.0  # Exponential backoff
+            else:
+                logger.error(f"Failed to download test image {image_name} after {max_retries} attempts: {e}")
+                return None
+
+        except Exception as e:
+            logger.error(f"Unexpected error downloading {image_name}: {e}", exc_info=True)
+            return None
+
+    return None

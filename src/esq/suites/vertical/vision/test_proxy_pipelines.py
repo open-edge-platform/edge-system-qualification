@@ -408,7 +408,7 @@ def _initialize_csv_files(output_dir: str, csv_files: list):
             "Duration(s), Errors"
         ),
         "smart_nvr_proxy_pipeline.csv": (
-            "Pipeline, Device, Codec, Resolution, Model, Compose, Num Monitors, non-AI Channels, AI Channels,"
+            "Pipeline, Device, Codec, Resolution, Model, Compose, Num Monitors, Non-AI Channels, AI Channels,"
             "GPU Freq, Pkg Power,"
             "Ref Platform, Ref AI Channels, Ref GPU Freq, Ref Pkt Power,"
             "Duration(s), Errors"
@@ -772,18 +772,101 @@ def test_proxy_pipelines(
     core_data_dir = "".join(c for c in core_data_dir_tainted)
     data_dir = os.path.join(core_data_dir, "data", "vertical", "vision")
     pp_results = os.path.join(data_dir, "results", "ppl")
-    os.makedirs(pp_results, exist_ok=True)
+
+    # Initialize failure tracking before any operations that could fail
+    test_failed = False
+    failure_message = ""
+
+    try:
+        os.makedirs(pp_results, exist_ok=True)
+    except (OSError, PermissionError) as dir_error:
+        test_failed = True
+        failure_message = (
+            f"Failed to create results directory: {type(dir_error).__name__}: {str(dir_error)}. "
+            f"Path: {pp_results}. "
+            f"Check file system permissions and available disk space."
+        )
+        logger.error(failure_message, exc_info=True)
 
     # Create resources directory for models and videos under esq_data (FW team recommendation)
     resources_dir = os.path.join(pp_results, "resources")
-    os.makedirs(resources_dir, exist_ok=True)
-    ensure_dir_permissions(resources_dir, uid=os.getuid(), gid=os.getgid(), mode=0o775)
+
+    if not test_failed:
+        try:
+            os.makedirs(resources_dir, exist_ok=True)
+            ensure_dir_permissions(resources_dir, uid=os.getuid(), gid=os.getgid(), mode=0o775)
+        except (OSError, PermissionError) as dir_error:
+            test_failed = True
+            failure_message = (
+                f"Failed to create/configure resources directory: {type(dir_error).__name__}: {str(dir_error)}. "
+                f"Path: {resources_dir}. "
+                f"Check file system permissions."
+            )
+            logger.error(failure_message, exc_info=True)
 
     # Get test suite configuration and download resources
-    test_suite, csvlist, models_path, videos_path = proxy_pl_suite(suite_name, resources_dir)
+    # Handle ALL failures gracefully instead of breaking the test (network, permissions, imports, etc.)
+    if not test_failed:
+        try:
+            test_suite, csvlist, models_path, videos_path = proxy_pl_suite(suite_name, resources_dir)
+        except (RuntimeError, ImportError, OSError, PermissionError) as setup_error:
+            test_failed = True
+            error_type = type(setup_error).__name__
 
-    # Ensure directories have correct permissions
-    ensure_dir_permissions(pp_results, uid=os.getuid(), gid=os.getgid(), mode=0o775)
+            # Categorize error for better diagnostics
+            if isinstance(setup_error, ImportError):
+                error_category = "Import error - resource downloader module not available"
+            elif isinstance(setup_error, (OSError, PermissionError)):
+                error_category = "File system error - directory creation or permission issue"
+            else:  # RuntimeError
+                error_category = "Resource download failure"
+
+            failure_message = (
+                f"Test setup failed ({error_category}): {error_type}: {str(setup_error)}. "
+                f"Suite: {suite_name}. "
+                f"Possible causes: network issues, missing dependencies, or file system permissions. "
+                f"Check logs for detailed error and verify system configuration."
+            )
+            logger.error(failure_message, exc_info=True)
+            # Set dummy values to allow test to continue to N/A result reporting
+            test_suite = "None"
+            csvlist = []
+            models_path = None
+            videos_path = None
+        except Exception as unexpected_error:
+            # Catch any other unexpected exceptions to prevent test breakage
+            test_failed = True
+            error_type = type(unexpected_error).__name__
+            failure_message = (
+                f"Unexpected error during test setup: {error_type}: {str(unexpected_error)}. "
+                f"Suite: {suite_name}. "
+                f"Check logs for full stack trace and error details."
+            )
+            logger.error(failure_message, exc_info=True)
+            # Set dummy values to allow test to continue to N/A result reporting
+            test_suite = "None"
+            csvlist = []
+            models_path = None
+            videos_path = None
+    else:
+        # Directory creation failed - set dummy values
+        test_suite = "None"
+        csvlist = []
+        models_path = None
+        videos_path = None
+
+    # Ensure directories have correct permissions (if not already failed)
+    if not test_failed:
+        try:
+            ensure_dir_permissions(pp_results, uid=os.getuid(), gid=os.getgid(), mode=0o775)
+        except (OSError, PermissionError) as perm_error:
+            test_failed = True
+            failure_message = (
+                f"Failed to set directory permissions: {type(perm_error).__name__}: {str(perm_error)}. "
+                f"Path: {pp_results}. "
+                f"Check file system permissions."
+            )
+            logger.error(failure_message, exc_info=True)
 
     # Step 1: Validate system requirements (CPU, memory, storage, Docker, etc.)
     # This will skip the test if requirements are not met (test framework decision)
@@ -840,6 +923,40 @@ def test_proxy_pipelines(
         logger.error(f"Test failed: {failure_msg}")
         pytest.fail(failure_msg)
 
+    # Step 4: Handle download failures with N/A metrics (graceful failure, not crash)
+    if test_failed:
+        logger.error("Download failure detected - reporting N/A metrics")
+
+        # Create N/A result for download failure
+        metrics = _create_proxy_pipeline_metrics(suite_name, value="N/A", unit="")
+
+        results = Result.from_test_config(
+            configs=configs,
+            parameters={
+                "timeout(s)": timeout,
+                "display_name": test_display_name,
+                "suite_name": suite_name,
+                "devices": devices,
+            },
+            metrics=metrics,
+            metadata={
+                "status": "N/A",
+                "failure_reason": failure_message,
+            },
+        )
+
+        # Summarize with N/A status
+        summarize_test_results(
+            results=results,
+            test_name=test_name,
+            configs=configs,
+            get_kpi_config=get_kpi_config,
+        )
+
+        # Fail test with clear message (ensures proper reporting)
+        logger.error(f"Test failed due to download error: {failure_message}")
+        pytest.fail(failure_message)
+
     # Log detailed device information
     for device_id, device_info in device_dict.items():
         logger.debug(f"Device {device_id}: Type={device_info['device_type']}, Name={device_info['full_name']}")
@@ -855,8 +972,7 @@ def test_proxy_pipelines(
         logger.warning(f"Failed to cleanup stale containers: {cleanup_error}")
 
     # Initialize variables for finally block and exception handlers (moved to top for broader coverage)
-    test_failed = False
-    failure_message = ""
+    # Note: test_failed and failure_message already initialized earlier for download failure handling
     results = None
     container_name = None  # Track container for cleanup on interrupts
 

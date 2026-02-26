@@ -94,7 +94,6 @@ def test_system_gpu(
         f"{configs.get('container_image', 'metro_dqt_ai_freq_measure')}:{configs.get('image_tag', '3.0')}"
     )
     timeout = int(configs.get("timeout", 300))
-    base_image = configs.get("base_image", "intel/dlstreamer:2025.1.2-ubuntu24")
     device = configs.get("device", "igpu")
     # Setup
     test_dir = os.path.dirname(os.path.abspath(__file__))
@@ -179,6 +178,10 @@ def test_system_gpu(
 
     docker_client = DockerClient()
 
+    # Extract first device_id from device_dict for image preparation
+    # This device_id is used to determine the appropriate base image (iGPU vs dGPU)
+    device_id = next(iter(device_dict.keys())) if device_dict else None
+
     # Initialize variables for finally block (moved to top for broader coverage)
     # Note: results object already initialized above before validation
     test_failed = False
@@ -189,10 +192,64 @@ def test_system_gpu(
         # Step 2: Prepare test environment
         def prepare_assets():
             # Access outer scope variables
-            nonlocal base_image, docker_image_tag, dockerfile_name, docker_dir, timeout
+            nonlocal device_id, docker_image_tag, dockerfile_name, docker_dir, timeout
+
+            # Build 1: Get FW custom device-specific images from dlstreamer preparation
+            from esq.suites.ai.vision.src.dlstreamer.preparation import (
+                prepare_assets as prepare_dlstreamer_assets,
+            )
+
+            test_dir_abs = os.path.dirname(os.path.abspath(__file__))
+            # Navigate to ai/vision to access dlstreamer src
+            ai_vision_dir = os.path.join(test_dir_abs, "..", "..", "ai", "vision")
+            src_dir = os.path.join(ai_vision_dir, "src")
+
+            # Setup models/videos dirs for dlstreamer prep
+            core_data_dir_tainted = os.environ.get("CORE_DATA_DIR", os.path.join(os.getcwd(), "esq_data"))
+            core_data_dir = "".join(c for c in core_data_dir_tainted)
+            prep_models_dir = os.path.join(core_data_dir, "data", "ai", "vision", "models")
+            prep_videos_dir = os.path.join(core_data_dir, "data", "ai", "vision", "videos")
+
+            logger.info("Build 1: Preparing FW custom device-specific DLStreamer images...")
+            dlstreamer_result = prepare_dlstreamer_assets(
+                configs=configs,
+                models_dir=prep_models_dir,
+                videos_dir=prep_videos_dir,
+                src_dir=src_dir,
+                docker_client=docker_client,
+                docker_image_tag_analyzer="test-dlstreamer-analyzer:latest",
+                docker_image_tag_utils="test-dlstreamer-utils:latest",
+                docker_container_prefix="test",
+            )
+
+            fw_container_config = dlstreamer_result.metadata.get("container_config", {})
+            logger.info(f"FW custom images available: {list(fw_container_config.keys())}")
+
+            # Build 2: Select FW custom image based on device (detect dGPU vs iGPU)
+            fw_custom_base_image = fw_container_config.get("analyzer_image", "intel/dlstreamer:2025.2.0-ubuntu24")
+
+            # Check if testing dGPU (discrete GPU)
+            if device_id and device_id.upper().startswith("GPU"):
+                from sysagent.utils.system.hardware import collect_hardware_info
+                hardware_info = collect_hardware_info()
+                gpu_info = hardware_info.get("gpu", {})
+                is_discrete = any(
+                    gpu.get("is_discrete", False) for gpu in gpu_info.get("devices", [])
+                )
+                if is_discrete:
+                    fw_custom_base_image = fw_container_config.get(
+                        "dgpu_analyzer_image",
+                        fw_container_config.get("analyzer_image", "intel/dlstreamer:2025.2.0-ubuntu24")
+                    )
+                    logger.info("Detected discrete GPU, using dGPU custom image")
+
+            logger.info(f"Using FW image as base for GPU freq test: {fw_custom_base_image}")
 
             docker_nocache = configs.get("docker_nocache", False)
             logger.info(f"Docker build cache setting: nocache={docker_nocache}")
+            logger.info(
+                f"Build 2: Building test suite image '{docker_image_tag}' on top of FW custom image..."
+            )
 
             # Download models and assets outside container
             logger.info("Downloading OpenVINO models for GPU benchmarking...")
@@ -322,7 +379,7 @@ def test_system_gpu(
                 raise RuntimeError(f"Model preparation failed: {model_error}") from model_error
 
             build_args = {
-                "COMMON_BASE_IMAGE": f"{base_image}",
+                "COMMON_BASE_IMAGE": fw_custom_base_image,  # FW custom image
             }
 
             build_result = docker_client.build_image(
@@ -369,7 +426,7 @@ def test_system_gpu(
             f"Check logs for full stack trace and error details."
         )
         logger.error(failure_message, exc_info=True)
-        logger.debug(f"Preparation context - Docker dir: {docker_dir}, Base image: {base_image}")
+        logger.debug(f"Preparation context - Docker dir: {docker_dir}")
         # Don't raise yet - create N/A result below
 
     try:
@@ -384,7 +441,7 @@ def test_system_gpu(
             f"Check logs for detailed error and verify Docker daemon is running."
         )
         logger.error(failure_message, exc_info=True)
-        logger.debug(f"Preparation failed - Docker dir: {docker_dir}, Base image: {base_image}, Timeout: {timeout}s")
+        logger.debug(f"Preparation failed - Docker dir: {docker_dir}, Timeout: {timeout}s")
 
     # If preparation failed, update existing results and exit
     if test_failed:

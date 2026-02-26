@@ -347,59 +347,59 @@ class VAMediumBenchmark(BaseVideoAnalyticsBenchmark):
             else:
                 if self.is_MTL:
                     self.config = {
-                        "ref_stream_list": [10],
-                        "ref_platform": "MTL 165H (32G Mem)",
+                        "ref_stream_list": [5,6,5,6,6],
+                        "ref_platform": "ARL Ultra 9 285K (32G Mem)",
                         "ref_gpu_freq": -1,
                         "ref_pkg_power": -1,
                         "models": ["yolov5m+resnet-50-tf+mobilenet-v2-pytorch"],
                         "modes": self.get_mode_and_compute_devices(available_devices, va_medium_executed_modes),
                         "mode_ref_streams": {
-                            "Mode 0": 4,  # CPU/CPU/CPU
-                            "Mode 2": 10,  # iGPU/iGPU/iGPU
-                            "Mode 3": 14,  # iGPU/iGPU/NPU
-                            "Mode 4": 18,  # iGPU/NPU/NPU
-                            "Mode 7": 20,  # iGPU + NPU concurrent
+                            "Mode 0": 5,  # CPU/CPU/CPU
+                            "Mode 2": 6,  # iGPU/iGPU/iGPU
+                            "Mode 3": 5,  # iGPU/iGPU/NPU
+                            "Mode 4": 6,  # iGPU/NPU/NPU
+                            "Mode 7": 6,  # iGPU + NPU concurrent
                         },
                     }
                 else:
                     self.config = {
-                        "ref_stream_list": [8],
-                        "ref_platform": "i7-1360p (16G Mem)",
+                        "ref_stream_list": [5,6],
+                        "ref_platform": "ARL Ultra 9 285K (32G Mem)",
                         "ref_gpu_freq": -1,
                         "ref_pkg_power": -1,
                         "models": ["yolov5m+resnet-50-tf+mobilenet-v2-pytorch"],
                         "modes": self.get_mode_and_compute_devices(available_devices, va_medium_executed_modes),
                         "mode_ref_streams": {
-                            "Mode 0": 4,  # CPU/CPU/CPU
-                            "Mode 2": 8,  # iGPU/iGPU/iGPU
+                            "Mode 0": 5,  # CPU/CPU/CPU
+                            "Mode 2": 6,  # iGPU/iGPU/iGPU
                         },
                     }
         elif device_type == "dGPU":
             self.config = {
-                "ref_stream_list": [22],
-                "ref_platform": "ARL Ultra 9 285 + B580",
+                "ref_stream_list": [5,14,14,6,11],
+                "ref_platform": "ARL Ultra 9 285K + B580",
                 "ref_gpu_freq": -1,
                 "ref_pkg_power": -1,
                 "models": ["yolov5m+resnet-50-tf+mobilenet-v2-pytorch"],
                 "modes": self.get_mode_and_compute_devices(available_devices, va_medium_executed_modes),
                 "mode_ref_streams": {
-                    "Mode 0": 4,  # CPU/CPU/CPU
-                    "Mode 1": 22,  # dGPU/dGPU/dGPU
-                    "Mode 5": 26,  # dGPU/dGPU/NPU
-                    "Mode 6": 30,  # dGPU/NPU/NPU
-                    "Mode 8": 40,  # dGPU + NPU concurrent
+                    "Mode 0": 5,  # CPU/CPU/CPU
+                    "Mode 1": 14,  # dGPU/dGPU/dGPU
+                    "Mode 5": 14,  # dGPU/dGPU/NPU
+                    "Mode 6": 6,  # dGPU/NPU/NPU
+                    "Mode 8": 11,  # dGPU + NPU concurrent
                 },
             }
         elif device_type == "CPU":
             self.config = {
-                "ref_stream_list": [10],
+                "ref_stream_list": [23],
                 "ref_platform": "Xeon(R) Gold 6414U (128G Mem)",
                 "ref_gpu_freq": -1,
                 "ref_pkg_power": -1,
                 "models": ["yolov5m+resnet-50-tf+mobilenet-v2-pytorch"],
                 "modes": self.get_mode_and_compute_devices(available_devices, va_medium_executed_modes),
                 "mode_ref_streams": {
-                    "Mode 0": 10,  # CPU/CPU/CPU
+                    "Mode 0": 23,  # CPU/CPU/CPU
                 },
             }
         else:

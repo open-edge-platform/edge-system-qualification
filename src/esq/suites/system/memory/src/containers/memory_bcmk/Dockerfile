@@ -8,7 +8,7 @@ FROM ${COMMON_BASE_IMAGE}
 ARG STREAM_GIT_URL
 
 USER root
-RUN apt-get update --no-install-recommends -y && apt-get install --no-install-recommends -y git gcc  &&  rm -rf /var/lib/apt/lists/*
+RUN apt-get update -y && apt-get install --no-install-recommends -y git build-essential && rm -rf /var/lib/apt/lists/*
 
 USER dlstreamer
 ENV HOME=/home/dlstreamer

@@ -28,6 +28,38 @@ logger = logging.getLogger(__name__)
 test_container_path = "src/containers/media_benchmark/"
 
 
+def _normalize_device_categories(device_value, default: str = "igpu") -> list[str]:
+    if isinstance(device_value, str):
+        categories = [device_value]
+    elif isinstance(device_value, (list, tuple, set)):
+        categories = [str(category) for category in device_value]
+    elif device_value is None:
+        categories = [default]
+    else:
+        categories = [str(device_value)]
+
+    normalized = [category.strip().lower() for category in categories if str(category).strip()]
+    return normalized if normalized else [default]
+
+
+def _resolve_esq_build_context(test_file_dir: Path, relative_dockerfile: str) -> Path:
+    candidate_paths = [
+        test_file_dir.parents[2],
+        Path.cwd() / "src" / "esq",
+        Path.cwd() / "esq",
+    ]
+
+    for candidate in candidate_paths:
+        dockerfile_path = candidate / relative_dockerfile
+        if candidate.is_dir() and dockerfile_path.is_file():
+            return candidate
+
+    raise FileNotFoundError(
+        f"Unable to resolve Docker build context for '{relative_dockerfile}'. "
+        f"Checked: {[str(path) for path in candidate_paths]}"
+    )
+
+
 def _create_media_metrics(value: str = "N/A", unit: str = None) -> dict:
     """
     Create media performance metrics dictionary.
@@ -377,8 +409,12 @@ def _run_media_container(
     is_mtl = "true" if platform_info.get("is_mtl", False) else "false"
     has_igpu = "true" if platform_info.get("has_igpu", False) else "false"
 
+    # Force entrypoint to bash because some FW custom base images define
+    # ENTRYPOINT to a Python CLI (e.g., main.py baseline/total). Without
+    # overriding entrypoint, docker treats command below as args to that
+    # ENTRYPOINT and fails with: invalid choice: 'bash'.
+    entrypoint = "/bin/bash"
     command = [
-        "bash",
         "./run_media_benchmark_parallel.sh",
         normalized_device,
         operation,
@@ -400,6 +436,7 @@ def _run_media_container(
         result = docker_client.run_container(
             name=container_name,
             image=f"{image_name}:{image_tag}",
+            entrypoint=entrypoint,
             command=command,
             volumes=volumes,
             devices=container_devices,
@@ -465,8 +502,9 @@ def test_media_pipelines(
     dockerfile_name = configs.get("dockerfile_name", "Dockerfile")
     docker_image_tag = f"{configs.get('container_image', 'openvino_bm_runner')}:{configs.get('image_tag', '1.0')}"
     timeout = configs.get("timeout", 300)
-    base_image = configs.get("base_image", "intel/dlstreamer:2025.1.2-ubuntu24")
     device = configs.get("device", "igpu")
+    device_categories = _normalize_device_categories(device)
+    device = device_categories[0]
     operation = configs.get("operation", "decode")
     codec = configs.get("codec", "H.264")
     bitrate = configs.get("bitrate", "4Mbps")
@@ -493,8 +531,8 @@ def test_media_pipelines(
     validate_system_requirements_from_configs(configs)
 
     # Step 2: Get available devices based on device categories
-    logger.info(f"Configured device categories: {device}")
-    device_dict = get_available_devices_by_category(device_categories=device)
+    logger.info(f"Configured device categories: {device_categories}")
+    device_dict = get_available_devices_by_category(device_categories=device_categories)
 
     logger.debug(f"Available devices: {device_dict}")
     if not device_dict:
@@ -538,8 +576,73 @@ def test_media_pipelines(
     try:
         # Step 3: Prepare test environment
         def prepare_assets():
+            # Access outer scope variables
+            nonlocal device
+
+            # Build 1: Get FW custom device-specific images from dlstreamer preparation
+            from esq.suites.ai.vision.src.dlstreamer.preparation import (
+                prepare_assets as prepare_dlstreamer_assets,
+            )
+
+            test_dir_abs = os.path.dirname(os.path.abspath(__file__))
+            # Navigate to ai/vision to access dlstreamer src
+            ai_vision_dir = os.path.join(test_dir_abs, "..", "..", "ai", "vision")
+            src_dir = os.path.join(ai_vision_dir, "src")
+
+            # Setup models/videos dirs for dlstreamer prep
+            core_data_dir_tainted = os.environ.get("CORE_DATA_DIR", os.path.join(os.getcwd(), "esq_data"))
+            core_data_dir = "".join(c for c in core_data_dir_tainted)
+            prep_models_dir = os.path.join(core_data_dir, "data", "ai", "vision", "models")
+            prep_videos_dir = os.path.join(core_data_dir, "data", "ai", "vision", "videos")
+
+            logger.info("Build 1: Preparing FW custom device-specific DLStreamer images...")
+            dlstreamer_result = prepare_dlstreamer_assets(
+                configs=configs,
+                models_dir=prep_models_dir,
+                videos_dir=prep_videos_dir,
+                src_dir=src_dir,
+                docker_client=docker_client,
+                docker_image_tag_analyzer="test-dlstreamer-analyzer:latest",
+                docker_image_tag_utils="test-dlstreamer-utils:latest",
+                docker_container_prefix="test",
+            )
+
+            fw_container_config = dlstreamer_result.metadata.get("container_config", {})
+            logger.info(f"FW custom images available: {list(fw_container_config.keys())}")
+
+            # Build 2: Select FW custom image based on device
+            fw_custom_base_image = fw_container_config.get("analyzer_image", "intel/dlstreamer:2025.2.0-ubuntu24")
+
+            # Check device parameter
+            device_lower = device.lower()
+            if "npu" in device_lower:
+                fw_custom_base_image = fw_container_config.get(
+                    "npu_analyzer_image",
+                    fw_container_config.get("analyzer_image", "intel/dlstreamer:2025.2.0-ubuntu24")
+                )
+                logger.info("Detected NPU device, using NPU custom image")
+            elif device_lower.startswith("gpu"):
+                # Check for discrete GPU
+                from sysagent.utils.system.hardware import collect_hardware_info
+                hardware_info = collect_hardware_info()
+                gpu_info = hardware_info.get("gpu", {})
+                is_discrete = any(
+                    gpu.get("is_discrete", False) for gpu in gpu_info.get("devices", [])
+                )
+                if is_discrete:
+                    fw_custom_base_image = fw_container_config.get(
+                        "dgpu_analyzer_image",
+                        fw_container_config.get("analyzer_image", "intel/dlstreamer:2025.2.0-ubuntu24")
+                    )
+                    logger.info("Detected discrete GPU, using dGPU custom image")
+
+            logger.info(f"Using FW image as base for media pipeline test: {fw_custom_base_image}")
+
             docker_nocache = configs.get("docker_nocache", False)
             logger.info(f"Docker build cache setting: nocache={docker_nocache}")
+            logger.info(
+                f"Build 2: Building test suite image '{docker_image_tag}' on top of FW custom image..."
+            )
 
             # Download video files from GitHub
             logger.info("Downloading media benchmark video files from GitHub...")
@@ -563,23 +666,20 @@ def test_media_pipelines(
             logger.info("Preparing Docker build with extended build context...")
 
             test_file_dir = Path(__file__).resolve().parent
-            # Set build context to esq/ directory (3 levels up from test file)
-            # test_file_dir = .../src/esq/suites/media/performance/
-            # esq_dir = .../src/esq/
-            esq_dir = test_file_dir.parent.parent.parent
 
             # Dockerfile path relative to esq/ build context
             relative_dockerfile = "suites/media/performance/src/containers/media_benchmark/Dockerfile"
 
-            logger.debug(f"Build context directory: {esq_dir}")
+            build_context_dir = _resolve_esq_build_context(test_file_dir, relative_dockerfile)
+            logger.debug(f"Build context directory: {build_context_dir}")
             logger.debug(f"Relative Dockerfile path: {relative_dockerfile}")
 
             build_args = {
-                "COMMON_BASE_IMAGE": f"{base_image}",
+                "COMMON_BASE_IMAGE": fw_custom_base_image,  # FW custom image
             }
 
             docker_client.build_image(
-                path=str(esq_dir),
+                path=str(build_context_dir),
                 tag=docker_image_tag,
                 nocache=docker_nocache,
                 dockerfile=relative_dockerfile,
@@ -614,7 +714,7 @@ def test_media_pipelines(
             f"Check logs for full stack trace and error details."
         )
         logger.error(failure_message, exc_info=True)
-        logger.debug(f"Preparation context - Docker dir: {docker_dir}, Base image: {base_image}")
+        logger.debug(f"Preparation context - Docker dir: {docker_dir}")
         # Don't raise yet - create N/A result below
 
     try:
@@ -629,7 +729,7 @@ def test_media_pipelines(
             f"Check logs for detailed error and verify Docker daemon is running."
         )
         logger.error(failure_message, exc_info=True)
-        logger.debug(f"Preparation failed - Docker dir: {docker_dir}, Base image: {base_image}, Timeout: {timeout}s")
+        logger.debug(f"Preparation failed - Docker dir: {docker_dir}, Timeout: {timeout}s")
 
     # If preparation failed, return N/A metrics immediately
     if test_failed:

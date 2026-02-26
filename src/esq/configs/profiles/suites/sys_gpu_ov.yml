@@ -23,7 +23,6 @@ params:
   container_image: "ai_freq_measure"
   image_tag: "1.0"
   dockerfile_name: "Dockerfile"
-  base_image: "intel/dlstreamer:2025.1.2-ubuntu24"
 
 suites:
   - name: "system"

@@ -271,7 +271,7 @@ dGPU_Dev_IDs = [
 Ref_Platform_Bcmk_Settings = {
     "1VDBOX": {
         "description": "Platforms with 1VD Box iGPU",
-        "samples": "i5-12400 (16G Mem)",
+        "samples": "i5-13600 (32G Mem)",
     },
     "2VDBOX": {
         "description": "Platforms with 2VD Box iGPU",

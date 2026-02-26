@@ -75,7 +75,6 @@ def test_memory_stream(
 
     # Ensure timeout is an integer (Converting in case YAML has string)
     timeout = int(configs.get("timeout", 300))
-    base_image = configs.get("base_image", "intel/dlstreamer:2025.1.2-dev-ubuntu24")
 
     # Step 1: Validate system requirements (CPU, memory, storage, Docker, etc.)
     validate_system_requirements_from_configs(configs)
@@ -105,12 +104,49 @@ def test_memory_stream(
         # Step 2: Prepare test environment
         def prepare_assets():
             # Access outer scope variables
-            nonlocal base_image, docker_image_tag, dockerfile_name, docker_dir, timeout
+            nonlocal docker_image_tag, dockerfile_name, docker_dir, timeout
+
+            # Build 1: Get FW custom device-specific images from dlstreamer preparation
+            from esq.suites.ai.vision.src.dlstreamer.preparation import (
+                prepare_assets as prepare_dlstreamer_assets,
+            )
+
+            test_dir_abs = os.path.dirname(os.path.abspath(__file__))
+            # Navigate to ai/vision to access dlstreamer src
+            ai_vision_dir = os.path.join(test_dir_abs, "..", "..", "ai", "vision")
+            src_dir = os.path.join(ai_vision_dir, "src")
+            models_dir = os.path.join(data_dir, "models")
+            videos_dir = os.path.join(data_dir, "videos")
+
+            logger.info("Build 1: Preparing FW custom device-specific DLStreamer images...")
+            dlstreamer_result = prepare_dlstreamer_assets(
+                configs=configs,
+                models_dir=models_dir,
+                videos_dir=videos_dir,
+                src_dir=src_dir,
+                docker_client=docker_client,
+                docker_image_tag_analyzer="test-dlstreamer-analyzer:latest",
+                docker_image_tag_utils="test-dlstreamer-utils:latest",
+                docker_container_prefix="test",
+            )
+
+            fw_container_config = dlstreamer_result.metadata.get("container_config", {})
+            logger.info(f"FW custom images available: {list(fw_container_config.keys())}")
+
+            # Build 2: Select FW custom image based on device
+            fw_custom_base_image = fw_container_config.get("analyzer_image", "intel/dlstreamer:2025.2.0-ubuntu24")
+            logger.info(f"Using FW image as base for memory test: {fw_custom_base_image}")
 
             docker_nocache = configs.get("docker_nocache", False)
             logger.info(f"Docker build cache setting: nocache={docker_nocache}")
+            logger.info(
+                f"Build 2: Building test suite image '{docker_image_tag}' on top of FW custom image..."
+            )
 
-            build_args = {"COMMON_BASE_IMAGE": f"{base_image}", "STREAM_GIT_URL": f"{stream_url}"}
+            build_args = {
+                "COMMON_BASE_IMAGE": fw_custom_base_image,  # FW custom image
+                "STREAM_GIT_URL": f"{stream_url}",
+            }
 
             build_result = docker_client.build_image(
                 path=docker_dir,
@@ -155,7 +191,7 @@ def test_memory_stream(
             f"Check logs for full stack trace and error details."
         )
         logger.error(failure_message, exc_info=True)
-        logger.debug(f"Preparation context - Docker dir: {docker_dir}, Base image: {base_image}")
+        logger.debug(f"Preparation context - Docker dir: {docker_dir}")
         # Don't raise yet - create N/A result below
 
     try:
@@ -170,7 +206,7 @@ def test_memory_stream(
             f"Check logs for detailed error and verify Docker daemon is running."
         )
         logger.error(failure_message, exc_info=True)
-        logger.debug(f"Preparation failed - Docker dir: {docker_dir}, Base image: {base_image}, Timeout: {timeout}s")
+        logger.debug(f"Preparation failed - Docker dir: {docker_dir}, Timeout: {timeout}s")
 
     # If preparation failed, return N/A metrics immediately
     if test_failed:

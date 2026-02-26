@@ -306,18 +306,18 @@ class VAHeavyBenchmark(BaseVideoAnalyticsBenchmark):
 
         if device_type == "iGPU":
             self.config = {
-                "ref_stream_list": [4],  # Placeholder reference values
-                "ref_platform": "Heavy iGPU Reference",
+                "ref_stream_list": [5,4,4,4,8],  # Placeholder reference values
+                "ref_platform": "ARL Ultra 9 285K (32G Mem)",
                 "ref_gpu_freq_list": [-1],
                 "ref_pkg_power_list": [-1],
                 "models": [model_combo],
                 "modes": self.get_mode_and_compute_devices(available_devices, va_heavy_executed_modes),
                 "mode_ref_streams": {
-                    "Mode 0": 2,  # CPU/CPU/CPU - heavy workload
+                    "Mode 0": 5,  # CPU/CPU/CPU - heavy workload
                     "Mode 2": 4,  # iGPU/iGPU/iGPU
-                    "Mode 3": 5,  # iGPU/iGPU/NPU
-                    "Mode 4": 5,  # iGPU/NPU/NPU
-                    "Mode 7": 6,  # iGPU + NPU concurrent
+                    "Mode 3": 4,  # iGPU/iGPU/NPU
+                    "Mode 4": 4,  # iGPU/NPU/NPU
+                    "Mode 7": 8,  # iGPU + NPU concurrent
                 },
                 "mode_ref_gpu_freq": {},
                 "mode_ref_pkg_power": {},
@@ -325,17 +325,17 @@ class VAHeavyBenchmark(BaseVideoAnalyticsBenchmark):
 
         elif device_type == "dGPU":
             self.config = {
-                "ref_stream_list": [8],  # Placeholder reference values
-                "ref_platform": "Heavy dGPU Reference",
+                "ref_stream_list": [14,14,4,28],  # Placeholder reference values
+                "ref_platform": "Intel Arc B580",
                 "ref_gpu_freq_list": [-1],
                 "ref_pkg_power_list": [-1],
                 "models": [model_combo],
                 "modes": self.get_mode_and_compute_devices(available_devices, va_heavy_executed_modes),
                 "mode_ref_streams": {
-                    "Mode 1": 8,  # dGPU/dGPU/dGPU
-                    "Mode 5": 10,  # dGPU/dGPU/NPU
-                    "Mode 6": 10,  # dGPU/NPU/NPU
-                    "Mode 8": 12,  # dGPU + NPU concurrent
+                    "Mode 1": 14,  # dGPU/dGPU/dGPU
+                    "Mode 5": 14,  # dGPU/dGPU/NPU
+                    "Mode 6": 4,  # dGPU/NPU/NPU
+                    "Mode 8": 28,  # dGPU + NPU concurrent
                 },
                 "mode_ref_gpu_freq": {},
                 "mode_ref_pkg_power": {},
@@ -343,14 +343,14 @@ class VAHeavyBenchmark(BaseVideoAnalyticsBenchmark):
 
         elif device_type == "CPU":
             self.config = {
-                "ref_stream_list": [2],
-                "ref_platform": "Heavy CPU Reference",
+                "ref_stream_list": [5],
+                "ref_platform": "ARL Ultra 9 285K (32G Mem)",
                 "ref_gpu_freq_list": [-1],
                 "ref_pkg_power_list": [-1],
                 "models": [model_combo],
                 "modes": self.get_mode_and_compute_devices(available_devices, va_heavy_executed_modes),
                 "mode_ref_streams": {
-                    "Mode 0": 2,  # CPU/CPU/CPU
+                    "Mode 0": 5,  # CPU/CPU/CPU
                 },
                 "mode_ref_gpu_freq": {},
                 "mode_ref_pkg_power": {},

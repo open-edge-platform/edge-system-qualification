@@ -52,7 +52,6 @@ params:
   # Container configuration
   container_image: "video_analytics_bm"
   image_tag: "1.0"
-  base_image: "intel/dlstreamer:2025.2.0-ubuntu24"
   dockerfile_name: "Dockerfile"
   
   # Test execution settings

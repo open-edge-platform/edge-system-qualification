@@ -162,9 +162,9 @@ class LPRBenchmark(BaseProxyPipelineBenchmark):
             if self.VDBOX == 1:
                 self.config = {
                     "ref_stream_list": [4, 7],
-                    "ref_platform": "i5-12400 (16G Mem)",
-                    "ref_gpu_freq_list": [-1, 1636.37],
-                    "ref_pkg_power_list": [-1, 11.96],
+                    "ref_platform": "i5-13600 (32G Mem)",
+                    "ref_gpu_freq_list": [-1, 1336.37],
+                    "ref_pkg_power_list": [-1, 36.1],
                     "models": ["yolov8_license_plate_detector+ch_PP-OCRv4_rec_infer"],
                     "modes": self.get_mode_and_compute_devices(available_devices, lpr_execd_modes),
                     # Mode-specific reference values for graph visualization
@@ -185,7 +185,7 @@ class LPRBenchmark(BaseProxyPipelineBenchmark):
             else:
                 if self.is_MTL:
                     self.config = {
-                        "ref_stream_list": [6, 15, 17, 17],
+                        "ref_stream_list": [6, 12, 13, 5],
                         "ref_platform": "MTL 165H (32G Mem)",
                         "ref_gpu_freq_list": [-1, 1153.45, 1177.11, 243.96],
                         "ref_pkg_power_list": [-1, 25.41, 26.23, 18.77],
@@ -195,9 +195,9 @@ class LPRBenchmark(BaseProxyPipelineBenchmark):
                         # MTL 165H has iGPU and NPU support
                         "mode_ref_streams": {
                             "Mode 0": 6,  # CPU/CPU/CPU
-                            "Mode 2": 15,  # iGPU/iGPU/iGPU
-                            "Mode 3": 17,  # iGPU/iGPU/NPU
-                            "Mode 4": 17,  # iGPU/NPU/NPU
+                            "Mode 2": 12,  # iGPU/iGPU/iGPU
+                            "Mode 3": 13,  # iGPU/iGPU/NPU
+                            "Mode 4": 5,  # iGPU/NPU/NPU
                         },
                         "mode_ref_gpu_freq": {
                             "Mode 0": -1,  # CPU/CPU/CPU
@@ -214,7 +214,7 @@ class LPRBenchmark(BaseProxyPipelineBenchmark):
                     }
                 else:
                     self.config = {
-                        "ref_stream_list": [5, 18],
+                        "ref_stream_list": [5, 12],
                         "ref_platform": "i7-1360p (16G Mem)",
                         "ref_gpu_freq_list": [-1, 1396.09],
                         "ref_pkg_power_list": [-1, 36.10],
@@ -224,7 +224,7 @@ class LPRBenchmark(BaseProxyPipelineBenchmark):
                         # Note: i7-1360p does not have NPU, so only CPU and iGPU modes
                         "mode_ref_streams": {
                             "Mode 0": 5,  # CPU/CPU/CPU
-                            "Mode 2": 18,  # iGPU/iGPU/iGPU
+                            "Mode 2": 12,  # iGPU/iGPU/iGPU
                         },
                         "mode_ref_gpu_freq": {
                             "Mode 0": -1,  # CPU/CPU/CPU

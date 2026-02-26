@@ -50,10 +50,10 @@ class SmartNVRBenchmark(BaseProxyPipelineBenchmark):
             if self.VDBOX == 1:
                 self.config = {
                     "compose_size": 4,
-                    "ref_stream_list": [10],
-                    "ref_gpu_freq_list": [735.93],
-                    "ref_pkg_power_list": [11.96],
-                    "ref_platform": "i5-12400 (16G Mem)",
+                    "ref_stream_list": [12,5,2],
+                    "ref_gpu_freq_list": [1039.58,1327.17,1312.96],
+                    "ref_pkg_power_list": [27.4,37.52,26.68],
+                    "ref_platform": "i5-13600 (32G Mem)",
                     "output_width": 1920,
                     "output_height": 1080,
                     "models": ["yolov5s-416"],
@@ -64,7 +64,7 @@ class SmartNVRBenchmark(BaseProxyPipelineBenchmark):
                 if self.is_MTL:
                     self.config = {
                         "compose_size": 5,
-                        "ref_stream_list": [18, 9, 3],
+                        "ref_stream_list": [13, 7, 2],
                         "ref_gpu_freq_list": [1034.29, 1285.81, 957.05],
                         "ref_pkg_power_list": [25.85, 26.98, 24.99],
                         "ref_platform": "MTL 165H (32G Mem)",
@@ -77,7 +77,7 @@ class SmartNVRBenchmark(BaseProxyPipelineBenchmark):
                 else:
                     self.config = {
                         "compose_size": 5,
-                        "ref_stream_list": [17, 9, 3],
+                        "ref_stream_list": [19, 9, 3],
                         "ref_gpu_freq_list": [1039.58, 1327.17, 1312.96],
                         "ref_pkg_power_list": [27.47, 37.52, 26.68],
                         "ref_platform": "i7-1360p (16G Mem)",

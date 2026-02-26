@@ -51,7 +51,12 @@ RUN mkdir -p /home/dlstreamer/output && \
 COPY  --chown=dlstreamer:dlstreamer requirements.txt ./
 
 # Install dependencies
-RUN pip install --no-cache-dir --break-system-packages -r requirements.txt
+RUN pip install \
+  --no-cache-dir \
+  --break-system-packages \
+  --retries 10 \
+  --timeout 120 \
+  -r requirements.txt
 
 USER dlstreamer
 ENV HOME=/home/dlstreamer

@@ -421,7 +421,6 @@ def test_ov_benchmark(
     dockerfile_name = configs.get("dockerfile_name", "Dockerfile")
     docker_image_tag = f"{configs.get('container_image', 'openvino_bm_runner')}:{configs.get('image_tag', '1.0')}"
     timeout = int(configs.get("timeout", 300))
-    base_image = configs.get("base_image", "intel/dlstreamer:2025.2.0-ubuntu24")
     devices = configs.get("devices", "igpu")
     model = configs.get("model", "resnet-50-tf")
     precision = configs.get("precision", "INT8")
@@ -576,10 +575,66 @@ def test_ov_benchmark(
 
             logger.info(f"Model ready: {model_path}")
 
-            # Build Docker container for benchmark execution
+            # Build 1: Get FW custom device-specific images from dlstreamer preparation
+            # This builds: DLS base → DLS + device drivers (NPU/dGPU/standard)
+            from esq.suites.ai.vision.src.dlstreamer.preparation import (
+                prepare_assets as prepare_dlstreamer_assets,
+            )
+
+            test_dir_abs = os.path.dirname(os.path.abspath(__file__))
+            src_dir = os.path.join(test_dir_abs, "src")
+            models_dir = os.path.join(data_dir, "models")
+            videos_dir = os.path.join(data_dir, "videos")
+
+            logger.info("Build 1: Preparing FW custom device-specific DLStreamer images...")
+            dlstreamer_result = prepare_dlstreamer_assets(
+                configs=configs,
+                models_dir=models_dir,
+                videos_dir=videos_dir,
+                src_dir=src_dir,
+                docker_client=docker_client,
+                docker_image_tag_analyzer="test-dlstreamer-analyzer:latest",
+                docker_image_tag_utils="test-dlstreamer-utils:latest",
+                docker_container_prefix="test",
+            )
+
+            fw_container_config = dlstreamer_result.metadata.get("container_config", {})
+            logger.info(f"FW custom images available: {list(fw_container_config.keys())}")
+
+            # Build 2: Select appropriate FW custom image based on test devices
+            # Determine which device-specific base image to use
+            fw_custom_base_image = None
+            if isinstance(devices, list):
+                # Check for NPU or dGPU in device list
+                if any("npu" in str(d).lower() for d in devices):
+                    fw_custom_base_image = fw_container_config.get("npu_analyzer_image")
+                    logger.info(f"Using FW NPU custom image: {fw_custom_base_image}")
+                elif any("dgpu" in str(d).lower() or "gpu." in str(d).lower() for d in devices):
+                    # Check if it's actually discrete GPU
+                    fw_custom_base_image = fw_container_config.get("dgpu_analyzer_image")
+                    if fw_custom_base_image:
+                        logger.info(f"Using FW dGPU custom image: {fw_custom_base_image}")
+            elif isinstance(devices, str):
+                if "npu" in devices.lower():
+                    fw_custom_base_image = fw_container_config.get("npu_analyzer_image")
+                    logger.info(f"Using FW NPU custom image: {fw_custom_base_image}")
+                elif "dgpu" in devices.lower():
+                    fw_custom_base_image = fw_container_config.get("dgpu_analyzer_image")
+                    logger.info(f"Using FW dGPU custom image: {fw_custom_base_image}")
+
+            # Fallback to standard analyzer image
+            if not fw_custom_base_image:
+                fw_custom_base_image = fw_container_config.get("analyzer_image", "intel/dlstreamer:2025.2.0-ubuntu24")
+                logger.info(f"Using FW standard image: {fw_custom_base_image}")
+
+            # Build Docker container for benchmark execution using FW custom image as base
             docker_nocache = configs.get("docker_nocache", False)
+            logger.info(
+                f"Build 2: Building test suite image '{docker_image_tag}' on top of FW custom image '{fw_custom_base_image}'..."
+            )
+
             build_args = {
-                "COMMON_BASE_IMAGE": f"{base_image}",
+                "COMMON_BASE_IMAGE": fw_custom_base_image,  # FW custom device-specific image
             }
 
             build_result = docker_client.build_image(
@@ -587,7 +642,7 @@ def test_ov_benchmark(
                 tag=docker_image_tag,
                 nocache=docker_nocache,
                 dockerfile=dockerfile_name,
-                buildargs=build_args,
+                buildargs=build_args,  # Pass FW custom image to test Dockerfile
             )
 
             container_config = {
@@ -635,7 +690,7 @@ def test_ov_benchmark(
             f"Check logs for full stack trace and error details."
         )
         logger.error(failure_message, exc_info=True)
-        logger.debug(f"Preparation context - Docker dir: {docker_dir}, Base image: {base_image}")
+        logger.debug(f"Preparation context - Docker dir: {docker_dir}")
 
     # If preparation failed, update existing results and exit
     if test_failed:

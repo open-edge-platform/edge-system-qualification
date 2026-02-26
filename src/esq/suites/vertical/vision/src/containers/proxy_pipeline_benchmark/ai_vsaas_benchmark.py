@@ -48,10 +48,10 @@ class AIVSaaSBenchmark(BaseProxyPipelineBenchmark):
             if self.VDBOX == 1:
                 # Reference values from i5-12400 benchmarking (1 VDBox)
                 self.config = {
-                    "ref_stream_list": [10, 4],
-                    "ref_gpu_freq_list": [858.21, 991.32],
-                    "ref_pkg_power_list": [93.39, 98.32],
-                    "ref_platform": "i5-12400 (16G Mem)",
+                    "ref_stream_list": [63,6,2],
+                    "ref_gpu_freq_list": [1251.51,1361.6,1437.98],
+                    "ref_pkg_power_list": [32.1,34.65,29.14],
+                    "ref_platform": "i5-13600 (32G Mem)",
                     "models": ["yolov5s-416", "yolov5m-416"],
                     "enc_flag": "rate-control=cbr bitrate=2000 target-usage=7",
                     "preproc_backend": "pre-process-backend=va-surface-sharing scale-method=fast",

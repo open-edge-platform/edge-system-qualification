@@ -304,8 +304,11 @@ def run_va_container(
     has_igpu = "true" if platform_info.get("has_igpu", False) else "false"
     cfg_file_arg = config_file if config_file and config_file != "none" else "none"
 
+    # Force entrypoint to bash because FW custom base images may define
+    # ENTRYPOINT to a Python CLI (e.g., main.py baseline/total). Without
+    # overriding entrypoint, command below is treated as CLI args and fails.
+    entrypoint = "/bin/bash"
     command = [
-        "bash",
         "./run_video_analytics_benchmark.sh",
         *device_args,
         display_output,
@@ -325,6 +328,7 @@ def run_va_container(
         result = docker_client.run_container(
             name=container_name,
             image=f"{image_name}:{image_tag}",
+            entrypoint=entrypoint,
             command=command,
             volumes=volumes,
             devices=container_devices,

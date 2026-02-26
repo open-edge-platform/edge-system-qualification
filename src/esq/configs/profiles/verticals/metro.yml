@@ -30,7 +30,6 @@ params:
   container_image: "proxy_pl_bm_runner"
   image_tag: "1.0"
   dockerfile_name: "Dockerfile"
-  base_image: "intel/dlstreamer:2025.1.2-ubuntu24"
 
 suites:
   - name: "vertical"

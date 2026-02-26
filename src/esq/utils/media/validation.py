@@ -108,6 +108,19 @@ IGPU_DEV_IDS = [
     "7D51",
     "7D67",
     "7D41",
+    # Panther Lake (Xe3)
+    "B080",
+    "B081",
+    "B082",
+    "B083",
+    "B084",
+    "B085",
+    "B086",
+    "B087",
+    "B08F",
+    "B090",
+    "B0A0",
+    "B0B0",
     # Raptor Lake
     "A720",  # RPL-P (ADDED)
     "A721",  # RPL-P (ADDED)
@@ -204,6 +217,19 @@ NPU_PLATFORM_DEV_IDS = [
     "6420",  # LNL
     "6422",  # LNL variant
     "64B0",  # LNL variant
+    # Panther Lake iGPU IDs
+    "B080",
+    "B081",
+    "B082",
+    "B083",
+    "B084",
+    "B085",
+    "B086",
+    "B087",
+    "B08F",
+    "B090",
+    "B0A0",
+    "B0B0",
 ]
 
 logger = logging.getLogger(__name__)

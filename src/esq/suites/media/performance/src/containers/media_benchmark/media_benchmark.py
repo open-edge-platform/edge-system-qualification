@@ -77,18 +77,18 @@ class MediaBenchmark(BaseDLBenchmark):
                 self.config = {
                     "Encode": {
                         "ref_stream_list": [10, 2, 14, 3],
-                        "ref_gpu_freq_list": [-1, -1, -1],
-                        "ref_pkg_power_list": [-1, -1, -1],
+                        "ref_gpu_freq_list": [-1, -1, -1, -1],
+                        "ref_pkg_power_list": [-1, -1, -1, -1],
                     },
                     "Decode": {
                         "ref_stream_list": [43, 10, 55, 14],
-                        "ref_gpu_freq_list": [-1, -1, -1],
-                        "ref_pkg_power_list": [-1, -1, -1],
+                        "ref_gpu_freq_list": [-1, -1, -1, -1],
+                        "ref_pkg_power_list": [-1, -1, -1, -1],
                     },
                     "Decode+Compose": {
                         "ref_stream_list": [10, 9, 16, 8],
-                        "ref_gpu_freq_list": [-1, -1, -1],
-                        "ref_pkg_power_list": [-1, -1, -1],
+                        "ref_gpu_freq_list": [-1, -1, -1, -1],
+                        "ref_pkg_power_list": [-1, -1, -1, -1],
                         "compose_size": 4,
                     },
                     "ref_platform": "i5-12400 (16G Mem)",
@@ -97,19 +97,19 @@ class MediaBenchmark(BaseDLBenchmark):
                 if self.is_MTL:
                     self.config = {
                         "Encode": {
-                            "ref_stream_list": [25, 5, 18, 3],
-                            "ref_gpu_freq_list": [-1, -1, -1],
-                            "ref_pkg_power_list": [-1, -1, -1],
+                            "ref_stream_list": [24, 8, 26, 6],
+                            "ref_gpu_freq_list": [1038.75, 1046.13, 1018.15, 1039.54],
+                            "ref_pkg_power_list": [2.74, 2.96, 2.82, 2.94],
                         },
                         "Decode": {
-                            "ref_stream_list": [77, 23, 107, 28],
-                            "ref_gpu_freq_list": [-1, -1, -1],
-                            "ref_pkg_power_list": [-1, -1, -1],
+                            "ref_stream_list": [56, 23, 66, 28],
+                            "ref_gpu_freq_list": [1049.57, 1047.67, 1037.63, 1050.03],
+                            "ref_pkg_power_list": [2.76, 2.98, 2.71, 3.0],
                         },
                         "Decode+Compose": {
                             "ref_stream_list": [17, 4, 17, 4],
-                            "ref_gpu_freq_list": [-1, -1, -1],
-                            "ref_pkg_power_list": [-1, -1, -1],
+                            "ref_gpu_freq_list": [-1, -1, -1, -1],
+                            "ref_pkg_power_list": [-1, -1, -1, -1],
                             "compose_size": 6,
                         },
                         "ref_platform": "MTL 165H (32G Mem)",
@@ -117,19 +117,19 @@ class MediaBenchmark(BaseDLBenchmark):
                 else:
                     self.config = {
                         "Encode": {
-                            "ref_stream_list": [17, 4, 27, 6],
-                            "ref_gpu_freq_list": [-1, -1, -1],
-                            "ref_pkg_power_list": [-1, -1, -1],
+                            "ref_stream_list": [15, 4, 27, 6],
+                            "ref_gpu_freq_list": [1492.86, 1486.61, 1496.28, 1499.63],
+                            "ref_pkg_power_list": [1.65, 2.21, 3.1, 3.56],
                         },
                         "Decode": {
-                            "ref_stream_list": [87, 22, 108, 27],
-                            "ref_gpu_freq_list": [-1, -1, -1],
-                            "ref_pkg_power_list": [-1, -1, -1],
+                            "ref_stream_list": [83, 21, 98, 27],
+                            "ref_gpu_freq_list": [1499.53, 2474.42, 1499.75, 1485.9],
+                            "ref_pkg_power_list": [0.92, 0.89, 1.23, 1.21],
                         },
                         "Decode+Compose": {
                             "ref_stream_list": [18, 14, 17, 12],
-                            "ref_gpu_freq_list": [-1, -1, -1],
-                            "ref_pkg_power_list": [-1, -1, -1],
+                            "ref_gpu_freq_list": [-1, -1, -1, -1],
+                            "ref_pkg_power_list": [-1, -1, -1, -1],
                             "compose_size": 6,
                         },
                         "ref_platform": "i7-1360P (16G Mem)",
@@ -138,18 +138,18 @@ class MediaBenchmark(BaseDLBenchmark):
             self.config = {
                 "Encode": {
                     "ref_stream_list": [29, 6, 36, 8],
-                    "ref_gpu_freq_list": [-1, -1, -1],
-                    "ref_pkg_power_list": [-1, -1, -1],
+                    "ref_gpu_freq_list": [-1, -1, -1, -1],
+                    "ref_pkg_power_list": [-1, -1, -1, -1],
                 },
                 "Decode": {
                     "ref_stream_list": [97, 25, 121, 31],
-                    "ref_gpu_freq_list": [-1, -1, -1],
-                    "ref_pkg_power_list": [-1, -1, -1],
+                    "ref_gpu_freq_list": [-1, -1, -1, -1],
+                    "ref_pkg_power_list": [-1, -1, -1, -1],
                 },
                 "Decode+Compose": {
                     "ref_stream_list": [18, 19, 18, 18],
-                    "ref_gpu_freq_list": [-1, -1, -1],
-                    "ref_pkg_power_list": [-1, -1, -1],
+                    "ref_gpu_freq_list": [-1, -1, -1, -1],
+                    "ref_pkg_power_list": [-1, -1, -1, -1],
                     "compose_size": 6,
                 },
                 "ref_platform": "Arc A380",
@@ -158,22 +158,51 @@ class MediaBenchmark(BaseDLBenchmark):
             self.config = {
                 "Encode": {
                     "ref_stream_list": [75, 39, 34, 13],
-                    "ref_gpu_freq_list": [-1, -1, -1],
-                    "ref_pkg_power_list": [-1, -1, -1],
+                    "ref_gpu_freq_list": [-1, -1, -1, -1],
+                    "ref_pkg_power_list": [-1, -1, -1, -1],
                 },
                 "Decode": {
                     "ref_stream_list": [458, 124, 325, 84],
-                    "ref_gpu_freq_list": [-1, -1, -1],
-                    "ref_pkg_power_list": [-1, -1, -1],
+                    "ref_gpu_freq_list": [-1, -1, -1, -1],
+                    "ref_pkg_power_list": [-1, -1, -1, -1],
                 },
                 "Decode+Compose": {
                     "ref_stream_list": [36, 36, 36, 36],
-                    "ref_gpu_freq_list": [-1, -1, -1],
-                    "ref_pkg_power_list": [-1, -1, -1],
+                    "ref_gpu_freq_list": [-1, -1, -1, -1],
+                    "ref_pkg_power_list": [-1, -1, -1, -1],
                     "compose_size": 6,
                 },
                 "ref_platform": "Xeon(R) Gold 6430 (512G Mem)",
             }
+
+    def _get_reference_index(self, codec, resolution):
+        """Map codec/resolution to reference index in a stable order.
+
+        Order matches configured reference lists:
+        [h264-1080p, h264-4K, h265-1080p, h265-4K]
+        """
+        try:
+            codec_index = self.codecs.index(codec)
+            resolution_index = self.resolutions.index(resolution)
+            return codec_index * len(self.resolutions) + resolution_index
+        except ValueError:
+            self.logger.warning(
+                "Unknown codec/resolution combination for reference mapping: "
+                f"codec={codec}, resolution={resolution}. Falling back to index 0"
+            )
+            return 0
+
+    def _get_reference_value(self, task_name, list_name, index, default_value=-1):
+        """Safely get reference value from task config list by index."""
+        values = self.config.get(task_name, {}).get(list_name, [])
+        if 0 <= index < len(values):
+            return values[index]
+
+        self.logger.warning(
+            f"Reference list '{list_name}' index {index} out of range "
+            f"(len={len(values)}) for task '{task_name}'. Using default {default_value}"
+        )
+        return default_value
 
     def igpu_specified(self, codec):
         if self.device == "iGPU":
@@ -319,7 +348,6 @@ class MediaBenchmark(BaseDLBenchmark):
             max_streams = self.config[self.task]["compose_size"] ** 2
         else:
             max_streams = -1
-        ref_id = 0
 
         # Filter codecs if specified
         codecs_to_test = [filter_codec] if filter_codec else self.codecs
@@ -365,10 +393,15 @@ class MediaBenchmark(BaseDLBenchmark):
                     )
                     continue
 
-                cur_ref_value = self.config[self.task]["ref_stream_list"][ref_id]
+                ref_index = self._get_reference_index(codec, res)
+                cur_ref_value = self._get_reference_value(self.task, "ref_stream_list", ref_index, default_value=0)
                 # Get reference values from config (will be overwritten with actual telemetry data)
-                cur_ref_gpu_freq = self.config[self.task]["ref_gpu_freq_list"][ref_id]
-                cur_ref_pkg_power = self.config[self.task]["ref_pkg_power_list"][ref_id]
+                cur_ref_gpu_freq = self._get_reference_value(
+                    self.task, "ref_gpu_freq_list", ref_index, default_value=-1
+                )
+                cur_ref_pkg_power = self._get_reference_value(
+                    self.task, "ref_pkg_power_list", ref_index, default_value=-1
+                )
 
                 self.telemetry_file = (
                     f"{self.telemetry_file_prefix}_{self.task}_{codec}_{cur_bitrate}_{res}_{self.device}.result"
@@ -410,7 +443,6 @@ class MediaBenchmark(BaseDLBenchmark):
                 self.logger.info(
                     f"Media {self.task} Benchmark execution [Input Codec: {codec}], Bitrate: {cur_bitrate}, Resolution: {res}, Device: {self.device} finished in {duration} seconds"
                 )
-                ref_id += 1
 
 
 OUTPUT_DIR = "/home/dlstreamer/output"

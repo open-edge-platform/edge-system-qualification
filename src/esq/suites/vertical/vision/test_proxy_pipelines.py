@@ -32,6 +32,38 @@ logger = logging.getLogger(__name__)
 test_container_path = "src/containers/proxy_pipeline_benchmark/"
 
 
+def _normalize_device_categories(device_value, default: str = "igpu") -> list[str]:
+    if isinstance(device_value, str):
+        categories = [device_value]
+    elif isinstance(device_value, (list, tuple, set)):
+        categories = [str(category) for category in device_value]
+    elif device_value is None:
+        categories = [default]
+    else:
+        categories = [str(device_value)]
+
+    normalized = [category.strip().lower() for category in categories if str(category).strip()]
+    return normalized if normalized else [default]
+
+
+def _resolve_esq_build_context(test_file_dir: Path, relative_dockerfile: str) -> Path:
+    candidate_paths = [
+        test_file_dir.parents[2],
+        Path.cwd() / "src" / "esq",
+        Path.cwd() / "esq",
+    ]
+
+    for candidate in candidate_paths:
+        dockerfile_path = candidate / relative_dockerfile
+        if candidate.is_dir() and dockerfile_path.is_file():
+            return candidate
+
+    raise FileNotFoundError(
+        f"Unable to resolve Docker build context for '{relative_dockerfile}'. "
+        f"Checked: {[str(path) for path in candidate_paths]}"
+    )
+
+
 def _create_proxy_pipeline_metrics(suite_name: str, value: str = "N/A", unit: Optional[str] = None) -> dict:
     """
     Create proxy pipeline performance metrics dictionary based on suite type.
@@ -676,8 +708,11 @@ def _run_proxy_pipeline_container(
     has_igpu = "true" if platform_info.get("has_igpu", False) else "false"
     cfg_file_arg = config_file if config_file and config_file != "none" else "none"
 
+    # Force entrypoint to bash because FW custom base images may define
+    # ENTRYPOINT to a Python CLI (e.g., main.py baseline/total). Without
+    # overriding entrypoint, command below is treated as CLI args and fails.
+    entrypoint = "/bin/bash"
     command = [
-        "bash",
         "./run_proxy_pipeline_benchmark_parallel.sh",
         *device_args,
         display_output,
@@ -698,6 +733,7 @@ def _run_proxy_pipeline_container(
         result = docker_client.run_container(
             name=container_name,
             image=f"{image_name}:{image_tag}",
+            entrypoint=entrypoint,
             command=command,
             volumes=volumes,
             devices=container_devices,
@@ -759,8 +795,9 @@ def test_proxy_pipelines(
     dockerfile_name = configs.get("dockerfile_name", "Dockerfile")
     docker_image_tag = f"{configs.get('container_image', 'proxy_pl_bm_runner')}:{configs.get('image_tag', '1.0')}"
     timeout = int(configs.get("timeout", 300))
-    base_image = configs.get("base_image", "intel/dlstreamer:2025.1.2-ubuntu24")
     devices = configs.get("devices", "igpu")
+    device_categories = _normalize_device_categories(devices)
+    devices = ",".join(device_categories)
 
     # Setup
     test_dir = os.path.dirname(os.path.abspath(__file__))
@@ -873,8 +910,8 @@ def test_proxy_pipelines(
     validate_system_requirements_from_configs(configs)
 
     # Step 2: Get available devices based on device categories
-    logger.info(f"Configured device categories: {devices}")
-    device_dict = get_available_devices_by_category(device_categories=devices)
+    logger.info(f"Configured device categories: {device_categories}")
+    device_dict = get_available_devices_by_category(device_categories=device_categories)
 
     logger.debug(f"Available devices: {device_dict}")
 
@@ -980,10 +1017,72 @@ def test_proxy_pipelines(
         # Step 3: Prepare test environment
         def prepare_assets():
             # Access outer scope variables
-            nonlocal base_image, docker_image_tag, dockerfile_name, docker_dir, timeout
+            nonlocal devices, docker_image_tag, dockerfile_name, docker_dir, timeout
+
+            # Build 1: Get FW custom device-specific images from dlstreamer preparation
+            from esq.suites.ai.vision.src.dlstreamer.preparation import (
+                prepare_assets as prepare_dlstreamer_assets,
+            )
+
+            test_dir_abs = os.path.dirname(os.path.abspath(__file__))
+            # Navigate to ai/vision to access dlstreamer src
+            ai_vision_dir = os.path.join(test_dir_abs, "..", "..", "ai", "vision")
+            src_dir = os.path.join(ai_vision_dir, "src")
+
+            # Setup models/videos dirs for dlstreamer prep
+            core_data_dir_tainted = os.environ.get("CORE_DATA_DIR", os.path.join(os.getcwd(), "esq_data"))
+            core_data_dir = "".join(c for c in core_data_dir_tainted)
+            prep_models_dir = os.path.join(core_data_dir, "data", "ai", "vision", "models")
+            prep_videos_dir = os.path.join(core_data_dir, "data", "ai", "vision", "videos")
+
+            logger.info("Build 1: Preparing FW custom device-specific DLStreamer images...")
+            dlstreamer_result = prepare_dlstreamer_assets(
+                configs=configs,
+                models_dir=prep_models_dir,
+                videos_dir=prep_videos_dir,
+                src_dir=src_dir,
+                docker_client=docker_client,
+                docker_image_tag_analyzer="test-dlstreamer-analyzer:latest",
+                docker_image_tag_utils="test-dlstreamer-utils:latest",
+                docker_container_prefix="test",
+            )
+
+            fw_container_config = dlstreamer_result.metadata.get("container_config", {})
+            logger.info(f"FW custom images available: {list(fw_container_config.keys())}")
+
+            # Build 2: Select FW custom image based on devices
+            fw_custom_base_image = fw_container_config.get("analyzer_image", "intel/dlstreamer:2025.2.0-ubuntu24")
+
+            # Check if any device is NPU or dGPU
+            devices_lower = [d.lower() for d in device_categories]
+            if any("npu" in d for d in devices_lower):
+                fw_custom_base_image = fw_container_config.get(
+                    "npu_analyzer_image",
+                    fw_container_config.get("analyzer_image", "intel/dlstreamer:2025.2.0-ubuntu24")
+                )
+                logger.info("Detected NPU in device list, using NPU custom image")
+            elif any(d.startswith("gpu") for d in devices_lower):
+                # Check for discrete GPU
+                from sysagent.utils.system.hardware import collect_hardware_info
+                hardware_info = collect_hardware_info()
+                gpu_info = hardware_info.get("gpu", {})
+                is_discrete = any(
+                    gpu.get("is_discrete", False) for gpu in gpu_info.get("devices", [])
+                )
+                if is_discrete:
+                    fw_custom_base_image = fw_container_config.get(
+                        "dgpu_analyzer_image",
+                        fw_container_config.get("analyzer_image", "intel/dlstreamer:2025.2.0-ubuntu24")
+                    )
+                    logger.info("Detected discrete GPU, using dGPU custom image")
+
+            logger.info(f"Using FW image as base for proxy pipeline test: {fw_custom_base_image}")
 
             docker_nocache = configs.get("docker_nocache", False)
             logger.info(f"Docker build cache setting: nocache={docker_nocache}")
+            logger.info(
+                f"Build 2: Building test suite image '{docker_image_tag}' on top of FW custom image..."
+            )
 
             # Validate platform and detect device types using Python validation
             logger.info("Validating platform configuration...")
@@ -998,24 +1097,20 @@ def test_proxy_pipelines(
             logger.info("Preparing Docker build with extended build context...")
 
             test_file_dir = Path(__file__).resolve().parent
-            # Set build context to esq/ directory (3 levels up from test file)
-            # test_file_dir = .../src/esq/suites/vertical/vision/
-            # esq_dir = .../src/esq/
-            esq_dir = test_file_dir.parent.parent.parent
 
             # Dockerfile path relative to esq/ build context
             relative_dockerfile = "suites/vertical/vision/src/containers/proxy_pipeline_benchmark/Dockerfile"
 
-            logger.debug(f"Build context directory: {esq_dir}")
+            build_context_dir = _resolve_esq_build_context(test_file_dir, relative_dockerfile)
+            logger.debug(f"Build context directory: {build_context_dir}")
             logger.debug(f"Relative Dockerfile path: {relative_dockerfile}")
 
-            # Build arguments
             build_args = {
-                "COMMON_BASE_IMAGE": f"{base_image}",
+                "COMMON_BASE_IMAGE": fw_custom_base_image,  # FW custom image
             }
 
             build_result = docker_client.build_image(
-                path=str(esq_dir),
+                path=str(build_context_dir),
                 tag=docker_image_tag,
                 nocache=docker_nocache,
                 dockerfile=relative_dockerfile,
@@ -1061,7 +1156,7 @@ def test_proxy_pipelines(
             f"Check logs for full stack trace and error details."
         )
         logger.error(failure_message, exc_info=True)
-        logger.debug(f"Preparation context - Docker dir: {docker_dir}, Base image: {base_image}")
+        logger.debug(f"Preparation context - Docker dir: {docker_dir}")
 
         # Attach traceback to Allure report
         try:
@@ -1089,7 +1184,7 @@ def test_proxy_pipelines(
             f"Check logs for detailed error and verify Docker daemon is running."
         )
         logger.error(failure_message, exc_info=True)
-        logger.debug(f"Preparation failed - Docker dir: {docker_dir}, Base image: {base_image}, Timeout: {timeout}s")
+        logger.debug(f"Preparation failed - Docker dir: {docker_dir}, Timeout: {timeout}s")
 
     # If preparation failed, return N/A metrics immediately
     if test_failed:

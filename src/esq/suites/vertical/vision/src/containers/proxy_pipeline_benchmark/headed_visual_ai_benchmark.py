@@ -50,10 +50,10 @@ class HeadedVisualAIBenchmark(BaseProxyPipelineBenchmark):
             if self.VDBOX == 1:
                 self.config = {
                     "compose_size": 3,
-                    "ref_stream_list": [9],
-                    "ref_gpu_freq_list": [728.11],
-                    "ref_pkg_power_list": [11.93],
-                    "ref_platform": "i5-12400 (16G Mem)",
+                    "ref_stream_list": [12,6,2],
+                    "ref_gpu_freq_list": [1041.3,1335.19,1359.42],
+                    "ref_pkg_power_list": [29.29,36,86,30.95],
+                    "ref_platform": "i5-13600 (32G Mem)",
                     "output_width": 1920,
                     "output_height": 1080,
                     "models": ["yolov5s-416"],
@@ -64,7 +64,7 @@ class HeadedVisualAIBenchmark(BaseProxyPipelineBenchmark):
                 if self.is_MTL:
                     self.config = {
                         "compose_size": 4,
-                        "ref_stream_list": [13, 10, 5],
+                        "ref_stream_list": [14, 9, 3],
                         "ref_gpu_freq_list": [1062.86, 1070.77, 781.55],
                         "ref_pkg_power_list": [29.08, 28.00, 27.96],
                         "ref_platform": "MTL 165H (32G Mem)",
@@ -77,7 +77,7 @@ class HeadedVisualAIBenchmark(BaseProxyPipelineBenchmark):
                 else:
                     self.config = {
                         "compose_size": 4,
-                        "ref_stream_list": [16, 15, 4],
+                        "ref_stream_list": [16, 10, 3],
                         "ref_gpu_freq_list": [1041.30, 1335.19, 1359.42],
                         "ref_pkg_power_list": [29.29, 36.86, 30.95],
                         "ref_platform": "i7-1360p (16G Mem)",

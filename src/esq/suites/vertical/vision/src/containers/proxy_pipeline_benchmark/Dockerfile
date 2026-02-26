@@ -11,13 +11,28 @@ ARG IS_XEON_PLATFORM
 USER root
 
 RUN set -e -o pipefail; \
+    apt-get update -y; \
+    COMMON_PKGS="sudo numactl x11-utils libgsl27 libasound2-plugins libasound2-data"; \
+    if apt-cache show libxmlrpc-core-c3 >/dev/null 2>&1; then \
+        COMMON_PKGS="$COMMON_PKGS libxmlrpc-core-c3"; \
+    else \
+        echo "[WARN] libxmlrpc-core-c3 is not available in apt repositories; continuing without it"; \
+    fi; \
     if [ "$IS_XEON_PLATFORM" = "true" ] ; then \
-        apt-get update && apt-get install --no-install-recommends sudo numactl libgsl27 libasound2-plugins libasound2-data libxmlrpc-core-c3 -y; \
+        apt-get install --no-install-recommends -y $COMMON_PKGS; \
         echo "dlstreamer ALL=(ALL) NOPASSWD: /usr/bin/ln,/usr/local/bin/ln" | \
         tee /etc/sudoers.d/user-conf && \
         chmod 0440 /etc/sudoers.d/user-conf ; \
     else \
-        apt-get update -y && apt-get install --no-install-recommends -y sudo intel-gpu-tools xpu-smi numactl libgsl27 libasound2-plugins libasound2-data libxmlrpc-core-c3; \
+        GPU_PKGS=""; \
+        for pkg in intel-gpu-tools xpu-smi; do \
+            if apt-cache show "$pkg" >/dev/null 2>&1; then \
+                GPU_PKGS="$GPU_PKGS $pkg"; \
+            else \
+                echo "[WARN] $pkg is not available in apt repositories; continuing without it"; \
+            fi; \
+        done; \
+        apt-get install --no-install-recommends -y $COMMON_PKGS $GPU_PKGS; \
         set -e -o pipefail && \
             echo "dlstreamer ALL=(ALL) NOPASSWD: /usr/bin/intel_gpu_top,/usr/bin/rm,/usr/bin/xpu-smi,/usr/local/bin/intel_gpu_top,/usr/local/bin/xpu-smi" | \
             tee /etc/sudoers.d/user-conf && \

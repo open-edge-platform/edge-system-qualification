@@ -132,7 +132,6 @@ def test_va_light(
     dockerfile_name = configs.get("dockerfile_name", "Dockerfile")
     docker_image_tag = f"{configs.get('container_image', 'va_light_bm')}:{configs.get('image_tag', '1.0')}"
     timeout = int(configs.get("timeout", 600))
-    base_image = configs.get("base_image", "intel/dlstreamer:2025.2.0-ubuntu24")
     devices = configs.get("devices", "igpu")
 
     # Setup
@@ -212,7 +211,7 @@ def test_va_light(
     try:
         # Step 3: Prepare test environment
         def prepare_assets():
-            nonlocal base_image, docker_image_tag, dockerfile_name, docker_dir, timeout
+            nonlocal docker_image_tag, dockerfile_name, docker_dir, timeout
 
             docker_nocache = configs.get("docker_nocache", False)
             logger.info(f"Docker build cache setting: nocache={docker_nocache}")
@@ -242,8 +241,54 @@ def test_va_light(
             # Build Docker image if Dockerfile exists
             dockerfile_path = os.path.join(docker_dir, dockerfile_name)
             if os.path.exists(dockerfile_path):
+                # Build 1: Get FW custom device-specific images from dlstreamer preparation
+                from esq.suites.ai.vision.src.dlstreamer.preparation import (
+                    prepare_assets as prepare_dlstreamer_assets,
+                )
+
+                src_dir = str(Path(__file__).resolve().parent.parent)
+
+                logger.info("Build 1: Preparing FW custom device-specific DLStreamer images...")
+                dlstreamer_result = prepare_dlstreamer_assets(
+                    configs=configs,
+                    models_dir=models_path,
+                    videos_dir=videos_path,
+                    src_dir=src_dir,
+                    docker_client=docker_client,
+                    docker_image_tag_analyzer="test-dlstreamer-analyzer:latest",
+                    docker_image_tag_utils="test-dlstreamer-utils:latest",
+                    docker_container_prefix="test",
+                )
+
+                fw_container_config = dlstreamer_result.metadata.get("container_config", {})
+                logger.info(f"FW custom images available: {list(fw_container_config.keys())}")
+
+                # Build 2: Select appropriate FW custom image based on test devices
+                fw_custom_base_image = None
+                if isinstance(devices, list):
+                    if any("npu" in str(device).lower() for device in devices):
+                        fw_custom_base_image = fw_container_config.get("npu_analyzer_image")
+                        logger.info(f"Using FW NPU custom image: {fw_custom_base_image}")
+                    elif any("dgpu" in str(device).lower() or "gpu." in str(device).lower() for device in devices):
+                        fw_custom_base_image = fw_container_config.get("dgpu_analyzer_image")
+                        if fw_custom_base_image:
+                            logger.info(f"Using FW dGPU custom image: {fw_custom_base_image}")
+                elif isinstance(devices, str):
+                    if "npu" in devices.lower():
+                        fw_custom_base_image = fw_container_config.get("npu_analyzer_image")
+                        logger.info(f"Using FW NPU custom image: {fw_custom_base_image}")
+                    elif "dgpu" in devices.lower():
+                        fw_custom_base_image = fw_container_config.get("dgpu_analyzer_image")
+                        logger.info(f"Using FW dGPU custom image: {fw_custom_base_image}")
+
+                if not fw_custom_base_image:
+                    fw_custom_base_image = fw_container_config.get(
+                        "analyzer_image", "intel/dlstreamer:2025.2.0-ubuntu24"
+                    )
+                    logger.info(f"Using FW standard image: {fw_custom_base_image}")
+
                 build_args = {
-                    "COMMON_BASE_IMAGE": f"{base_image}",
+                    "COMMON_BASE_IMAGE": fw_custom_base_image,
                 }
 
                 build_result = docker_client.build_image(

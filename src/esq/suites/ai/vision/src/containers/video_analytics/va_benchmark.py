@@ -291,7 +291,7 @@ class VABenchmark(BaseVideoAnalyticsBenchmark):
         if device_type == "iGPU":
             if self.VDBOX == 1:
                 self.config = {
-                    "ref_stream_list": [7],
+                    "ref_stream_list": [4,7],
                     "ref_platform": "i5-12400 (16G Mem)",
                     "ref_gpu_freq": -1,
                     "ref_pkg_power": -1,
@@ -305,59 +305,59 @@ class VABenchmark(BaseVideoAnalyticsBenchmark):
             else:
                 if self.is_MTL:
                     self.config = {
-                        "ref_stream_list": [14],
-                        "ref_platform": "MTL 165H (32G Mem)",
+                        "ref_stream_list": [8,9,9,5,6],
+                        "ref_platform": "ARL Ultra 9 285K (32G Mem)",
                         "ref_gpu_freq": -1,
                         "ref_pkg_power": -1,
                         "models": ["yolov11n+resnet-50-tf"],
                         "modes": self.get_mode_and_compute_devices(available_devices, va_executed_modes),
                         "mode_ref_streams": {
-                            "Mode 0": 6,  # CPU/CPU/CPU
-                            "Mode 2": 14,  # iGPU/iGPU/iGPU
-                            "Mode 3": 18,  # iGPU/iGPU/NPU
-                            "Mode 4": 22,  # iGPU/NPU/NPU
-                            "Mode 7": 26,  # iGPU + NPU concurrent
+                            "Mode 0": 8,  # CPU/CPU/CPU
+                            "Mode 2": 9,  # iGPU/iGPU/iGPU
+                            "Mode 3": 9,  # iGPU/iGPU/NPU
+                            "Mode 4": 5,  # iGPU/NPU/NPU
+                            "Mode 7": 6,  # iGPU + NPU concurrent
                         },
                     }
                 else:
                     self.config = {
-                        "ref_stream_list": [12],
-                        "ref_platform": "i7-1360p (16G Mem)",
+                        "ref_stream_list": [8,9],
+                        "ref_platform": "ARL Ultra 9 285 (32G Mem)",
                         "ref_gpu_freq": -1,
                         "ref_pkg_power": -1,
                         "models": ["yolov11n+resnet-50-tf"],
                         "modes": self.get_mode_and_compute_devices(available_devices, va_executed_modes),
                         "mode_ref_streams": {
-                            "Mode 0": 5,  # CPU/CPU/CPU
-                            "Mode 2": 12,  # iGPU/iGPU/iGPU
+                            "Mode 0": 8,  # CPU/CPU/CPU
+                            "Mode 2": 9,  # iGPU/iGPU/iGPU
                         },
                     }
         elif device_type == "dGPU":
             self.config = {
-                "ref_stream_list": [30],
-                "ref_platform": "ARL Ultra 9 285 + B580",
+                "ref_stream_list": [8,15,11,7,11],
+                "ref_platform": "ARL Ultra 9 285K + B580",
                 "ref_gpu_freq": -1,
                 "ref_pkg_power": -1,
                 "models": ["yolov11n+resnet-50-tf"],
                 "modes": self.get_mode_and_compute_devices(available_devices, va_executed_modes),
                 "mode_ref_streams": {
-                    "Mode 0": 6,  # CPU/CPU/CPU
-                    "Mode 1": 30,  # dGPU/dGPU/dGPU
-                    "Mode 5": 35,  # dGPU/dGPU/NPU
-                    "Mode 6": 40,  # dGPU/NPU/NPU
-                    "Mode 8": 50,  # dGPU + NPU concurrent
+                    "Mode 0": 8,  # CPU/CPU/CPU
+                    "Mode 1": 15,  # dGPU/dGPU/dGPU
+                    "Mode 5": 11,  # dGPU/dGPU/NPU
+                    "Mode 6": 7,  # dGPU/NPU/NPU
+                    "Mode 8": 11,  # dGPU + NPU concurrent
                 },
             }
         elif device_type == "CPU":
             self.config = {
-                "ref_stream_list": [14],
+                "ref_stream_list": [26],
                 "ref_platform": "Xeon(R) Gold 6414U (128G Mem)",
                 "ref_gpu_freq": -1,
                 "ref_pkg_power": -1,
                 "models": ["yolov11n+resnet-50-tf"],
                 "modes": self.get_mode_and_compute_devices(available_devices, va_executed_modes),
                 "mode_ref_streams": {
-                    "Mode 0": 14,  # CPU/CPU/CPU
+                    "Mode 0": 26,  # CPU/CPU/CPU
                 },
             }
         else:

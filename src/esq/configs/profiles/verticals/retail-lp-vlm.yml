@@ -33,4 +33,6 @@ suites:
                 timeout: 3600  # 60 minutes
                 camera_stream: "camera_to_workload_vlm.json"
                 commit_id: "2205dc9"  # Loss Prevention repository commit to checkout
+                requirements:
+                  igpu_required: true
               

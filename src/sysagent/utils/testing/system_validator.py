@@ -206,13 +206,13 @@ class SystemValidator:
                 intel_devices, intel_devices_with_ov, devices, device_type, non_intel_check
             )
         else:
-            actual_msg = f"{len(intel_devices_with_ov)} Intel {device_type}(s) detected by OpenVINO"
+            actual_msg = f"{len(intel_devices_with_ov)} {device_type}(s)"
 
         return {
             "name": f"{device_type}s >= {min_count}",
             "passed": passed,
             "actual": actual_msg,
-            "required": f">= {min_count} Intel {device_type}(s) detected by OpenVINO",
+            "required": f"At least {min_count} Intel {device_type}(s) detected by OpenVINO",
             "category": category,
         }
 
@@ -239,13 +239,13 @@ class SystemValidator:
         """
         intel_devices, intel_devices_with_ov = self._get_intel_devices_with_openvino(devices, device_filter)
         passed = len(intel_devices_with_ov) <= max_count
-        actual_msg = f"{len(intel_devices_with_ov)} Intel {device_type}(s) detected by OpenVINO"
+        actual_msg = f"{len(intel_devices_with_ov)} {device_type}(s)"
 
         return {
             "name": f"{device_type}s <= {max_count}",
             "passed": passed,
             "actual": actual_msg,
-            "required": f"<= {max_count} Intel {device_type}(s) detected by OpenVINO",
+            "required": f"At most {max_count} Intel {device_type}(s) detected by OpenVINO",
             "category": category,
         }
 
@@ -360,8 +360,8 @@ class SystemValidator:
                 {
                     "name": f"CPU cores >= {min_cores}",
                     "passed": passed,
-                    "actual": actual_cores,
-                    "required": f">= {min_cores}",
+                    "actual": f"{actual_cores} cores",
+                    "required": f"At least {min_cores} CPU cores",
                     "category": "hardware.cpu.cores",
                 }
             )
@@ -379,8 +379,8 @@ class SystemValidator:
                 {
                     "name": f"Available memory >= {min_memory} GB",
                     "passed": passed,
-                    "actual": f"{available_memory_gb:.0f} GB",
-                    "required": f">= {min_memory} GB",
+                    "actual": f"{available_memory_gb:.2f} GB",
+                    "required": f"At least {min_memory} GB available memory",
                     "category": "hardware.memory.available",
                 }
             )
@@ -397,8 +397,8 @@ class SystemValidator:
                 {
                     "name": f"Total memory >= {min_total_memory} GB",
                     "passed": passed,
-                    "actual": f"{actual_memory_gb:.0f} GB",
-                    "required": f">= {min_total_memory} GB",
+                    "actual": f"{actual_memory_gb:.2f} GB",
+                    "required": f"At least {min_total_memory} GB total memory",
                     "category": "hardware.memory.total",
                 }
             )
@@ -414,8 +414,8 @@ class SystemValidator:
                 {
                     "name": f"Free storage >= {min_storage} GB",
                     "passed": passed,
-                    "actual": f"{actual_storage_gb:.0f} GB",
-                    "required": f">= {min_storage} GB",
+                    "actual": f"{actual_storage_gb:.2f} GB",
+                    "required": f"At least {min_storage} GB free storage",
                     "category": "hardware.storage.free",
                 }
             )
@@ -431,8 +431,8 @@ class SystemValidator:
                 {
                     "name": f"Total storage >= {min_total_storage} GB",
                     "passed": passed,
-                    "actual": f"{actual_total_storage_gb:.0f} GB",
-                    "required": f">= {min_total_storage} GB",
+                    "actual": f"{actual_total_storage_gb:.2f} GB",
+                    "required": f"At least {min_total_storage} GB total storage",
                     "category": "hardware.storage.total",
                 }
             )
@@ -557,8 +557,8 @@ class SystemValidator:
                 {
                     "name": f"Discrete GPU VRAM >= {min_vram} GB",
                     "passed": passed,
-                    "actual": f"{total_vram_gb:.1f} GB total",
-                    "required": f">= {min_vram} GB",
+                    "actual": f"{total_vram_gb:.1f} GB",
+                    "required": f"At least {min_vram} GB total discrete GPU VRAM",
                     "category": "hardware.gpu.vram_min",
                 }
             )
@@ -585,8 +585,8 @@ class SystemValidator:
                 {
                     "name": f"Discrete GPU VRAM <= {max_vram} GB",
                     "passed": passed,
-                    "actual": f"{total_vram_gb:.1f} GB total",
-                    "required": f"<= {max_vram} GB",
+                    "actual": f"{total_vram_gb:.1f} GB",
+                    "required": f"At most {max_vram} GB total discrete GPU VRAM",
                     "category": "hardware.gpu.vram_max",
                 }
             )
@@ -621,7 +621,7 @@ class SystemValidator:
                     "name": f"Each discrete GPU VRAM >= {min_vram_per_device} GB",
                     "passed": passed,
                     "actual": actual_info,
-                    "required": f"Each GPU >= {min_vram_per_device} GB",
+                    "required": f"At least {min_vram_per_device} GB VRAM per discrete GPU",
                     "category": "hardware.gpu.vram_per_device_min",
                 }
             )
@@ -656,7 +656,7 @@ class SystemValidator:
                     "name": f"Each discrete GPU VRAM <= {max_vram_per_device} GB",
                     "passed": passed,
                     "actual": actual_info,
-                    "required": f"Each GPU <= {max_vram_per_device} GB",
+                    "required": f"At most {max_vram_per_device} GB VRAM per discrete GPU",
                     "category": "hardware.gpu.vram_per_device_max",
                 }
             )

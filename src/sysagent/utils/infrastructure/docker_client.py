@@ -131,6 +131,7 @@ class DockerClient:
         dockerfile: str = None,
         buildargs: dict = None,
         extract_packages: bool = False,
+        extract_base_image_info: bool = False,
     ):
         """
         Build a Docker image with streaming logs and Allure attachments.
@@ -142,6 +143,7 @@ class DockerClient:
             dockerfile: Dockerfile name (default: Dockerfile)
             buildargs: Build arguments dictionary
             extract_packages: If True, extract and attach package list as Allure attachment
+            extract_base_image_info: If True, extract and attach base image info
 
         Returns:
             dict: {"docker_image": tag, "image_id": image.id, "build_log_text": ..., "image_obj": image}
@@ -332,11 +334,12 @@ class DockerClient:
             dockerfile_name = dockerfile if dockerfile else "Dockerfile"
             dockerfile_path = os.path.join(path, dockerfile_name)
 
-        # Extract and attach package list if requested, otherwise just extract base image info
+        # Extract package list and/or base image info based on flags
         if extract_packages:
+            # Package extraction includes base image info in the attachment
             self._extract_package_list(tag, dockerfile_path)
-        else:
-            # Always extract base image information even when package list is disabled
+        elif extract_base_image_info:
+            # Extract only base image info without package list
             logger.info(f"Extracting base image information from Docker image: {tag}")
             base_image_info = self._extract_base_image_info(tag, dockerfile_path)
             self._create_base_image_attachment(tag, base_image_info)
@@ -356,75 +359,115 @@ class DockerClient:
             dockerfile_path: Path to Dockerfile used for build (optional)
         """
         try:
+            from pathlib import Path
+
+            from sysagent.utils.config.config_loader import get_cli_aware_project_name
+
             logger.info(f"Extracting package list from Docker image: {tag}")
 
-            # Use run_container's built-in file extraction to avoid stdout logging
-            # Create results directory first, then run package extraction
-            package_cmd = (
-                "mkdir -p /mnt/results && "
-                "dpkg -l | grep '^ii' | awk '{print $2\" \"$3}' | sort > /mnt/results/packages.txt && "
-                "echo 'Package extraction completed'"
-            )
+            project_name = get_cli_aware_project_name()
+            default_data_dir = os.path.join(os.getcwd(), f"{project_name}_data")
+            core_data_dir_tainted = os.environ.get("CORE_DATA_DIR", default_data_dir)
+            core_data_dir = "".join(c for c in core_data_dir_tainted)
 
-            container_result = self.run_container(
-                image=tag,
-                entrypoint=["sh", "-c", package_cmd],
-                name=f"package-list-{hash(tag) % 10000}",
-                user="root",  # Run as root for dpkg access and directory creation
-                remove=True,
-                timeout=30,
-                mode="batch",
-                attach_logs=False,  # Don't attach container logs
-                result_file="packages.txt",  # Extract this file from container
-                container_result_file_dir="/mnt/results",  # Container directory containing the file
-            )
+            docker_infra_dir = os.path.join(core_data_dir, "data", "core", "infra", "docker")
+            os.makedirs(docker_infra_dir, exist_ok=True)
 
-            if container_result.get("container_info", {}).get("exit_code") == 0:
-                # Get the package list from the extracted file (not from stdout)
-                package_list_raw = container_result.get("result_text", "")
-                if package_list_raw:
-                    # Process package list and add line numbers
-                    package_lines = package_list_raw.strip().split("\n")
-                    package_count = len([line for line in package_lines if line.strip()])
+            safe_tag = "".join(c if c.isalnum() or c in ("-", "_") else "-" for c in tag)
+            packages_file = os.path.join(docker_infra_dir, f"packages-{safe_tag}.txt")
 
-                    # Create numbered package list
-                    numbered_packages = []
-                    line_num = 1
-                    for line in package_lines:
-                        if line.strip():
-                            numbered_packages.append(f"{line_num:4d}. {line}")
-                            line_num += 1
+            docker_infra_path = Path(docker_infra_dir).resolve()
+            packages_path = Path(packages_file).resolve()
 
-                    # Get base image hash information with Dockerfile parsing
-                    base_image_info = self._extract_base_image_info(tag, dockerfile_path)
+            if not str(packages_path).startswith(str(docker_infra_path)):
+                logger.error(f"Path traversal attempt detected: {packages_file}")
+                raise ValueError("Invalid package file path: path traversal detected")
 
-                    # Create comprehensive attachment content
-                    attachment_content = "Docker Image Information Report\n"
-                    attachment_content += f"Image: {tag}\n"
-                    attachment_content += "Generated by: DockerClient.build_image()\n"
-                    attachment_content += f"Generated at: {datetime.now().isoformat()}\n"
-                    attachment_content += "=" * 60 + "\n\n"
+            if os.path.exists(packages_file):
+                logger.info(f"Package list already exists, skipping extraction: {packages_file}")
+                with open(packages_file, "r", encoding="utf-8") as f:
+                    package_list_raw = f.read()
+            else:
+                os.chmod(docker_infra_dir, 0o770)
+                logger.debug(f"Set secure permissions (0o770) on directory: {docker_infra_dir}")
 
-                    # Add base image information using shared formatter
-                    if base_image_info:
-                        attachment_content += self._format_base_image_section(base_image_info)
+                package_cmd = (
+                    f"dpkg-query -W -f='${{binary:Package}} ${{Version}}\\n' 2>/dev/null | "
+                    f"sort > /mnt/pkg-extract/packages-{safe_tag}.txt"
+                )
 
-                    # Add package list with count and line numbers
-                    attachment_content += f"INSTALLED PACKAGES ({package_count} total)\n"
-                    attachment_content += "-" * 30 + "\n"
-                    attachment_content += "Line  Package Name                     Version\n"
-                    attachment_content += "-" * 60 + "\n"
-                    attachment_content += "\n".join(numbered_packages)
+                volumes = {docker_infra_dir: {"bind": "/mnt/pkg-extract", "mode": "rw"}}
+                host_gid = str(os.getgid())
 
-                    # Attach to Allure report
-                    allure.attach(
-                        attachment_content,
-                        name=f"Docker Image Info & Packages - {tag}",
-                        attachment_type=allure.attachment_type.TEXT,
-                    )
-                    logger.info(f"✓ Package list attached for Docker image: {tag} ({package_count} packages)")
+                container_result = self.run_container(
+                    image=tag,
+                    entrypoint=["sh", "-c", package_cmd],
+                    name=f"package-list-{hash(tag) % 10000}",
+                    volumes=volumes,
+                    group_add=[host_gid],
+                    remove=True,
+                    timeout=30,
+                    mode="batch",
+                    attach_logs=False,
+                )
+
+                if container_result.get("container_info", {}).get("exit_code") == 0:
+                    if os.path.exists(packages_file):
+                        with open(packages_file, "r", encoding="utf-8") as f:
+                            package_list_raw = f.read()
+                        logger.debug(f"Package list written directly to data directory: {packages_file}")
+                    else:
+                        logger.warning(f"Package file not found after extraction: {packages_file}")
+                        package_list_raw = ""
                 else:
-                    logger.warning(f"No package list output for Docker image: {tag}")
+                    exit_code = container_result.get("container_info", {}).get("exit_code", "unknown")
+                    logger.warning(f"Package extraction failed with exit code {exit_code} for Docker image: {tag}")
+                    package_list_raw = ""
+
+            # Process and attach package list if available
+            if package_list_raw:
+                # Process package list and add line numbers
+                package_lines = package_list_raw.strip().split("\n")
+                # Filter valid package lines (format: "package-name version")
+                package_lines = [line.strip() for line in package_lines if line.strip() and " " in line]
+                package_count = len(package_lines)
+
+                # Create numbered package list
+                numbered_packages = []
+                for line_num, line in enumerate(package_lines, start=1):
+                    numbered_packages.append(f"{line_num:4d}. {line}")
+
+                # Get base image hash information with Dockerfile parsing
+                base_image_info = self._extract_base_image_info(tag, dockerfile_path)
+
+                # Create comprehensive attachment content
+                attachment_content = "Docker Image Information Report\n"
+                attachment_content += f"Image: {tag}\n"
+                attachment_content += "Generated by: DockerClient.build_image()\n"
+                attachment_content += f"Generated at: {datetime.now().isoformat()}\n"
+                attachment_content += f"Package list cache: {packages_file}\n"
+                attachment_content += "=" * 60 + "\n\n"
+
+                # Add base image information using shared formatter
+                if base_image_info:
+                    attachment_content += self._format_base_image_section(base_image_info)
+
+                # Add package list with count and line numbers
+                attachment_content += f"INSTALLED PACKAGES ({package_count} total)\n"
+                attachment_content += "-" * 30 + "\n"
+                attachment_content += "Line  Package Name                     Version\n"
+                attachment_content += "-" * 60 + "\n"
+                attachment_content += "\n".join(numbered_packages)
+
+                # Attach to Allure report
+                allure.attach(
+                    attachment_content,
+                    name=f"Docker Image Info & Packages - {tag}",
+                    attachment_type=allure.attachment_type.TEXT,
+                )
+                logger.info(f"✓ Package list extracted for Docker image: {tag} ({package_count} packages)")
+            else:
+                logger.warning(f"No package list output for Docker image: {tag}")
 
         except Exception as e:
             logger.warning(f"Error extracting package list for {tag}: {str(e)}")
@@ -763,26 +806,29 @@ class DockerClient:
 
             # For batch mode: stream logs and wait for container to finish
             if mode == "batch":
+                # Save container info before it might be auto-removed
+                container_id = container.id
+                container_name = container.name
+
                 timeout_triggered = threading.Event()
 
                 def timeout_killer():
                     if timeout:
-                        logger.debug(f"Starting container {container.name} timeout killer thread for {timeout} seconds")
+                        logger.debug(f"Starting container {container_name} timeout killer thread for {timeout} seconds")
                         time.sleep(timeout)
                         try:
                             try:
-                                refreshed = self.client.containers.get(container.id)
+                                refreshed = self.client.containers.get(container_id)
                             except docker.errors.NotFound:
                                 return
 
-                            logger.info(f"Checking container {container.name} status after {timeout} secs")
+                            logger.info(f"Checking container {container_name} status after {timeout} secs")
                             refreshed.reload()
                             if refreshed.status == "running":
-                                logger.warning(f"Timeout reached ({timeout}s), stopping container {container.name}")
+                                logger.warning(f"Timeout reached ({timeout}s), stopping container {container_name}")
                                 refreshed.stop(timeout=5)
                                 timeout_triggered.set()
                         except Exception as e:
-                            container_name = container.name if container else "unknown"
                             logger.warning(f"Failed to stop container {container_name} after timeout: {e}")
 
                 killer_thread = threading.Thread(target=timeout_killer, daemon=True)
@@ -798,10 +844,16 @@ class DockerClient:
                     except UnicodeDecodeError:
                         container_logs_text += f"[binary data: {len(log_chunk)} bytes]\n"
 
-                result = container.wait(timeout=10)
+                # Handle case where container might be auto-removed before we can wait
+                try:
+                    result = container.wait(timeout=10)
+                except docker.errors.NotFound:
+                    # Container was auto-removed (remove=True), assume success
+                    logger.debug(f"Container {container_name} was auto-removed, assuming successful completion")
+                    result = {"StatusCode": 0}
+
                 killer_thread.join(0)
                 if timeout_triggered.is_set():
-                    container_name = container.name if container and hasattr(container, "name") else "unknown"
                     logger.error(f"Container {container_name} stopped due to timeout ({timeout}s)")
                     if container_logs_text:
                         allure.attach(
@@ -811,7 +863,8 @@ class DockerClient:
                         )
                     pytest.fail(f"Container {container_name} execution stopped due to timeout ({timeout}s)")
 
-                logger.debug(f"Waiting for container {container.name} to finish processing...")
+                logger.debug(f"Waiting for container {container_name} to finish processing...")
+                time.sleep(5)
                 time.sleep(5)
 
             elif mode == "server":
@@ -819,11 +872,11 @@ class DockerClient:
                 return container
 
             exit_code = result.get("StatusCode", -1)
-            logger.info(f"Container completed with exit code: {exit_code}")
+            logger.info(f"Container completed with exit_code: {exit_code}")
 
             container_info = {
-                "id": container.id[:12],
-                "name": container.name,
+                "id": container_id[:12],
+                "name": container_name,
                 "exit_code": exit_code,
             }
 
@@ -832,7 +885,7 @@ class DockerClient:
             if attach_logs and not os.environ.get("CORE_SUPPRESS_CONTAINER_LOG_ATTACHMENTS"):
                 allure.attach(
                     container_logs_text,
-                    name=f"Container Logs - {name} (Exit Code: {exit_code})",
+                    name=f"Container Logs - {container_name} (Exit Code: {exit_code})",
                     attachment_type=allure.attachment_type.TEXT,
                 )
             elif attach_logs:
@@ -840,13 +893,13 @@ class DockerClient:
                 try:
                     from sysagent.utils.plugins.pytest_execution import add_container_log_for_consolidation
 
-                    add_container_log_for_consolidation(name, container_logs_text, exit_code)
+                    add_container_log_for_consolidation(container_name, container_logs_text, exit_code)
                 except ImportError:
                     pass  # Collector not available, skip
 
             if exit_code != 0:
-                logger.error(f"Container {name} exited with non-zero code: {exit_code}")
-                pytest.fail(f"Container {name} failed with exit code: {exit_code}")
+                logger.error(f"Container {container_name} exited with non-zero code: {exit_code}")
+                pytest.fail(f"Container {container_name} failed with exit code: {exit_code}")
 
             result_text = None
             result_json = None

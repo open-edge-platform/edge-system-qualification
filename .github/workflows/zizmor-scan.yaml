@@ -29,10 +29,10 @@ jobs:
     env:
       EXTERNAL_REPO: 'open-edge-platform/edge-system-qualification'
     outputs:
-      is_external: ${{ steps.detect.outputs.is_external }}
+      is_external: ${{ steps.detect-repo.outputs.is_external }}
     steps:
       - name: "Detect if repository is external"
-        id: detect
+        id: detect-repo
         run: |
           if [[ "${{ github.repository }}" == "${{ env.EXTERNAL_REPO }}" ]]; then
             echo "Repository type: External"
@@ -50,7 +50,7 @@ jobs:
       contents: read
       security-events: write # Needed to upload the results to code-scanning dashboard
     runs-on: ubuntu-latest
-    if: needs.detect.outputs.is_external == 'true'
+    if: needs.detect-repo.outputs.is_external == 'true'
     needs: detect-repo
     steps:
       - name: "Checkout code"

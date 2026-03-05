@@ -135,7 +135,6 @@ params:
         precision: "Precision"
         batch_size: "Batch Size"
         no_of_streams: "No. of Streams"
-        power_per_stream: "Power/Stream"
       # Reference data entries
       data:
         - device_sku: "Intel Core Ultra 7 255H"
@@ -143,55 +142,46 @@ params:
           precision: "INT8"
           batch_size: 8
           no_of_streams: 8
-          power_per_stream: 49.64
         - device_sku: "Intel Core Ultra 7 255H"
           type: "iGPU"
           precision: "INT8"
           batch_size: 8
           no_of_streams: 19
-          power_per_stream: 27.04
         - device_sku: "Intel Core Ultra 7 255H"
           type: "NPU"
           precision: "INT8"
           batch_size: 1
           no_of_streams: 10
-          power_per_stream: 18.52
         - device_sku: "Intel Core Ultra Series 3 X7 358H"
           type: "CPU"
           precision: "INT8"
           batch_size: 8
           no_of_streams: 8
-          power_per_stream: 0.14
         - device_sku: "Intel Core Ultra Series 3 X7 358H"
           type: "iGPU"
           precision: "INT8"
           batch_size: 8
           no_of_streams: 44
-          power_per_stream: 1.18
         - device_sku: "Intel Xeon 6730P (32 Cores at 2.5GHz)"
           type: "CPU"
           precision: "INT8"
           batch_size: 8
           no_of_streams: 20
-          power_per_stream: "N/A"
         - device_sku: "Intel Xeon 6761P (64 Cores at 2.5GHz)"
           type: "CPU"
           precision: "INT8"
           batch_size: 8
           no_of_streams: 31
-          power_per_stream: "N/A"
         - device_sku: "Intel ARC B50"
           type: "dGPU"
           precision: "INT8"
           batch_size: 8
           no_of_streams: 24
-          power_per_stream: "N/A"
         - device_sku: "Intel ARC B60"
           type: "dGPU"
           precision: "INT8"
           batch_size: 8
           no_of_streams: 36
-          power_per_stream: "N/A"
   # Vision AI global params
   assets:
     - id: "yolo11n"

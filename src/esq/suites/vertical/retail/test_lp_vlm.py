@@ -272,6 +272,21 @@ def test_lp_vlm(
                         name="Pipeline Run Output",
                         attachment_type=allure.attachment_type.TEXT,
                     )
+                    # Get model downloader container logs and attach to allure
+                    model_downloader_cmd = ["docker", "logs", "model-downloader-lp"]
+                    try:
+                        model_downloader_result = run_command(model_downloader_cmd, stream_output=True, timeout=30)
+                        if model_downloader_result.returncode == 0:
+                            allure.attach(
+                                model_downloader_result.stdout + model_downloader_result.stderr,
+                                name="Model Downloader Container Logs",
+                                attachment_type=allure.attachment_type.TEXT,
+                            )
+                            logger.info("Model downloader container logs attached to allure report")
+                        else:
+                            logger.warning(f"Failed to get model downloader logs: {model_downloader_result.stderr}")
+                    except Exception as e:
+                        logger.warning(f"Error getting model downloader container logs: {e}")
                     # Monitor vlm-pipeline-runner container logs to detect completion
                     logs_dir = os.path.join(core_data_dir, "data", "vertical", "retail")
                     os.makedirs(logs_dir, exist_ok=True)

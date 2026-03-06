@@ -499,13 +499,15 @@ def test_lp_vlm(
 
                                 # Map metrics to standardized names and units
                                 if key == "Throughput_Mean":
-                                    results.metadata["throughput_mean"] = round(avg_value, 2)
-                                elif key == "TTFT_Mean":
-                                    results.metadata["ttft_mean"] = round(avg_value, 2) if avg_value > 0 else 0.0
-                                    results.metrics["ft_throughput"] = Metrics(
-                                        value=round(1000 / avg_value, 2) if avg_value > 0 else 0.0,
+                                    results.metrics["throughput_mean"] = Metrics(
+                                        value=round(avg_value, 2) if avg_value > 0 else 0.0,
                                         unit="tokens/sec",
                                         is_key_metric=True,
+                                    )
+                                elif key == "TTFT_Mean":
+                                    results.metadata["ttft_mean"] = round(avg_value, 2) if avg_value > 0 else 0.0
+                                    results.metadata["ft_throughput"] = (
+                                        round(1000 / avg_value, 2) if avg_value > 0 else 0.0
                                     )
                                 elif key == "TPOT_Mean":
                                     results.metadata["tpot_mean"] = round(avg_value, 2) if avg_value > 0 else 0.0

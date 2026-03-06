@@ -2,6 +2,13 @@
 
 Intel® ESQ changelog and version history.
 
+## Version 2026.1.0 - March 2026
+
+### Features
+- New Metro vertical profile with proxy workload coverage for LPR, Smart NVR, headed Visual AI, and VSaaS pipelines
+- New Horizontal suites: Vision OpenVINO, System GPU OpenVINO, Media Performance, and Video Analytics
+- Enable Metro execution with automatic dependent suite execution
+
 ## Version 2025.2.0 - December 2025
 
 ### Features

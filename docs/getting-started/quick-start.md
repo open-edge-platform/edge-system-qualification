@@ -50,7 +50,7 @@ sudo bash -c "$(wget -qLO - https://raw.githubusercontent.com/open-edge-platform
 Install essential system packages:
 
 ```bash
-sudo apt update && sudo apt install -y curl git libgl1
+sudo apt update && sudo apt install -y curl git libgl1 make
 ```
 
 ### 3. Docker Engine
@@ -148,6 +148,11 @@ This setup script:
 
 
 ### 6. Intel® ESQ
+!!! info "Development Version"
+    To access the latest features that may not be available in the current release, you can install the development version from the main branch:
+    ```bash
+    uv tool install --force --refresh git+https://github.com/open-edge-platform/edge-system-qualification.git@main
+    ```
 
 Install Intel® ESQ from GitHub*:
 

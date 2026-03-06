@@ -4,10 +4,45 @@ Intel® ESQ changelog and version history.
 
 ## Version 2026.1.0 - March 2026
 
-### Features
+### Changes
+- New Platform Support:
+  - Intel® Core™ Ultra Processors (Series 3), Products formerly Panther Lake
+  - Intel® Core™ Processors (Series 2), Products formerly Bartlett Lake
+  - Intel® Xeon® 6 processors, Products formerly Granite Rapids
+- Enabled Verified Reference Blueprints (VRB) data on ESQ Report
+- Enhanced OpenVINO™ Model Server (OVMS) with version 2025.4.1 for Gen AI workloads
+- OpenVINO 2025.3.0 support for Vision AI related Test Suite
+- Platform power configuration in report generation
+- Configurable DL Streamer pipeline enhancements:
+  - Configurable sink element support
+  - Configurable consecutive timeout threshold
+- New supported qualification platform detection logic
+- New retail-focused pipeline - Loss Prevention VLM
+- Enabled ModelScope download source support
 - New Metro vertical profile with proxy workload coverage for LPR, Smart NVR, headed Visual AI, and VSaaS pipelines
 - New Horizontal suites: Vision OpenVINO, System GPU OpenVINO, Media Performance, and Video Analytics
-- Enable Metro execution with automatic dependent suite execution
+- Enabled Metro execution with automatic dependent suite execution
+- AI Frequency long run test suite integration
+- Generic GPU required flag support in system validator
+- Enabled display mode by default for media & proxy test cases
+- Updated iGPU/dGPU ID lookup table with latest hardware IDs
+- Enhanced container security with cap_add parameter exposure
+- Enabled new horizontal test cases for Edge Workloads and Benchmarks Pipelines
+- Enhanced CPU streams handling to prevent drops due to CPU scaling logic
+- Updated qualification model for scalable performance tier with DeepSeek-R1-Distill-Qwen-14B
+- Increased default test execution timeout value to 640 minutes
+- Fixed vision AI dGPU pipeline timeout when iGPU is disabled
+- Improved cache reuse for multi-device DL Streamer analysis
+- Enhanced multi-device max streams metric population for multi-socket CPUs
+- Fixed dGPU performance optimization to exceed iGPU performance
+- Addressed protobuf JSON recursion depth bypass vulnerability
+- Fixed Pillow version security vulnerability
+- Enhanced resource download failure handling and error management
+- Fixed PDD model download failure and performance optimization
+
+### Known Issue
+- DL Streamer dGPU test cases use Intel® DL Streamer 2025.1.2 with OpenVINO™ 2025.2.0, while CPU and NPU tests use the newer OpenVINO™ 2025.3.0 version
+- GPU utilization and package power monitoring may show inconsistent readings on Ubuntu* 24.04.3 systems with Linux* kernel 6.14
 
 ## Version 2025.2.0 - December 2025
 

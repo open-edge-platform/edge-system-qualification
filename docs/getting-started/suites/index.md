@@ -111,9 +111,9 @@ esq run --profile profile.qualification.ai-edge-system
 
 | Test ID | Test Case |
 |---------|-----------| 
-| MFG-PDD-001 | Pallet Defect Detection - multi-stream 480p30 H.264 gvadetect YOLOX-TINY FP32 (CPU) |
-| MFG-PDD-002 | Pallet Defect Detection - multi-stream 480p30 H.264 gvadetect YOLOX-TINY FP32 (iGPU) |
-| MFG-PDD-003 | Pallet Defect Detection - multi-stream 480p30 H.264 gvadetect YOLOX-TINY FP32 (dGPU) |
+| MFG-PDD-001 | Pallet Defect Detection - multi-stream 480p30 H.264 gvadetect YOLOX-TINY INT8 (CPU) |
+| MFG-PDD-002 | Pallet Defect Detection - multi-stream 480p30 H.264 gvadetect YOLOX-TINY INT8 (iGPU) |
+| MFG-PDD-003 | Pallet Defect Detection - multi-stream 480p30 H.264 gvadetect YOLOX-TINY INT8 (dGPU) |
 | MFG-WPC-001 | Weld Porosity Classification - multi-stream 1024p30 H.264 gvaclassify EfficientNet-B0 FP16 (CPU) |
 | MFG-WPC-002 | Weld Porosity Classification - multi-stream 1024p30 H.264 gvaclassify EfficientNet-B0 FP16 (iGPU) |
 | MFG-WPC-003 | Weld Porosity Classification - multi-stream 1024p30 H.264 gvaclassify EfficientNet-B0 FP16 (dGPU) |
@@ -195,6 +195,21 @@ esq run --profile profile.vertical.retail-asc
 **Run this profile**:
 ```bash
 esq run --profile profile.vertical.retail-lp
+```
+
+---
+
+**Profile**: `profile.vertical.retail-lp-vlm`
+
+**Test Cases**:
+
+| Test ID | Test Case |
+|---------|-----------| 
+| LP-VLM-001 | Loss Prevention VLM - 1080p15 H.264 gvadetect YOLO11n FP16 (CPU) VLM analysis Qwen2.5-VL-7B-Instruct INT8 (GPU) |
+
+**Run this profile**:
+```bash
+esq run --profile profile.vertical.retail-lp-vlm
 ```
 
 ---

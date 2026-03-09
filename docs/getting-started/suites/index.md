@@ -41,9 +41,9 @@ Quick reference of all available test suites and their profile names.
 | `profile.vertical.retail-lp` | Vertical | Retail Loss Prevention | `esq run --profile profile.vertical.retail-lp` |
 | `profile.suite.ai.gen` | Horizontal | Gen AI profile | `esq run --profile profile.suite.ai.gen` |
 | `profile.suite.ai.vision-light` | Horizontal | DL Streamer Analysis - Multi-Stream Pipelines With Multiple AI Stages | `esq run --profile profile.suite.ai.vision-light` |
-| `profile.suite.ai.vision-ov` | Horizontal | OpenVINO Benchmark - Measures raw inference performance using OpenVINO Runtime API | `esq run --profile profile.suite.ai.vision-ov` |
+| `profile.suite.ai.vision-ov` | Horizontal | OpenVINO™ Toolkit Benchmark - Measures raw inference performance using OpenVINO Runtime API | `esq run --profile profile.suite.ai.vision-ov` |
 | `profile.suite.ai.vision-vrb` | Horizontal | Vision AI profile - Verified Reference Blueprints | `esq run --profile profile.suite.ai.vision-vrb` |
-| `profile.suite.system.gpu-ov` | Horizontal | System GPU Performance using OpenVINO benchmark | `esq run --profile profile.suite.system.gpu-ov` |
+| `profile.suite.system.gpu-ov` | Horizontal | System GPU Performance using OpenVINO™ Toolkit benchmark | `esq run --profile profile.suite.system.gpu-ov` |
 | `profile.suite.system.memory-stream` | Horizontal | System Memory Performance using STREAM benchmark | `esq run --profile profile.suite.system.memory-stream` |
 | `profile.suite.media.performance-pipelines` | Horizontal | Media Performance | `esq run --profile profile.suite.media.performance-pipelines` |
 | `profile.suite.ai.vision-va` | Horizontal | Multi-stage video analytics pipelines with detection, tracking, and classification | `esq run --profile profile.suite.ai.vision-va` |
@@ -59,15 +59,15 @@ esq list
 
 | Test Suite | Purpose | Benefit |
 |------|---------|----------|
-| **Qualifications** | Measuring system performance to qualify against AI Edge Systems Qualifications Metrics | Gain Catalog inclusion and other marketing benefits from Intel.  |
+| **Qualifications** | Measuring system performance to qualify against  Intel® AI Edge Systems Qualifications Metrics | Gain Catalog inclusion and other marketing benefits from Intel.  |
 | **Vertical** | System benchmarking vertical specific proxy workloads like retail self checkout, smart NVR and manufacturing defect detection | Gain understanding and communicate on system's potential to be used in a variety of verticals and use-cases |
-| **Horizontal** | 	General system benchmarking (includes OpenVINO™, Audio, Memory Performance) | Gain understanding on system's resource utilization and performance like System memory and GPU during select AI workload  |
+| **Horizontal** | 	General system benchmarking (includes OpenVINO™ Toolkit, Audio, Memory Performance) | Gain understanding on system's resource utilization and performance like System memory and GPU during select AI workload  |
 
 ---
 
 ## Qualifications
 
-### AI Edge System Qualification
+### Intel® AI Edge System Qualification
 
 **Profile**: `profile.qualification.ai-edge-system`
 
@@ -84,7 +84,7 @@ Generative AI test on text generation
 | Scalable Performance Graphics Media | AES-GEN-001 | Gen AI LLM Serving Benchmark - Phi-4-mini-reasoning 3.8B INT4<br>Gen AI LLM Serving Benchmark - DeepSeek-R1-Distill-Qwen-14B INT4<br>Gen AI LLM Serving Benchmark - Qwen3-32B INT4 | >= 10.0 tokens/sec |
 
 
-Vision AI test using Intel® DLStreamer
+Vision AI test using Intel® DL Streamer
 
 | Tier | Test ID | Test Case | Qualification Criteria |
 |------|---------|-----------|-----------| 
@@ -369,7 +369,7 @@ esq run --profile profile.suite.ai.vision-va
 
 ---
 
-### System GPU - OpenVINO
+### System GPU - OpenVINO™ Toolkit
 
 **Profile**: `profile.suite.system.gpu-ov`
 

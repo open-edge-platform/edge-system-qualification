@@ -9,9 +9,9 @@ Intel® ESQ changelog and version history.
   - Intel® Core™ Ultra Processors (Series 3), Products formerly Panther Lake
   - Intel® Core™ Processors (Series 2), Products formerly Bartlett Lake
   - Intel® Xeon® 6 processors, Products formerly Granite Rapids
-- Enabled Verified Reference Blueprints (VRB) data on ESQ Report
+- Enabled Verified Reference Blueprints (VRB) data on Intel® ESQ Report
 - Enhanced OpenVINO™ Model Server (OVMS) with version 2025.4.1 for Gen AI workloads
-- OpenVINO 2025.3.0 support for Vision AI related Test Suite
+- OpenVINO toolkit 2025.3.0 support for Vision AI related Test Suite
 - Platform power configuration in report generation
 - Configurable DL Streamer pipeline enhancements:
   - Configurable sink element support
@@ -40,7 +40,7 @@ Intel® ESQ changelog and version history.
 - Enhanced resource download failure handling and error management
 - Fixed PDD model download failure and performance optimization
 
-### Known Issue
+### Known Issues
 - DL Streamer dGPU test cases use Intel® DL Streamer 2025.1.2 with OpenVINO™ 2025.2.0, while CPU and NPU tests use the newer OpenVINO™ 2025.3.0 version
 - GPU utilization and package power monitoring may show inconsistent readings on Ubuntu* 24.04.3 systems with Linux* kernel 6.14
 

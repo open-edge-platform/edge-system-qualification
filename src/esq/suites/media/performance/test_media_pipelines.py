@@ -13,9 +13,9 @@ import pytest
 from esq.utils.genutils import plot_grouped_bar_chart
 from esq.utils.media import (
     detect_display_settings,
-    get_x11_volumes,
-    get_x11_environment,
     determine_display_output,
+    get_x11_environment,
+    get_x11_volumes,
 )
 from esq.utils.media.validation import detect_platform_type
 from sysagent.utils.config import ensure_dir_permissions
@@ -38,7 +38,9 @@ def _normalize_device_categories(device_value, default: str = "igpu") -> list[st
     else:
         categories = [str(device_value)]
 
-    normalized = [category.strip().lower() for category in categories if str(category).strip()]
+    normalized = [
+        category.strip().lower() for category in categories if str(category).strip()
+    ]
     return normalized if normalized else [default]
 
 
@@ -80,7 +82,9 @@ def _create_media_metrics(value: str = "N/A", unit: str = None) -> dict:
     }
 
 
-def _generate_media_charts(media_results: str, configs: dict, logger, specific_csv: str = None):
+def _generate_media_charts(
+    media_results: str, configs: dict, logger, specific_csv: str = None
+):
     """
     Generate performance charts from aggregated test group CSV files.
     Each aggregated CSV contains results from comparable tests (same codec/operation).
@@ -124,7 +128,9 @@ def _generate_media_charts(media_results: str, configs: dict, logger, specific_c
                 parts = filename.split("_")
 
                 if len(parts) < 3:
-                    logger.warning(f"Invalid aggregated CSV filename format: {csv_path.name}")
+                    logger.warning(
+                        f"Invalid aggregated CSV filename format: {csv_path.name}"
+                    )
                     continue
 
                 codec = parts[1]  # h264, h265
@@ -135,7 +141,9 @@ def _generate_media_charts(media_results: str, configs: dict, logger, specific_c
 
                 # Read CSV file
                 df = pd.read_csv(csv_path)
-                logger.info(f"Processing aggregated CSV: {csv_path.name}, rows={len(df)}, operation='{operation}'")
+                logger.info(
+                    f"Processing aggregated CSV: {csv_path.name}, rows={len(df)}, operation='{operation}'"
+                )
 
                 if df.empty:
                     logger.warning(f"Empty aggregated CSV: {csv_path.name}")
@@ -156,15 +164,21 @@ def _generate_media_charts(media_results: str, configs: dict, logger, specific_c
                     if pd.notna(ref_value) and ref_value != -1:
                         try:
                             reference_max_channels = float(ref_value)
-                            logger.debug(f"Extracted reference max channels: {reference_max_channels}")
+                            logger.debug(
+                                f"Extracted reference max channels: {reference_max_channels}"
+                            )
                         except (ValueError, TypeError):
-                            logger.warning(f"Invalid reference max channels value: {ref_value}")
+                            logger.warning(
+                                f"Invalid reference max channels value: {ref_value}"
+                            )
 
                 if "Ref Platform" in df.columns and not df.empty:
                     ref_platform = df.iloc[0]["Ref Platform"]
                     if pd.notna(ref_platform) and ref_platform != "N/A":
                         reference_platform = str(ref_platform)
-                        logger.debug(f"Extracted reference platform: {reference_platform}")
+                        logger.debug(
+                            f"Extracted reference platform: {reference_platform}"
+                        )
 
                 # Use actual CSV column names for chart generation (no renaming needed)
                 # Check required columns exist
@@ -226,7 +240,11 @@ def _generate_media_charts(media_results: str, configs: dict, logger, specific_c
                     xlabel="Device",
                     ylabel="Max Channels (Stream Count)",
                     reference_value=reference_max_channels,
-                    reference_label=(f"Reference ({reference_platform})" if reference_max_channels else "Reference"),
+                    reference_label=(
+                        f"Reference ({reference_platform})"
+                        if reference_max_channels
+                        else "Reference"
+                    ),
                     figsize=(12, 6),
                     rotation=0,
                     color_map=resolution_colors,
@@ -240,18 +258,27 @@ def _generate_media_charts(media_results: str, configs: dict, logger, specific_c
                             name=f"Performance Comparison - {codec.upper()} {operation.capitalize()} ({len(df)} tests)",
                             attachment_type=allure.attachment_type.PNG,
                         )
-                    logger.info(f"Generated and attached chart: {chart_filename} with {len(df)} test results")
+                    logger.info(
+                        f"Generated and attached chart: {chart_filename} with {len(df)} test results"
+                    )
 
                     # Clean up chart file after attaching
                     chart_path.unlink()
                 else:
-                    logger.warning(f"Chart file not found after generation: {chart_path}")
+                    logger.warning(
+                        f"Chart file not found after generation: {chart_path}"
+                    )
 
             except Exception as chart_error:
-                logger.error(f"Failed to generate chart for {csv_path.name}: {chart_error}", exc_info=True)
+                logger.error(
+                    f"Failed to generate chart for {csv_path.name}: {chart_error}",
+                    exc_info=True,
+                )
 
     except Exception as chart_error:
-        logger.warning(f"Failed to generate media performance charts: {chart_error}", exc_info=True)
+        logger.warning(
+            f"Failed to generate media performance charts: {chart_error}", exc_info=True
+        )
 
 
 def _initialize_media_csv_files(output_dir: str):
@@ -329,8 +356,14 @@ def _run_media_container(
     # Prepare volumes for input/output
     videos_path = Path(media_results) / "videos"
     volumes = {
-        str(Path(media_results).resolve()): {"bind": "/home/dlstreamer/output", "mode": "rw"},
-        str(videos_path.resolve()): {"bind": "/home/dlstreamer/sample_video", "mode": "rw"},
+        str(Path(media_results).resolve()): {
+            "bind": "/home/dlstreamer/output",
+            "mode": "rw",
+        },
+        str(videos_path.resolve()): {
+            "bind": "/home/dlstreamer/sample_video",
+            "mode": "rw",
+        },
     }
 
     # Auto-detect display settings using shared utility
@@ -386,7 +419,9 @@ def _run_media_container(
         resolution_normalized = "4K"
     else:
         resolution_normalized = "1080p"
-    logger.debug(f"Normalized resolution for container: {resolution} → {resolution_normalized}")
+    logger.debug(
+        f"Normalized resolution for container: {resolution} → {resolution_normalized}"
+    )
 
     # Normalize bitrate format (4Mbps -> 4000 kbps for container)
     # Container bitrates are in kbps: {"h264": [4000, 16000], "h265": [2000, 8000]}
@@ -396,10 +431,14 @@ def _run_media_container(
 
     bitrate_match = re.match(r"(\d+)Mbps", bitrate)
     if bitrate_match:
-        bitrate_normalized = str(int(bitrate_match.group(1)) * 1000)  # 4Mbps -> 4000 kbps
+        bitrate_normalized = str(
+            int(bitrate_match.group(1)) * 1000
+        )  # 4Mbps -> 4000 kbps
     else:
         bitrate_normalized = bitrate  # Keep as-is if format unexpected
-    logger.debug(f"Normalized bitrate for container: {bitrate} → {bitrate_normalized} kbps")
+    logger.debug(
+        f"Normalized bitrate for container: {bitrate} → {bitrate_normalized} kbps"
+    )
 
     # Display output: 0=fakesink (no display), 1=xvimagesink (display enabled)
     # Use the auto-detected display_output_enabled value determined earlier
@@ -433,6 +472,7 @@ def _run_media_container(
 
     try:
         # Use DockerClient.run_container in batch mode
+        # Run as dlstreamer (non-root) with specific caps instead of privileged mode
         result = docker_client.run_container(
             name=container_name,
             image=f"{image_name}:{image_tag}",
@@ -441,9 +481,12 @@ def _run_media_container(
             volumes=volumes,
             devices=container_devices,
             environment=environment,
-            user="root:root",  # Run as root for GPU access
             group_add=[render_gid, user_gid],
-            privileged=True,  # validation-skip-privileged # Required for GPU access and benchmarking
+            cap_add=[
+                "PERFMON",
+                "SYS_ADMIN",
+                "DAC_READ_SEARCH",
+            ],  # Required for GPU access, performance monitoring (intel_gpu_top, xpu-smi), and RAPL energy reading
             network_mode="host",  # Required for inter-process communication
             ipc_mode="host",  # Required for shared memory
             working_dir="/home/dlstreamer",
@@ -490,7 +533,9 @@ def test_media_pipelines(
     # Parameters
     test_id = configs.get("test_id", test_name)
     test_display_name = configs.get("display_name", test_name)
-    force_run = configs.get("force_run", False)  # Control whether to force re-run even if results exist
+    force_run = configs.get(
+        "force_run", False
+    )  # Control whether to force re-run even if results exist
 
     # Container execution control - read from profile config (default False to enable full test execution)
     skip_container_execution = configs.get("skip_container_execution", False)
@@ -513,7 +558,9 @@ def test_media_pipelines(
     test_dir = os.path.dirname(os.path.abspath(__file__))
     docker_dir = os.path.join(test_dir, test_container_path)
 
-    core_data_dir_tainted = os.environ.get("CORE_DATA_DIR", os.path.join(os.getcwd(), "esq_data"))
+    core_data_dir_tainted = os.environ.get(
+        "CORE_DATA_DIR", os.path.join(os.getcwd(), "esq_data")
+    )
     core_data_dir = "".join(c for c in core_data_dir_tainted)
     data_dir = os.path.join(core_data_dir, "data", "media", "performance")
     media_results = os.path.join(data_dir, "results", "media")
@@ -540,7 +587,9 @@ def test_media_pipelines(
 
     # Log detailed device information
     for device_id, device_info in device_dict.items():
-        logger.debug(f"Device {device_id}: Type={device_info['device_type']}, Name={device_info['full_name']}")
+        logger.debug(
+            f"Device {device_id}: Type={device_info['device_type']}, Name={device_info['full_name']}"
+        )
 
     docker_client = DockerClient()
 
@@ -590,12 +639,20 @@ def test_media_pipelines(
             src_dir = os.path.join(ai_vision_dir, "src")
 
             # Setup models/videos dirs for dlstreamer prep
-            core_data_dir_tainted = os.environ.get("CORE_DATA_DIR", os.path.join(os.getcwd(), "esq_data"))
+            core_data_dir_tainted = os.environ.get(
+                "CORE_DATA_DIR", os.path.join(os.getcwd(), "esq_data")
+            )
             core_data_dir = "".join(c for c in core_data_dir_tainted)
-            prep_models_dir = os.path.join(core_data_dir, "data", "ai", "vision", "models")
-            prep_videos_dir = os.path.join(core_data_dir, "data", "ai", "vision", "videos")
+            prep_models_dir = os.path.join(
+                core_data_dir, "data", "ai", "vision", "models"
+            )
+            prep_videos_dir = os.path.join(
+                core_data_dir, "data", "ai", "vision", "videos"
+            )
 
-            logger.info("Build 1: Preparing FW custom device-specific DLStreamer images...")
+            logger.info(
+                "Build 1: Preparing FW custom device-specific DLStreamer images..."
+            )
             dlstreamer_result = prepare_dlstreamer_assets(
                 configs=configs,
                 models_dir=prep_models_dir,
@@ -608,17 +665,23 @@ def test_media_pipelines(
             )
 
             fw_container_config = dlstreamer_result.metadata.get("container_config", {})
-            logger.info(f"FW custom images available: {list(fw_container_config.keys())}")
+            logger.info(
+                f"FW custom images available: {list(fw_container_config.keys())}"
+            )
 
             # Build 2: Select FW custom image based on device
-            fw_custom_base_image = fw_container_config.get("analyzer_image", "intel/dlstreamer:2025.2.0-ubuntu24")
+            fw_custom_base_image = fw_container_config.get(
+                "analyzer_image", "intel/dlstreamer:2025.2.0-ubuntu24"
+            )
 
             # Check device parameter
             device_lower = device.lower()
             if "npu" in device_lower:
                 fw_custom_base_image = fw_container_config.get(
                     "npu_analyzer_image",
-                    fw_container_config.get("analyzer_image", "intel/dlstreamer:2025.2.0-ubuntu24")
+                    fw_container_config.get(
+                        "analyzer_image", "intel/dlstreamer:2025.2.0-ubuntu24"
+                    ),
                 )
                 logger.info("Detected NPU device, using NPU custom image")
             elif device_lower.startswith("gpu"):
@@ -632,11 +695,15 @@ def test_media_pipelines(
                 if is_discrete:
                     fw_custom_base_image = fw_container_config.get(
                         "dgpu_analyzer_image",
-                        fw_container_config.get("analyzer_image", "intel/dlstreamer:2025.2.0-ubuntu24")
+                        fw_container_config.get(
+                            "analyzer_image", "intel/dlstreamer:2025.2.0-ubuntu24"
+                        ),
                     )
                     logger.info("Detected discrete GPU, using dGPU custom image")
 
-            logger.info(f"Using FW image as base for media pipeline test: {fw_custom_base_image}")
+            logger.info(
+                f"Using FW image as base for media pipeline test: {fw_custom_base_image}"
+            )
 
             docker_nocache = configs.get("docker_nocache", False)
             logger.info(f"Docker build cache setting: nocache={docker_nocache}")
@@ -668,9 +735,13 @@ def test_media_pipelines(
             test_file_dir = Path(__file__).resolve().parent
 
             # Dockerfile path relative to esq/ build context
-            relative_dockerfile = "suites/media/performance/src/containers/media_benchmark/Dockerfile"
+            relative_dockerfile = (
+                "suites/media/performance/src/containers/media_benchmark/Dockerfile"
+            )
 
-            build_context_dir = _resolve_esq_build_context(test_file_dir, relative_dockerfile)
+            build_context_dir = _resolve_esq_build_context(
+                test_file_dir, relative_dockerfile
+            )
             logger.debug(f"Build context directory: {build_context_dir}")
             logger.debug(f"Relative Dockerfile path: {relative_dockerfile}")
 
@@ -718,7 +789,12 @@ def test_media_pipelines(
         # Don't raise yet - create N/A result below
 
     try:
-        prepare_test(test_name=test_name, configs=configs, prepare_func=prepare_assets, name="media_test_assets")
+        prepare_test(
+            test_name=test_name,
+            configs=configs,
+            prepare_func=prepare_assets,
+            name="media_test_assets",
+        )
     except Exception as prep_error:
         # Handle docker build or other preparation failures
         test_failed = True
@@ -729,7 +805,9 @@ def test_media_pipelines(
             f"Check logs for detailed error and verify Docker daemon is running."
         )
         logger.error(failure_message, exc_info=True)
-        logger.debug(f"Preparation failed - Docker dir: {docker_dir}, Timeout: {timeout}s")
+        logger.debug(
+            f"Preparation failed - Docker dir: {docker_dir}, Timeout: {timeout}s"
+        )
 
     # If preparation failed, return N/A metrics immediately
     if test_failed:
@@ -778,12 +856,14 @@ def test_media_pipelines(
             csv_to_metric_map = {
                 "Max Channels": "max_streams",  # Actual max channels from test execution
                 "Average FPS": "avg_fps",  # Average FPS (backup to log extraction)
-                "Ref GPU Freq": "gpu_freq_mhz",  # Reference GPU frequency (will be -1 for now)
-                "Ref Pkg Power": "pkg_power_w",  # Reference package power (will be -1 for now)
+                "GPU Freq": "gpu_freq_mhz",  # Actual GPU frequency in MHz
+                "Pkg Power": "pkg_power_w",  # Actual package power in watts
                 "Duration(s)": "duration_s",  # Test duration (optional - defaults to 0 if missing)
             }
 
-            logger.debug(f"run_test() extracting metrics: {list(csv_to_metric_map.keys())}")
+            logger.debug(
+                f"run_test() extracting metrics: {list(csv_to_metric_map.keys())}"
+            )
 
             # Initialize result template using from_test_config for automatic metadata application
             result = Result.from_test_config(
@@ -807,7 +887,9 @@ def test_media_pipelines(
                     f"Verify hardware availability and driver installation (Intel GPU drivers required)."
                 )
                 logger.error(error_msg)
-                logger.debug(f"Test configuration - device category: {device}, display_name: {test_display_name}")
+                logger.debug(
+                    f"Test configuration - device category: {device}, display_name: {test_display_name}"
+                )
                 result.metadata["failure_reason"] = error_msg
                 return result
 
@@ -834,7 +916,9 @@ def test_media_pipelines(
                         dgpu_index += 1
 
                     device_canonical_map[device_id] = canonical_name
-                    logger.debug(f"Device {device_id} (Type={device_type}) mapped to {canonical_name}")
+                    logger.debug(
+                        f"Device {device_id} (Type={device_type}) mapped to {canonical_name}"
+                    )
 
                 for device_id, device_info in device_dict.items():
                     canonical_device_name = device_canonical_map[device_id]
@@ -842,9 +926,13 @@ def test_media_pipelines(
                     # Check if specific test result exists in CSV (not just if CSV file exists)
                     # Determine which CSV file to check based on operation
                     if operation == "encode":
-                        result_csv_path = Path(f"{media_results}/media_encode_performance_benchmark.csv")
+                        result_csv_path = Path(
+                            f"{media_results}/media_encode_performance_benchmark.csv"
+                        )
                     else:
-                        result_csv_path = Path(f"{media_results}/media_performance_benchmark.csv")
+                        result_csv_path = Path(
+                            f"{media_results}/media_performance_benchmark.csv"
+                        )
 
                     # Check if this specific device/codec/bitrate combination exists in CSV
                     result_exists_in_csv = False
@@ -858,15 +946,46 @@ def test_media_pipelines(
                                 device_normalized = canonical_device_name.lower()
 
                                 # Handle both old and new column names for backward compatibility
-                                codec_col = "Codec" if "Codec" in df.columns else "Input Codec"
-                                bitrate_col = "Bitrate" if "Bitrate" in df.columns else "Input Bitrate"
+                                codec_col = (
+                                    "Codec" if "Codec" in df.columns else "Input Codec"
+                                )
+                                bitrate_col = (
+                                    "Bitrate"
+                                    if "Bitrate" in df.columns
+                                    else "Input Bitrate"
+                                )
 
                                 # Check if matching row exists
-                                mask = (
-                                    (df[codec_col].str.replace(".", "").str.lower() == codec_normalized)
-                                    & (df[bitrate_col] == bitrate)
-                                    & (df["Device Used"].str.lower() == device_normalized)
+                                # NOTE: Decode and Decode+Compose share the same CSV file
+                                # (media_performance_benchmark.csv). Without filtering by the
+                                # task-name column, both operations can match each other's rows.
+                                is_compose_op = any(
+                                    kw in operation.lower() for kw in ["compose"]
                                 )
+                                task_col = "Media Performance Benchmark"
+
+                                mask = (
+                                    (
+                                        df[codec_col].str.replace(".", "").str.lower()
+                                        == codec_normalized
+                                    )
+                                    & (df[bitrate_col] == bitrate)
+                                    & (
+                                        df["Device Used"].str.lower()
+                                        == device_normalized
+                                    )
+                                )
+
+                                # Filter by task name to avoid Decode/Decode+Compose cross-match
+                                if task_col in df.columns:
+                                    if is_compose_op:
+                                        mask = mask & df[task_col].str.contains(
+                                            "Compose", case=False, na=False
+                                        )
+                                    else:
+                                        mask = mask & ~df[task_col].str.contains(
+                                            "Compose", case=False, na=False
+                                        )
 
                                 result_exists_in_csv = mask.any()
                                 if result_exists_in_csv:
@@ -875,14 +994,20 @@ def test_media_pipelines(
                                         f"operation={operation}, codec={codec}, bitrate={bitrate}"
                                     )
                         except Exception as e:
-                            logger.warning(f"Failed to check CSV for existing results: {e}")
+                            logger.warning(
+                                f"Failed to check CSV for existing results: {e}"
+                            )
 
                     # Determine if we need to run the benchmark
-                    should_run_benchmark = (not result_exists_in_csv or force_run) and not skip_container_execution
+                    should_run_benchmark = (
+                        not result_exists_in_csv or force_run
+                    ) and not skip_container_execution
 
                     if should_run_benchmark:
                         if force_run:
-                            logger.info("Force run enabled. Running media benchmark container...")
+                            logger.info(
+                                "Force run enabled. Running media benchmark container..."
+                            )
                         else:
                             logger.info(
                                 f"Result not found in CSV for device={device_id}, operation={operation}, "
@@ -903,13 +1028,13 @@ def test_media_pipelines(
                         try:
                             # Run media container using DockerClient API
                             # Track container name for cleanup in finally block
-                            container_name = (
-                                f"{configs.get('container_image', 'media_perf_runner')}_{device_id}_{test_id}"
-                            )
+                            container_name = f"{configs.get('container_image', 'media_perf_runner')}_{device_id}_{test_id}"
                             container_result = _run_media_container(
                                 docker_client=docker_client,
                                 container_name=container_name,
-                                image_name=configs.get("container_image", "media_perf_runner"),
+                                image_name=configs.get(
+                                    "container_image", "media_perf_runner"
+                                ),
                                 image_tag=configs.get("image_tag", "1.0"),
                                 device_id=canonical_device_name,
                                 media_results=media_results,
@@ -924,7 +1049,9 @@ def test_media_pipelines(
                             )
 
                             # Check container exit code
-                            exit_code = container_result.get("container_info", {}).get("exit_code", 1)
+                            exit_code = container_result.get("container_info", {}).get(
+                                "exit_code", 1
+                            )
                             if exit_code != 0:
                                 error_msg = (
                                     f"Container execution failed for device '{device_id}' with exit code {exit_code}. "
@@ -950,10 +1077,14 @@ def test_media_pipelines(
 
                     # Determine CSV file path based on operation
                     if operation == "encode":
-                        csv_file_path = Path(f"{media_results}/media_encode_performance_benchmark.csv")
+                        csv_file_path = Path(
+                            f"{media_results}/media_encode_performance_benchmark.csv"
+                        )
                     else:
                         # decode and decode + compose both use the main CSV
-                        csv_file_path = Path(f"{media_results}/media_performance_benchmark.csv")
+                        csv_file_path = Path(
+                            f"{media_results}/media_performance_benchmark.csv"
+                        )
 
                     if csv_file_path.exists():
                         logger.info(f"Processing CSV file: {csv_file_path.name}")
@@ -963,7 +1094,9 @@ def test_media_pipelines(
                             df = pd.read_csv(csv_file_path)
 
                             if df.empty:
-                                logger.warning(f"CSV file contains no data rows: {csv_file_path.name}")
+                                logger.warning(
+                                    f"CSV file contains no data rows: {csv_file_path.name}"
+                                )
                                 continue
 
                             # Normalize column names (strip spaces)
@@ -973,7 +1106,9 @@ def test_media_pipelines(
                             # Filter rows to find matching test result
                             # Use pandas query for cleaner filtering with normalized values
                             # Normalize codec for matching (H.264 -> h264)
-                            codec_normalized = codec.replace(".", "").lower()  # H.264 -> h264
+                            codec_normalized = codec.replace(
+                                ".", ""
+                            ).lower()  # H.264 -> h264
 
                             # Use canonical name from mapping (already determined by device type)
                             device_normalized = canonical_device_name.lower()
@@ -982,12 +1117,39 @@ def test_media_pipelines(
                             mask = pd.Series([True] * len(df))
 
                             # Handle both old column names (Input Codec) and new names (Codec) for backward compatibility
-                            codec_col = "Codec" if "Codec" in df.columns else "Input Codec"
-                            bitrate_col = "Bitrate" if "Bitrate" in df.columns else "Input Bitrate"
+                            codec_col = (
+                                "Codec" if "Codec" in df.columns else "Input Codec"
+                            )
+                            bitrate_col = (
+                                "Bitrate"
+                                if "Bitrate" in df.columns
+                                else "Input Bitrate"
+                            )
 
-                            mask = mask & (df[codec_col].str.replace(".", "").str.lower() == codec_normalized)
+                            mask = mask & (
+                                df[codec_col].str.replace(".", "").str.lower()
+                                == codec_normalized
+                            )
                             mask = mask & (df[bitrate_col] == bitrate)
-                            mask = mask & (df["Device Used"].str.lower() == device_normalized)
+                            mask = mask & (
+                                df["Device Used"].str.lower() == device_normalized
+                            )
+
+                            # Decode and Decode+Compose share the same CSV file.
+                            # Filter by task-name column so decode rows don't pick compose rows and vice versa.
+                            is_compose_op = any(
+                                kw in operation.lower() for kw in ["compose"]
+                            )
+                            task_col = "Media Performance Benchmark"
+                            if task_col in df.columns:
+                                if is_compose_op:
+                                    mask = mask & df[task_col].str.contains(
+                                        "Compose", case=False, na=False
+                                    )
+                                else:
+                                    mask = mask & ~df[task_col].str.contains(
+                                        "Compose", case=False, na=False
+                                    )
 
                             filtered_df = df[mask]
 
@@ -996,14 +1158,22 @@ def test_media_pipelines(
                                     f"No matching data found. Looking for: operation={operation}, "
                                     f"device={device_normalized}, codec={codec_normalized}, bitrate={bitrate}"
                                 )
-                                logger.debug(f"Available devices in CSV: {df['Device Used'].unique()}")
-                                logger.debug(f"Available codecs in CSV: {df['Codec'].unique()}")
-                                logger.debug(f"Available bitrates in CSV: {df['Bitrate'].unique()}")
+                                logger.debug(
+                                    f"Available devices in CSV: {df['Device Used'].unique()}"
+                                )
+                                logger.debug(
+                                    f"Available codecs in CSV: {df['Codec'].unique()}"
+                                )
+                                logger.debug(
+                                    f"Available bitrates in CSV: {df['Bitrate'].unique()}"
+                                )
                                 continue
 
                             # Take the first matching row
                             best_row = filtered_df.iloc[0]
-                            logger.info(f"Found matching row: {len(filtered_df)} result(s), using first match")
+                            logger.info(
+                                f"Found matching row: {len(filtered_df)} result(s), using first match"
+                            )
 
                             # Extract metrics directly from CSV columns
                             for csv_col, metric_key in csv_to_metric_map.items():
@@ -1014,65 +1184,92 @@ def test_media_pipelines(
                                             # Max streams/channels (key metric)
                                             result.metrics[metric_key].value = (
                                                 int(value)
-                                                if str(value) not in ["N/A", "nan", "", "None"] and pd.notna(value)
+                                                if str(value)
+                                                not in ["N/A", "nan", "", "None"]
+                                                and pd.notna(value)
                                                 else 0
                                             )
                                             result.metrics[metric_key].unit = "streams"
-                                            logger.info(f"Extracted {metric_key} = {value}")
+                                            logger.info(
+                                                f"Extracted {metric_key} = {value}"
+                                            )
                                         elif csv_col == "Average FPS":
                                             # Average FPS (backup if log extraction fails)
                                             fps_val = (
                                                 float(value)
-                                                if str(value) not in ["N/A", "nan", "", "-1"] and pd.notna(value)
+                                                if str(value)
+                                                not in ["N/A", "nan", "", "-1"]
+                                                and pd.notna(value)
                                                 else 0.0
                                             )
-                                            if fps_val > 0 and result.metrics[metric_key].value == "N/A":
-                                                result.metrics[metric_key].value = fps_val
+                                            if (
+                                                fps_val > 0
+                                                and result.metrics[metric_key].value
+                                                == "N/A"
+                                            ):
+                                                result.metrics[
+                                                    metric_key
+                                                ].value = fps_val
                                                 result.metrics[metric_key].unit = "fps"
-                                                logger.debug(f"Extracted {metric_key} = {value} from CSV (backup)")
+                                                logger.debug(
+                                                    f"Extracted {metric_key} = {value} from CSV (backup)"
+                                                )
                                         elif csv_col == "Duration(s)":
                                             # Duration in seconds
                                             duration_str = str(value).strip()
                                             if (
                                                 duration_str
-                                                and duration_str not in ["N/A", "nan", "", "-1", "None"]
+                                                and duration_str
+                                                not in ["N/A", "nan", "", "-1", "None"]
                                                 and pd.notna(value)
                                             ):
-                                                result.metrics[metric_key].value = float(duration_str)
+                                                result.metrics[
+                                                    metric_key
+                                                ].value = float(duration_str)
                                                 result.metrics[metric_key].unit = "s"
                                                 logger.debug(f"Extracted {metric_key} = {value}")
-                                        elif csv_col in ["Ref GPU Freq"]:
-                                            # Reference GPU frequency in MHz (will be -1 if not available)
+                                        elif csv_col in ["GPU Freq"]:
+                                            # Actual GPU frequency in MHz (use -1 if unavailable)
                                             try:
                                                 freq_val = (
                                                     float(value)
-                                                    if pd.notna(value) and str(value) not in ["N/A", "nan", "", "None"]
+                                                    if pd.notna(value)
+                                                    and str(value)
+                                                    not in ["N/A", "nan", "", "None"]
                                                     else -1.0
                                                 )
-                                                result.metrics[metric_key].value = freq_val
+                                                result.metrics[metric_key].value = freq_val if freq_val > 0 else -1.0
                                                 result.metrics[metric_key].unit = "MHz" if freq_val > 0 else None
                                                 logger.debug(f"Extracted {metric_key} = {freq_val} MHz")
                                             except (ValueError, TypeError):
                                                 result.metrics[metric_key].value = -1.0
                                                 logger.debug(f"{metric_key} = -1 (not available)")
-                                        elif csv_col in ["Ref Pkg Power"]:
-                                            # Reference package power in watts (will be -1 if not available)
+                                        elif csv_col in ["Pkg Power"]:
+                                            # Actual package power in watts (use -1 if unavailable)
                                             try:
                                                 power_val = (
                                                     float(value)
-                                                    if pd.notna(value) and str(value) not in ["N/A", "nan", "", "None"]
+                                                    if pd.notna(value)
+                                                    and str(value)
+                                                    not in ["N/A", "nan", "", "None"]
                                                     else -1.0
                                                 )
-                                                result.metrics[metric_key].value = power_val
+                                                result.metrics[metric_key].value = power_val if power_val > 0 else -1.0
                                                 result.metrics[metric_key].unit = "W" if power_val > 0 else None
                                                 logger.debug(f"Extracted {metric_key} = {power_val} W")
                                             except (ValueError, TypeError):
                                                 result.metrics[metric_key].value = -1.0
-                                                logger.debug(f"{metric_key} = -1 (not available)")
+                                                logger.debug(
+                                                    f"{metric_key} = -1 (not available)"
+                                                )
                                     except (ValueError, TypeError) as e:
-                                        logger.warning(f"Failed to convert {csv_col}={value}: {e}")
+                                        logger.warning(
+                                            f"Failed to convert {csv_col}={value}: {e}"
+                                        )
                                 else:
-                                    logger.debug(f"CSV column '{csv_col}' not found in CSV (may be optional)")
+                                    logger.debug(
+                                        f"CSV column '{csv_col}' not found in CSV (may be optional)"
+                                    )
 
                             # Extract avg_fps from log file (not from CSV)
                             log_filename = "media_performance_benchmark_runner.log"
@@ -1080,51 +1277,81 @@ def test_media_pipelines(
 
                             if log_file_path.exists():
                                 try:
-                                    with open(log_file_path, "r", encoding="utf-8", errors="ignore") as log_f:
+                                    with open(
+                                        log_file_path,
+                                        "r",
+                                        encoding="utf-8",
+                                        errors="ignore",
+                                    ) as log_f:
                                         log_lines = log_f.readlines()
 
                                     # Pattern: "Average fps is X" or "Average FPS: X"
                                     import re
 
-                                    fps_pattern = r"Average\s+fps\s+(?:is\s+|:\s*)([\d.]+)"
+                                    fps_pattern = (
+                                        r"Average\s+fps\s+(?:is\s+|:\s*)([\d.]+)"
+                                    )
 
                                     fps_values = []
                                     for line in log_lines:
-                                        match = re.search(fps_pattern, line, re.IGNORECASE)
+                                        match = re.search(
+                                            fps_pattern, line, re.IGNORECASE
+                                        )
                                         if match:
                                             fps_values.append(float(match.group(1)))
 
                                     if fps_values:
-                                        result.metrics["avg_fps"].value = fps_values[-1]  # Use last/final FPS
+                                        result.metrics["avg_fps"].value = fps_values[
+                                            -1
+                                        ]  # Use last/final FPS
                                         result.metrics["avg_fps"].unit = "fps"
                                         logger.info(
                                             f"Extracted avg_fps={fps_values[-1]} from {log_filename} ({len(fps_values)} entries)"
                                         )
                                     else:
-                                        logger.warning(f"No FPS values found in log: {log_filename}")
+                                        logger.warning(
+                                            f"No FPS values found in log: {log_filename}"
+                                        )
 
                                     # Extract duration from log
                                     duration_pattern = r"(?:Duration|total\s+time)[:\s]+([\\d.]+)\\s*s(?:econds)?"
                                     duration_values = []
                                     for line in log_lines:
-                                        match = re.search(duration_pattern, line, re.IGNORECASE)
+                                        match = re.search(
+                                            duration_pattern, line, re.IGNORECASE
+                                        )
                                         if match:
-                                            duration_values.append(float(match.group(1)))
+                                            duration_values.append(
+                                                float(match.group(1))
+                                            )
 
                                     if duration_values:
-                                        result.metrics["duration_s"].value = duration_values[-1]
+                                        result.metrics[
+                                            "duration_s"
+                                        ].value = duration_values[-1]
                                         result.metrics["duration_s"].unit = "s"
-                                        logger.info(f"Extracted duration={duration_values[-1]}s from {log_filename}")
+                                        logger.info(
+                                            f"Extracted duration={duration_values[-1]}s from {log_filename}"
+                                        )
                                     else:
-                                        logger.debug(f"No duration found in log: {log_filename}")
+                                        logger.debug(
+                                            f"No duration found in log: {log_filename}"
+                                        )
                                 except Exception as log_err:
-                                    logger.warning(f"Failed to extract metrics from {log_filename}: {log_err}")
+                                    logger.warning(
+                                        f"Failed to extract metrics from {log_filename}: {log_err}"
+                                    )
                             else:
                                 logger.warning(f"Log file not found: {log_file_path}")
 
                             # Verify key metric was assigned
-                            if result.metrics["max_streams"].value == "N/A" or result.metrics["max_streams"].value == 0:
-                                logger.warning("Key metric 'max_streams' not extracted or is zero")
+                            if (
+                                result.metrics["max_streams"].value == "N/A"
+                                or result.metrics["max_streams"].value == 0
+                            ):
+                                logger.warning(
+                                    "Key metric 'max_streams' not extracted or is zero"
+                                )
 
                         except Exception as csv_error:
                             error_msg = (
@@ -1150,8 +1377,12 @@ def test_media_pipelines(
                             if Path(media_results).exists()
                             else "Directory not found"
                         )
-                        logger.debug(f"Results directory contents: {results_dir_contents}")
-                        result.metadata["failure_reason"] = "Results CSV file not generated by test container"
+                        logger.debug(
+                            f"Results directory contents: {results_dir_contents}"
+                        )
+                        result.metadata["failure_reason"] = (
+                            "Results CSV file not generated by test container"
+                        )
                         result.metadata["status"] = "N/A"
                         return result
 
@@ -1165,14 +1396,18 @@ def test_media_pipelines(
                         f"Verify CSV format matches expected structure."
                     )
                     logger.error(error_msg)
-                    logger.debug(f"CSV file location: {csv_file_path if 'csv_file_path' in locals() else 'undefined'}")
+                    logger.debug(
+                        f"CSV file location: {csv_file_path if 'csv_file_path' in locals() else 'undefined'}"
+                    )
                     result.metadata["failure_reason"] = error_msg
                     result.metadata["status"] = "N/A"
                     return result
 
                 # If successfully processed all devices and collected valid metrics, mark as success
                 result.metadata["status"] = True
-                result.metadata.pop("failure_reason", None)  # Remove failure_reason if test succeeded
+                result.metadata.pop(
+                    "failure_reason", None
+                )  # Remove failure_reason if test succeeded
 
             except Exception as exec_error:
                 # Handle any execution errors (shell script failures, CSV parsing, etc.)
@@ -1239,14 +1474,18 @@ def test_media_pipelines(
             try:
                 logger.debug(f"Finally block: Cleaning up container {container_name}")
                 docker_client.cleanup_container(container_name, timeout=30)
-                logger.info(f"Finally block: Successfully cleaned up container {container_name}")
+                logger.info(
+                    f"Finally block: Successfully cleaned up container {container_name}"
+                )
             except Exception as cleanup_err:
                 logger.warning(
                     f"Finally block: Failed to cleanup container {container_name}: {cleanup_err}. "
                     "Container may require manual cleanup with 'docker rm -f'."
                 )
         else:
-            logger.debug("Finally block: No container to cleanup (container_name is None)")
+            logger.debug(
+                "Finally block: No container to cleanup (container_name is None)"
+            )
 
     # Execute the test with shared fixture
     results = execute_test_with_cache(
@@ -1266,12 +1505,18 @@ def test_media_pipelines(
 
         if is_hardware_missing:
             logger.error(f"Test failed - hardware not available: {failure_msg}")
-            logger.info(f"Test summary - ID: {test_id}, Device: {device}, Operation: {operation}")
-            logger.info(f"N/A metrics will be reported for {device.upper()} (hardware not present)")
+            logger.info(
+                f"Test summary - ID: {test_id}, Device: {device}, Operation: {operation}"
+            )
+            logger.info(
+                f"N/A metrics will be reported for {device.upper()} (hardware not present)"
+            )
         else:
             # Actual test execution error - log as error
             logger.error(f"Test failed with N/A status: {failure_msg}")
-            logger.info(f"Test summary - ID: {test_id}, Device: {device}, Operation: {operation}")
+            logger.info(
+                f"Test summary - ID: {test_id}, Device: {device}, Operation: {operation}"
+            )
 
         summarize_test_results(
             results=results,
@@ -1283,9 +1528,16 @@ def test_media_pipelines(
         pytest.fail(f"Media Benchmark test failed - {failure_msg}")
 
     # Validate test results against KPI thresholds
-    validate_test_results(results=results, configs=configs, get_kpi_config=get_kpi_config, test_name=test_name)
+    validate_test_results(
+        results=results,
+        configs=configs,
+        get_kpi_config=get_kpi_config,
+        test_name=test_name,
+    )
     try:
-        logger.info(f"Generating test result visualizations (always executed) Results: {results}")
+        logger.info(
+            f"Generating test result visualizations (always executed) Results: {results}"
+        )
 
         # Summarize results using the shared fixture
         # NOTE: enable_visualizations NOT used - charts generated separately via _generate_media_charts()
@@ -1303,7 +1555,9 @@ def test_media_pipelines(
         )
         logger.error(error_msg, exc_info=True)
         device_keys = list(device_dict.keys()) if device_dict else "None"
-        logger.debug(f"Summary context - Results dir: {media_results}, Device dict: {device_keys}")
+        logger.debug(
+            f"Summary context - Results dir: {media_results}, Device dict: {device_keys}"
+        )
 
     # Create aggregated CSV for chart generation from main performance benchmark CSV
     # Read from the main CSV that container writes to (not the per-test CSV)
@@ -1331,7 +1585,9 @@ def test_media_pipelines(
                 actual_device_id = list(device_dict.keys())[0]
                 logger.debug(f"Using device ID for aggregation: {actual_device_id}")
             else:
-                logger.warning("No devices in device_dict, cannot create aggregated CSV")
+                logger.warning(
+                    "No devices in device_dict, cannot create aggregated CSV"
+                )
                 raise ValueError("No devices available for aggregation")
 
             # Get canonical name for the device using common utility
@@ -1339,7 +1595,9 @@ def test_media_pipelines(
 
             device_type = device_dict[actual_device_id].get("device_type")
             device_normalized = normalize_device_name(actual_device_id, device_type)
-            logger.debug(f"Canonical device for CSV matching: {actual_device_id} → {device_normalized}")
+            logger.debug(
+                f"Canonical device for CSV matching: {actual_device_id} → {device_normalized}"
+            )
 
             # Normalize codec for matching (remove dots, lowercase)
             codec_normalized_match = codec.replace(".", "").replace("-", "").lower()
@@ -1350,17 +1608,43 @@ def test_media_pipelines(
 
             # Filter for matching row
             mask = (
-                (main_df["Device Used"].str.contains(device_normalized, case=False, na=False))
-                & (main_df[codec_col].str.replace(".", "").str.replace("-", "").str.lower() == codec_normalized_match)
+                (
+                    main_df["Device Used"].str.contains(
+                        device_normalized, case=False, na=False
+                    )
+                )
+                & (
+                    main_df[codec_col]
+                    .str.replace(".", "")
+                    .str.replace("-", "")
+                    .str.lower()
+                    == codec_normalized_match
+                )
                 & (main_df[bitrate_col] == bitrate)
             )
+
+            # Decode and Decode+Compose share the same main CSV.
+            # Apply operation filter on task-name column to prevent cross-contamination.
+            is_compose_op_agg = any(kw in operation.lower() for kw in ["compose"])
+            task_col_agg = "Media Performance Benchmark"
+            if task_col_agg in main_df.columns:
+                if is_compose_op_agg:
+                    mask = mask & main_df[task_col_agg].str.contains(
+                        "Compose", case=False, na=False
+                    )
+                else:
+                    mask = mask & ~main_df[task_col_agg].str.contains(
+                        "Compose", case=False, na=False
+                    )
 
             filtered_df = main_df[mask]
 
             if not filtered_df.empty:
                 # Normalize operation name for filename (replace spaces with underscores)
                 operation_normalized = operation.replace(" ", "_")
-                aggregated_csv_path = Path(f"{media_results}/aggregated_{codec_normalized}_{operation_normalized}.csv")
+                aggregated_csv_path = Path(
+                    f"{media_results}/aggregated_{codec_normalized}_{operation_normalized}.csv"
+                )
 
                 # Extract the test result row
                 test_row = filtered_df.iloc[0].to_dict()
@@ -1375,7 +1659,9 @@ def test_media_pipelines(
                     # Remove old row with same test_id if exists (overwrite)
                     agg_df = agg_df[agg_df["Test Id"] != test_id]
                     # Append new row
-                    agg_df = pd.concat([agg_df, pd.DataFrame([test_row])], ignore_index=True)
+                    agg_df = pd.concat(
+                        [agg_df, pd.DataFrame([test_row])], ignore_index=True
+                    )
                 else:
                     agg_df = pd.DataFrame([test_row])
 
@@ -1390,7 +1676,9 @@ def test_media_pipelines(
                     f"No matching row found in {main_csv_name} for device={device_normalized}, "
                     f"codec={codec_normalized_match}, bitrate={bitrate}"
                 )
-                logger.debug(f"Available devices in CSV: {main_df['Device Used'].unique()}")
+                logger.debug(
+                    f"Available devices in CSV: {main_df['Device Used'].unique()}"
+                )
 
     except Exception as agg_error:
         logger.warning(f"Failed to update aggregated CSV: {agg_error}", exc_info=True)
@@ -1398,7 +1686,9 @@ def test_media_pipelines(
     # Attach CSV artifacts (only aggregated CSV)
     # Normalize operation name for filename (replace spaces with underscores)
     operation_normalized = operation.replace(" ", "_")
-    aggregated_csv_path = Path(f"{media_results}/aggregated_{codec_normalized}_{operation_normalized}.csv")
+    aggregated_csv_path = Path(
+        f"{media_results}/aggregated_{codec_normalized}_{operation_normalized}.csv"
+    )
     if aggregated_csv_path.exists():
         try:
             # Read aggregated CSV and filter to essential columns only
@@ -1427,13 +1717,19 @@ def test_media_pipelines(
             df_filtered = df[available_cols]
 
             # Save filtered CSV temporarily
-            filtered_csv_path = aggregated_csv_path.parent / f"filtered_{aggregated_csv_path.name}"
+            filtered_csv_path = (
+                aggregated_csv_path.parent / f"filtered_{aggregated_csv_path.name}"
+            )
             df_filtered.to_csv(filtered_csv_path, index=False)
 
             # Attach filtered CSV
             file_name = os.path.basename(aggregated_csv_path)
             with open(filtered_csv_path, "rb") as f:
-                allure.attach(f.read(), name=f"Media Results - {file_name}", attachment_type=allure.attachment_type.CSV)
+                allure.attach(
+                    f.read(),
+                    name=f"Media Results - {file_name}",
+                    attachment_type=allure.attachment_type.CSV,
+                )
             logger.info(f"Attached aggregated CSV (filtered): {file_name}")
 
             # Clean up filtered CSV
@@ -1445,7 +1741,9 @@ def test_media_pipelines(
 
     # Generate chart only for this test's aggregated CSV (not all CSVs to avoid duplicates)
     operation_normalized = operation.replace(" ", "_")
-    current_aggregated_csv = Path(f"{media_results}/aggregated_{codec_normalized}_{operation_normalized}.csv")
+    current_aggregated_csv = Path(
+        f"{media_results}/aggregated_{codec_normalized}_{operation_normalized}.csv"
+    )
 
     if current_aggregated_csv.exists():
         logger.info(f"Generating chart for current test: {current_aggregated_csv.name}")
@@ -1460,7 +1758,9 @@ def test_media_pipelines(
         except Exception as chart_gen_error:
             logger.error(f"Chart generation failed: {chart_gen_error}", exc_info=True)
     else:
-        logger.debug(f"No aggregated CSV found for chart generation: {current_aggregated_csv.name}")
+        logger.debug(
+            f"No aggregated CSV found for chart generation: {current_aggregated_csv.name}"
+        )
 
     if test_failed:
         pytest.fail(failure_message)

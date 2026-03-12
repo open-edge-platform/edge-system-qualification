@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import shutil
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -12,7 +13,12 @@ import allure
 import pandas as pd
 import pytest
 from esq.utils.genutils import plot_grouped_bar_chart
-from esq.utils.media import detect_display_settings, determine_display_output
+from esq.utils.media import (
+    detect_display_settings,
+    determine_display_output,
+    get_x11_environment,
+    get_x11_volumes,
+)
 from esq.utils.media.validation import detect_platform_type
 from sysagent.utils.config import ensure_dir_permissions
 from sysagent.utils.core import Metrics, Result
@@ -63,6 +69,36 @@ def _resolve_esq_build_context(test_file_dir: Path, relative_dockerfile: str) ->
         f"Checked: {[str(path) for path in candidate_paths]}"
     )
 
+def _verify_proxy_image_x11_tools(docker_client: DockerClient, image_tag: str) -> None:
+    """Verify proxy image contains required X11 tools used by runtime display probes."""
+    probe_cmd = "command -v xdpyinfo && command -v xauth"
+    probe_container_name = f"proxy_x11_probe_{os.getpid()}_{int(time.time())}"
+    logger.info(f"Verifying X11 tools in proxy image '{image_tag}'")
+
+    try:
+        result = docker_client.run_container(
+            name=probe_container_name,
+            image=image_tag,
+            entrypoint=["/bin/sh", "-lc"],
+            command=probe_cmd,
+            detach=True,
+            remove=False,
+            mode="batch",
+            attach_logs=True,
+            timeout=30,
+        )
+        probe_output = (result or {}).get("container_logs_text", "").strip()
+        logger.info(f"X11 tool probe succeeded for '{image_tag}'. Output: {probe_output}")
+    except Exception as probe_error:
+        raise RuntimeError(
+            f"Proxy image '{image_tag}' is missing required X11 tools (xdpyinfo/xauth), "
+            f"or image probe failed: {probe_error}"
+        ) from probe_error
+    finally:
+        try:
+            docker_client.cleanup_container(probe_container_name, timeout=10)
+        except Exception as cleanup_error:
+            logger.debug(f"Probe cleanup warning for {probe_container_name}: {cleanup_error}")
 
 def _create_proxy_pipeline_metrics(suite_name: str, value: str = "N/A", unit: Optional[str] = None) -> dict:
     """
@@ -520,7 +556,6 @@ def _run_proxy_pipeline_container(
     volumes = {
         output_dir: {"bind": "/home/dlstreamer/output", "mode": "rw"},
         sink_dir: {"bind": "/home/dlstreamer/sink", "mode": "rw"},
-        "/tmp/.X11-unix": {"bind": "/tmp/.X11-unix", "mode": "rw"},
     }
 
     # Mount models and videos directories from esq_data/data/vertical/vision/results/ppl/resources
@@ -558,8 +593,16 @@ def _run_proxy_pipeline_container(
             "No X11 display detected. Will auto-fallback to fakesink (headless mode). "
             "Set DISPLAY environment variable for display output."
         )
+
+    # Determine display setting with auto-fallback before preparing env/volumes
+    config_display_output = configs.get("display_output")
+    display_enabled = determine_display_output(
+        config_display_output=config_display_output,
+        display_available=display_available,
+        logger=logger,
+    )
+
     environment = {
-        "DISPLAY": display,
         "DEVICES_LIST": " ".join(device_dict.keys()),
         "PL_NAME": benchmark_script,
         "OUTPUT_DIR": "/home/dlstreamer/output",
@@ -574,99 +617,10 @@ def _run_proxy_pipeline_container(
     if search_algorithm == "adaptive":
         logger.info("FPS-Guided Adaptive Search enabled for this test")
 
-    # Create Docker-compatible X authority file (required for xvimagesink/compositor)
-    xauth_file = "/tmp/.docker.xauth"
-    # Always recreate xauth file to ensure it matches current DISPLAY
-    try:
-        # Remove old file if exists
-        if os.path.exists(xauth_file):
-            os.remove(xauth_file)
-        # Create empty xauth file
-        Path(xauth_file).touch(mode=0o660)
-        # Copy X11 authentication to Docker-compatible format
-
-        # Sanitize display value using character-by-character copying to break taint chain
-        # Allow only alphanumeric, colon, dot, and dash characters
-        sanitized_display = "".join(c for c in display if c.isalnum() or c in ":.-")
-
-        # Sanitize xauth_file path using character-by-character copying
-        sanitized_xauth = "".join(c for c in xauth_file if c.isalnum() or c in "/._-")
-
-        # Execute xauth command using explicit pipeline without shell=True
-        # Chain three processes: xauth nlist | sed | xauth nmerge
-        # Inputs are sanitized above to prevent command injection
-        import subprocess  # nosec B404 # For xauth pipeline
-
-        p1 = None
-        p2 = None
-        p3 = None
-        try:
-            # Process 1: xauth nlist - list X11 authorization entries
-            p1 = subprocess.Popen(
-                ["xauth", "nlist", sanitized_display],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-            )
-
-            # Process 2: sed - replace first 4 chars with 'ffff' for wildcard hostname
-            p2 = subprocess.Popen(
-                ["sed", "-e", "s/^..../ffff/"],
-                stdin=p1.stdout,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-            )
-            if p1.stdout:
-                p1.stdout.close()  # Allow p1 to receive SIGPIPE if p2 exits
-
-            # Process 3: xauth nmerge - merge modified entries into Docker xauth file
-            p3 = subprocess.Popen(
-                ["xauth", "-f", sanitized_xauth, "nmerge", "-"],
-                stdin=p2.stdout,
-                stderr=subprocess.PIPE,
-                text=True,
-            )
-            if p2.stdout:
-                p2.stdout.close()  # Allow p2 to receive SIGPIPE if p3 exits
-
-            # Wait for final process to complete
-            _, stderr = p3.communicate(timeout=10)
-            returncode = p3.returncode
-
-            # Log result for debugging
-            if returncode != 0:
-                logger.warning(f"xauth command failed with code {returncode}: {stderr}")
-            else:
-                logger.debug("xauth command succeeded")
-
-            # Verify xauth file was created with content
-            if os.path.exists(xauth_file):
-                file_size = os.path.getsize(xauth_file)
-                if file_size == 0:
-                    logger.warning("xauth file created but empty - X11 display authorization may not work")
-                else:
-                    logger.debug(f"xauth file created successfully ({file_size} bytes)")
-        except subprocess.TimeoutExpired:
-            logger.warning("xauth command timed out after 10 seconds")
-            # Clean up processes on timeout
-            for proc in [p3, p2, p1]:
-                try:
-                    if proc is not None and proc.poll() is None:
-                        proc.kill()
-                        proc.wait(timeout=1)
-                except Exception:
-                    pass
-        except Exception as xauth_err:
-            logger.warning(f"xauth command failed: {xauth_err}")
-        os.chmod(xauth_file, 0o660)
-        logger.debug(f"Created X authority file for display {sanitized_display}")
-    except Exception as e:
-        logger.warning(f"Failed to create Docker X authority file: {e}")
-
-    if os.path.exists(xauth_file):
-        environment["XAUTHORITY"] = xauth_file
-        volumes[xauth_file] = {"bind": xauth_file, "mode": "rw"}
+    # Mount X11 volumes and environment only when display output is enabled.
+    if display_enabled:
+        volumes.update(get_x11_volumes(display, logger))
+        environment.update(get_x11_environment(display, display_enabled))
 
     # GPU devices
     container_devices = ["/dev/dri:/dev/dri"]
@@ -696,13 +650,7 @@ def _run_proxy_pipeline_container(
     logger.debug(f"Normalized devices for benchmark: {list(device_dict.keys())} → {device_args}")
 
     # Display output: 0=fakesink (no display), 1=xvimagesink (display enabled)
-    # Use shared determine_display_output() for auto-fallback when display not available
-    config_display_output = configs.get("display_output")
-    display_enabled = determine_display_output(
-        config_display_output=config_display_output,
-        display_available=display_available,
-        logger=logger
-    )
+    # Use the auto-detected display setting determined earlier
     display_output = "1" if display_enabled else "0"
     is_mtl = "true" if platform_info.get("is_mtl", False) else "false"
     has_igpu = "true" if platform_info.get("has_igpu", False) else "false"
@@ -729,7 +677,7 @@ def _run_proxy_pipeline_container(
 
     try:
         # Use DockerClient.run_container in batch mode
-        # Match old run_container.sh flags: privileged, net=host, ipc=host
+        # Run as dlstreamer (non-root) with specific caps instead of privileged mode
         result = docker_client.run_container(
             name=container_name,
             image=f"{image_name}:{image_tag}",
@@ -738,9 +686,8 @@ def _run_proxy_pipeline_container(
             volumes=volumes,
             devices=container_devices,
             environment=environment,
-            user="root:root",  # Run as root for GPU access
             group_add=[render_gid, user_gid],
-            privileged=True,  # validation-skip-privileged # Required for GPU access and benchmarking
+            cap_add=["PERFMON", "SYS_ADMIN"],  # Required for GPU access and performance monitoring (intel_gpu_top, xpu-smi)
             network_mode="host",  # Required for inter-process communication
             ipc_mode="host",  # Required for shared memory
             working_dir="/home/dlstreamer",
@@ -1050,31 +997,55 @@ def test_proxy_pipelines(
             fw_container_config = dlstreamer_result.metadata.get("container_config", {})
             logger.info(f"FW custom images available: {list(fw_container_config.keys())}")
 
-            # Build 2: Select FW custom image based on devices
+            # Build 2: Select FW custom image based on devices/capabilities
             fw_custom_base_image = fw_container_config.get("analyzer_image", "intel/dlstreamer:2025.2.0-ubuntu24")
 
-            # Check if any device is NPU or dGPU
+            # Determine if this run can leverage NPU image.
+            # Important: LPR may run with iGPU/dGPU as primary device but still use
+            # NPU in mixed modes, so profile device categories may not include "npu".
+            from sysagent.utils.system.hardware import collect_hardware_info
+
+            hardware_info = collect_hardware_info()
+            npu_info = hardware_info.get("npu", {}) if isinstance(hardware_info, dict) else {}
+            npu_devices = npu_info.get("devices", []) if isinstance(npu_info, dict) else []
+
+            has_npu_from_device_dict = any(
+                "npu" in (info.get("device_type") or "").lower() for info in device_dict.values()
+            )
+            has_npu_platform = bool(npu_devices)
+            has_npu_device = has_npu_from_device_dict or has_npu_platform
+            is_lpr_runner = suite_name == "LPRAIRunner" or configs.get("pptest") == "LPRAIRunner"
+
+            # Check if any requested device category explicitly includes NPU
             devices_lower = [d.lower() for d in device_categories]
-            if any("npu" in d for d in devices_lower):
+            if any("npu" in d for d in devices_lower) or (is_lpr_runner and has_npu_device):
                 fw_custom_base_image = fw_container_config.get(
                     "npu_analyzer_image",
-                    fw_container_config.get("analyzer_image", "intel/dlstreamer:2025.2.0-ubuntu24")
+                    fw_container_config.get("analyzer_image", "intel/dlstreamer:2025.2.0-ubuntu24"),
                 )
-                logger.info("Detected NPU in device list, using NPU custom image")
-            elif any(d.startswith("gpu") for d in devices_lower):
-                # Check for discrete GPU
-                from sysagent.utils.system.hardware import collect_hardware_info
-                hardware_info = collect_hardware_info()
-                gpu_info = hardware_info.get("gpu", {})
-                is_discrete = any(
-                    gpu.get("is_discrete", False) for gpu in gpu_info.get("devices", [])
+                logger.info(
+                    "Using NPU custom image for proxy pipeline "
+                    f"(explicit_npu={'yes' if any('npu' in d for d in devices_lower) else 'no'}, "
+                    f"lpr_runner={'yes' if is_lpr_runner else 'no'}, has_npu_device={'yes' if has_npu_device else 'no'}, "
+                    f"platform_npu={'yes' if has_npu_platform else 'no'}, filtered_npu={'yes' if has_npu_from_device_dict else 'no'})"
                 )
-                if is_discrete:
+            elif any(("gpu" in d) or (d in ["igpu", "dgpu"]) for d in devices_lower):
+                # Use dGPU image only when this test actually targets dGPU.
+                has_explicit_dgpu_request = any("dgpu" in d for d in devices_lower)
+                has_selected_discrete_device = any(
+                    "discrete" in (info.get("device_type") or "").lower() for info in device_dict.values()
+                )
+
+                if has_explicit_dgpu_request or has_selected_discrete_device:
                     fw_custom_base_image = fw_container_config.get(
                         "dgpu_analyzer_image",
-                        fw_container_config.get("analyzer_image", "intel/dlstreamer:2025.2.0-ubuntu24")
+                        fw_container_config.get("analyzer_image", "intel/dlstreamer:2025.2.0-ubuntu24"),
                     )
-                    logger.info("Detected discrete GPU, using dGPU custom image")
+                    logger.info(
+                        "Using dGPU custom image for proxy pipeline "
+                        f"(explicit_dgpu={'yes' if has_explicit_dgpu_request else 'no'}, "
+                        f"selected_discrete={'yes' if has_selected_discrete_device else 'no'})"
+                    )
 
             logger.info(f"Using FW image as base for proxy pipeline test: {fw_custom_base_image}")
 
@@ -1105,6 +1076,15 @@ def test_proxy_pipelines(
             logger.debug(f"Build context directory: {build_context_dir}")
             logger.debug(f"Relative Dockerfile path: {relative_dockerfile}")
 
+            dockerfile_full_path = build_context_dir / relative_dockerfile
+            dockerfile_version = int(dockerfile_full_path.stat().st_mtime)
+            if ":" in docker_image_tag:
+                image_repo, image_ver = docker_image_tag.split(":", 1)
+                docker_image_tag = f"{image_repo}:{image_ver}-df{dockerfile_version}"
+            else:
+                docker_image_tag = f"{docker_image_tag}:df{dockerfile_version}"
+            logger.info(f"Using Dockerfile-versioned image tag: {docker_image_tag}")
+
             build_args = {
                 "COMMON_BASE_IMAGE": fw_custom_base_image,  # FW custom image
             }
@@ -1116,6 +1096,8 @@ def test_proxy_pipelines(
                 dockerfile=relative_dockerfile,
                 buildargs=build_args,
             )
+
+            _verify_proxy_image_x11_tools(docker_client, docker_image_tag)
 
             container_config = {
                 "image_id": build_result.get("image_id", ""),
@@ -1305,11 +1287,21 @@ def test_proxy_pipelines(
                         container_timeout = int(configs.get("timeout", 7200))
                         logger.debug(f"Container timeout set to {container_timeout}s from profile config")
 
+                        resolved_image_name = configs.get("container_image", "proxy_pl_bm_runner")
+                        resolved_image_tag = configs.get("image_tag", "1.0")
+                        if isinstance(docker_image_tag, str) and ":" in docker_image_tag:
+                            resolved_image_name, resolved_image_tag = docker_image_tag.rsplit(":", 1)
+
+                        logger.info(
+                            "Using resolved proxy image for run: "
+                            f"{resolved_image_name}:{resolved_image_tag}"
+                        )
+
                         container_result = _run_proxy_pipeline_container(
                             docker_client=docker_client,
                             container_name=container_name,
-                            image_name=configs.get("container_image", "proxy_pl_bm_runner"),
-                            image_tag=configs.get("image_tag", "1.0"),
+                            image_name=resolved_image_name,
+                            image_tag=resolved_image_tag,
                             benchmark_script=test_suite,
                             output_dir=pp_results,
                             device_dict=device_dict,

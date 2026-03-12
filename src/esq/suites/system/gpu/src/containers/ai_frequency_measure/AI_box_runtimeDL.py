@@ -193,6 +193,7 @@ def GetProcessorName():
 
 
 def TestStarter():
+    os.environ["AI_FREQ_TELEMETRY_TARGET_DEVICE"] = __Device
     telemetry_data = RunStable_Bcmk()
     cpu_util_list = telemetry_data["CPU_Usage"]
     cpu_freq_list = telemetry_data["CPU_Freq"]
@@ -204,20 +205,28 @@ def TestStarter():
         # Extract dGPU selection metadata
         dgpu_device_id = gpu_usage.get("dgpu_device_id", None)
         dgpu_count = gpu_usage.get("dgpu_count", 0)
+        dgpu_freq_source = gpu_usage.get("dgpu_freq_source", "unknown")
+        dgpu_util_source = gpu_usage.get("dgpu_util_source", "unknown")
+        dgpu_power_source = gpu_usage.get("dgpu_power_source", "unknown")
         dgpu_power_list = telemetry_data.get("dGPU_Power", None)
     else:
         igpu_usage_list = None
         dgpu_usage_list = None
         dgpu_device_id = None
         dgpu_count = 0
+        dgpu_freq_source = "unavailable"
+        dgpu_util_source = "unavailable"
+        dgpu_power_source = "unavailable"
         dgpu_power_list = None
 
     cpu_merged_df = pd.merge(
         cpu_util_list[["date", "sum"]], cpu_freq_list[["date", "max_freq"]], on="date", how="inner"
     )
 
-    dfs = [cpu_merged_df, igpu_usage_list, dgpu_usage_list, dgpu_power_list]
-    min_row_num = min(len(df) for df in dfs if df is not None and not df.empty)
+    # Align frequency/utilization series by CPU + GPU usage only.
+    # Do not let dGPU power dataframe length truncate the full frequency timeline.
+    dfs_for_alignment = [cpu_merged_df, igpu_usage_list, dgpu_usage_list]
+    min_row_num = min(len(df) for df in dfs_for_alignment if df is not None and not df.empty)
 
     # align the data
     # min_row_num = min(len(cpu_merged_df), len(igpu_usage_list))
@@ -236,8 +245,8 @@ def TestStarter():
         dgpu_usage_list_adjusted = None
 
     if dgpu_power_list is not None:
-        dgpu_power_list_adjusted = dgpu_power_list.iloc[-min_row_num:]
-        # dgpu_usage_list_adjusted['date'] = cpu_merged_df_adjusted['date'].values
+        # Keep full dGPU power timeline for plotting instead of truncating to min_row_num.
+        dgpu_power_list_adjusted = dgpu_power_list.copy()
     else:
         dgpu_power_list_adjusted = None
 
@@ -250,6 +259,9 @@ def TestStarter():
         dgpu_power_list_adjusted,
         dgpu_device_id,
         dgpu_count,
+        dgpu_freq_source,
+        dgpu_util_source,
+        dgpu_power_source,
     )
 
 
@@ -507,7 +519,17 @@ def DataParser(output_folder):
     ParseStableRuntime(get_file_abs_path("outlog"))
 
 
-def draw_graph(cpu_df, igpu_df, dgpu_df, dgpu_power_df, dgpu_device_id=None, dgpu_count=0):
+def draw_graph(
+    cpu_df,
+    igpu_df,
+    dgpu_df,
+    dgpu_power_df,
+    dgpu_device_id=None,
+    dgpu_count=0,
+    dgpu_freq_source="unknown",
+    dgpu_util_source="unknown",
+    dgpu_power_source="unknown",
+):
     # Initialize Metrics with default values including stability metrics
     summary_df = pd.DataFrame(
         [
@@ -535,6 +557,9 @@ def draw_graph(cpu_df, igpu_df, dgpu_df, dgpu_power_df, dgpu_device_id=None, dgp
                 # dGPU selection metadata
                 "dgpu_device_id": dgpu_device_id if dgpu_device_id else "N/A",
                 "dgpu_count": dgpu_count,
+                "dgpu_freq_source": dgpu_freq_source,
+                "dgpu_util_source": dgpu_util_source,
+                "dgpu_power_source": dgpu_power_source,
             }
         ]
     )
@@ -561,10 +586,18 @@ def draw_graph(cpu_df, igpu_df, dgpu_df, dgpu_power_df, dgpu_device_id=None, dgp
 
     if igpu_df is not None:
         ax1.plot(igpu_df["date"], igpu_df["gpu_util"], label="iGPU Utilization", color="#4169E1", linestyle="--")
-        summary_df.at[0, "utilization_igpu"] = round(igpu_df["gpu_util"].mean(), 2)
+        igpu_util_mean = igpu_df["gpu_util"].mean(skipna=True)
+        summary_df.at[0, "utilization_igpu"] = -1 if pd.isna(igpu_util_mean) else round(igpu_util_mean, 2)
     if dgpu_df is not None:
-        ax1.plot(dgpu_df["date"], dgpu_df["gpu_util"], label="dGPU Utilization", color="#87CEEB", linestyle="-.")
-        summary_df.at[0, "utilization_dgpu"] = round(dgpu_df["gpu_util"].mean(), 2)
+        dgpu_util_series = pd.to_numeric(dgpu_df["gpu_util"], errors="coerce")
+        valid_dgpu_util = dgpu_util_series[(~dgpu_util_series.isna()) & (dgpu_util_series > 0)]
+        if not valid_dgpu_util.empty:
+            ax1.plot(dgpu_df["date"], dgpu_util_series, label="dGPU Utilization", color="#87CEEB", linestyle="-.")
+            summary_df.at[0, "utilization_dgpu"] = round(valid_dgpu_util.mean(), 2)
+        else:
+            summary_df.at[0, "utilization_dgpu"] = -1
+            if summary_df.at[0, "dgpu_util_source"] == "unknown":
+                summary_df.at[0, "dgpu_util_source"] = "unavailable"
     ax1.tick_params(axis="y", labelcolor="tab:blue")
     ax1.set_ylim(-5, 110)
     ax1.legend(bbox_to_anchor=(1.05, 1), loc="upper left")
@@ -590,12 +623,17 @@ def draw_graph(cpu_df, igpu_df, dgpu_df, dgpu_power_df, dgpu_device_id=None, dgp
         ax2.plot(
             dgpu_df["date"], dgpu_df["gpu_freq"], label="dGPU Frequency", color="#FFD700", marker="x", linestyle="-."
         )
+        valid_dgpu_freq = dgpu_df["gpu_freq"]
+        valid_dgpu_freq = valid_dgpu_freq[(~valid_dgpu_freq.isna()) & (valid_dgpu_freq > 0.01)]
+        if valid_dgpu_freq.empty:
+            valid_dgpu_freq = dgpu_df["gpu_freq"].dropna()
+
         # Performance metrics
-        summary_df.at[0, "frequency_max_dgpu"] = round(dgpu_df["gpu_freq"].mean(), 2)
+        summary_df.at[0, "frequency_max_dgpu"] = round(valid_dgpu_freq.max(), 2)
         # Stability metrics (lower is better for consistency)
-        summary_df.at[0, "frequency_stddev_dgpu"] = round(dgpu_df["gpu_freq"].std(), 4)
-        summary_df.at[0, "frequency_min_dgpu"] = round(dgpu_df["gpu_freq"].min(), 2)
-        freq_range_dgpu = dgpu_df["gpu_freq"].max() - dgpu_df["gpu_freq"].min()
+        summary_df.at[0, "frequency_stddev_dgpu"] = round(valid_dgpu_freq.std(), 4)
+        summary_df.at[0, "frequency_min_dgpu"] = round(valid_dgpu_freq.min(), 2)
+        freq_range_dgpu = valid_dgpu_freq.max() - valid_dgpu_freq.min()
         summary_df.at[0, "frequency_range_dgpu"] = round(freq_range_dgpu, 4)
 
     ax2.tick_params(axis="y", labelcolor="tab:orange")
@@ -611,15 +649,19 @@ def draw_graph(cpu_df, igpu_df, dgpu_df, dgpu_power_df, dgpu_device_id=None, dgp
         ax3.set_xlabel("Date")
         ax3.set_ylabel("Power (W)", color="tab:purple")
         if igpu_df is not None:
-            ax3_right_spine.plot(
-                igpu_df["date"],
-                igpu_df["pkg_power"],
-                label="iGPU Power",
-                color="#1E90FF",
-                marker="o",
-                linestyle="--",
-            )
-            summary_df.at[0, "max_power_igpu"] = round(igpu_df["pkg_power"].mean(), 2)
+            if "pkg_power" in igpu_df.columns:
+                ax3_right_spine.plot(
+                    igpu_df["date"],
+                    igpu_df["pkg_power"],
+                    label="iGPU Power",
+                    color="#1E90FF",
+                    marker="o",
+                    linestyle="--",
+                )
+                igpu_power_mean = igpu_df["pkg_power"].mean(skipna=True)
+                summary_df.at[0, "max_power_igpu"] = -1 if pd.isna(igpu_power_mean) else round(igpu_power_mean, 2)
+            else:
+                summary_df.at[0, "max_power_igpu"] = -1
 
         # Plot dGPU power - prefer xpu-smi data, fallback to pkg_power from intel_gpu_top
         dgpu_power_plotted = False
@@ -656,7 +698,9 @@ def draw_graph(cpu_df, igpu_df, dgpu_df, dgpu_power_df, dgpu_device_id=None, dgp
 
         # Default to 0.0 if no power data available
         if not dgpu_power_plotted and dgpu_df is not None:
-            summary_df.at[0, "max_power_dgpu"] = 0.0
+            summary_df.at[0, "max_power_dgpu"] = -1
+            if summary_df.at[0, "dgpu_power_source"] == "unknown":
+                summary_df.at[0, "dgpu_power_source"] = "unavailable"
 
         ax3_right_spine.tick_params(axis="y", labelcolor="tab:purple")
         ax3_right_spine.set_ylim(-5, 120)

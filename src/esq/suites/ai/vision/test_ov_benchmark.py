@@ -839,7 +839,7 @@ def test_ov_benchmark(
                         logger.debug(f"  - Group add: {group_add}")
                         logger.debug(f"  - Timeout: {timeout}s")
                         logger.debug("  - Capabilities: ['PERFMON', 'SYS_ADMIN']")
-                        logger.debug("  - User: root:root")
+                        logger.debug("  - User: dlstreamer (non-root, caps granted)")
 
                         # Use framework's run_container API with cap_add support
                         # Note: Framework automatically fails test if container exits with non-zero code
@@ -851,9 +851,12 @@ def test_ov_benchmark(
                                 command=command,
                                 volumes=volumes,
                                 devices=devices,
-                                user="root:root",
                                 group_add=group_add,
-                                cap_add=["PERFMON", "SYS_ADMIN"],  # Required for performance monitoring
+                                cap_add=[
+                                    "PERFMON",
+                                    "SYS_ADMIN",
+                                    "DAC_READ_SEARCH",
+                                ],  # Required for performance monitoring (intel_gpu_top, xpu-smi) and RAPL energy reading
                                 timeout=timeout,
                                 mode="batch",  # Wait for container to complete
                                 attach_logs=True,  # Automatically attach logs to Allure
@@ -951,6 +954,149 @@ def test_ov_benchmark(
                     import math
                     import pandas as pd
 
+                    def _to_float(metric_key, raw_value):
+                        if raw_value is None:
+                            return None
+
+                        if isinstance(raw_value, str):
+                            normalized = raw_value.strip().replace(",", "")
+                            if normalized.upper() in {"", "N/A", "NA", "NONE", "NULL", "-"}:
+                                return None
+                            raw_value = normalized
+
+                        try:
+                            parsed_value = float(raw_value)
+                            if math.isnan(parsed_value):
+                                return None
+                            return parsed_value
+                        except (TypeError, ValueError):
+                            logger.warning(
+                                f"Non-numeric value for {metric_key}: {raw_value!r}. "
+                                "Treating as missing and setting metric to -1"
+                            )
+                            return None
+
+                    def _extract_metric_from_gpu_usage(device_ids: list[str], metric_key: str):
+                        """
+                        Recover GPU telemetry from raw gpu_usage_<device>.txt when CSV value is missing/0.
+
+                        This parser is intentionally simple and works with both intel_gpu_top output
+                        and PMU-generated intel_gpu_top-compatible output.
+                        """
+                        for device_id in device_ids:
+                            telemetry_file = Path(ov_results) / f"gpu_usage_{device_id}.txt"
+                            if not telemetry_file.exists():
+                                continue
+
+                            act_freq_total = 0.0
+                            pkg_power_total = 0.0
+                            sample_count = 0
+
+                            try:
+                                with open(telemetry_file, "r", encoding="utf-8", errors="ignore") as telemetry_handle:
+                                    for line in telemetry_handle:
+                                        parts = line.strip().split()
+                                        if len(parts) < 6:
+                                            continue
+
+                                        try:
+                                            act_freq_mhz = float(parts[1])
+                                            pkg_power_w = float(parts[5])
+                                        except ValueError:
+                                            continue
+
+                                        act_freq_total += act_freq_mhz
+                                        pkg_power_total += pkg_power_w
+                                        sample_count += 1
+                            except Exception as telemetry_err:
+                                logger.debug(
+                                    f"Failed reading telemetry fallback file {telemetry_file}: {telemetry_err}"
+                                )
+                                continue
+
+                            if sample_count == 0:
+                                continue
+
+                            if metric_key == "dev_avg_freq":
+                                avg_ghz = (act_freq_total / sample_count) / 1000.0
+                                if avg_ghz > 0:
+                                    return avg_ghz
+
+                            if metric_key == "package_power":
+                                avg_power = pkg_power_total / sample_count
+                                if avg_power > 0:
+                                    return avg_power
+
+                            # dGPU fallback: package power may be unavailable in gpu_usage,
+                            # but present in xpu-smi dump.
+                            if metric_key == "package_power":
+                                dgpu_power_file = Path(ov_results) / f"dgpu_power_dump_{device_id}.txt"
+                                if dgpu_power_file.exists():
+                                    try:
+                                        dgpu_df = pd.read_csv(dgpu_power_file, sep=",")
+                                        dgpu_df.columns = dgpu_df.columns.str.strip()
+                                        if "GPU Power (W)" in dgpu_df.columns:
+                                            dgpu_df["GPU Power (W)"] = pd.to_numeric(
+                                                dgpu_df["GPU Power (W)"], errors="coerce"
+                                            )
+                                            avg_dgpu_power = float(dgpu_df["GPU Power (W)"].mean())
+                                            if avg_dgpu_power > 0:
+                                                return avg_dgpu_power
+                                    except Exception as dgpu_power_err:
+                                        logger.debug(
+                                            f"Failed reading dGPU power fallback file {dgpu_power_file}: "
+                                            f"{dgpu_power_err}"
+                                        )
+
+                        # Last resort for platform/device-key mismatches:
+                        # parse any available telemetry file in ov_results.
+                        if metric_key == "dev_avg_freq":
+                            for telemetry_file in sorted(Path(ov_results).glob("gpu_usage_*.txt")):
+                                act_freq_total = 0.0
+                                sample_count = 0
+                                try:
+                                    with open(telemetry_file, "r", encoding="utf-8", errors="ignore") as telemetry_handle:
+                                        for line in telemetry_handle:
+                                            parts = line.strip().split()
+                                            if len(parts) < 2:
+                                                continue
+                                            try:
+                                                act_freq_mhz = float(parts[1])
+                                            except ValueError:
+                                                continue
+                                            act_freq_total += act_freq_mhz
+                                            sample_count += 1
+                                except Exception as telemetry_err:
+                                    logger.debug(
+                                        f"Failed reading telemetry fallback file {telemetry_file}: {telemetry_err}"
+                                    )
+                                    continue
+
+                                if sample_count > 0:
+                                    avg_ghz = (act_freq_total / sample_count) / 1000.0
+                                    if avg_ghz > 0:
+                                        return avg_ghz
+
+                        if metric_key == "package_power":
+                            for dgpu_power_file in sorted(Path(ov_results).glob("dgpu_power_dump_*.txt")):
+                                try:
+                                    dgpu_df = pd.read_csv(dgpu_power_file, sep=",")
+                                    dgpu_df.columns = dgpu_df.columns.str.strip()
+                                    if "GPU Power (W)" in dgpu_df.columns:
+                                        dgpu_df["GPU Power (W)"] = pd.to_numeric(
+                                            dgpu_df["GPU Power (W)"], errors="coerce"
+                                        )
+                                        avg_dgpu_power = float(dgpu_df["GPU Power (W)"].mean())
+                                        if avg_dgpu_power > 0:
+                                            return avg_dgpu_power
+                                except Exception as dgpu_power_err:
+                                    logger.debug(
+                                        f"Failed reading dGPU power fallback file {dgpu_power_file}: "
+                                        f"{dgpu_power_err}"
+                                    )
+
+                        return None
+
                     df = pd.read_csv(csv_file_path)
                     logger.debug(f"CSV columns: {list(df.columns)}")
 
@@ -998,11 +1144,10 @@ def test_ov_benchmark(
                         # Normalize device name for CSV query (iGPU -> GPU, GPU.0 -> GPU, etc.)
                         csv_device_name = normalize_device_name_for_csv(device_id, csv_file_path, logger)
                         throughput_val = extract_csv_values(csv_file_path, "Device", csv_device_name, throughput_column)
-                        if throughput_val is not None and not (
-                            isinstance(throughput_val, float) and math.isnan(throughput_val)
-                        ):
-                            device_throughputs[device_id] = throughput_val
-                            logger.debug(f"Throughput for {device_id}: {throughput_val} FPS")
+                        throughput_numeric = _to_float("throughput", throughput_val)
+                        if throughput_numeric is not None and not math.isnan(throughput_numeric):
+                            device_throughputs[device_id] = throughput_numeric
+                            logger.debug(f"Throughput for {device_id}: {throughput_numeric} FPS")
 
                     if not device_throughputs:
                         logger.error("No valid throughput values found for any device")
@@ -1045,10 +1190,38 @@ def test_ov_benchmark(
                         else:
                             unit = None
 
-                        if val is not None and not (isinstance(val, float) and math.isnan(val)):
+                        numeric_val = _to_float(metric_name, val)
+
+                        # Minimal release fallback: if telemetry in CSV is missing/0,
+                        # recover frequency/power from raw gpu_usage data when available.
+                        if metric_name in {"dev_avg_freq", "package_power"} and (
+                            numeric_val is None or math.isnan(numeric_val) or numeric_val <= 0.0
+                        ):
+                            fallback_device_ids = [best_device, csv_best_device]
+                            if best_device.startswith("dGPU"):
+                                fallback_device_ids.extend(["GPU.1", "GPU.0"])
+                            elif best_device.startswith("GPU"):
+                                fallback_device_ids.extend(["GPU.0", "GPU.1"])
+
+                            # Preserve order, remove duplicates/empty values.
+                            fallback_device_ids = [
+                                dev_id
+                                for idx, dev_id in enumerate(fallback_device_ids)
+                                if dev_id and dev_id not in fallback_device_ids[:idx]
+                            ]
+
+                            fallback_val = _extract_metric_from_gpu_usage(fallback_device_ids, metric_name)
+                            if fallback_val is not None:
+                                numeric_val = fallback_val
+                                logger.info(
+                                    f"Recovered {metric_name} from gpu usage telemetry for {best_device}: "
+                                    f"{fallback_val:.2f}"
+                                )
+
+                        if numeric_val is not None and not math.isnan(numeric_val):
                             # Convert 0 or 0.0 values to -1 (indicating failed/missing data)
                             # This handles cases where tools couldn't retrieve the metric
-                            if val == 0.0:
+                            if numeric_val == 0.0:
                                 result.metrics[metric_name].value = -1
                                 # Skip unit for -1 values (avoid "-1 FPS" etc.")
                                 result.metrics[metric_name].unit = None
@@ -1056,9 +1229,9 @@ def test_ov_benchmark(
                                     f"Converted 0 to -1 for {metric_name} from {best_device} (data not available)"
                                 )
                             else:
-                                result.metrics[metric_name].value = round(val, 2)
+                                result.metrics[metric_name].value = round(numeric_val, 2)
                                 result.metrics[metric_name].unit = unit
-                                logger.info(f"Metric {metric_name} from {best_device}: {val:.2f} {unit}")
+                                logger.info(f"Metric {metric_name} from {best_device}: {numeric_val:.2f} {unit}")
                         else:
                             result.metrics[metric_name].value = -1
                             # Skip unit for -1 values
@@ -1069,6 +1242,31 @@ def test_ov_benchmark(
                     # This ensures the CSV attached to reports shows -1 for missing/failed data
                     try:
                         df = pd.read_csv(csv_file_path)
+
+                        # Keep CSV table aligned with final in-memory metrics for the selected device.
+                        # This guarantees CSV and reported metrics stay consistent, including -1 values.
+                        metric_to_csv_column = {
+                            "throughput": "Throughput",
+                            "latency": "Latency",
+                            "dev_avg_freq": "Dev Freq",
+                            "package_power": "Pkg Power",
+                            "duration": "Duration(s)",
+                        }
+
+                        for metric_key, csv_col in metric_to_csv_column.items():
+                            if csv_col not in df.columns:
+                                continue
+
+                            metric_obj = result.metrics.get(metric_key)
+                            metric_value = metric_obj.value if metric_obj is not None else None
+
+                            if isinstance(metric_value, (int, float)):
+                                df.loc[df["Device"] == csv_best_device, csv_col] = round(float(metric_value), 2)
+                            elif metric_value in {"N/A", None}:
+                                # Preserve numeric CSV convention for unavailable values.
+                                df.loc[df["Device"] == csv_best_device, csv_col] = -1
+
+                        logger.debug(f"Synchronized CSV metrics for device {csv_best_device} with in-memory results")
 
                         # Convert 0.0 to -1 for all numeric metric columns (exclude Device, Model, Reference columns, etc.)
                         numeric_columns = df.select_dtypes(include=["float64", "int64"]).columns

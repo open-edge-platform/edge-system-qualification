@@ -394,11 +394,52 @@ class BaseDLBenchmark:
 
     def update_telemetry(self):
         """Read telemetry results from file."""
-        self.telemetry_list = []
-        with open(self.telemetry_file, "r") as f:
-            for line in f:
-                self.logger.debug(f"Telemetry line: {line.strip()} from {self.telemetry_file}")
-                self.telemetry_list.append(line.split(":")[1].strip())
+        fallback_telemetry = [-1] * 8
+
+        if not os.path.isfile(self.telemetry_file):
+            self.logger.warning(
+                f"Telemetry file not found: {self.telemetry_file}. "
+                "Using fallback telemetry values (-1)."
+            )
+            self.telemetry_list = fallback_telemetry
+            return
+
+        parsed_values = []
+        try:
+            with open(self.telemetry_file, "r") as f:
+                for line in f:
+                    clean_line = line.strip()
+                    if not clean_line:
+                        continue
+
+                    self.logger.debug(f"Telemetry line: {clean_line} from {self.telemetry_file}")
+                    if ":" not in clean_line:
+                        self.logger.debug(f"Skipping malformed telemetry line (missing ':'): {clean_line}")
+                        continue
+
+                    parsed_values.append(clean_line.split(":", 1)[1].strip())
+        except (OSError, UnicodeError) as error:
+            self.logger.warning(
+                f"Failed to read telemetry file {self.telemetry_file}: {error}. "
+                "Using fallback telemetry values (-1)."
+            )
+            self.telemetry_list = fallback_telemetry
+            return
+
+        if len(parsed_values) < 8:
+            self.logger.warning(
+                f"Telemetry file {self.telemetry_file} has incomplete data "
+                f"({len(parsed_values)} values). Padding with fallback values (-1)."
+            )
+            parsed_values.extend(["-1"] * (8 - len(parsed_values)))
+        elif len(parsed_values) > 8:
+            self.logger.debug(
+                f"Telemetry file {self.telemetry_file} has extra data "
+                f"({len(parsed_values)} values). Truncating to first 8 values."
+            )
+            parsed_values = parsed_values[:8]
+
+        self.telemetry_list = parsed_values
 
     def gen_gst_command(self, stream, resolution=None, codec=None, bitrate=None, model_name=None):
         """
@@ -634,20 +675,40 @@ class BaseDLBenchmark:
 
         fps_measurements = []
         overall_lines_by_stream_count = {}
+        last_lines_by_stream_count = {}
+        average_lines_by_stream_count = {}
+
+        def _extract_stream_count(fps_line: str):
+            """Extract stream count from FPS counter line with tolerant pattern matching."""
+            match = re.search(r"number[-_]streams\s*=\s*(\d+)", fps_line, re.IGNORECASE)
+            return int(match.group(1)) if match else None
 
         for line in result_file_content.splitlines():
             if "ERROR: from element" in line:
                 status = 1
                 break
             # Collect all "overall" lines and group by number-streams count
-            if "FpsCounter(overall" in line and "number-streams=" in line:
-                # Extract number-streams value to identify which test iteration this is from
-                stream_match = re.search(r"number-streams=(\d+)", line)
-                if stream_match:
-                    stream_count = int(stream_match.group(1))
-                    if stream_count not in overall_lines_by_stream_count:
-                        overall_lines_by_stream_count[stream_count] = []
-                    overall_lines_by_stream_count[stream_count].append(line)
+            if "FpsCounter(overall" in line:
+                stream_count = _extract_stream_count(line)
+                if stream_count is None:
+                    stream_count = getattr(self, "_expected_stream_count", None) or 1
+                if stream_count not in overall_lines_by_stream_count:
+                    overall_lines_by_stream_count[stream_count] = []
+                overall_lines_by_stream_count[stream_count].append(line)
+            elif "FpsCounter(last" in line:
+                stream_count = _extract_stream_count(line)
+                if stream_count is None:
+                    stream_count = getattr(self, "_expected_stream_count", None) or 1
+                if stream_count not in last_lines_by_stream_count:
+                    last_lines_by_stream_count[stream_count] = []
+                last_lines_by_stream_count[stream_count].append(line)
+            elif "FpsCounter(average" in line:
+                stream_count = _extract_stream_count(line)
+                if stream_count is None:
+                    stream_count = getattr(self, "_expected_stream_count", None) or 1
+                if stream_count not in average_lines_by_stream_count:
+                    average_lines_by_stream_count[stream_count] = []
+                average_lines_by_stream_count[stream_count].append(line)
 
         # Debug: Log what we found BEFORE filtering
         if overall_lines_by_stream_count:
@@ -734,10 +795,28 @@ class BaseDLBenchmark:
             # Line format: "... total=404.56 fps, number-streams=5, per-stream=80.91 fps ..."
             for line in overall_lines:
                 # Match specifically: "per-stream= <number> fps"
-                match = re.search(r"per-stream=\s*([\d]+\.?\d*)\s+fps", line)
+                match = re.search(r"per-stream\s*=\s*([\d]+\.?\d*)\s*fps", line, re.IGNORECASE)
                 if match:
                     fps_value = float(match.group(1))
                     fps_measurements.append(fps_value)
+
+            # Fallback 1: use "last" counter lines when no overall samples were parsed.
+            if not fps_measurements and target_stream_count in last_lines_by_stream_count:
+                fallback_lines = last_lines_by_stream_count[target_stream_count]
+                for line in fallback_lines:
+                    match = re.search(r"per-stream\s*=\s*([\d]+\.?\d*)\s*fps", line, re.IGNORECASE)
+                    if match:
+                        fps_value = float(match.group(1))
+                        fps_measurements.append(fps_value)
+
+            # Fallback 2: use "average" counter lines when still empty.
+            if not fps_measurements and target_stream_count in average_lines_by_stream_count:
+                fallback_lines = average_lines_by_stream_count[target_stream_count]
+                for line in fallback_lines:
+                    match = re.search(r"per-stream\s*=\s*([\d]+\.?\d*)\s*fps", line, re.IGNORECASE)
+                    if match:
+                        fps_value = float(match.group(1))
+                        fps_measurements.append(fps_value)
 
         # Calculate average FPS across all per-stream measurements
         if fps_measurements:
@@ -901,7 +980,12 @@ class BaseDLBenchmark:
                 and resolution[3] == "NPU_CONCURRENT"
             )
 
-            if is_concurrent:
+            if numeric_result == 0:
+                self.logger.warning(
+                    f"[PROGRESS] Skipping final {self.benchmark_name} verification because optimal stream count is 0"
+                )
+                result = f"{best_avg_fps}@{numeric_result}"
+            elif is_concurrent:
                 self.logger.info(
                     f"[PROGRESS] Concurrent mode detected (dGPU+NPU), "
                     f"using best FPS from binary search: {best_avg_fps:.2f} @ {numeric_result} streams"

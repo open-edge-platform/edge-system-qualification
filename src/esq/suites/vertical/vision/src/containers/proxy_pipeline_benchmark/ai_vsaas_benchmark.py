@@ -1,10 +1,13 @@
 import argparse
+import os
+import subprocess  # nosec B404 # For X11 display validation (xdpyinfo)
 import sys
 
 # Add consolidated utilities to path
 sys.path.insert(0, "/home/dlstreamer")
 
 from base_plbenchmark import BaseProxyPipelineBenchmark
+
 
 class AIVSaaSBenchmark(BaseProxyPipelineBenchmark):
     def __init__(
@@ -120,6 +123,53 @@ class AIVSaaSBenchmark(BaseProxyPipelineBenchmark):
         video_src = f"/home/dlstreamer/sample_video/car_{resolution}30_180s_{codec}.mp4"
         gst_cmd = ""
 
+        if stream <= 0:
+            self.logger.info("Requested stream count is 0; generating no-op pipeline")
+            return "fakesrc num-buffers=1 ! fakesink sync=false"
+
+        # Media-compatible display fallback logic:
+        # - monitor_num == 0: always headless
+        # - monitor_num > 0: try X11 via xdpyinfo, fallback to fakesink on failure
+        display_env = os.environ.get("DISPLAY", ":0")
+        display_sink = "fakesink async=false sync=false"
+        if self.monitor_num > 0:
+            x11_available = False
+            try:
+                result = subprocess.run(
+                    ["xdpyinfo", "-display", display_env],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    stdin=subprocess.DEVNULL,
+                    timeout=2,
+                    check=False,
+                )
+                x11_available = result.returncode == 0
+            except FileNotFoundError:
+                x11_socket_available = os.path.exists("/tmp/.X11-unix")
+                xauth_path = os.environ.get("XAUTHORITY", "/tmp/.docker.xauth")
+                xauth_available = os.path.exists(xauth_path)
+                x11_available = x11_socket_available and xauth_available
+                self.logger.warning(
+                    "xdpyinfo not found in container; falling back to X11 socket/auth heuristic "
+                    f"(socket={x11_socket_available}, xauth={xauth_available}, path={xauth_path})"
+                )
+            except (subprocess.TimeoutExpired, Exception) as e:
+                self.logger.debug(f"X11 connectivity check failed: {e}")
+                x11_available = False
+
+            if x11_available:
+                # Use self.post_proc_ele (device-specific) to convert VA memory → system memory.
+                # For iGPU: vapostproc (renderD128)
+                # For dGPU: varenderD129postproc (renderD129)
+                # Using generic vapostproc on dGPU would cross VA device contexts → blank frames.
+                display_sink = f"{self.post_proc_ele} ! video/x-raw ! xvimagesink display={display_env} async=false sync=false"
+                self.logger.info(f"Display output enabled: {self.post_proc_ele} → xvimagesink using {display_env}")
+            else:
+                self.logger.warning(
+                    f"Display requested (monitor_num={self.monitor_num}) but X11 display {display_env} not accessible. "
+                    "Falling back to fakesink (no visual output)."
+                )
+
         preproc_backend = self.config["preproc_backend"]
         enc_flag = self.config["enc_flag"]
 
@@ -167,7 +217,13 @@ class AIVSaaSBenchmark(BaseProxyPipelineBenchmark):
             detect_params = "batch-size=1 nireq=2 ie-config=NUM_STREAMS=2"
 
         for i in range(stream):
-            gst_cmd += f"filesrc location={video_src} ! qtdemux ! h264parse ! tee name=t{i} ! queue ! mp4mux ! filesink async=false sync=false location={self.sink_dir}/vsaas_gateway_with_storage_and_ai_proxy_pipeline_local_storage_stream{i}.mp4 "
+            demux_name = f"demux{i}"
+            gst_cmd += (
+                f"filesrc location={video_src} ! qtdemux name={demux_name} "
+                f"{demux_name}.video_0 ! h264parse ! tee name=t{i} ! "
+                f"queue ! mp4mux ! filesink async=false sync=false "
+                f"location={self.sink_dir}/vsaas_gateway_with_storage_and_ai_proxy_pipeline_local_storage_stream{i}.mp4 "
+            )
 
             # Build per-stream detection and tracking commands
             # Each stream needs its own model instance for parallel processing
@@ -218,7 +274,8 @@ class AIVSaaSBenchmark(BaseProxyPipelineBenchmark):
                 starting_frame = 500  # Single-model with encode storage adds latency
             else:
                 starting_frame = 1000  # CPU or simple cases
-            gst_cmd += f"! gvafpscounter starting-frame={starting_frame} ! fakesink async=false sync=false "
+            stream_sink = display_sink if self.monitor_num > 0 and i == 0 else "fakesink async=false sync=false"
+            gst_cmd += f"! gvafpscounter starting-frame={starting_frame} ! {stream_sink} "
 
         self.logger.debug(f"GStreamer command: {gst_cmd}")
 
@@ -228,7 +285,7 @@ class AIVSaaSBenchmark(BaseProxyPipelineBenchmark):
         tc_name = "AI VSaaS Gateway Pipeline"
 
         if not self.config_file_path:
-            result, ref_value, actual_gpu_freq, actual_pkg_power, duration, model_name = arg
+            result, ref_value, _ref_gpu_freq_input, _ref_pkg_power_input, duration, model_name = arg
             ref_platform = self.config.get("ref_platform", "Unknown")
 
             # Get reference values from config for comparison
@@ -248,6 +305,7 @@ class AIVSaaSBenchmark(BaseProxyPipelineBenchmark):
 
             # Telemetry collected
             cpu_freq, cpu_util, sys_mem, gpu_freq, eu_usage, vdbox_usage, pkg_power, gpu_power = self.telemetry_list
+            actual_gpu_freq, actual_pkg_power = self.resolve_power_telemetry_values(ref_gpu_freq, ref_pkg_power)
 
             prefix = f"{tc_name}, {self.device}, H264 (4Mbps), 1080p@30, {model_name}, {result}"
             prefix_esc = f"{tc_name},{self.device},H264 \\(4Mbps\\), 1080p@30, {model_name}, {result}"
@@ -316,4 +374,4 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    run_ai_vsaas_benchmark(args.device, "N/A", args.is_mtl, args.has_igpu, args.config_file)
+    run_ai_vsaas_benchmark(args.device, args.monitor_num, args.is_mtl, args.has_igpu, args.config_file)

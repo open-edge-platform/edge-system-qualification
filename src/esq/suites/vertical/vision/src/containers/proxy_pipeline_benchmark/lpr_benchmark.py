@@ -59,6 +59,14 @@ class LPRBenchmark(BaseProxyPipelineBenchmark):
     def get_sub_elemments(self, stage, dev):
         det_opt = "nireq=2 batch-size=4 inference-interval=3 model-instance-id=detect0 "
         cls_opt = "nireq=2 batch-size=4 inference-interval=3 model-instance-id=lpr0 "
+
+        current_mode = getattr(self, "current_mode", "")
+        if current_mode in {"Mode 4", "Mode 6"}:
+            det_opt_npu = "nireq=1 batch-size=1 inference-interval=3 model-instance-id=detect0 "
+            cls_opt_npu = "nireq=1 batch-size=1 inference-interval=3 model-instance-id=lpr0 "
+        else:
+            det_opt_npu = det_opt
+            cls_opt_npu = cls_opt
         # This maps device to plugin element names
         if stage == "decode":
             return {
@@ -75,7 +83,7 @@ class LPRBenchmark(BaseProxyPipelineBenchmark):
                 "CPU": f"device=CPU pre-process-backend=opencv {det_opt}",
                 "iGPU": f"device=GPU pre-process-backend=va-surface-sharing {det_opt}",
                 "dGPU": f"device={dgpu_device} pre-process-backend=va-surface-sharing {det_opt}",
-                "NPU": f"device=NPU pre-process-backend=opencv {det_opt}",
+                "NPU": f"device=NPU pre-process-backend=opencv {det_opt_npu}",
             }.get(dev, "unknown_detect")
 
         elif stage == "classify":
@@ -85,7 +93,7 @@ class LPRBenchmark(BaseProxyPipelineBenchmark):
                 "CPU": f"device=CPU pre-process-backend=opencv {cls_opt}",
                 "iGPU": f"device=GPU pre-process-backend=va-surface-sharing {cls_opt}",
                 "dGPU": f"device={dgpu_device} pre-process-backend=va-surface-sharing {cls_opt}",
-                "NPU": f"device=NPU pre-process-backend=opencv {cls_opt}",
+                "NPU": f"device=NPU pre-process-backend=opencv {cls_opt_npu}",
             }.get(dev, "unknown_classify")
         return "unknown_element"
 
@@ -352,7 +360,11 @@ class LPRBenchmark(BaseProxyPipelineBenchmark):
             additional = (
                 f"{gpu_freq},{pkg_power},{ref_platform},{mode_ref_value},{mode_ref_gpu_freq},{mode_ref_pkg_power}"
             )
-            additional += f",{duration:.2f},No Error"
+            if int(result) <= 0 or float(avg_fps) <= 0.0:
+                error_label = "ZERO_STREAMS_OR_NO_FPS"
+            else:
+                error_label = "No Error"
+            additional += f",{duration:.2f},{error_label}"
 
         else:
             raise RuntimeError("Running with config_file_path {self.config_file_path} not supported!")

@@ -42,7 +42,7 @@ COPY  --chown=dlstreamer:dlstreamer entrypoint.sh ./
 RUN chmod +x entrypoint.sh
 
 COPY --chown=dlstreamer:dlstreamer spr_bcmk.py run_benchmark.py ref_bcmk.py bcmk_ref.csv ./
-COPY --chown=dlstreamer:dlstreamer bcmk_telemetry.py gpu_util.py ./
+COPY --chown=dlstreamer:dlstreamer bcmk_telemetry.py gpu_util.py pmu_gpu_collector.py ./
 
 HEALTHCHECK CMD [ "cat", "/dev/null" ]
 ENTRYPOINT ["./entrypoint.sh"]

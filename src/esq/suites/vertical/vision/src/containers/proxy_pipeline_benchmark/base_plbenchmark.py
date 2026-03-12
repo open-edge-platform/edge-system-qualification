@@ -191,6 +191,8 @@ class BaseProxyPipelineBenchmark(BaseDLBenchmark):
 
         for j, (mode, devices) in enumerate(self.config["modes"].items()):
             for i, mod in enumerate(self.config["models"]):
+                self.current_mode = mode
+                self.current_mode_devices = devices
                 cur_ref_value = self.config["ref_stream_list"][i]
                 self.telemetry_file = f"{self.telemetry_file_prefix}_{mod}_{self.device}.result"
                 self.result_file = f"{self.result_file_prefix}_{mod}_{self.device}.result"
@@ -248,10 +250,16 @@ class BaseProxyPipelineBenchmark(BaseDLBenchmark):
         # Determine if running on iGPU (shares system RAM) or dGPU
         is_igpu = not self.device.startswith("dGPU")
 
-        # Use generic encoder for dGPU since compositor outputs system memory
-        use_generic_enc = self.device.startswith("dGPU")
+        # For Smart NVR/headed pipelines: compositor outputs system memory, so the
+        # generic VA encoder (vah265enc, renderD128) can consume it without issue.
+        # For AI VSaaS: the encode-storage branch feeds video/x-raw(memory:VAMemory)
+        # from the dGPU (renderD129) directly into the encoder. Using the generic
+        # vah265enc (renderD128) here causes a cross-device VA memory access → SIGSEGV.
+        # Solution: use device-specific varenderD129h265enc for AI VSaaS dGPU.
+        is_vsaas = self.benchmark_name == "AI VSaaS Gateway Benchmark"
+        use_generic_enc = self.device.startswith("dGPU") and not is_vsaas
         self.get_gst_elements("h264", use_generic_encoder=use_generic_enc)
-        if self.benchmark_name == "AI VSaaS Gateway Benchmark":
+        if is_vsaas:
             # replace h264 encoding with h265 encoding
             self.enc_ele = self.enc_ele.replace("264", "265")
             max_stream = -1
@@ -399,32 +407,6 @@ class BaseProxyPipelineBenchmark(BaseDLBenchmark):
                     self.logger.error(f"Failed to update telemetry for {mod}: {e}")
                     self.telemetry_list = [-1] * 8
 
-            # Extract actual GPU Freq and Pkg Power from telemetry data collected during test
-            # Telemetry list order: [0]=CPU Freq, [1]=CPU Usage, [2]=Mem Usage,
-            #                        [3]=GPU Freq, [4]=EU Usage, [5]=VDBox Usage,
-            #                        [6]=Pkg Power, [7]=GPU Power
-            # Initialize with reference config values (will be overwritten if telemetry is valid)
-            actual_gpu_freq = cur_ref_gpu_freq
-            actual_pkg_power = cur_ref_pkg_power
-            try:
-                if len(self.telemetry_list) >= 8:
-                    telemetry_gpu_freq = float(self.telemetry_list[3])
-                    telemetry_pkg_power = float(self.telemetry_list[6])
-                    if telemetry_gpu_freq > 0:
-                        actual_gpu_freq = telemetry_gpu_freq
-                        actual_pkg_power = telemetry_pkg_power
-                        self.logger.info(
-                            f"Using actual telemetry data - GPU Freq: {actual_gpu_freq:.2f} MHz, Pkg Power: {actual_pkg_power:.2f} W"
-                        )
-                    else:
-                        self.logger.warning("GPU Freq is 0, telemetry may not be available. Using config values.")
-                else:
-                    self.logger.warning(
-                        f"Insufficient telemetry data ({len(self.telemetry_list)} entries), using config values"
-                    )
-            except (ValueError, IndexError, TypeError) as e:
-                self.logger.warning(f"Failed to extract telemetry data: {e}, using config values")
-
             self.logger.info(f"[PROGRESS] Writing results to CSV for {mod}...")
             self.report_csv(result, cur_ref_value, cur_ref_gpu_freq, cur_ref_pkg_power, duration, mod)
             self.logger.info("[PROGRESS] CSV report written successfully")
@@ -450,11 +432,37 @@ class BaseProxyPipelineBenchmark(BaseDLBenchmark):
         self.update_telemetry()
         return avg_fps
 
+    def resolve_power_telemetry_values(self, ref_gpu_freq, ref_pkg_power):
+        """Return raw telemetry GPU/package power values without reference substitution."""
+        if not self.telemetry_list or len(self.telemetry_list) < 8:
+            self.logger.warning("Telemetry list missing/incomplete, keeping GPU/Pkg telemetry invalid")
+            return -1.0, -1.0
+
+        try:
+            telemetry_gpu_freq = float(self.telemetry_list[3])
+        except (TypeError, ValueError):
+            telemetry_gpu_freq = -1.0
+
+        try:
+            telemetry_pkg_power = float(self.telemetry_list[6])
+        except (TypeError, ValueError):
+            telemetry_pkg_power = -1.0
+
+        if telemetry_gpu_freq <= 0 or telemetry_pkg_power <= 0:
+            self.logger.warning(
+                "Telemetry reported invalid GPU/Pkg values: "
+                f"gpu_freq={telemetry_gpu_freq}, pkg_power={telemetry_pkg_power}"
+            )
+
+        return telemetry_gpu_freq, telemetry_pkg_power
+
     def run_pipeline_with_config(self):
-        # Use generic encoder for dGPU since compositor outputs system memory
-        use_generic_enc = self.device.startswith("dGPU")
+        # Use device-specific encoder for AI VSaaS dGPU (VA memory path)
+        # vs generic encoder for other pipelines where compositor outputs system memory.
+        is_vsaas = self.benchmark_name == "AI VSaaS Gateway Benchmark"
+        use_generic_enc = self.device.startswith("dGPU") and not is_vsaas
         self.get_gst_elements("h264", use_generic_encoder=use_generic_enc)
-        if self.benchmark_name == "AI VSaaS Gateway Benchmark":
+        if is_vsaas:
             # replace h264 encoding with h265 encoding
             self.enc_ele = self.enc_ele.replace("264", "265")
 

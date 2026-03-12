@@ -12,13 +12,13 @@ USER root
 
 # Install additional dependencies for benchmarking
 # Matches proxy test suite packages for telemetry compatibility
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN set -e -o pipefail && \
+    apt-get update && apt-get install -y --no-install-recommends \
     python3-pip \
     python3-dev \
     python3-psutil \
     lshw \
     pciutils \
-    sudo \
     intel-gpu-tools \
     xpu-smi \
     numactl \
@@ -28,12 +28,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxmlrpc-core-c3 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
-
-# Configure sudoers for telemetry tools (matches proxy test suite)
-RUN set -e -o pipefail && \
-    echo "dlstreamer ALL=(ALL) NOPASSWD: /usr/bin/intel_gpu_top,/usr/bin/rm,/usr/bin/xpu-smi,/usr/local/bin/intel_gpu_top,/usr/local/bin/xpu-smi" | \
-    tee /etc/sudoers.d/dlstreamer && \
-    chmod 0440 /etc/sudoers.d/dlstreamer
 
 # Create working directories
 RUN mkdir -p /home/dlstreamer/output \

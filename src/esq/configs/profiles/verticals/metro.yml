@@ -104,7 +104,7 @@ suites:
                 display_name: "VSaaS Visual AI Proxy Pipeline (dGPU)"
                 devices: [dgpu]
                 pptest: "VsaasAIRunner"
-                timeout: 4800  # 80 min - dGPU with adaptive search
+                timeout: 9600  # 160 min - dGPU binary search needs full budget across all models
                 force_run: true
                 requirements:
                   dgpu_required: true

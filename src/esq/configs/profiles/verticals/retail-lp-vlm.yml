@@ -37,4 +37,3 @@ suites:
                 requirements:
                   igpu_required: true
                   cpu_entry_excluded: true
-              

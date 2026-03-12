@@ -45,6 +45,7 @@ from .va_common import (
     attach_va_artifacts,
     create_va_metrics,
     determine_expected_modes,
+    enrich_device_dict_with_node_fallback,
     extract_fps_from_log,
     extract_metrics_from_csv,
     generate_va_charts,
@@ -171,6 +172,7 @@ def test_va_medium(
     # Step 2: Get available devices
     logger.info(f"Configured device categories: {devices}")
     device_dict = get_available_devices_by_category(device_categories=devices)
+    device_dict = enrich_device_dict_with_node_fallback(device_dict=device_dict, requested_devices=devices)
     logger.debug(f"Available devices: {device_dict}")
 
     # Step 3: Handle missing hardware
@@ -279,20 +281,38 @@ def test_va_medium(
 
                 # Build 2: Select appropriate FW custom image based on test devices
                 fw_custom_base_image = None
+
                 if isinstance(devices, list):
-                    if any("npu" in str(device).lower() for device in devices):
-                        fw_custom_base_image = fw_container_config.get("npu_analyzer_image")
-                        logger.info(f"Using FW NPU custom image: {fw_custom_base_image}")
-                    elif any("dgpu" in str(device).lower() or "gpu." in str(device).lower() for device in devices):
-                        fw_custom_base_image = fw_container_config.get("dgpu_analyzer_image")
-                        if fw_custom_base_image:
-                            logger.info(f"Using FW dGPU custom image: {fw_custom_base_image}")
+                    devices_lower = [str(device).lower() for device in devices]
                 elif isinstance(devices, str):
-                    if "npu" in devices.lower():
-                        fw_custom_base_image = fw_container_config.get("npu_analyzer_image")
-                        logger.info(f"Using FW NPU custom image: {fw_custom_base_image}")
-                    elif "dgpu" in devices.lower():
-                        fw_custom_base_image = fw_container_config.get("dgpu_analyzer_image")
+                    devices_lower = [devices.lower()]
+                else:
+                    devices_lower = []
+
+                has_explicit_npu_request = any("npu" in dev for dev in devices_lower)
+                has_npu_from_device_dict = any(
+                    "npu" in (info.get("device_type") or "").lower() for info in device_dict.values()
+                )
+
+                from sysagent.utils.system.hardware import collect_hardware_info
+
+                hardware_info = collect_hardware_info()
+                npu_info = hardware_info.get("npu", {}) if isinstance(hardware_info, dict) else {}
+                npu_devices = npu_info.get("devices", []) if isinstance(npu_info, dict) else []
+                has_npu_platform = bool(npu_devices)
+
+                if has_explicit_npu_request or has_npu_from_device_dict or has_npu_platform:
+                    fw_custom_base_image = fw_container_config.get("npu_analyzer_image")
+                    if fw_custom_base_image:
+                        logger.info(
+                            "Using FW NPU custom image for VA pipeline "
+                            f"(explicit_npu={'yes' if has_explicit_npu_request else 'no'}, "
+                            f"platform_npu={'yes' if has_npu_platform else 'no'}, "
+                            f"selected_npu={'yes' if has_npu_from_device_dict else 'no'})"
+                        )
+                elif any("dgpu" in dev or "gpu." in dev for dev in devices_lower):
+                    fw_custom_base_image = fw_container_config.get("dgpu_analyzer_image")
+                    if fw_custom_base_image:
                         logger.info(f"Using FW dGPU custom image: {fw_custom_base_image}")
 
                 if not fw_custom_base_image:

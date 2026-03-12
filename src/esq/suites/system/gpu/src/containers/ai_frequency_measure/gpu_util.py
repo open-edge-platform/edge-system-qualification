@@ -5,10 +5,40 @@ import json
 import re
 import subprocess  # nosec B404 # For GPU frequency monitoring (intel_gpu_top)
 
+PTL_IGPU_DEVICE_IDS = {
+    "B080",
+    "B081",
+    "B082",
+    "B083",
+    "B084",
+    "B085",
+    "B086",
+    "B087",
+    "B08F",
+    "B090",
+    "B0A0",
+    "B0B0",
+}
+
+
+def _normalize_pci_device_id(device_id: str) -> str:
+    normalized = str(device_id).strip().upper()
+    if normalized.startswith("0X"):
+        normalized = normalized[2:]
+    return normalized
+
 
 def _get_device_type(device_id):
-    first_char = device_id[0].upper()
-    if first_char in ["4", "9", "A", "a"]:
+    normalized_device_id = _normalize_pci_device_id(device_id)
+    if not normalized_device_id:
+        return "iGPU"
+
+    # Panther Lake uses explicit PCI ID allow-list.
+    if normalized_device_id in PTL_IGPU_DEVICE_IDS:
+        return "iGPU"
+
+    first_char = normalized_device_id[0]
+    if first_char in ["4", "9", "A"]:
         return "iGPU"
     elif first_char == "5":
         return "dGPU"
@@ -25,7 +55,9 @@ def parse_gpu_types():
 
         # Apply your grep equivalent in Python
         lspci_output = "\n".join(
-            line for line in lspci_out.splitlines() if re.search(r"DISPLAY|VGA", line, re.IGNORECASE)
+            line
+            for line in lspci_out.splitlines()
+            if re.search(r"DISPLAY|VGA", line, re.IGNORECASE)
         )
 
     except subprocess.CalledProcessError as e:
@@ -55,7 +87,8 @@ def parse_igt():
     # └─renderD129
     # """
     card_pattern = re.compile(
-        r"^(card\d+)\s+(.*?)\s+pci:vendor=(\w+),device=(\w+),card=(\d+)\n└─(renderD\d+)", re.MULTILINE
+        r"^(card\d+)\s+(.*?)\s+pci:vendor=(\w+),device=(\w+),card=(\d+)\n└─(renderD\d+)",
+        re.MULTILINE,
     )
 
     matches = card_pattern.findall(command_output)
@@ -76,7 +109,9 @@ def parse_igt():
 
 def _parse_xs_discovery():
     try:
-        xpu_smi_output = subprocess.check_output(["xpu-smi", "discovery", "-j"], text=True)
+        xpu_smi_output = subprocess.check_output(
+            ["xpu-smi", "discovery", "-j"], text=True
+        )
     except subprocess.CalledProcessError as e:
         print(f"Error executing xpu-smi command: {e}")
         return None

@@ -4,6 +4,7 @@
 import argparse
 import logging
 import os
+import subprocess  # nosec B404 # For X11 display validation (xdpyinfo)
 import time
 
 # Support both installed package and Docker container usage
@@ -64,6 +65,8 @@ class MediaBenchmark(BaseDLBenchmark):
             ["bash", "gst_loop_mp4.sh", "12", "4K", "h265"],
         ]
 
+        self.last_error_summary = "No Error"
+
         BenchmarkLogger.configure(self.log_file)
         self.logger = logging.getLogger(self.__class__.__name__)
 
@@ -107,9 +110,9 @@ class MediaBenchmark(BaseDLBenchmark):
                             "ref_pkg_power_list": [2.76, 2.98, 2.71, 3.0],
                         },
                         "Decode+Compose": {
-                            "ref_stream_list": [17, 4, 17, 4],
-                            "ref_gpu_freq_list": [-1, -1, -1, -1],
-                            "ref_pkg_power_list": [-1, -1, -1, -1],
+                            "ref_stream_list": [31, 20, 30, 27],
+                            "ref_gpu_freq_list": [1023.02, 1012.70, 1048.54, 1044.81],
+                            "ref_pkg_power_list": [1.07, 0.93, 1.33, 1.11],
                             "compose_size": 6,
                         },
                         "ref_platform": "MTL 165H (32G Mem)",
@@ -127,9 +130,9 @@ class MediaBenchmark(BaseDLBenchmark):
                             "ref_pkg_power_list": [0.92, 0.89, 1.23, 1.21],
                         },
                         "Decode+Compose": {
-                            "ref_stream_list": [18, 14, 17, 12],
-                            "ref_gpu_freq_list": [-1, -1, -1, -1],
-                            "ref_pkg_power_list": [-1, -1, -1, -1],
+                            "ref_stream_list": [28, 22, 27, 30],
+                            "ref_gpu_freq_list": [1830.08, 1537.31, 1448.23, 1448.23],
+                            "ref_pkg_power_list": [2.21, 1.77, 2.85, 1.09],
                             "compose_size": 6,
                         },
                         "ref_platform": "i7-1360P (16G Mem)",
@@ -137,22 +140,22 @@ class MediaBenchmark(BaseDLBenchmark):
         elif device_type == "dGPU":
             self.config = {
                 "Encode": {
-                    "ref_stream_list": [29, 6, 36, 8],
+                    "ref_stream_list": [14, 10, 12, 8],
                     "ref_gpu_freq_list": [-1, -1, -1, -1],
                     "ref_pkg_power_list": [-1, -1, -1, -1],
                 },
                 "Decode": {
-                    "ref_stream_list": [97, 25, 121, 31],
+                    "ref_stream_list": [41, 27, 32, 31],
                     "ref_gpu_freq_list": [-1, -1, -1, -1],
                     "ref_pkg_power_list": [-1, -1, -1, -1],
                 },
                 "Decode+Compose": {
-                    "ref_stream_list": [18, 19, 18, 18],
+                    "ref_stream_list": [14, 14, 13, 13],
                     "ref_gpu_freq_list": [-1, -1, -1, -1],
                     "ref_pkg_power_list": [-1, -1, -1, -1],
                     "compose_size": 6,
                 },
-                "ref_platform": "Arc A380",
+                "ref_platform": "Arc B580",
             }
         elif device_type == "CPU":
             self.config = {
@@ -214,17 +217,65 @@ class MediaBenchmark(BaseDLBenchmark):
     def dgpu_specified(self, codec):
         """Set dGPU-specific GStreamer elements.
 
-        The container uses the vaapi plugin (vaapih264enc, vaapih265enc) not the
-        va plugin (vah264enc, varenderD129h264enc). For dGPU, we must use vaapi
-        elements and set GST_VAAPI_DRM_DEVICE to the correct render device.
+        Prefer render-node-specific VA elements for dGPU when available.
+        Fall back to vaapi elements only if render-specific elements are missing.
         """
         if self.device.startswith("dGPU"):
-            self.enc_ele = f"vaapi{codec}enc"
-            self.dec_ele = f"vaapi{codec}dec"
-            self.post_proc_ele = "vaapipostproc"
-            # Set the render device for dGPU (renderD129 for first dGPU, etc.)
-            os.environ["GST_VAAPI_DRM_DEVICE"] = f"/dev/dri/renderD{self.gpu_render}"
-            self.logger.info(f"dGPU using vaapi elements with GST_VAAPI_DRM_DEVICE=/dev/dri/renderD{self.gpu_render}")
+            render_enc = f"varenderD{self.gpu_render}{codec}enc"
+            render_dec = f"varenderD{self.gpu_render}{codec}dec"
+            render_post = f"varenderD{self.gpu_render}postproc"
+
+            has_render_specific = all(
+                element in self.available_va_plugins for element in [render_enc, render_dec, render_post]
+            )
+
+            if has_render_specific:
+                self.enc_ele = render_enc
+                self.dec_ele = render_dec
+                self.post_proc_ele = render_post
+                self.logger.info(
+                    "dGPU using render-specific va elements: "
+                    f"enc={self.enc_ele}, dec={self.dec_ele}, postproc={self.post_proc_ele}"
+                )
+            else:
+                self.enc_ele = f"vaapi{codec}enc"
+                self.dec_ele = f"vaapi{codec}dec"
+                self.post_proc_ele = "vaapipostproc"
+                os.environ["GST_VAAPI_DRM_DEVICE"] = f"/dev/dri/renderD{self.gpu_render}"
+                self.logger.warning(
+                    "dGPU render-specific va elements not found, falling back to vaapi elements "
+                    f"with GST_VAAPI_DRM_DEVICE=/dev/dri/renderD{self.gpu_render}"
+                )
+
+    def _extract_pipeline_error_summary(self):
+        """Extract concise error summary from latest pipeline result file."""
+        error_patterns = [
+            "ERROR: from element",
+            "failed to get surface attributes",
+            "streaming stopped, reason",
+            "not-negotiated",
+            "Internal data stream error",
+        ]
+
+        if not os.path.isfile(self.result_file):
+            return "No Error"
+
+        try:
+            matched_errors = []
+            with open(self.result_file, "r") as result_handle:
+                for line in result_handle:
+                    line_stripped = line.strip()
+                    if any(pattern in line_stripped for pattern in error_patterns):
+                        matched_errors.append(line_stripped)
+                        if len(matched_errors) >= 3:
+                            break
+
+            if matched_errors:
+                return " | ".join(matched_errors)
+        except Exception as exc:
+            self.logger.warning(f"Failed to parse result file for errors: {exc}")
+
+        return "No Error"
 
     def gen_gst_command(self, stream, resolution=None, codec=None, bitrate=None, model_name=None):
         video_src = f"/home/dlstreamer/sample_video/car_{resolution}30_120s_{codec}.mp4"
@@ -243,6 +294,42 @@ class MediaBenchmark(BaseDLBenchmark):
                 gst_cmd += f"sink_{i}::xpos={i % compose_size * cell_width} sink_{i}::ypos={i // compose_size * cell_height} sink_{i}::alpha=1 "
             # Get DISPLAY from environment variable (default :0 for backward compatibility)
             display_env = os.environ.get("DISPLAY", ":0")
+            display_sink = "fakesink async=false sync=false"
+
+            if self.monitor_num > 0:
+                x11_available = False
+                try:
+                    result = subprocess.run(
+                        ["xdpyinfo", "-display", display_env],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        stdin=subprocess.DEVNULL,
+                        timeout=2,
+                        check=False,
+                    )
+                    x11_available = result.returncode == 0
+                except FileNotFoundError:
+                    x11_socket_available = os.path.exists("/tmp/.X11-unix")
+                    xauth_path = os.environ.get("XAUTHORITY", "/tmp/.docker.xauth")
+                    xauth_available = os.path.exists(xauth_path)
+                    x11_available = x11_socket_available and xauth_available
+                    self.logger.warning(
+                        "xdpyinfo not found in container; falling back to X11 socket/auth heuristic "
+                        f"(socket={x11_socket_available}, xauth={xauth_available}, path={xauth_path})"
+                    )
+                except (subprocess.TimeoutExpired, Exception) as e:
+                    self.logger.debug(f"X11 connectivity check failed: {e}")
+                    x11_available = False
+
+                if x11_available:
+                    display_sink = f"xvimagesink display={display_env} async=false sync=false"
+                    self.logger.info(f"Display output enabled: xvimagesink using {display_env}")
+                else:
+                    self.logger.warning(
+                        f"Display requested (monitor_num={self.monitor_num}) but X11 display {display_env} not accessible. "
+                        "Falling back to fakesink (no visual output)."
+                    )
+
             if self.monitor_num == 0:
                 if self.device == "CPU":
                     gst_cmd += f"! video/x-raw,format=I420,width={self.resolution_dict[resolution]['width']},height={self.resolution_dict[resolution]['height']} "
@@ -251,13 +338,13 @@ class MediaBenchmark(BaseDLBenchmark):
                 else:
                     gst_cmd += "! fakesink async=false sync=false "
             elif self.monitor_num == 1:
-                gst_cmd += f"! xvimagesink display={display_env} async=false sync=false "
+                gst_cmd += f"! {display_sink} "
             else:
-                gst_cmd += f"! xvimagesink display={display_env} async=false sync=false "
+                gst_cmd += f"! {display_sink} "
                 gst_cmd += "compositor name=comp_1 "
                 for i in range(stream):
                     gst_cmd += f"sink_{i}::xpos={i % compose_size * cell_width} sink_{i}::ypos={i // compose_size * cell_height} sink_{i}::alpha=1 "
-                gst_cmd += f"! xvimagesink display={display_env} async=false sync=false "
+                gst_cmd += f"! {display_sink} "
 
         for i in range(stream):
             if self.task == "Encode":
@@ -328,8 +415,9 @@ class MediaBenchmark(BaseDLBenchmark):
 
         ref_platform = self.config.get("ref_platform", "Unknown")
 
+        error_summary = self.last_error_summary or "No Error"
         additional = f"{gpu_freq},{pkg_power},{ref_platform},{ref_stream},{ref_gpu_freq},{ref_pkg_power}"
-        additional += f",{duration:.2f},No Error"
+        additional += f",{duration:.2f},{error_summary}"
 
         if self.task == "Encode":
             self.update_csv(self.enc_csv_path, prefix_esc, prefix + "," + additional)
@@ -395,7 +483,7 @@ class MediaBenchmark(BaseDLBenchmark):
 
                 ref_index = self._get_reference_index(codec, res)
                 cur_ref_value = self._get_reference_value(self.task, "ref_stream_list", ref_index, default_value=0)
-                # Get reference values from config (will be overwritten with actual telemetry data)
+                # Get reference values from config (comparison-only columns; runtime telemetry is written separately)
                 cur_ref_gpu_freq = self._get_reference_value(
                     self.task, "ref_gpu_freq_list", ref_index, default_value=-1
                 )
@@ -416,26 +504,14 @@ class MediaBenchmark(BaseDLBenchmark):
                 result = self.run_test_round(
                     resolution=res, codec=codec, bitrate=cur_bitrate, ref_stream=cur_ref_value, max_stream=max_streams
                 )
+                self.last_error_summary = self._extract_pipeline_error_summary()
                 end_time = time.time()
                 duration = end_time - start_time
 
-                # Extract actual GPU Freq and Pkg Power from telemetry data collected during test
-                # Telemetry list order: [0]=CPU Freq, [1]=CPU Usage, [2]=Mem Usage,
-                #                        [3]=GPU Freq, [4]=EU Usage, [5]=VDBox Usage,
-                #                        [6]=Pkg Power, [7]=GPU Power
-                try:
-                    if len(self.telemetry_list) >= 8:
-                        actual_gpu_freq = float(self.telemetry_list[3])
-                        actual_pkg_power = float(self.telemetry_list[6])
-                        self.logger.info(
-                            f"Using actual telemetry data - GPU Freq: {actual_gpu_freq:.2f} MHz, Pkg Power: {actual_pkg_power:.2f} W"
-                        )
-                    else:
-                        self.logger.warning(
-                            f"Insufficient telemetry data ({len(self.telemetry_list)} entries), using config values"
-                        )
-                except (ValueError, IndexError) as e:
-                    self.logger.warning(f"Failed to extract telemetry data: {e}, using config values")
+                if len(self.telemetry_list) < 8:
+                    self.logger.warning(
+                        f"Insufficient telemetry data ({len(self.telemetry_list)} entries); keeping runtime telemetry invalid"
+                    )
 
                 self.report_csv(
                     result, res, codec, cur_bitrate, cur_ref_value, cur_ref_gpu_freq, cur_ref_pkg_power, duration

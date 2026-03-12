@@ -40,6 +40,8 @@ sys.path.insert(0, "/home/dlstreamer")
 
 from base_benchmark import BaseVideoAnalyticsBenchmark
 from esq_utils.media.memory_utils import (
+    check_available_memory,
+    get_concurrent_mode_max_streams,
     get_memory_based_max_streams,
     log_memory_status,
 )
@@ -325,17 +327,17 @@ class VAHeavyBenchmark(BaseVideoAnalyticsBenchmark):
 
         elif device_type == "dGPU":
             self.config = {
-                "ref_stream_list": [14,14,4,28],  # Placeholder reference values
+                "ref_stream_list": [15,15,5,30],  # Placeholder reference values
                 "ref_platform": "Intel Arc B580",
-                "ref_gpu_freq_list": [-1],
+                "ref_gpu_freq_list": [2772.79,2841.67,1892.28,2807.89],
                 "ref_pkg_power_list": [-1],
                 "models": [model_combo],
                 "modes": self.get_mode_and_compute_devices(available_devices, va_heavy_executed_modes),
                 "mode_ref_streams": {
-                    "Mode 1": 14,  # dGPU/dGPU/dGPU
-                    "Mode 5": 14,  # dGPU/dGPU/NPU
-                    "Mode 6": 4,  # dGPU/NPU/NPU
-                    "Mode 8": 28,  # dGPU + NPU concurrent
+                    "Mode 1": 15,  # dGPU/dGPU/dGPU
+                    "Mode 5": 15,  # dGPU/dGPU/NPU
+                    "Mode 6": 5,  # dGPU/NPU/NPU
+                    "Mode 8": 30,  # dGPU + NPU concurrent
                 },
                 "mode_ref_gpu_freq": {},
                 "mode_ref_pkg_power": {},
@@ -359,8 +361,8 @@ class VAHeavyBenchmark(BaseVideoAnalyticsBenchmark):
         else:
             # Default/fallback configuration
             self.config = {
-                "ref_stream_list": [2],
-                "ref_platform": "Heavy Unknown Platform",
+                "ref_stream_list": [4,4,15,5],
+                "ref_platform": "ARL Ultra 9 285K + Arc B580",
                 "ref_gpu_freq_list": [-1],
                 "ref_pkg_power_list": [-1],
                 "models": [model_combo],
@@ -503,6 +505,9 @@ class VAHeavyBenchmark(BaseVideoAnalyticsBenchmark):
         # Log memory status at start
         log_memory_status(self.logger, "VA Heavy benchmark start")
 
+        # Determine memory profile for stream cap calculation
+        is_igpu = self.device in ["iGPU", "GPU", "gpu"]
+
         # Track best result across all modes
         best_result = -1
         best_telemetry_list = None
@@ -518,6 +523,21 @@ class VAHeavyBenchmark(BaseVideoAnalyticsBenchmark):
             # Check if this is a concurrent mode
             is_concurrent_mode = len(devices) > 3 and devices[3] == "NPU_CONCURRENT"
 
+            # Re-check memory before each mode to prevent OOM
+            log_memory_status(self.logger, f"[VA-Heavy {mode_name}] ")
+            if not check_available_memory(min_available_gb=6.0, logger=self.logger):
+                self.logger.warning(f"[VA-Heavy] Insufficient memory to run {mode_name}, skipping remaining modes")
+                break
+
+            mode_max_stream = get_memory_based_max_streams(is_igpu=is_igpu, logger=self.logger)
+            if is_concurrent_mode:
+                if not check_available_memory(min_available_gb=8.0, logger=self.logger):
+                    self.logger.warning(
+                        f"[VA-Heavy] Insufficient memory for concurrent mode {mode_name}, skipping this mode"
+                    )
+                    continue
+                mode_max_stream = get_concurrent_mode_max_streams(mode_max_stream, logger=self.logger)
+
             for model_combo in self.config["models"]:
                 self.telemetry_file = f"{self.telemetry_file_prefix}_{model_combo}_{self.device}.result"
                 self.result_file = f"{self.result_file_prefix}_{model_combo}_{self.device}.result"
@@ -526,19 +546,16 @@ class VAHeavyBenchmark(BaseVideoAnalyticsBenchmark):
                 start_time = time.time()
 
                 # Get memory-based max streams
-                is_igpu = self.device.startswith("iGPU") or self.device == "GPU"
-                max_stream = get_memory_based_max_streams(is_igpu=is_igpu, logger=self.logger)
-
                 # For concurrent mode, we need to run two pipelines in parallel
                 if is_concurrent_mode:
-                    result = self._run_concurrent_mode(video_src, devices, model_combo, max_stream)
+                    result = self._run_concurrent_mode(video_src, devices, model_combo, mode_max_stream)
                 else:
                     result = self.run_test_round(
                         resolution=devices,
                         codec="h265",
                         ref_stream=self.config["ref_stream_list"][0],
                         model_name=model_combo,
-                        max_stream=max_stream,
+                        max_stream=mode_max_stream,
                     )
 
                 end_time = time.time()
@@ -607,7 +624,7 @@ class VAHeavyBenchmark(BaseVideoAnalyticsBenchmark):
             codec="h265",
             ref_stream=self.config["ref_stream_list"][0],
             model_name=model_combo,
-            max_stream=max_stream // 2,
+            max_stream=max(1, max_stream // 2),
         )
 
         # Parse GPU result
@@ -655,6 +672,13 @@ class VAHeavyBenchmark(BaseVideoAnalyticsBenchmark):
         # Get telemetry values
         if self.telemetry_list and len(self.telemetry_list) >= 8:
             cpu_freq, cpu_util, sys_mem, gpu_freq, eu_usage, vdbox_usage, pkg_power, gpu_power = self.telemetry_list
+
+            if "dGPU" in self.device:
+                try:
+                    if float(pkg_power) <= 0 and float(gpu_power) > 0:
+                        pkg_power = gpu_power
+                except (TypeError, ValueError):
+                    pass
         else:
             gpu_freq = -1
             pkg_power = -1

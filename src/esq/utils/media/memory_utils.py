@@ -10,14 +10,17 @@ memory-constrained platforms (especially iGPU systems that share RAM).
 """
 
 import logging
-from typing import Optional, Tuple
+from importlib.util import find_spec
+from typing import Any, Optional, Tuple
 
 # Try to import psutil for memory monitoring
-try:
-    import psutil
+psutil: Any = None
+if find_spec("psutil") is not None:
+    import importlib
 
+    psutil = importlib.import_module("psutil")
     PSUTIL_AVAILABLE = True
-except ImportError:
+else:
     PSUTIL_AVAILABLE = False
 
 # Memory-based stream limits (streams per GB of available RAM)
@@ -29,6 +32,7 @@ STREAMS_PER_GB_DGPU = 3.0  # dGPU has dedicated VRAM, less system RAM pressure
 MIN_AVAILABLE_MEMORY_GB = 4.0  # Minimum available memory to continue scaling
 MEMORY_SAFETY_MARGIN = 0.8  # Use only 80% of available memory for streams
 DEFAULT_MAX_STREAMS_UNLIMITED = 100  # Default max when memory info unavailable
+CONCURRENT_MODE_STREAM_FACTOR = 0.6  # Additional cap for GPU+NPU concurrent VA modes
 
 def get_memory_info() -> Tuple[float, float, float]:
     """
@@ -99,6 +103,39 @@ def get_memory_based_max_streams(
         )
 
     return max_streams
+
+
+def get_concurrent_mode_max_streams(
+    base_max_streams: int,
+    logger: Optional[logging.Logger] = None,
+) -> int:
+    """
+    Apply an additional conservative cap for concurrent GPU+NPU modes.
+
+    Concurrent modes run two pipelines at once and have higher memory pressure
+    than split/single-device modes, so this function reduces the base stream
+    limit returned by get_memory_based_max_streams().
+
+    Args:
+        base_max_streams: Base stream limit from memory-based calculation.
+        logger: Optional logger for debug output.
+
+    Returns:
+        Conservative stream cap for concurrent execution.
+    """
+    if base_max_streams <= 0:
+        return 1
+
+    concurrent_cap = max(2, int(base_max_streams * CONCURRENT_MODE_STREAM_FACTOR))
+    concurrent_cap = min(concurrent_cap, base_max_streams)
+
+    if logger:
+        logger.info(
+            f"[MEMORY] Concurrent mode cap: {concurrent_cap} streams "
+            f"(base={base_max_streams}, factor={CONCURRENT_MODE_STREAM_FACTOR})"
+        )
+
+    return concurrent_cap
 
 
 def check_available_memory(

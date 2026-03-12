@@ -1,5 +1,6 @@
 import argparse
 import os
+import subprocess  # nosec B404 # For X11 display validation (xdpyinfo)
 import sys
 
 # Add consolidated utilities to path
@@ -169,9 +170,51 @@ class SmartNVRBenchmark(BaseProxyPipelineBenchmark):
         if self.monitor_num == 0:
             display_sink = "fakesink async=false sync=false"
         else:
-            # Use DISPLAY environment variable (e.g., :1 for NoMachine, :0 for native X)
+            # Runtime X11 validation: Test actual connectivity, not just socket existence
+            # This catches remote environments where X11 sockets exist but require authorization
             display = os.getenv("DISPLAY", ":0")
-            display_sink = f"xvimagesink display={display} async=false sync=false"
+            x11_available = False
+
+            try:
+                # Test X11 connectivity by attempting to query the display
+                # This will fail if display requires xauth or xhost permissions
+                # Security: xdpyinfo is a hardcoded trusted command, display var from environment
+                result = subprocess.run(
+                    ["xdpyinfo", "-display", display],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    stdin=subprocess.DEVNULL,  # Detach from TTY
+                    timeout=2,
+                    check=False  # We check returncode manually
+                )
+                x11_available = (result.returncode == 0)
+            except FileNotFoundError:
+                x11_socket_available = os.path.exists("/tmp/.X11-unix")
+                xauth_path = os.environ.get("XAUTHORITY", "/tmp/.docker.xauth")
+                xauth_available = os.path.exists(xauth_path)
+                x11_available = x11_socket_available and xauth_available
+                self.logger.warning(
+                    "xdpyinfo not found in container; falling back to X11 socket/auth heuristic "
+                    f"(socket={x11_socket_available}, xauth={xauth_available}, path={xauth_path})"
+                )
+            except (subprocess.TimeoutExpired, Exception) as e:
+                # display check failed
+                self.logger.debug(f"X11 connectivity check failed: {e}")
+                x11_available = False
+
+            if x11_available:
+                # X11 display accessible - use xvimagesink for visual output
+                display_sink = f"xvimagesink display={display} async=false sync=false"
+                self.logger.info(f"Display output enabled: xvimagesink using {display}")
+            else:
+                # X11 not accessible - fall back to fakesink to prevent pipeline failure
+                # Handles: headless systems, remote environments without xauth, CI runners
+                display_sink = "fakesink async=false sync=false"
+                self.logger.warning(
+                    f"Display requested (monitor_num={self.monitor_num}) but X11 display {display} not accessible. "
+                    f"Falling back to fakesink (no visual output). This is expected on remote/headless systems. "
+                    f"For display output, ensure DISPLAY is set and X11 is authorized (xhost +local:root or proper .Xauthority)."
+                )
 
         for i in range(total_stream):
             gst_cmd += f"sink_{i}::xpos={i % compose_size * cell_width} sink_{i}::ypos={i // compose_size * cell_height} sink_{i}::alpha=1 "

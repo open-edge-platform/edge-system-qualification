@@ -38,6 +38,7 @@ sys.path.insert(0, "/home/dlstreamer")
 from base_benchmark import BaseVideoAnalyticsBenchmark
 from esq_utils.media.memory_utils import (
     check_available_memory,
+    get_concurrent_mode_max_streams,
     get_memory_based_max_streams,
     log_memory_status,
 )
@@ -611,6 +612,13 @@ class VAMediumBenchmark(BaseVideoAnalyticsBenchmark):
             # Telemetry collected
             cpu_freq, cpu_util, sys_mem, gpu_freq, eu_usage, vdbox_usage, pkg_power, gpu_power = self.telemetry_list
 
+            if "dGPU" in self.device:
+                try:
+                    if float(pkg_power) <= 0 and float(gpu_power) > 0:
+                        pkg_power = gpu_power
+                except (TypeError, ValueError):
+                    pass
+
             prefix = f"{tc_name},{model_name},{mode},{dev_str},{result},{avg_fps}"
             prefix_esc = f"{tc_name},{model_name},{mode},{dev_str},{result},{avg_fps}"
             prefix_esc = prefix_esc.replace("+", "\\+")
@@ -651,15 +659,25 @@ class VAMediumBenchmark(BaseVideoAnalyticsBenchmark):
             # Force garbage collection between modes to prevent memory accumulation
             gc.collect()
 
+            is_concurrent_mode = len(devices) > 3 and devices[3] == "NPU_CONCURRENT"
+
             # Re-check memory before each mode to prevent OOM
             log_memory_status(self.logger, prefix=f"[VA-Medium {mode}] ")
             if not check_available_memory(min_available_gb=6.0, logger=self.logger):
                 self.logger.warning(f"[VA-Medium] Insufficient memory to run {mode}, skipping remaining modes")
                 break
 
+            if is_concurrent_mode and not check_available_memory(min_available_gb=8.0, logger=self.logger):
+                self.logger.warning(
+                    f"[VA-Medium] Insufficient memory for concurrent mode {mode}, skipping this mode"
+                )
+                continue
+
             # Recalculate max streams based on current available memory (apply 75% reduction)
-            max_stream = get_memory_based_max_streams(is_igpu=is_igpu, logger=self.logger)
-            max_stream = max(1, int(max_stream * 0.75))
+            mode_max_stream = get_memory_based_max_streams(is_igpu=is_igpu, logger=self.logger)
+            mode_max_stream = max(1, int(mode_max_stream * 0.75))
+            if is_concurrent_mode:
+                mode_max_stream = get_concurrent_mode_max_streams(mode_max_stream, logger=self.logger)
 
             for i, mod in enumerate(self.config["models"]):
                 cur_ref_value = self.config["ref_stream_list"][i]
@@ -677,7 +695,7 @@ class VAMediumBenchmark(BaseVideoAnalyticsBenchmark):
                     codec="h265",
                     ref_stream=cur_ref_value,
                     model_name=mod,
-                    max_stream=max_stream,
+                    max_stream=mode_max_stream,
                 )
                 end_time = time.time()
                 duration = end_time - start_time

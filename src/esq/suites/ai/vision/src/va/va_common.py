@@ -20,7 +20,7 @@ import os
 import re
 import shutil
 from pathlib import Path
-from typing import Optional
+from typing import Dict, List, Optional
 
 import allure
 import pandas as pd
@@ -80,6 +80,57 @@ def create_va_metrics(value: str = "N/A", unit: Optional[str] = None) -> dict:
     return base_metrics
 
 
+def enrich_device_dict_with_node_fallback(device_dict: Dict[str, Dict[str, str]], requested_devices) -> Dict[str, Dict[str, str]]:
+    """
+    Enrich device discovery using device-node fallback.
+
+    This addresses environments where host-side OpenVINO discovery only reports CPU,
+    while GPU/NPU device nodes are still available for container-based execution.
+
+    Args:
+        device_dict: Devices detected by get_available_devices_by_category
+        requested_devices: Requested categories from profile config (list or string)
+
+    Returns:
+        Updated device dictionary with fallback entries when applicable.
+    """
+    if isinstance(requested_devices, list):
+        requested = {str(dev).strip().lower() for dev in requested_devices}
+    elif isinstance(requested_devices, str):
+        requested = {part.strip().lower() for part in requested_devices.split(",") if part.strip()}
+    else:
+        requested = set()
+
+    has_igpu = any(key == "iGPU" or "GPU.0" in key for key in device_dict.keys())
+    has_dgpu = any(key == "dGPU" or "GPU.1" in key for key in device_dict.keys())
+    has_npu = any(key == "NPU" for key in device_dict.keys())
+
+    if "igpu" in requested and not has_igpu and os.path.exists("/dev/dri/renderD128"):
+        device_dict["GPU.0"] = {
+            "device_type": "Type.INTEGRATED",
+            "full_name": "iGPU (node fallback)",
+        }
+        logger.warning("Added iGPU fallback device (GPU.0) from /dev/dri/renderD128")
+
+    if "dgpu" in requested and not has_dgpu and os.path.exists("/dev/dri/renderD129"):
+        device_dict["GPU.1"] = {
+            "device_type": "Type.DISCRETE",
+            "full_name": "dGPU (node fallback)",
+        }
+        logger.warning("Added dGPU fallback device (GPU.1) from /dev/dri/renderD129")
+
+    accel_path = "/dev/accel"
+    has_accel = os.path.exists(accel_path) and any(name.startswith("accel") for name in os.listdir(accel_path))
+    if "npu" in requested and not has_npu and has_accel:
+        device_dict["NPU"] = {
+            "device_type": "NPU",
+            "full_name": "NPU (node fallback)",
+        }
+        logger.warning("Added NPU fallback device from /dev/accel")
+
+    return device_dict
+
+
 def initialize_csv_files(pp_results: str, csvlist: list = None) -> None:
     """
     Initialize CSV files with headers if they don't exist.
@@ -128,6 +179,7 @@ def prepare_docker_build_context(
             "__init__.py",
             "pipeline_utils.py",
             "telemetry.py",
+            "pmu_gpu_collector.py",
             "validation.py",
             "container_utils.py",
             "memory_utils.py",
@@ -325,6 +377,7 @@ def run_va_container(
 
     try:
         # Use DockerClient.run_container in batch mode
+        # Run as dlstreamer (non-root) with specific caps for telemetry collection
         result = docker_client.run_container(
             name=container_name,
             image=f"{image_name}:{image_tag}",
@@ -334,6 +387,11 @@ def run_va_container(
             devices=container_devices,
             environment=environment,
             group_add=[render_gid, user_gid],
+            cap_add=[
+                "PERFMON",
+                "SYS_ADMIN",
+                "DAC_READ_SEARCH",
+            ],  # Required for GPU access, performance monitoring (intel_gpu_top, xpu-smi), and RAPL energy reading
             network_mode="host",
             ipc_mode="host",
             working_dir="/home/dlstreamer",

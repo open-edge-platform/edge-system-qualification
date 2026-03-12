@@ -43,6 +43,13 @@ Intel® ESQ changelog and version history.
 ### Known Issues
 - DL Streamer dGPU test cases use Intel® DL Streamer 2025.1.2 with OpenVINO™ 2025.2.0, while CPU and NPU tests use the newer OpenVINO™ 2025.3.0 version
 - GPU utilization and package power monitoring may show inconsistent readings on Ubuntu* 24.04.3 systems with Linux* kernel 6.14
+- Metro proxy pipeline test case generates excessive download progress log output
+- Metro proxy pipeline intermittently report zero stream counts across different display environments
+- Metro proxy pipeline and System GPU OpenVINO test cases use reference data when runtime telemetry is unavailable
+- LPR proxy pipeline fails to execute on Panther Lake NPU devices
+- Media Performance encode and decode test cases produce duplicate results in CSV table
+- Vision AI test cases run concurrently on all devices (dGPU/iGPU/CPU/NPU), while Verified Reference data test cases run on individual components. This will be fixed in the next release.
+- Gen AI test cases running on NPU with Intel® Core™ Ultra Processors (Series 2) may fail if throughput drops below the 10 token/s threshold. This will be fixed in the next release.
 
 ## Version 2025.2.0 - December 2025
 

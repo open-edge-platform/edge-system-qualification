@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/logo.svg">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
     
     
       
@@ -1324,7 +1324,7 @@
 <tbody>
 <tr>
 <td><strong>Scalable Performance Graphics Media</strong></td>
-<td><strong>Xeon-Based</strong>: <br>Intel® Xeon® 6 Processors,<br>5<sup>th</sup> Gen Intel® Xeon® Scalable Processors,<br>Intel® Xeon® W Processors<br><br><strong>Core-Based</strong>: <br>Intel® Core Ultra Series 2,<br> Intel® Core™ Series 2</td>
+<td><strong>Xeon-Based</strong>: <br>Intel® Xeon® 6 Processors,<br>5<sup>th</sup> Gen Intel® Xeon® Scalable Processors,<br>Intel® Xeon® W Processors<br><br><strong>Core-Based</strong>: <br>Intel® Core Ultra Processor (Series 2),<br> Intel® Core™ (Series 2)</td>
 <td><strong>Xeon-Based</strong>: <br><strong>SKU</strong>: Dual and Single Socket<br><strong>Minimum System Memory</strong>: 128 GB DDR5 (Dual Channel)<br><br> <strong>Core-Based</strong>:<br> <strong>Minimum System Memory</strong>: 64GB DDR5 (Dual Channel)<br></td>
 <td><strong>Recommended</strong>: 1TB</td>
 <td><strong>Intel® Arc™ B-Series Graphics,</strong><br><strong>Intel® Arc™ Pro B-Series Graphics</strong></td>
@@ -1338,14 +1338,14 @@
 </tr>
 <tr>
 <td><strong>Efficiency Optimized</strong></td>
-<td>Intel® Core™ Ultra processor Series 2</td>
+<td>Intel® Core™ Ultra Processor (Series 2)</td>
 <td><strong>Graphics</strong>: Integrated GPU with 7 Xe-Cores or more <br> <strong>SKU</strong>: Single Socket <br><strong>Minimum System Memory</strong>: 32 GB DDR5 (Dual Channel)</td>
 <td><strong>Recommended</strong>: 512 GB</td>
 <td>N/A</td>
 </tr>
 <tr>
 <td><strong>Mainstream</strong></td>
-<td>Intel® Core™ Series 2</td>
+<td>Intel® Core™ (Series 2)</td>
 <td><strong>Minimum System Memory</strong>: 32 GB DDR5 (Dual Channel)</td>
 <td><strong>Recommended</strong>: 512 GB</td>
 <td>N/A</td>
@@ -1393,7 +1393,7 @@
 </div>
 <h3 id="2-system-dependencies">2. System Dependencies<a class="headerlink" href="#2-system-dependencies" title="Permanent link">&para;</a></h3>
 <p>Install essential system packages:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>sudo<span class="w"> </span>apt<span class="w"> </span>update<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span>curl<span class="w"> </span>git<span class="w"> </span>libgl1
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>sudo<span class="w"> </span>apt<span class="w"> </span>update<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span>curl<span class="w"> </span>git<span class="w"> </span>libgl1<span class="w"> </span>make
 </span></code></pre></div>
 <h3 id="3-docker-engine">3. Docker Engine<a class="headerlink" href="#3-docker-engine" title="Permanent link">&para;</a></h3>
 <p>Install Docker* Engine:</p>
@@ -1472,30 +1472,36 @@
 If this command prints a number without requiring sudo, the setup was successful.</p>
 </div>
 <h3 id="6-intel-esq">6. Intel® ESQ<a class="headerlink" href="#6-intel-esq" title="Permanent link">&para;</a></h3>
-<p>Install Intel® ESQ from GitHub*:</p>
+<div class="admonition info">
+<p class="admonition-title">Development Version</p>
+<p>To access the latest features that may not be available in the current release, you can install the development version from the main branch:
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>uv<span class="w"> </span>tool<span class="w"> </span>install<span class="w"> </span>--force<span class="w"> </span>--refresh<span class="w"> </span>git+https://github.com/open-edge-platform/edge-system-qualification.git@main
+</span></code></pre></div></p>
+</div>
+<p>Install Intel® ESQ from GitHub*:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>uv<span class="w"> </span>tool<span class="w"> </span>install<span class="w"> </span>--force<span class="w"> </span>--refresh<span class="w"> </span>git+https://github.com/open-edge-platform/edge-system-qualification.git@main
 </span></code></pre></div>
-<p>Verify that ESQ is working correctly:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>esq<span class="w"> </span>--version
+<p>Verify that Intel® ESQ is working correctly:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>esq<span class="w"> </span>--version
 </span></code></pre></div>
 <h2 id="quick-start_1">Quick Start<a class="headerlink" href="#quick-start_1" title="Permanent link">&para;</a></h2>
 <p>Run all tests and review the generated test report:</p>
 <div class="admonition tip">
 <p class="admonition-title">Newer Version</p>
-<p>Before running a new version of ESQ, run the following command to clean up any previously created <code>esq_data</code> folder:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>esq<span class="w"> </span>clean<span class="w"> </span>--all
+<p>Before running a new version of Intel® ESQ, run the following command to clean up any previously created <code>esq_data</code> folder:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>esq<span class="w"> </span>clean<span class="w"> </span>--all
 </span></code></pre></div>
 <p>This ensures that leftover data from previous ESQ versions does not interfere with the new installation. If you have uninstalled ESQ but the <code>esq_data</code> folder still exists, remove it using the above command before running any new ESQ commands. Otherwise, ESQ may not work as expected.</p>
 </div>
 <div class="admonition info">
 <p class="admonition-title">Alternative Download Source</p>
 <p>Intel® ESQ uses HuggingFace* as the default download source. If you prefer to use an alternative source such as ModelScope*, you can configure it with:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">PREFER_MODELSCOPE</span><span class="o">=</span><span class="m">1</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">PREFER_MODELSCOPE</span><span class="o">=</span><span class="m">1</span>
 </span></code></pre></div>
 </div>
 <h3 id="1-run-intel-esq">1. Run Intel® ESQ<a class="headerlink" href="#1-run-intel-esq" title="Permanent link">&para;</a></h3>
 <p>Run qualification and vertical (recommended) test profiles to generate a test report:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>esq<span class="w"> </span>run
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>esq<span class="w"> </span>run
 </span></code></pre></div>
 <p>By default, this command will:</p>
 <ol>
@@ -1506,14 +1512,14 @@ If this command prints a number without requiring sudo, the setup was successful
 <div class="admonition tip">
 <p class="admonition-title">Verbose Output</p>
 <p>Use the <code>--verbose</code> option to see detailed information while running tests:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>esq<span class="w"> </span>--verbose<span class="w"> </span>run
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>esq<span class="w"> </span>--verbose<span class="w"> </span>run
 </span></code></pre></div>
 <p>This provides real-time feedback on test progress, system information collection, and detailed execution logs.</p>
 </div>
 <div class="admonition tip">
 <p class="admonition-title">Run All Profile Types</p>
 <p>Use the <code>--all</code> option to run all available profile types (qualification, vertical, and suite):</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>esq<span class="w"> </span>--verbose<span class="w"> </span>run<span class="w"> </span>--all
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>esq<span class="w"> </span>--verbose<span class="w"> </span>run<span class="w"> </span>--all
 </span></code></pre></div>
 </div>
 <div class="admonition info">

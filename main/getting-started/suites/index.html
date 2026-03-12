@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/logo.svg">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
     
     
       
@@ -967,10 +967,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#ai-edge-system-qualification" class="md-nav__link">
+  <a href="#intel-ai-edge-system-qualification" class="md-nav__link">
     <span class="md-ellipsis">
       
-        AI Edge System Qualification
+        Intel® AI Edge System Qualification
       
     </span>
   </a>
@@ -1128,16 +1128,27 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#video-analytics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Video Analytics
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#system-gpu-openvino" class="md-nav__link">
+  <a href="#system-gpu-openvinotm-toolkit" class="md-nav__link">
     <span class="md-ellipsis">
       
-        System GPU - OpenVINO
+        System GPU - OpenVINO™ Toolkit
       
     </span>
   </a>
@@ -1230,6 +1241,7 @@
 <li><a href="#dl-streamer-analysis---multi-stream-pipelines-with-multiple-ai-stages">DL Streamer Analysis - Multi-Stream Pipelines With Multiple AI Stages</a></li>
 <li><a href="#verified-reference-blueprints">DL Streamer Analysis - Verified Reference Blueprints</a></li>
 <li><a href="#openvino">OpenVINO</a></li>
+<li><a href="#video-analytics">Video Analytics</a></li>
 </ul>
 </li>
 <li><a href="#system-gpu---openvino">System GPU - OpenVINO</a></li>
@@ -1266,7 +1278,7 @@
 <tr>
 <td><code>profile.vertical.metro</code></td>
 <td>Vertical</td>
-<td>Metro</td>
+<td>Metro proxy workloads (LPR, Smart NVR, Visual AI, VSaaS)</td>
 <td><code>esq run --profile profile.vertical.metro</code></td>
 </tr>
 <tr>
@@ -1296,7 +1308,7 @@
 <tr>
 <td><code>profile.suite.ai.vision-ov</code></td>
 <td>Horizontal</td>
-<td>OpenVINO Benchmark - Measures raw inference performance using OpenVINO Runtime API</td>
+<td>OpenVINO™ Toolkit Benchmark - Measures raw inference performance using OpenVINO Runtime API</td>
 <td><code>esq run --profile profile.suite.ai.vision-ov</code></td>
 </tr>
 <tr>
@@ -1308,7 +1320,7 @@
 <tr>
 <td><code>profile.suite.system.gpu-ov</code></td>
 <td>Horizontal</td>
-<td>System GPU Performance using OpenVINO benchmark</td>
+<td>System GPU Performance using OpenVINO™ Toolkit benchmark</td>
 <td><code>esq run --profile profile.suite.system.gpu-ov</code></td>
 </tr>
 <tr>
@@ -1322,6 +1334,12 @@
 <td>Horizontal</td>
 <td>Media Performance</td>
 <td><code>esq run --profile profile.suite.media.performance-pipelines</code></td>
+</tr>
+<tr>
+<td><code>profile.suite.ai.vision-va</code></td>
+<td>Horizontal</td>
+<td>Multi-stage video analytics pipelines with detection, tracking, and classification</td>
+<td><code>esq run --profile profile.suite.ai.vision-va</code></td>
 </tr>
 </tbody>
 </table>
@@ -1341,7 +1359,7 @@
 <tbody>
 <tr>
 <td><strong>Qualifications</strong></td>
-<td>Measuring system performance to qualify against AI Edge Systems Qualifications Metrics</td>
+<td>Measuring system performance to qualify against  Intel® AI Edge Systems Qualifications Metrics</td>
 <td>Gain Catalog inclusion and other marketing benefits from Intel.</td>
 </tr>
 <tr>
@@ -1351,14 +1369,14 @@
 </tr>
 <tr>
 <td><strong>Horizontal</strong></td>
-<td>General system benchmarking (includes OpenVINO™, Audio, Memory Performance)</td>
+<td>General system benchmarking (includes OpenVINO™ Toolkit, Audio, Memory Performance)</td>
 <td>Gain understanding on system's resource utilization and performance like System memory and GPU during select AI workload</td>
 </tr>
 </tbody>
 </table>
 <hr />
 <h2 id="qualifications">Qualifications<a class="headerlink" href="#qualifications" title="Permanent link">&para;</a></h2>
-<h3 id="ai-edge-system-qualification">AI Edge System Qualification<a class="headerlink" href="#ai-edge-system-qualification" title="Permanent link">&para;</a></h3>
+<h3 id="intel-ai-edge-system-qualification">Intel® AI Edge System Qualification<a class="headerlink" href="#intel-ai-edge-system-qualification" title="Permanent link">&para;</a></h3>
 <p><strong>Profile</strong>: <code>profile.qualification.ai-edge-system</code></p>
 <p><strong>Test Cases</strong>:</p>
 <p>Generative AI test on text generation</p>
@@ -1404,7 +1422,7 @@
 </tr>
 </tbody>
 </table>
-<p>Vision AI test using Intel® DLStreamer</p>
+<p>Vision AI test using Intel® DL Streamer</p>
 <table>
 <thead>
 <tr>
@@ -1465,15 +1483,15 @@
 <tbody>
 <tr>
 <td>MFG-PDD-001</td>
-<td>Pallet Defect Detection - multi-stream 480p30 H.264 gvadetect YOLOX-TINY FP32 (CPU)</td>
+<td>Pallet Defect Detection - multi-stream 480p30 H.264 gvadetect YOLOX-TINY INT8 (CPU)</td>
 </tr>
 <tr>
 <td>MFG-PDD-002</td>
-<td>Pallet Defect Detection - multi-stream 480p30 H.264 gvadetect YOLOX-TINY FP32 (iGPU)</td>
+<td>Pallet Defect Detection - multi-stream 480p30 H.264 gvadetect YOLOX-TINY INT8 (iGPU)</td>
 </tr>
 <tr>
 <td>MFG-PDD-003</td>
-<td>Pallet Defect Detection - multi-stream 480p30 H.264 gvadetect YOLOX-TINY FP32 (dGPU)</td>
+<td>Pallet Defect Detection - multi-stream 480p30 H.264 gvadetect YOLOX-TINY INT8 (dGPU)</td>
 </tr>
 <tr>
 <td>MFG-WPC-001</td>
@@ -1506,37 +1524,46 @@
 <tbody>
 <tr>
 <td>METRO-PROXY-001</td>
-<td>LPR Pipeline (Multi-Devices)</td>
+<td>LPR Pipeline (Multi-Devices) - LPR proxy workload on iGPU and dGPU for multi-device throughput scaling.</td>
 </tr>
 <tr>
 <td>METRO-PROXY-002</td>
-<td>Smart NVR (iGPU)</td>
+<td>Smart NVR (iGPU) - Smart NVR proxy workload on iGPU with display output for real-time analytics.</td>
 </tr>
 <tr>
 <td>METRO-PROXY-003</td>
-<td>Smart NVR (dGPU)</td>
+<td>Smart NVR (dGPU) - Smart NVR proxy workload on dGPU for high-density stream analytics.</td>
 </tr>
 <tr>
 <td>METRO-PROXY-004</td>
-<td>Headed Visual AI Proxy Pipeline (iGPU)</td>
+<td>Headed Visual AI Proxy Pipeline (iGPU) - Headed Visual AI proxy workload on iGPU with display output for interactive analytics.</td>
 </tr>
 <tr>
 <td>METRO-PROXY-005</td>
-<td>Headed Visual AI Proxy Pipeline (dGPU)</td>
+<td>Headed Visual AI Proxy Pipeline (dGPU) - Headed Visual AI proxy workload on dGPU with display output for interactive analytics.</td>
 </tr>
 <tr>
 <td>METRO-PROXY-006</td>
-<td>VSaaS Visual AI Proxy Pipeline (iGPU)</td>
+<td>VSaaS Visual AI Proxy Pipeline (iGPU) - VSaaS Visual AI proxy workload on iGPU with multi-model inference and encode stages.</td>
 </tr>
 <tr>
 <td>METRO-PROXY-007</td>
-<td>VSaaS Visual AI Proxy Pipeline (dGPU)</td>
+<td>VSaaS Visual AI Proxy Pipeline (dGPU) - VSaaS Visual AI proxy workload on dGPU for scalable stream analytics.</td>
 </tr>
 </tbody>
 </table>
 <p><strong>Run this profile</strong>:
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>esq<span class="w"> </span>run<span class="w"> </span>--profile<span class="w"> </span>profile.vertical.metro
 </span></code></pre></div></p>
+<blockquote>
+<p><strong>Note:</strong> Running <code>esq run --profile profile.vertical.metro</code> also runs dependent profiles:
+<code>profile.suite.system.memory-stream</code>,
+<code>profile.suite.system.gpu-ov</code>,
+<code>profile.suite.ai.vision-ov</code>,
+<code>profile.suite.media.performance-pipelines</code>, and
+<code>profile.suite.ai.vision-va</code>.
+Total execution time depends on your hardware capabilities and available accelerators.</p>
+</blockquote>
 <hr />
 <h3 id="retail">Retail<a class="headerlink" href="#retail" title="Permanent link">&para;</a></h3>
 <h4 id="automated-self-checkout">Automated Self Checkout<a class="headerlink" href="#automated-self-checkout" title="Permanent link">&para;</a></h4>
@@ -1603,6 +1630,26 @@
 </table>
 <p><strong>Run this profile</strong>:
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>esq<span class="w"> </span>run<span class="w"> </span>--profile<span class="w"> </span>profile.vertical.retail-lp
+</span></code></pre></div></p>
+<hr />
+<p><strong>Profile</strong>: <code>profile.vertical.retail-lp-vlm</code></p>
+<p><strong>Test Cases</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Test ID</th>
+<th>Test Case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LP-VLM-001</td>
+<td>Loss Prevention VLM - 1080p15 H.264 gvadetect YOLO11n FP16 (CPU) VLM analysis Qwen2.5-VL-7B-Instruct INT8 (GPU)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Run this profile</strong>:
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>esq<span class="w"> </span>run<span class="w"> </span>--profile<span class="w"> </span>profile.vertical.retail-lp-vlm
 </span></code></pre></div></p>
 <hr />
 <h2 id="horizontal">Horizontal<a class="headerlink" href="#horizontal" title="Permanent link">&para;</a></h2>
@@ -1743,7 +1790,7 @@
 </details>
 <p><br></p>
 <p><strong>Run this profile</strong>:
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>esq<span class="w"> </span>run<span class="w"> </span>--profile<span class="w"> </span>profile.suite.ai.gen
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>esq<span class="w"> </span>run<span class="w"> </span>--profile<span class="w"> </span>profile.suite.ai.gen
 </span></code></pre></div></p>
 <hr />
 <h3 id="vision-ai">Vision AI<a class="headerlink" href="#vision-ai" title="Permanent link">&para;</a></h3>
@@ -1781,7 +1828,7 @@
 </tbody>
 </table>
 <p><strong>Run this profile</strong>:
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>esq<span class="w"> </span>run<span class="w"> </span>--profile<span class="w"> </span>profile.suite.ai.vision-light
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>esq<span class="w"> </span>run<span class="w"> </span>--profile<span class="w"> </span>profile.suite.ai.vision-light
 </span></code></pre></div></p>
 <hr />
 <h4 id="verified-reference-blueprints">Verified Reference Blueprints<a class="headerlink" href="#verified-reference-blueprints" title="Permanent link">&para;</a></h4>
@@ -1818,7 +1865,7 @@
 </tbody>
 </table>
 <p><strong>Run this profile</strong>:
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>esq<span class="w"> </span>run<span class="w"> </span>--profile<span class="w"> </span>profile.suite.ai.vision-vrb
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>esq<span class="w"> </span>run<span class="w"> </span>--profile<span class="w"> </span>profile.suite.ai.vision-vrb
 </span></code></pre></div></p>
 <hr />
 <h4 id="openvino">OpenVINO<a class="headerlink" href="#openvino" title="Permanent link">&para;</a></h4>
@@ -1914,10 +1961,39 @@
 </details>
 <p><br></p>
 <p><strong>Run this profile</strong>:
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>esq<span class="w"> </span>run<span class="w"> </span>--profile<span class="w"> </span>profile.suite.ai.vision-ov
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>esq<span class="w"> </span>run<span class="w"> </span>--profile<span class="w"> </span>profile.suite.ai.vision-ov
 </span></code></pre></div></p>
 <hr />
-<h3 id="system-gpu-openvino">System GPU - OpenVINO<a class="headerlink" href="#system-gpu-openvino" title="Permanent link">&para;</a></h3>
+<h4 id="video-analytics">Video Analytics<a class="headerlink" href="#video-analytics" title="Permanent link">&para;</a></h4>
+<p><strong>Profile</strong>: <code>profile.suite.ai.vision-va</code></p>
+<p><strong>Test Cases</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Test ID</th>
+<th>Test Case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>VSN-LIGHT-001</td>
+<td>VA Light - All Available Devices (YOLO11n + ResNet-50, H.265)</td>
+</tr>
+<tr>
+<td>VSN-MEDIUM-001</td>
+<td>VA Medium - All Available Devices (YOLOv5m + ResNet-50 + MobileNet-v2, H.265)</td>
+</tr>
+<tr>
+<td>VSN-HEAVY-001</td>
+<td>VA Heavy - All Available Devices (YOLO11m + ResNet-v1-50 + MobileNet-v2, H.265)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Run this profile</strong>:
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>esq<span class="w"> </span>run<span class="w"> </span>--profile<span class="w"> </span>profile.suite.ai.vision-va
+</span></code></pre></div></p>
+<hr />
+<h3 id="system-gpu-openvinotm-toolkit">System GPU - OpenVINO™ Toolkit<a class="headerlink" href="#system-gpu-openvinotm-toolkit" title="Permanent link">&para;</a></h3>
 <p><strong>Profile</strong>: <code>profile.suite.system.gpu-ov</code></p>
 <p><strong>Test Cases</strong>:</p>
 <table>
@@ -1939,7 +2015,7 @@
 </tbody>
 </table>
 <p><strong>Run this profile</strong>:
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>esq<span class="w"> </span>run<span class="w"> </span>--profile<span class="w"> </span>profile.suite.system.gpu-ov
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>esq<span class="w"> </span>run<span class="w"> </span>--profile<span class="w"> </span>profile.suite.system.gpu-ov
 </span></code></pre></div></p>
 <hr />
 <h3 id="system-memory-stream">System Memory - STREAM<a class="headerlink" href="#system-memory-stream" title="Permanent link">&para;</a></h3>
@@ -1972,7 +2048,7 @@
 </tbody>
 </table>
 <p><strong>Run this profile</strong>:
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>esq<span class="w"> </span>run<span class="w"> </span>--profile<span class="w"> </span>profile.suite.system.memory-stream
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>esq<span class="w"> </span>run<span class="w"> </span>--profile<span class="w"> </span>profile.suite.system.memory-stream
 </span></code></pre></div></p>
 <h3 id="media-performance">Media Performance<a class="headerlink" href="#media-performance" title="Permanent link">&para;</a></h3>
 <p><strong>Profile</strong>: <code>profile.suite.media.performance-pipelines</code></p>
@@ -2087,8 +2163,9 @@
 </details>
 <p><br></p>
 <p><strong>Run this profile</strong>:
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>esq<span class="w"> </span>run<span class="w"> </span>--profile<span class="w"> </span>profile.suite.media.performance-pipelines
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>esq<span class="w"> </span>run<span class="w"> </span>--profile<span class="w"> </span>profile.suite.media.performance-pipelines
 </span></code></pre></div></p>
+<hr />
 
 
 

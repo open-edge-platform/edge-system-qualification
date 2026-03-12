@@ -21,7 +21,7 @@
       
       
       <link rel="icon" href="../../assets/images/logo.svg">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
     
     
       
@@ -922,6 +922,45 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#version-202610-march-2026" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Version 2026.1.0 - March 2026
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Version 2026.1.0 - March 2026">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#known-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Known Issues
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#version-202520-december-2025" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1031,6 +1070,45 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#version-202610-march-2026" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Version 2026.1.0 - March 2026
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Version 2026.1.0 - March 2026">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#known-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Known Issues
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#version-202520-december-2025" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1132,6 +1210,56 @@
 
 <h1 id="changelog">Changelog<a class="headerlink" href="#changelog" title="Permanent link">&para;</a></h1>
 <p>Intel® ESQ changelog and version history.</p>
+<h2 id="version-202610-march-2026">Version 2026.1.0 - March 2026<a class="headerlink" href="#version-202610-march-2026" title="Permanent link">&para;</a></h2>
+<h3 id="changes">Changes<a class="headerlink" href="#changes" title="Permanent link">&para;</a></h3>
+<ul>
+<li>New Platform Support:</li>
+<li>Intel® Core™ Ultra Processors (Series 3), Products formerly Panther Lake</li>
+<li>Intel® Core™ Processors (Series 2), Products formerly Bartlett Lake</li>
+<li>Intel® Xeon® 6 processors, Products formerly Granite Rapids</li>
+<li>Enabled Verified Reference Blueprints (VRB) data on Intel® ESQ Report</li>
+<li>Enhanced OpenVINO™ Model Server (OVMS) with version 2025.4.1 for Gen AI workloads</li>
+<li>OpenVINO toolkit 2025.3.0 support for Vision AI related Test Suite</li>
+<li>Platform power configuration in report generation</li>
+<li>Configurable DL Streamer pipeline enhancements:</li>
+<li>Configurable sink element support</li>
+<li>Configurable consecutive timeout threshold</li>
+<li>New supported qualification platform detection logic</li>
+<li>New retail-focused pipeline - Loss Prevention VLM</li>
+<li>Enabled ModelScope download source support</li>
+<li>New Metro vertical profile with proxy workload coverage for LPR, Smart NVR, headed Visual AI, and VSaaS pipelines</li>
+<li>New Horizontal suites: Vision OpenVINO, System GPU OpenVINO, Media Performance, and Video Analytics</li>
+<li>Enabled Metro execution with automatic dependent suite execution</li>
+<li>AI Frequency long run test suite integration</li>
+<li>Generic GPU required flag support in system validator</li>
+<li>Enabled display mode by default for media &amp; proxy test cases</li>
+<li>Updated iGPU/dGPU ID lookup table with latest hardware IDs</li>
+<li>Enhanced container security with cap_add parameter exposure</li>
+<li>Enabled new horizontal test cases for Edge Workloads and Benchmarks Pipelines</li>
+<li>Enhanced CPU streams handling to prevent drops due to CPU scaling logic</li>
+<li>Updated qualification model for scalable performance tier with DeepSeek-R1-Distill-Qwen-14B</li>
+<li>Increased default test execution timeout value to 640 minutes</li>
+<li>Fixed vision AI dGPU pipeline timeout when iGPU is disabled</li>
+<li>Improved cache reuse for multi-device DL Streamer analysis</li>
+<li>Enhanced multi-device max streams metric population for multi-socket CPUs</li>
+<li>Fixed dGPU performance optimization to exceed iGPU performance</li>
+<li>Addressed protobuf JSON recursion depth bypass vulnerability</li>
+<li>Fixed Pillow version security vulnerability</li>
+<li>Enhanced resource download failure handling and error management</li>
+<li>Fixed PDD model download failure and performance optimization</li>
+</ul>
+<h3 id="known-issues">Known Issues<a class="headerlink" href="#known-issues" title="Permanent link">&para;</a></h3>
+<ul>
+<li>DL Streamer dGPU test cases use Intel® DL Streamer 2025.1.2 with OpenVINO™ 2025.2.0, while CPU and NPU tests use the newer OpenVINO™ 2025.3.0 version</li>
+<li>GPU utilization and package power monitoring may show inconsistent readings on Ubuntu* 24.04.3 systems with Linux* kernel 6.14</li>
+<li>Metro proxy pipeline test case generates excessive download progress log output</li>
+<li>Metro proxy pipeline intermittently report zero stream counts across different display environments</li>
+<li>Metro proxy pipeline and System GPU OpenVINO test cases use reference data when runtime telemetry is unavailable</li>
+<li>LPR proxy pipeline fails to execute on Panther Lake NPU devices</li>
+<li>Media Performance encode and decode test cases produce duplicate results in CSV table</li>
+<li>Vision AI test cases run concurrently on all devices (dGPU/iGPU/CPU/NPU), while Verified Reference data test cases run on individual components. This will be fixed in the next release.</li>
+<li>Gen AI test cases running on NPU with Intel® Core™ Ultra Processors (Series 2) may fail if throughput drops below the 10 token/s threshold. This will be fixed in the next release.</li>
+</ul>
 <h2 id="version-202520-december-2025">Version 2025.2.0 - December 2025<a class="headerlink" href="#version-202520-december-2025" title="Permanent link">&para;</a></h2>
 <h3 id="features">Features<a class="headerlink" href="#features" title="Permanent link">&para;</a></h3>
 <ul>

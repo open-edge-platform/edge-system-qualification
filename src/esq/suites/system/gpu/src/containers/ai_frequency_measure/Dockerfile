@@ -45,7 +45,7 @@ RUN mkdir -p /home/dlstreamer/output && \
     mkdir -p /home/dlstreamer/share/images && \
     chown -R dlstreamer:dlstreamer /home/dlstreamer/output && \
     chown -R dlstreamer:dlstreamer /home/dlstreamer/share && \
-    chmod -R 777 /home/dlstreamer/output
+    chmod -R 770 /home/dlstreamer/output
 
 # Copy requirements
 COPY  --chown=dlstreamer:dlstreamer requirements.txt ./
@@ -63,7 +63,7 @@ RUN chmod +x entrypoint.sh
 
 # Copy run script
 COPY --chown=dlstreamer:dlstreamer AI_box_runtimeDL.py .
-COPY --chown=dlstreamer:dlstreamer bcmk_telemetry.py gpu_util.py ./
+COPY --chown=dlstreamer:dlstreamer bcmk_telemetry.py gpu_util.py pmu_gpu_collector.py ./
 
 HEALTHCHECK CMD [ "cat", "/dev/null" ]
 ENTRYPOINT ["./entrypoint.sh"]

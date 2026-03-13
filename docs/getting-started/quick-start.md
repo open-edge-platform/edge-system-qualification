@@ -17,10 +17,10 @@ Intel® ESQ supports a wide range of Intel® edge systems optimized for various 
 
 | **Category** | **Processors** | **Specifications** |**Storage** | **Discrete GPU Options** |
 |--------------|------------------------|------------------------|-------------|------------------|
-| **Scalable Performance Graphics Media** | **Xeon-Based**: <br>Intel® Xeon® 6 Processors,<br>5th Gen Intel® Xeon® Scalable Processors,<br>Intel® Xeon® W Processors<br><br>**Core-Based**: <br>Intel® Core Ultra Series 2,<br> Intel® Core™ Series 2 | **Xeon-Based**: <br>**SKU**: Dual and Single Socket<br>**Minimum System Memory**: 128 GB DDR5 (Dual Channel)<br><br> **Core-Based**:<br> **Minimum System Memory**: 64GB DDR5 (Dual Channel)<br>| **Recommended**: 1TB | **Intel® Arc™ B-Series Graphics,**<br>**Intel® Arc™ Pro B-Series Graphics** |
+| **Scalable Performance Graphics Media** | **Xeon-Based**: <br>Intel® Xeon® 6 Processors,<br>5th Gen Intel® Xeon® Scalable Processors,<br>Intel® Xeon® W Processors<br><br>**Core-Based**: <br>Intel® Core Ultra Processor (Series 2),<br> Intel® Core™ (Series 2) | **Xeon-Based**: <br>**SKU**: Dual and Single Socket<br>**Minimum System Memory**: 128 GB DDR5 (Dual Channel)<br><br> **Core-Based**:<br> **Minimum System Memory**: 64GB DDR5 (Dual Channel)<br>| **Recommended**: 1TB | **Intel® Arc™ B-Series Graphics,**<br>**Intel® Arc™ Pro B-Series Graphics** |
 | **Scalable Performance** | Intel® Xeon® 6 Processors,<br> 5th Gen Intel® Xeon® Scalable Processors, <br>Intel® Xeon® W Processors | **SKU**: Dual and Single Socket<br>**Minimum System Memory**: 128 GB DDR5 (Dual Channnel) <br>| **Recommended**: 1TB | N/A |
-| **Efficiency Optimized** | Intel® Core™ Ultra processor Series 2 | **Graphics**: Integrated GPU with 7 Xe-Cores or more <br> **SKU**: Single Socket <br>**Minimum System Memory**: 32 GB DDR5 (Dual Channel)| **Recommended**: 512 GB | N/A |
-| **Mainstream** | Intel® Core™ Series 2 | **Minimum System Memory**: 32 GB DDR5 (Dual Channel)| **Recommended**: 512 GB | N/A |
+| **Efficiency Optimized** | Intel® Core™ Ultra Processor (Series 2) | **Graphics**: Integrated GPU with 7 Xe-Cores or more <br> **SKU**: Single Socket <br>**Minimum System Memory**: 32 GB DDR5 (Dual Channel)| **Recommended**: 512 GB | N/A |
+| **Mainstream** | Intel® Core™ (Series 2) | **Minimum System Memory**: 32 GB DDR5 (Dual Channel)| **Recommended**: 512 GB | N/A |
 | **Entry** | Intel® Processor for Desktop,<br>Intel® Processor X-series, <br>Intel® Processor N-series | **Minimum System Memory**: 32 GB DDR5 (Dual Channel) | **Recommended**: 512 GB | N/A |
 
 ### 2. Operating System
@@ -50,7 +50,7 @@ sudo bash -c "$(wget -qLO - https://raw.githubusercontent.com/open-edge-platform
 Install essential system packages:
 
 ```bash
-sudo apt update && sudo apt install -y curl git libgl1
+sudo apt update && sudo apt install -y curl git libgl1 make
 ```
 
 ### 3. Docker Engine
@@ -148,14 +148,19 @@ This setup script:
 
 
 ### 6. Intel® ESQ
+!!! info "Development Version"
+    To access the latest features that may not be available in the current release, you can install the development version from the main branch:
+    ```bash
+    uv tool install --force --refresh git+https://github.com/open-edge-platform/edge-system-qualification.git@main
+    ```
 
 Install Intel® ESQ from GitHub*:
 
 ```bash
-uv tool install --force --refresh git+https://github.com/open-edge-platform/edge-system-qualification.git@main
+uv tool install --force --refresh git+https://github.com/open-edge-platform/edge-system-qualification.git@release/2026.1
 ```
 
-Verify that ESQ is working correctly:
+Verify that Intel® ESQ is working correctly:
 
 ```bash
 esq --version
@@ -166,7 +171,7 @@ esq --version
 Run all tests and review the generated test report:
 
 !!! tip "Newer Version"
-    Before running a new version of ESQ, run the following command to clean up any previously created `esq_data` folder:
+    Before running a new version of Intel® ESQ, run the following command to clean up any previously created `esq_data` folder:
     
     ```bash
     esq clean --all
@@ -175,7 +180,7 @@ Run all tests and review the generated test report:
     This ensures that leftover data from previous ESQ versions does not interfere with the new installation. If you have uninstalled ESQ but the `esq_data` folder still exists, remove it using the above command before running any new ESQ commands. Otherwise, ESQ may not work as expected.
 
 !!! info "Alternative Download Source"
-    Intel® ESQ uses HuggingFace* as the default download source. If you prefer to use an alternative source such as ModelScope*, you can configure it with:
+    Intel® ESQ uses HuggingFace* as the default download source. For ModelScope*, you can configure it with:
     
     ```bash
     export PREFER_MODELSCOPE=1

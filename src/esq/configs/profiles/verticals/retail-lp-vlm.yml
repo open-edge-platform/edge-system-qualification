@@ -12,7 +12,8 @@ params:
     display_status: false
   requirements:
     # Hardware requirements
-    memory_min_gb: 12.0
+    memory_min_gb: 20.0
+    memory_total_min_gb: 32.0
     storage_total_min_gb: 100.0
     storage_min_gb: 20.0  # Free storage for models, videos, and containers
     # Software requirements
@@ -33,4 +34,7 @@ suites:
                 timeout: 3600  # 60 minutes
                 camera_stream: "camera_to_workload_vlm.json"
                 commit_id: "2205dc9"  # Loss Prevention repository commit to checkout
+                requirements:
+                  igpu_required: true
+                  cpu_entry_excluded: true
               

@@ -54,8 +54,8 @@ def download_proxy_pipeline_resources(models_dir: str, videos_dir: str) -> bool:
     if all_models_exist:
         logger.info("All required models already exist, skipping download")
     else:
-        # Download tar.gz
-        if not download_file_from_url(pipeline_zoo_url, pipeline_zoo_tar):
+        # Download tar.gz with retry support
+        if not download_file_from_url(pipeline_zoo_url, pipeline_zoo_tar, max_retries=3):
             logger.error("Failed to download pipeline-zoo-models")
             success = False
         else:
@@ -126,7 +126,8 @@ def download_proxy_pipeline_resources(models_dir: str, videos_dir: str) -> bool:
             continue
 
         logger.info(f"Downloading {video_name} from {video_url}")
-        if not download_file_from_url(video_url, dest_video):
+        # Use 3 retries for video downloads to handle network glitches
+        if not download_file_from_url(video_url, dest_video, max_retries=3):
             logger.error(f"Failed to download video: {video_name}")
             success = False
         else:

@@ -20,6 +20,7 @@ Intel® ESQ provides a comprehensive collection of test suites to assess and qua
         - [DL Streamer Analysis - Multi-Stream Pipelines With Multiple AI Stages](#dl-streamer-analysis---multi-stream-pipelines-with-multiple-ai-stages)
         - [DL Streamer Analysis - Verified Reference Blueprints](#verified-reference-blueprints)
         - [OpenVINO](#openvino)
+        - [Video Analytics](#video-analytics)
     - [System GPU - OpenVINO](#system-gpu---openvino)
     - [System Memory - STREAM](#system-memory---stream)
     - [Media Performance](#media-performance)
@@ -35,16 +36,17 @@ Quick reference of all available test suites and their profile names.
 |--------------|----------|-------------|-------------|
 | `profile.qualification.ai-edge-system` | Qualification | AI Edge System qualification | `esq run --profile profile.qualification.ai-edge-system` |
 | `profile.vertical.manufacturing` | Vertical | Manufacturing | `esq run --profile profile.vertical.manufacturing` |
-| `profile.vertical.metro` | Vertical | Metro | `esq run --profile profile.vertical.metro` |
+| `profile.vertical.metro` | Vertical | Metro proxy workloads (LPR, Smart NVR, Visual AI, VSaaS) | `esq run --profile profile.vertical.metro` |
 | `profile.vertical.retail-asc` | Vertical | Retail Automated Self-Checkout | `esq run --profile profile.vertical.retail-asc` |
 | `profile.vertical.retail-lp` | Vertical | Retail Loss Prevention | `esq run --profile profile.vertical.retail-lp` |
 | `profile.suite.ai.gen` | Horizontal | Gen AI profile | `esq run --profile profile.suite.ai.gen` |
 | `profile.suite.ai.vision-light` | Horizontal | DL Streamer Analysis - Multi-Stream Pipelines With Multiple AI Stages | `esq run --profile profile.suite.ai.vision-light` |
-| `profile.suite.ai.vision-ov` | Horizontal | OpenVINO Benchmark - Measures raw inference performance using OpenVINO Runtime API | `esq run --profile profile.suite.ai.vision-ov` |
+| `profile.suite.ai.vision-ov` | Horizontal | OpenVINO™ Toolkit Benchmark - Measures raw inference performance using OpenVINO Runtime API | `esq run --profile profile.suite.ai.vision-ov` |
 | `profile.suite.ai.vision-vrb` | Horizontal | Vision AI profile - Verified Reference Blueprints | `esq run --profile profile.suite.ai.vision-vrb` |
-| `profile.suite.system.gpu-ov` | Horizontal | System GPU Performance using OpenVINO benchmark | `esq run --profile profile.suite.system.gpu-ov` |
+| `profile.suite.system.gpu-ov` | Horizontal | System GPU Performance using OpenVINO™ Toolkit benchmark | `esq run --profile profile.suite.system.gpu-ov` |
 | `profile.suite.system.memory-stream` | Horizontal | System Memory Performance using STREAM benchmark | `esq run --profile profile.suite.system.memory-stream` |
 | `profile.suite.media.performance-pipelines` | Horizontal | Media Performance | `esq run --profile profile.suite.media.performance-pipelines` |
+| `profile.suite.ai.vision-va` | Horizontal | Multi-stage video analytics pipelines with detection, tracking, and classification | `esq run --profile profile.suite.ai.vision-va` |
 
 **List all available profiles**:
 ```bash
@@ -57,15 +59,15 @@ esq list
 
 | Test Suite | Purpose | Benefit |
 |------|---------|----------|
-| **Qualifications** | Measuring system performance to qualify against AI Edge Systems Qualifications Metrics | Gain Catalog inclusion and other marketing benefits from Intel.  |
+| **Qualifications** | Measuring system performance to qualify against  Intel® AI Edge Systems Qualifications Metrics | Gain Catalog inclusion and other marketing benefits from Intel.  |
 | **Vertical** | System benchmarking vertical specific proxy workloads like retail self checkout, smart NVR and manufacturing defect detection | Gain understanding and communicate on system's potential to be used in a variety of verticals and use-cases |
-| **Horizontal** | 	General system benchmarking (includes OpenVINO™, Audio, Memory Performance) | Gain understanding on system's resource utilization and performance like System memory and GPU during select AI workload  |
+| **Horizontal** | 	General system benchmarking (includes OpenVINO™ Toolkit, Audio, Memory Performance) | Gain understanding on system's resource utilization and performance like System memory and GPU during select AI workload  |
 
 ---
 
 ## Qualifications
 
-### AI Edge System Qualification
+### Intel® AI Edge System Qualification
 
 **Profile**: `profile.qualification.ai-edge-system`
 
@@ -82,7 +84,7 @@ Generative AI test on text generation
 | Scalable Performance Graphics Media | AES-GEN-001 | Gen AI LLM Serving Benchmark - Phi-4-mini-reasoning 3.8B INT4<br>Gen AI LLM Serving Benchmark - DeepSeek-R1-Distill-Qwen-14B INT4<br>Gen AI LLM Serving Benchmark - Qwen3-32B INT4 | >= 10.0 tokens/sec |
 
 
-Vision AI test using Intel® DLStreamer
+Vision AI test using Intel® DL Streamer
 
 | Tier | Test ID | Test Case | Qualification Criteria |
 |------|---------|-----------|-----------| 
@@ -109,9 +111,9 @@ esq run --profile profile.qualification.ai-edge-system
 
 | Test ID | Test Case |
 |---------|-----------| 
-| MFG-PDD-001 | Pallet Defect Detection - multi-stream 480p30 H.264 gvadetect YOLOX-TINY FP32 (CPU) |
-| MFG-PDD-002 | Pallet Defect Detection - multi-stream 480p30 H.264 gvadetect YOLOX-TINY FP32 (iGPU) |
-| MFG-PDD-003 | Pallet Defect Detection - multi-stream 480p30 H.264 gvadetect YOLOX-TINY FP32 (dGPU) |
+| MFG-PDD-001 | Pallet Defect Detection - multi-stream 480p30 H.264 gvadetect YOLOX-TINY INT8 (CPU) |
+| MFG-PDD-002 | Pallet Defect Detection - multi-stream 480p30 H.264 gvadetect YOLOX-TINY INT8 (iGPU) |
+| MFG-PDD-003 | Pallet Defect Detection - multi-stream 480p30 H.264 gvadetect YOLOX-TINY INT8 (dGPU) |
 | MFG-WPC-001 | Weld Porosity Classification - multi-stream 1024p30 H.264 gvaclassify EfficientNet-B0 FP16 (CPU) |
 | MFG-WPC-002 | Weld Porosity Classification - multi-stream 1024p30 H.264 gvaclassify EfficientNet-B0 FP16 (iGPU) |
 | MFG-WPC-003 | Weld Porosity Classification - multi-stream 1024p30 H.264 gvaclassify EfficientNet-B0 FP16 (dGPU) |
@@ -131,19 +133,27 @@ esq run --profile profile.vertical.manufacturing
 **Test Cases**:
 
 | Test ID | Test Case |
-|---------|-----------|  
-| METRO-PROXY-001 | LPR Pipeline (Multi-Devices) |
-| METRO-PROXY-002 | Smart NVR (iGPU) |
-| METRO-PROXY-003 | Smart NVR (dGPU) |
-| METRO-PROXY-004 | Headed Visual AI Proxy Pipeline (iGPU) |
-| METRO-PROXY-005 | Headed Visual AI Proxy Pipeline (dGPU) |
-| METRO-PROXY-006 | VSaaS Visual AI Proxy Pipeline (iGPU) |
-| METRO-PROXY-007 | VSaaS Visual AI Proxy Pipeline (dGPU) |
+|---------|-----------|
+| METRO-PROXY-001 | LPR Pipeline (Multi-Devices) - LPR proxy workload on iGPU and dGPU for multi-device throughput scaling. |
+| METRO-PROXY-002 | Smart NVR (iGPU) - Smart NVR proxy workload on iGPU with display output for real-time analytics. |
+| METRO-PROXY-003 | Smart NVR (dGPU) - Smart NVR proxy workload on dGPU for high-density stream analytics. |
+| METRO-PROXY-004 | Headed Visual AI Proxy Pipeline (iGPU) - Headed Visual AI proxy workload on iGPU with display output for interactive analytics. |
+| METRO-PROXY-005 | Headed Visual AI Proxy Pipeline (dGPU) - Headed Visual AI proxy workload on dGPU with display output for interactive analytics. |
+| METRO-PROXY-006 | VSaaS Visual AI Proxy Pipeline (iGPU) - VSaaS Visual AI proxy workload on iGPU with multi-model inference and encode stages. |
+| METRO-PROXY-007 | VSaaS Visual AI Proxy Pipeline (dGPU) - VSaaS Visual AI proxy workload on dGPU for scalable stream analytics. |
 
 **Run this profile**:
 ```bash
 esq run --profile profile.vertical.metro
 ```
+
+> **Note:** Running `esq run --profile profile.vertical.metro` also runs dependent profiles:
+> `profile.suite.system.memory-stream`,
+> `profile.suite.system.gpu-ov`,
+> `profile.suite.ai.vision-ov`,
+> `profile.suite.media.performance-pipelines`, and
+> `profile.suite.ai.vision-va`.
+> Total execution time depends on your hardware capabilities and available accelerators.
 
 ---
 
@@ -185,6 +195,21 @@ esq run --profile profile.vertical.retail-asc
 **Run this profile**:
 ```bash
 esq run --profile profile.vertical.retail-lp
+```
+
+---
+
+**Profile**: `profile.vertical.retail-lp-vlm`
+
+**Test Cases**:
+
+| Test ID | Test Case |
+|---------|-----------| 
+| LP-VLM-001 | Loss Prevention VLM - 1080p15 H.264 gvadetect YOLO11n FP16 (CPU) VLM analysis Qwen2.5-VL-7B-Instruct INT8 (GPU) |
+
+**Run this profile**:
+```bash
+esq run --profile profile.vertical.retail-lp-vlm
 ```
 
 ---
@@ -325,7 +350,26 @@ esq run --profile profile.suite.ai.vision-ov
 
 ---
 
-### System GPU - OpenVINO
+#### Video Analytics
+
+**Profile**: `profile.suite.ai.vision-va`
+
+**Test Cases**:
+
+| Test ID | Test Case |
+|---------|-----------|
+| VSN-LIGHT-001 | VA Light - All Available Devices (YOLO11n + ResNet-50, H.265) |
+| VSN-MEDIUM-001 | VA Medium - All Available Devices (YOLOv5m + ResNet-50 + MobileNet-v2, H.265) |
+| VSN-HEAVY-001 | VA Heavy - All Available Devices (YOLO11m + ResNet-v1-50 + MobileNet-v2, H.265) |
+
+**Run this profile**:
+```bash
+esq run --profile profile.suite.ai.vision-va
+```
+
+---
+
+### System GPU - OpenVINO™ Toolkit
 
 **Profile**: `profile.suite.system.gpu-ov`
 
@@ -402,3 +446,5 @@ esq run --profile profile.suite.system.memory-stream
 ```bash
 esq run --profile profile.suite.media.performance-pipelines
 ```
+
+---

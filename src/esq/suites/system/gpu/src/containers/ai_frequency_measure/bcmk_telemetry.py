@@ -3,6 +3,7 @@
 
 import copy
 import csv
+import json
 import logging
 import os
 import re
@@ -17,6 +18,12 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+
+try:
+    from pmu_gpu_collector import collect_gpu_telemetry_pmu, generate_gpu_telemetry_output
+    PMU_TELEMETRY_AVAILABLE = True
+except ImportError:
+    PMU_TELEMETRY_AVAILABLE = False
 
 pd.options.mode.chained_assignment = None
 
@@ -111,6 +118,19 @@ def dgpu_power_filter(line):
     return line is not None and len(line.strip()) > 0
 
 
+def check_intel_gpu_top_available():
+    """Check if intel_gpu_top is available and working."""
+    try:
+        result = subprocess.run(
+            ["intel_gpu_top", "-h"],
+            capture_output=True,
+            timeout=2
+        )
+        return result.returncode == 0
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        return False
+
+
 # def cpu_proc_usage_filter(line):
 #     return line is not None and "benchmark_app" in line
 
@@ -118,7 +138,13 @@ def dgpu_power_filter(line):
 # This function will run in a separate thread, collecting usage data
 def collect_usage(command, output_file, event, filter_func):
     with open(output_file, "w", buffering=1) as f:  # Line buffering
-        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        process = subprocess.Popen(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            stdin=subprocess.DEVNULL,  # Detach from TTY (aligned with OV benchmark telemetry)
+            text=True,
+        )
 
         cmd_str = " ".join(command)
         logging.info(f"Starting telemetry: {cmd_str} -> {output_file}")
@@ -128,6 +154,8 @@ def collect_usage(command, output_file, event, filter_func):
             if "i7z" in command:
                 time.sleep(1)
             else:
+                if process.poll() is not None:
+                    break
                 line = process.stdout.readline()
                 if line:  # Log if we got any line
                     if filter_func(line):
@@ -138,6 +166,38 @@ def collect_usage(command, output_file, event, filter_func):
                             logging.debug(f"First line written to {output_file}: {line.strip()[:100]}")
 
         logging.info(f"Stopped telemetry: {cmd_str}, wrote {line_count} lines")
+        if line_count == 0:
+            try:
+                stderr_output = process.stderr.read().strip() if process.stderr else ""
+                if stderr_output:
+                    logging.warning(f"Telemetry stderr for '{cmd_str}': {stderr_output}")
+
+                    # Check for intel_gpu_top assertion failure (debugfs access issue)
+                    if "intel_gpu_top" in cmd_str and "Assertion" in stderr_output:
+                        logging.warning(f"intel_gpu_top failed with assertion error (likely debugfs permission issue)")
+                        logging.info(f"Attempting fallback: PMU-based telemetry collection for {output_file}")
+
+                        if PMU_TELEMETRY_AVAILABLE:
+                            try:
+                                # Extract device name from output filename
+                                device_name = "renderD128" if "renderD128" in str(output_file) else "renderD129"
+
+                                # Generate intel_gpu_top-compatible output using PMU/sysfs
+                                # Use same duration as test (typically 10+ seconds for sampling)
+                                pmu_output = generate_gpu_telemetry_output(device_name, duration_sec=10)
+
+                                # Write compatible format to output file
+                                with open(output_file, "w") as f:
+                                    f.write(pmu_output)
+
+                                logging.info(f"Fallback telemetry written to {output_file} using PMU/sysfs")
+                                logging.info(f"Output has {len(pmu_output.splitlines())} lines, compatible with intel_gpu_top format")
+                                return
+                            except Exception as fallback_err:
+                                logging.error(f"PMU fallback also failed: {fallback_err}")
+            except Exception as stderr_err:
+                logging.debug(f"Failed to read telemetry stderr for '{cmd_str}': {stderr_err}")
+
         if "i7z" in command:
             _filter_lines = []
             with open("i7z_output_raw.txt", "r") as f:
@@ -305,7 +365,11 @@ def eval_gpu_usage(gpu_file):
 
     catelogy_line = lines[0]
     title_line = lines[1]
-    data_lines = [l.strip() for l in lines if not l.strip().startswith("Freq") and not l.strip().startswith("req")]
+    data_lines = [
+        l.strip()
+        for l in lines
+        if l.strip() and not l.strip().startswith("Freq") and not l.strip().startswith("req")
+    ]
     data_lines_2d = np.array(
         [[float(item) if item.replace(".", "", 1).isdigit() else np.nan for item in l.split()] for l in data_lines]
     )

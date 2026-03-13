@@ -21,10 +21,8 @@ on:
       - '.github/workflows/docs-build.yml'
   workflow_dispatch:
 
-permissions:
-  contents: write
-  pages: write
-  id-token: write
+# Permissions are scoped at job level for least privilege
+permissions: {}
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -76,22 +74,26 @@ jobs:
     name: Detect Version Information
     needs: setup
     runs-on: ${{ fromJSON(needs.setup.outputs.runner_labels) }}
+    permissions:
+      contents: read  # Only read access needed for checkout
     outputs:
       version: ${{ steps.version.outputs.version }}
       title: ${{ steps.version.outputs.title }}
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           fetch-depth: 0
       
       - name: Detect version from branch
         id: version
+        env:
+          GITHUB_REF_NAME: ${{ github.ref_name }}  # Prevent injection via env var
         run: |
           echo "[INFO] Detecting version information..."
           
-          BRANCH_NAME="${{ github.ref_name }}"
+          BRANCH_NAME="${GITHUB_REF_NAME}"
           echo "Branch: ${BRANCH_NAME}"
           
           # Determine version based on branch
@@ -132,9 +134,11 @@ jobs:
     name: Build Documentation
     needs: [setup, detect-version]
     runs-on: ${{ fromJSON(needs.setup.outputs.runner_labels) }}
+    permissions:
+      contents: read  # Only read access needed
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           fetch-depth: 0
 
@@ -169,13 +173,15 @@ jobs:
           mkdocs build --clean
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4b58bb5c2f3  # v4.3.1
         with:
           name: documentation-site
           path: site/
 
       - name: Build Summary
         if: always()
+        env:
+          GITHUB_REF_NAME: ${{ github.ref_name }}  # Prevent injection via env var
         run: |
           echo "## 🔰 Documentation Build" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -187,7 +193,7 @@ jobs:
           echo "| Runner Name | \`${{ runner.name }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| Runner Environment | ${{ runner.environment }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Event | ${{ github.event_name }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Branch | \`${{ github.ref_name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Branch | \`${GITHUB_REF_NAME}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| Commit | [\`${{ github.sha }}\`](https://github.com/${{ github.repository }}/commit/${{ github.sha }}) |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           

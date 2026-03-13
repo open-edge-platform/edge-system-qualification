@@ -67,6 +67,7 @@ def _create_gpu_metrics(device: str, value: Any = -1, unit: Any = None) -> dict:
         "frequency_max_cpu": Metrics(unit=unit, value=value, is_key_metric=False),
     }
 
+
 @allure.title("System GPU Performance Test (OpenVINO)")
 def test_system_gpu(
     request,
@@ -401,6 +402,7 @@ def test_system_gpu(
         pytest.fail(failure_message)
 
     try:
+
         def run_test():
             # Define metrics with -1 as initial values (indicating data not available)
             # Unit will be set when valid value is populated (unit=None for -1 to avoid "-1 %" display)
@@ -467,6 +469,14 @@ def test_system_gpu(
                     "/proc/cpuinfo": {"bind": "/proc/cpuinfo", "mode": "ro"},  # CPU info
                 }
 
+                # Mount debugfs for intel_gpu_top telemetry if available
+                debugfs_path = "/sys/kernel/debug"
+                if os.path.exists(debugfs_path):
+                    volumes[debugfs_path] = {"bind": debugfs_path, "mode": "ro"}
+                    logger.info(f"Mounting debugfs: {debugfs_path} -> {debugfs_path}")
+                else:
+                    logger.warning("Debugfs not found on host; intel_gpu_top telemetry may not work")
+
                 # Add data directory mount (models/images from esq_data/data/vertical/metro)
                 if os.path.exists(data_dir):
                     volumes[str(data_dir)] = {"bind": "/home/dlstreamer/share", "mode": "ro"}
@@ -479,7 +489,8 @@ def test_system_gpu(
                 if Path("/dev/accel").exists():
                     devices.append("/dev/accel:/dev/accel")
 
-                # Get renderD128 and video group IDs for GPU access permissions
+                # Get render and user group IDs for GPU access permissions
+                # Align with proxy/video analytics container security model
                 group_add = []
                 try:
                     render_stat = os.stat("/dev/dri/renderD128")
@@ -489,17 +500,10 @@ def test_system_gpu(
                 except Exception as e:
                     logger.warning(f"Failed to get renderD128 group ID: {e}")
 
-                # Also add video group if different from render
-                try:
-                    import grp
-
-                    video_group = grp.getgrnam("video")
-                    video_gid = video_group.gr_gid
-                    if str(video_gid) not in group_add:
-                        group_add.append(str(video_gid))
-                        logger.debug(f"Adding video group: {video_gid}")
-                except Exception as e:
-                    logger.debug(f"Video group not found or not needed: {e}")
+                user_gid = str(os.getgid())
+                if user_gid not in group_add:
+                    group_add.append(user_gid)
+                    logger.debug(f"Adding user group: {user_gid}")
 
                 # Build environment variables
                 environment = {
@@ -517,10 +521,8 @@ def test_system_gpu(
                     try:
                         # Run container with CAP_PERFMON and CAP_SYS_ADMIN for intel_gpu_top performance monitoring
                         # Kernel requirement: 5.8+ (CAP_PERFMON), older kernels may need only SYS_ADMIN
-                        # Running as root for now - GPU telemetry requires root for full access
-                        logger.debug(
-                            f"Running container: {container_full_tag} with CAP_PERFMON and CAP_SYS_ADMIN as root"
-                        )
+                        # Container runs as dlstreamer (non-root); caps are container-wide so tools work without sudo
+                        logger.debug(f"Running container: {container_full_tag} with CAP_PERFMON and CAP_SYS_ADMIN")
 
                         logger.debug("Container parameters:")
                         logger.debug(f"  - Image: {container_full_tag}")
@@ -530,7 +532,7 @@ def test_system_gpu(
                         logger.debug(f"  - Devices: {devices}")
                         logger.debug(f"  - Environment: {environment}")
                         logger.debug("  - Capabilities: ['PERFMON', 'SYS_ADMIN']")
-                        logger.debug("  - User: root:root")
+                        logger.debug("  - User: dlstreamer (non-root, caps granted)")
                         logger.debug(f"  - Group add: {group_add}")
 
                         # Use framework's run_container API with cap_add support
@@ -544,9 +546,11 @@ def test_system_gpu(
                                 volumes=volumes,
                                 devices=devices,
                                 environment=environment,
-                                user="root:root",
                                 group_add=group_add,
-                                cap_add=["PERFMON", "SYS_ADMIN"],  # Required for intel_gpu_top
+                                cap_add=["PERFMON", "SYS_ADMIN", "DAC_READ_SEARCH"],  # PERFMON/SYS_ADMIN for intel_gpu_top, DAC_READ_SEARCH for RAPL power reading
+                                network_mode="host",  # Align with proxy/video analytics execution model
+                                ipc_mode="host",  # Required for shared memory access consistency
+                                working_dir="/home/dlstreamer",
                                 timeout=timeout,
                                 mode="batch",  # Wait for container to complete
                                 attach_logs=True,  # Automatically attach logs to Allure

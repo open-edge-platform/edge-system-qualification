@@ -135,7 +135,7 @@ def prepare_assets(
             path=f"{src_dir}/containers/dlstreamer_analyzer",
             tag=image_tag,
             dockerfile=dockerfile,
-            extract_packages=True,
+            extract_base_image_info=True,
         )
 
         if not build_result.get("image_id"):
@@ -147,7 +147,7 @@ def prepare_assets(
 
     # Prepare Docker image for DL Streamer utils
     build_utils_result = docker_client.build_image(
-        path=f"{src_dir}/containers/dlstreamer_utils", tag=docker_image_tag_utils, extract_packages=True
+        path=f"{src_dir}/containers/dlstreamer_utils", tag=docker_image_tag_utils, extract_base_image_info=True
     )
     if not build_utils_result.get("image_id"):
         pytest.fail(f"Failed to build Docker image: {docker_image_tag_utils}")

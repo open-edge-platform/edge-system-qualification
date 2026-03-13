@@ -322,6 +322,7 @@ def run_va_container(
 
     try:
         # Use DockerClient.run_container in batch mode
+        # Run as dlstreamer (non-root) with specific caps for telemetry collection
         result = docker_client.run_container(
             name=container_name,
             image=f"{image_name}:{image_tag}",
@@ -330,6 +331,11 @@ def run_va_container(
             devices=container_devices,
             environment=environment,
             group_add=[render_gid, user_gid],
+            cap_add=[
+                "PERFMON",
+                "SYS_ADMIN",
+                "DAC_READ_SEARCH",
+            ],  # Required for GPU access, performance monitoring (intel_gpu_top, xpu-smi), and RAPL energy reading
             network_mode="host",
             ipc_mode="host",
             working_dir="/home/dlstreamer",

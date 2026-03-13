@@ -139,7 +139,7 @@ def prepare_assets(
         container_src_dir = os.path.join(os.path.dirname(src_dir), "containers", "ovms_server")
 
         build_result = docker_client.build_image(
-            path=container_src_dir, tag=docker_image_tag, buildargs=docker_buildargs
+            path=container_src_dir, tag=docker_image_tag, buildargs=docker_buildargs, extract_base_image_info=True
         )
 
         container_config = {
@@ -166,7 +166,10 @@ def prepare_assets(
 
         logger.info(f"Building benchmark Docker image: {benchmark_image_tag}")
         build_result = docker_client.build_image(
-            path=benchmark_dockerfile_dir, tag=benchmark_image_tag, dockerfile="Dockerfile"
+            path=benchmark_dockerfile_dir,
+            tag=benchmark_image_tag,
+            dockerfile="Dockerfile",
+            extract_base_image_info=True,
         )
 
         if not build_result.get("image_id"):

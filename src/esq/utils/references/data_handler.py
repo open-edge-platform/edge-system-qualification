@@ -152,6 +152,7 @@ def _normalize_device_sku(device_sku: str) -> str:
 
     Handles:
     - GPU name variations (e.g., "Arc B60" vs "Intel Arc B60" vs "DG2 [Arc B60]")
+    - Removes parenthetical text: "(R)", "(TM)", "(dGPU)", "(iGPU)", "(Graphics)", etc.
     - Case insensitivity
     - Extra whitespace
 
@@ -180,8 +181,10 @@ def _normalize_device_sku(device_sku: str) -> str:
     if bracket_match:
         sku_lower = bracket_match.group(1).strip()
 
-    # Remove special characters and extra spaces
+    # Remove special characters and common parenthetical text
     sku_lower = re.sub(r"[™®]", "", sku_lower)
+    # Remove common parenthetical suffixes: (r), (tm), (dgpu), (igpu), (graphics), etc.
+    sku_lower = re.sub(r"\([^)]*\)", "", sku_lower)
     sku_lower = re.sub(r"\s+", " ", sku_lower).strip()
 
     return sku_lower
@@ -299,20 +302,37 @@ def _match_gpu(system_gpu_models: List[str], entry_sku: str) -> bool:
 
         # Strategy 3: Intel Arc model number extraction
         # Extract Arc model identifiers: "A770", "B60", "B580", etc.
+        # Handles "Arc B60", "Arc Pro B60", "Arc A770", etc.
         import re
 
-        gpu_arc_model = re.search(r"\barc\s+([a-z]\d{2,3})\b", gpu_normalized)
-        entry_arc_model = re.search(r"\barc\s+([a-z]\d{2,3})\b", entry_normalized)
+        # Updated regex to handle optional "Pro" or other modifiers between "Arc" and model number
+        gpu_arc_model = re.search(r"\barc\s+(?:pro\s+)?([a-z]\d{2,3})\b", gpu_normalized)
+        entry_arc_model = re.search(r"\barc\s+(?:pro\s+)?([a-z]\d{2,3})\b", entry_normalized)
 
-        if gpu_arc_model and entry_arc_model:
-            if gpu_arc_model.group(1) == entry_arc_model.group(1):
-                logger.debug(
-                    f"Intel Arc model match: '{entry_sku}' matches '{gpu_model}' (Arc {gpu_arc_model.group(1).upper()})"
-                )
-                return True
+        # If entry has an Arc model number, require exact model number matching
+        if entry_arc_model:
+            if gpu_arc_model:
+                # Both have Arc model numbers - compare them exactly
+                if gpu_arc_model.group(1) == entry_arc_model.group(1):
+                    logger.debug(
+                        f"Intel Arc model match: '{entry_sku}' matches '{gpu_model}' "
+                        f"(Arc {gpu_arc_model.group(1).upper()})"
+                    )
+                    return True
+                else:
+                    # Arc models don't match (e.g., B50 != B60) - continue to next GPU
+                    logger.debug(
+                        f"Intel Arc model mismatch: '{entry_sku}' (Arc {entry_arc_model.group(1).upper()}) != "
+                        f"'{gpu_model}' (Arc {gpu_arc_model.group(1).upper()})"
+                    )
+                    continue
+            else:
+                # Entry is Arc with model number, but system GPU is not Arc - no match
+                continue
 
-        # Strategy 4: Intel GPU family keyword matching
-        # Check for common Intel GPU families: Arc, Iris, UHD, HD, Xe
+        # Strategy 4: Intel GPU family keyword matching (for non-Arc GPUs or Arc without model numbers)
+        # This strategy is only used when entry doesn't have a specific Arc model number
+        # This prevents false matches like "Arc B50" matching "Arc B60"
         gpu_keywords = set(re.findall(r"\b(arc|iris|uhd|hd|xe)\b", gpu_normalized))
         entry_keywords = set(re.findall(r"\b(arc|iris|uhd|hd|xe)\b", entry_normalized))
 

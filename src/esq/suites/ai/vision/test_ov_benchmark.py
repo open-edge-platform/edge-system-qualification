@@ -784,7 +784,7 @@ def test_ov_benchmark(
                         logger.debug(f"  - Group add: {group_add}")
                         logger.debug(f"  - Timeout: {timeout}s")
                         logger.debug("  - Capabilities: ['PERFMON', 'SYS_ADMIN']")
-                        logger.debug("  - User: root:root")
+                        logger.debug("  - User: dlstreamer (non-root, caps granted)")
 
                         # Use framework's run_container API with cap_add support
                         # Note: Framework automatically fails test if container exits with non-zero code
@@ -796,9 +796,12 @@ def test_ov_benchmark(
                                 command=command,
                                 volumes=volumes,
                                 devices=devices,
-                                user="root:root",
                                 group_add=group_add,
-                                cap_add=["PERFMON", "SYS_ADMIN"],  # Required for performance monitoring
+                                cap_add=[
+                                    "PERFMON",
+                                    "SYS_ADMIN",
+                                    "DAC_READ_SEARCH",
+                                ],  # Required for performance monitoring (intel_gpu_top, xpu-smi) and RAPL energy reading
                                 timeout=timeout,
                                 mode="batch",  # Wait for container to complete
                                 attach_logs=True,  # Automatically attach logs to Allure

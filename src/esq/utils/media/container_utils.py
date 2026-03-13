@@ -332,7 +332,16 @@ def get_x11_volumes(host_display: str, logger=None) -> dict:
 
     Creates volume mappings for:
     1. X11 socket directory (/tmp/.X11-unix)
-    2. .Xauthority file for secure X11 access
+    2. A Docker-compatible X authority file at /tmp/.docker.xauth
+
+    The xauth file is generated via:
+        xauth nlist $DISPLAY | sed -e 's/^..../ffff/' | xauth -f /tmp/.docker.xauth nmerge -
+
+    The wildcard hostname format (ffff prefix via sed) allows the cookie to be
+    used by any hostname inside the container without needing the exact host
+    machine name.  Critically, the file is placed in /tmp (world-accessible),
+    so non-root container users (e.g. dlstreamer) can read it — unlike
+    ~/.Xauthority which is only readable by the owning user.
 
     Args:
         host_display: The X11 display string (e.g., ":0", ":1")
@@ -340,13 +349,15 @@ def get_x11_volumes(host_display: str, logger=None) -> dict:
 
     Returns:
         dict: Volume mappings in Docker SDK format
-            {"/path/on/host": {"bind": "/path/in/container", "mode": "ro/rw"}}
+            {"/path/on/host": {"bind": "/path/in/container", "mode": "rw/ro"}}
 
     Example:
         >>> volumes = get_x11_volumes(":1")
-        >>> # Returns {"/tmp/.X11-unix": {"bind": "/tmp/.X11-unix", "mode": "rw"}, ...}
+        >>> # Returns {"/tmp/.X11-unix": {"bind": "/tmp/.X11-unix", "mode": "rw"},
+        >>> #          "/tmp/.docker.xauth": {"bind": "/tmp/.docker.xauth", "mode": "rw"}}
     """
     import os
+    import subprocess  # nosec B404 # For xauth cookie generation pipeline
     from pathlib import Path
 
     def log_debug(msg):
@@ -367,15 +378,79 @@ def get_x11_volumes(host_display: str, logger=None) -> dict:
         volumes[str(x11_socket_dir)] = {"bind": "/tmp/.X11-unix", "mode": "rw"}
         log_debug(f"Mounted X11 socket for display output: {x11_socket_dir}")
 
-    # Mount .Xauthority for secure X11 access (avoids need for 'xhost +')
-    xauthority_path = os.environ.get("XAUTHORITY", os.path.expanduser("~/.Xauthority"))
-    if Path(xauthority_path).exists():
-        volumes[xauthority_path] = {"bind": "/root/.Xauthority", "mode": "ro"}
-        log_debug(f"Mounted .Xauthority for secure X11 access: {xauthority_path}")
-    else:
-        log_warning(
-            f".Xauthority not found at {xauthority_path}. X11 access may require 'xhost +local:root' (less secure)."
-        )
+    # Generate a Docker-compatible xauth file in /tmp so non-root container
+    # users can read it (avoids the /root/.Xauthority accessibility problem).
+    xauth_file = "/tmp/.docker.xauth"
+    try:
+        # Remove stale file from a previous run
+        if os.path.exists(xauth_file):
+            os.remove(xauth_file)
+        Path(xauth_file).touch(mode=0o660)
+
+        # Sanitize display value — allow only alphanumeric, colon, dot, dash
+        sanitized_display = "".join(c for c in host_display if c.isalnum() or c in ":.-")
+        # Sanitize xauth file path — allow only safe filesystem characters
+        sanitized_xauth = "".join(c for c in xauth_file if c.isalnum() or c in "/._-")
+
+        # Chain: xauth nlist | sed (wildcard hostname) | xauth nmerge
+        p1 = p2 = p3 = None
+        try:
+            p1 = subprocess.Popen(
+                ["xauth", "nlist", sanitized_display],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            p2 = subprocess.Popen(
+                ["sed", "-e", "s/^..../ffff/"],
+                stdin=p1.stdout,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            if p1.stdout:
+                p1.stdout.close()
+            p3 = subprocess.Popen(
+                ["xauth", "-f", sanitized_xauth, "nmerge", "-"],
+                stdin=p2.stdout,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            if p2.stdout:
+                p2.stdout.close()
+
+            _, stderr = p3.communicate(timeout=10)
+            if p3.returncode != 0:
+                log_warning(f"xauth nmerge returned {p3.returncode}: {stderr.strip()}")
+            else:
+                file_size = os.path.getsize(xauth_file)
+                if file_size == 0:
+                    log_warning("xauth file is empty — X11 display authorization may fail inside container")
+                else:
+                    log_debug(f"Docker xauth file created ({file_size} bytes): {xauth_file}")
+        except subprocess.TimeoutExpired:
+            log_warning("xauth pipeline timed out after 10 s")
+            for proc in [p3, p2, p1]:
+                try:
+                    if proc is not None and proc.poll() is None:
+                        proc.kill()
+                        proc.wait(timeout=1)
+                except Exception:
+                    pass
+        except FileNotFoundError:
+            log_warning("xauth binary not found — X11 auth cookie will not be generated")
+        except Exception as xauth_err:
+            log_warning(f"xauth pipeline failed: {xauth_err}")
+
+        os.chmod(xauth_file, 0o660)
+
+    except Exception as e:
+        log_warning(f"Failed to create Docker X authority file: {e}")
+
+    if os.path.exists(xauth_file):
+        # Mount at the same /tmp path so the XAUTHORITY env var works for any user
+        volumes[xauth_file] = {"bind": xauth_file, "mode": "rw"}
+        log_debug(f"Mounted Docker xauth file: {xauth_file}")
 
     return volumes
 
@@ -384,25 +459,29 @@ def get_x11_environment(host_display: str, display_enabled: bool = True) -> dict
     """
     Get environment variables for X11 display access in containers.
 
+    XAUTHORITY is set to /tmp/.docker.xauth — the Docker-compatible cookie file
+    generated by get_x11_volumes().  Unlike /root/.Xauthority this path is
+    readable by any container user (e.g. dlstreamer running as non-root).
+
     Args:
         host_display: The X11 display string (e.g., ":0", ":1")
         display_enabled: Whether display output is enabled
 
     Returns:
         dict: Environment variables for container
-            {"DISPLAY": ":1", "XAUTHORITY": "/root/.Xauthority"}
+            {"DISPLAY": ":1", "XAUTHORITY": "/tmp/.docker.xauth"}
             Returns empty dict if display_enabled is False
 
     Example:
         >>> env = get_x11_environment(":1", display_enabled=True)
-        >>> # Returns {"DISPLAY": ":1", "XAUTHORITY": "/root/.Xauthority"}
+        >>> # Returns {"DISPLAY": ":1", "XAUTHORITY": "/tmp/.docker.xauth"}
     """
     if not display_enabled:
         return {}
 
     return {
         "DISPLAY": host_display,
-        "XAUTHORITY": "/root/.Xauthority",
+        "XAUTHORITY": "/tmp/.docker.xauth",
     }
 
 

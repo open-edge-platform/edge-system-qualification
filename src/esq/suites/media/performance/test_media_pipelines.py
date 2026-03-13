@@ -397,6 +397,7 @@ def _run_media_container(
 
     try:
         # Use DockerClient.run_container in batch mode
+        # Run as dlstreamer (non-root) with specific caps instead of privileged mode
         result = docker_client.run_container(
             name=container_name,
             image=f"{image_name}:{image_tag}",
@@ -404,9 +405,12 @@ def _run_media_container(
             volumes=volumes,
             devices=container_devices,
             environment=environment,
-            user="root:root",  # Run as root for GPU access
             group_add=[render_gid, user_gid],
-            privileged=True,  # validation-skip-privileged # Required for GPU access and benchmarking
+            cap_add=[
+                "PERFMON",
+                "SYS_ADMIN",
+                "DAC_READ_SEARCH",
+            ],  # Required for GPU access, performance monitoring (intel_gpu_top, xpu-smi), and RAPL energy reading
             network_mode="host",  # Required for inter-process communication
             ipc_mode="host",  # Required for shared memory
             working_dir="/home/dlstreamer",
@@ -678,8 +682,8 @@ def test_media_pipelines(
             csv_to_metric_map = {
                 "Max Channels": "max_streams",  # Actual max channels from test execution
                 "Average FPS": "avg_fps",  # Average FPS (backup to log extraction)
-                "Ref GPU Freq": "gpu_freq_mhz",  # Reference GPU frequency (will be -1 for now)
-                "Ref Pkg Power": "pkg_power_w",  # Reference package power (will be -1 for now)
+                "GPU Freq": "gpu_freq_mhz",  # Actual GPU frequency in MHz
+                "Pkg Power": "pkg_power_w",  # Actual package power in watts
                 "Duration(s)": "duration_s",  # Test duration (optional - defaults to 0 if missing)
             }
 
@@ -941,29 +945,29 @@ def test_media_pipelines(
                                                 result.metrics[metric_key].value = float(duration_str)
                                                 result.metrics[metric_key].unit = "s"
                                                 logger.debug(f"Extracted {metric_key} = {value}")
-                                        elif csv_col in ["Ref GPU Freq"]:
-                                            # Reference GPU frequency in MHz (will be -1 if not available)
+                                        elif csv_col in ["GPU Freq"]:
+                                            # Actual GPU frequency in MHz (use -1 if unavailable)
                                             try:
                                                 freq_val = (
                                                     float(value)
                                                     if pd.notna(value) and str(value) not in ["N/A", "nan", "", "None"]
                                                     else -1.0
                                                 )
-                                                result.metrics[metric_key].value = freq_val
+                                                result.metrics[metric_key].value = freq_val if freq_val > 0 else -1.0
                                                 result.metrics[metric_key].unit = "MHz" if freq_val > 0 else None
                                                 logger.debug(f"Extracted {metric_key} = {freq_val} MHz")
                                             except (ValueError, TypeError):
                                                 result.metrics[metric_key].value = -1.0
                                                 logger.debug(f"{metric_key} = -1 (not available)")
-                                        elif csv_col in ["Ref Pkg Power"]:
-                                            # Reference package power in watts (will be -1 if not available)
+                                        elif csv_col in ["Pkg Power"]:
+                                            # Actual package power in watts (use -1 if unavailable)
                                             try:
                                                 power_val = (
                                                     float(value)
                                                     if pd.notna(value) and str(value) not in ["N/A", "nan", "", "None"]
                                                     else -1.0
                                                 )
-                                                result.metrics[metric_key].value = power_val
+                                                result.metrics[metric_key].value = power_val if power_val > 0 else -1.0
                                                 result.metrics[metric_key].unit = "W" if power_val > 0 else None
                                                 logger.debug(f"Extracted {metric_key} = {power_val} W")
                                             except (ValueError, TypeError):

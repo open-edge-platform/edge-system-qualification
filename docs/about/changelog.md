@@ -3,19 +3,17 @@
 Intel® ESQ changelog and version history.
 
 ## Version 2026.1.0 - March 2026
+### New Platform Support
+- Intel® Core™ Ultra Processors (Series 3), Products formerly Panther Lake
+- Intel® Core™ Processors (Series 2), Products formerly Bartlett Lake
+- Intel® Xeon® 6 Processors, Products formerly Granite Rapids
 
 ### Changes
-- New Platform Support:
-  - Intel® Core™ Ultra Processors (Series 3), Products formerly Panther Lake
-  - Intel® Core™ Processors (Series 2), Products formerly Bartlett Lake
-  - Intel® Xeon® 6 processors, Products formerly Granite Rapids
 - Enabled Verified Reference Blueprints (VRB) data on Intel® ESQ Report
 - Enhanced OpenVINO™ Model Server (OVMS) with version 2025.4.1 for Gen AI workloads
 - OpenVINO toolkit 2025.3.0 support for Vision AI related Test Suite
 - Platform power configuration in report generation
-- Configurable DL Streamer pipeline enhancements:
-  - Configurable sink element support
-  - Configurable consecutive timeout threshold
+- Configurable sink element and consecutive timeout threshold for DL Streamer pipeline
 - New supported qualification platform detection logic
 - New retail-focused pipeline - Loss Prevention VLM
 - Enabled ModelScope download source support
@@ -50,6 +48,7 @@ Intel® ESQ changelog and version history.
 - Media Performance encode and decode test cases produce duplicate results in CSV table
 - Vision AI test cases run concurrently on all devices (dGPU/iGPU/CPU/NPU), while Verified Reference data test cases run on individual components. This will be fixed in the next release.
 - Gen AI test cases running on NPU with Intel® Core™ Ultra Processors (Series 2) may fail if throughput drops below the 10 token/s threshold. This will be fixed in the next release.
+- Workstation segment Intel® Xeon® 6 Processors are incorrectly excluded from AI Edge System Qualification test execution.
 
 ## Version 2025.2.0 - December 2025
 

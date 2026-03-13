@@ -76,12 +76,12 @@ def download_lpr_resources(models_dir: str, videos_dir: str) -> bool:
             zip_path.unlink(missing_ok=True)
 
         else:
-            # Direct file download
+            # Direct file download with retry support
             if dest.exists():
                 logger.info(f"File already exists: {dest}")
                 continue
 
-            if not download_file_from_url(url, dest):
+            if not download_file_from_url(url, dest, max_retries=3):
                 success = False
                 continue
 

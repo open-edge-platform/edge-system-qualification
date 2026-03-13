@@ -276,7 +276,7 @@ suites:
                 devices: [cpu]
                 requirements:
                   cpu_entry_excluded: true
-                  memory_min_gb: 58.0
+                  memory_min_gb: 72.0
                   storage_total_min_gb: 256.0
 
               - test_id: "GEN-LLM-027"
@@ -287,7 +287,7 @@ suites:
                 requirements:
                   cpu_entry_excluded: true
                   igpu_required: true
-                  memory_min_gb: 58.0
+                  memory_min_gb: 72.0
                   storage_total_min_gb: 256.0
 
               - test_id: "GEN-LLM-028"
@@ -319,5 +319,5 @@ suites:
                 devices: [npu]
                 requirements:
                   npu_required: true
-                  memory_min_gb: 58.0
+                  memory_min_gb: 72.0
                   storage_total_min_gb: 256.0

@@ -18,6 +18,15 @@ import numpy as np
 import pandas as pd
 from gpu_util import get_gpu_devices
 
+# Try to import PMU GPU collector for fallback telemetry
+PMU_TELEMETRY_AVAILABLE = False
+try:
+    from pmu_gpu_collector import collect_gpu_telemetry_pmu, generate_gpu_telemetry_output
+    PMU_TELEMETRY_AVAILABLE = True
+    logging.info("PMU GPU telemetry collector available")
+except ImportError as e:
+    logging.warning(f"PMU GPU telemetry not available: {e}")
+
 CURR_DIR = os.path.dirname(os.path.abspath(__file__))
 OUTPUT_DIR = Path(f"{CURR_DIR}/output").resolve()
 if not OUTPUT_DIR.exists():
@@ -326,7 +335,11 @@ def eval_gpu_usage(gpu_file):
 
     catelogy_line = lines[0]
     title_line = lines[1]
-    data_lines = [l.strip() for l in lines if not l.strip().startswith("Freq") and not l.strip().startswith("req")]
+    data_lines = [
+        l.strip()
+        for l in lines
+        if l.strip() and not l.strip().startswith("Freq") and not l.strip().startswith("req")
+    ]
     data_lines_2d = np.array(
         [[float(item) if item.replace(".", "", 1).isdigit() else np.nan for item in l.split()] for l in data_lines]
     )
@@ -411,21 +424,27 @@ def eval_gpu_usage(gpu_file):
     avg_rcs0 = round_mean(gpu_rcs0_list)  # round(gpu_rcs0_list.mean(), 2)
 
     try:
-        pkg_power_idx = 0.0
+        pkg_power_idx = 0
         if "Power W" not in result_category and "pkg" in subtitle_list:
             pkg_power_idx = gpu_result_idx_map["IRQ RC6"]["pkg"]
+            logging.debug(f"Package power at IRQ RC6/pkg index: {pkg_power_idx}")
         else:
             pkg_power_idx = gpu_result_idx_map["Power W"]["pkg"]
+            logging.debug(f"Package power at Power W/pkg index: {pkg_power_idx}")
         pkg_power_list = data_lines_2d[:, pkg_power_idx].astype(float)
         avg_pkg_power = round_mean(pkg_power_list)  # round(pkg_power_list.mean(), 2)
-    except:
+        logging.debug(f"Extracted package power: {avg_pkg_power}W (from {len(pkg_power_list)} samples)")
+    except Exception as e:
+        logging.warning(f"Failed to extract package power: {type(e).__name__}: {e}")
         avg_pkg_power = 0.0
 
     try:
         gpu_power_idx = gpu_result_idx_map["Power W"]["gpu"]  # only igpu so far
         gpu_power_list = data_lines_2d[:, gpu_power_idx].astype(float)
         avg_gpu_power = round_mean(gpu_power_list)  # round(gpu_power_list.mean(), 2)
-    except:
+        logging.debug(f"Extracted GPU power: {avg_gpu_power}W")
+    except Exception as e:
+        logging.debug(f"No GPU power available: {type(e).__name__}: {e}")
         avg_gpu_power = 0.0
 
     return avg_gpu_freq, avg_gpu_power, avg_pkg_power, (avg_rcs0,), avg_vcss
@@ -476,21 +495,108 @@ def _start_gpu_usage_threads(event, gpu_devs):
     gpu_tds = []
     for _bcmk_dev, _dev_info in gpu_devs.items():
         rd_name = _dev_info["render_name"]
-        # Note: intel_gpu_top with -l flag should output to stdout without TTY interaction
-        thread_gpu = threading.Thread(
-            target=collect_usage,
-            args=(
-                ["intel_gpu_top", "-d", f"drm:/dev/dri/{rd_name}", "-l"],
-                f"gpu_usage_{_bcmk_dev}.txt",
-                event,
-                gpu_usage_filter,
-            ),
-        )
+        output_file = f"gpu_usage_{_bcmk_dev}.txt"
+
+        # Try PMU-based telemetry first (primary method)
+        if PMU_TELEMETRY_AVAILABLE:
+            logging.info(f"Using PMU telemetry (primary) for {rd_name}")
+            thread_gpu = threading.Thread(
+                target=collect_usage_pmu_with_fallback,
+                args=(
+                    rd_name,
+                    output_file,
+                    event,
+                ),
+            )
+        else:
+            # Fallback to intel_gpu_top if PMU not available
+            logging.info(f"Using intel_gpu_top (PMU not available) for {rd_name}")
+            thread_gpu = threading.Thread(
+                target=collect_usage,
+                args=(
+                    ["intel_gpu_top", "-d", f"drm:/dev/dri/{rd_name}", "-l"],
+                    output_file,
+                    event,
+                    gpu_usage_filter,
+                ),
+            )
         gpu_tds.append(thread_gpu)
     for g_td in gpu_tds:
         g_td.start()
 
     return gpu_tds
+
+
+def collect_usage_pmu_with_fallback(device_name, output_file, event):
+    """
+    Collect GPU telemetry using PMU as primary method, with intel_gpu_top as fallback.
+
+    Args:
+        device_name: GPU render device name (e.g., 'renderD128')
+        output_file: Output file path
+        event: Threading event for stopping collection
+    """
+    output_path = OUTPUT_DIR / output_file
+
+    try:
+        logging.info(f"Starting PMU telemetry collection for {device_name} -> {output_file}")
+
+        # Use PMU collector to generate intel_gpu_top-compatible output
+        # Duration will be controlled by event, so we'll sample continuously
+        pmu_output_lines = []
+
+        # Collect telemetry data in a loop until event is set
+        sample_duration = 1  # Sample every 1 second
+        first_sample = True
+
+        while not event.is_set():
+            try:
+                pmu_output = generate_gpu_telemetry_output(device_name, duration_sec=sample_duration)
+
+                if pmu_output:
+                    if first_sample:
+                        # Write full output including header on first sample
+                        pmu_output_lines.extend(pmu_output.splitlines())
+                        first_sample = False
+                    else:
+                        # On subsequent samples, only append data lines (skip header)
+                        lines = pmu_output.splitlines()
+                        # Skip first 6 lines (header lines) and last 2 lines (empty lines)
+                        data_lines = [l for l in lines[6:-2] if l.strip()]
+                        pmu_output_lines.extend(data_lines)
+
+                    # Write accumulated output to file
+                    with open(output_path, "w") as f:
+                        f.write("\n".join(pmu_output_lines))
+                        f.flush()
+                else:
+                    logging.warning(f"PMU telemetry returned empty output for {device_name}")
+                    break
+
+            except Exception as sample_err:
+                logging.error(f"Error during PMU sampling: {sample_err}")
+                break
+
+        logging.info(f"PMU telemetry collection stopped for {device_name}, wrote {len(pmu_output_lines)} lines")
+
+        # Check if we got meaningful data
+        if len(pmu_output_lines) < 8:
+            raise Exception("PMU telemetry produced insufficient data")
+
+    except Exception as pmu_err:
+        logging.warning(f"PMU telemetry failed for {device_name}: {pmu_err}")
+        logging.info(f"Falling back to intel_gpu_top for {device_name}")
+
+        # Fallback to intel_gpu_top
+        try:
+            collect_usage(
+                ["intel_gpu_top", "-d", f"drm:/dev/dri/{device_name}", "-l"],
+                output_file,
+                event,
+                gpu_usage_filter,
+            )
+        except Exception as fallback_err:
+            logging.error(f"intel_gpu_top fallback also failed: {fallback_err}")
 
 
 def _start_dgpu_power_threads(event, gpu_devs):

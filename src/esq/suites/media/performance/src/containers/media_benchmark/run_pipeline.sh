@@ -51,8 +51,9 @@ fi
 # Python source code (not user input), making this safe from injection attacks.
 # Example: "filesrc location=file.mp4 ! decoder ! sink" must become separate args
 # DO NOT quote ${gst_cmd} as it will break GStreamer pipeline parsing.
+# GST_DEBUG disabled for performance - set to 2 or 3 only for debugging
 # shellcheck disable=SC2086 # GStreamer pipeline requires word-splitting from controlled source
-GST_DEBUG=3 gst-launch-1.0 -e -v ${gst_cmd} &
+gst-launch-1.0 -e -v ${gst_cmd} &
 
 gst_pid=$!
 

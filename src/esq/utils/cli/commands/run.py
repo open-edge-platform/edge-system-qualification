@@ -155,10 +155,17 @@ UNSUPPORTED_GENERATIONS = [
     ("3rd Gen", "Xeon Scalable"),  # Ice Lake-SP
     ("2nd Gen", "Xeon Scalable"),  # Cascade Lake
     ("1st Gen", "Xeon Scalable"),  # Skylake-SP
-    # Catch-all for unrecognized processors
-    # Conservative approach: if we can't identify the processor, don't qualify it
-    # This ensures only known, validated processors pass qualification
-    "Unknown",  # Any processor with Unknown generation (detection failed or very old CPU)
+    # ============================================================================
+    # FORWARD COMPATIBILITY - "Unknown" generation is NO LONGER unsupported
+    # ============================================================================
+    # NOTE: Removed "Unknown" from unsupported list to allow CLI to run on newer
+    # processors that haven't been added to detection logic yet. The CPU detection
+    # now attempts to infer if a CPU is newer (e.g., Core Ultra Series 4+, newer
+    # Xeon 6/7/8 models) and assumes such processors are supported. Intel has moved
+    # to "Core Ultra" branding, so no 15th Gen+ Core i-series processors are expected.
+    # Only explicitly listed old generations are blocked. This ensures forward
+    # compatibility with future Intel platforms while maintaining qualification
+    # rigor for known older platforms.
     # Example of most specific format (currently not used, but available):
     # ("4th Gen", "Xeon Scalable", "server")  # Only blocks 4th Gen Xeon Scalable servers
 ]

@@ -696,9 +696,10 @@ def _detect_generation_from_brand(brand: str) -> Tuple[Optional[str], Optional[s
     brand_lower = brand.lower()
     is_n_series_brand = re.search(r"\bN\d{2,3}\b", brand, re.IGNORECASE) is not None
 
-    # Detect Core Ultra Series 3, 2, 1 (has "ultra" keyword)
+    # Detect Core Ultra Series 3, 2, 1, and FUTURE series (has "ultra" keyword)
     # Intel naming pattern: Core Ultra [X/9/7/5] [3-digit model number][suffix]
     # Series determined by model number:
+    # - 4XX+ (400+) = Series 4+ (FUTURE - forward compatibility)
     # - 3XX (300-399) = Series 3 (Panther Lake)
     # - 2XX (200-299) = Series 2 (Arrow Lake)
     # - 1XX (100-199) = Series 1 (Meteor Lake)
@@ -711,7 +712,16 @@ def _detect_generation_from_brand(brand: str) -> Tuple[Optional[str], Optional[s
             suffix = model_match.group(2)  # H, U, K, HX, etc.
 
             # Determine series based on model number
-            if 300 <= model_number <= 399:  # Series 3 (Panther Lake)
+            # FORWARD COMPATIBILITY: Support Series 4+ automatically
+            if model_number >= 400:  # Series 4+ (Future platforms)
+                series_num = model_number // 100  # 4XX = 4, 5XX = 5, etc.
+                codename = f"Unknown (Series {series_num})"
+                generation = f"Core Ultra (Series {series_num})"
+                product_collection = "Core Ultra"
+                segment = "mobile"  # Most Core Ultra are mobile
+                logger.debug(f"Detected future Core Ultra Series {series_num} from model: {model_number}{suffix}")
+                return codename, generation, product_collection, segment
+            elif 300 <= model_number <= 399:  # Series 3 (Panther Lake)
                 # Panther Lake: All models are mobile only
                 codename = "Panther Lake"
                 generation = "Core Ultra (Series 3)"
@@ -1029,14 +1039,9 @@ def _detect_generation_from_brand(brand: str) -> Tuple[Optional[str], Optional[s
     # Detect traditional Core i-series generations (14th, 13th, 12th gen)
     # IMPORTANT: 14th gen (Raptor Lake Refresh) shares CPUID model 183 with 13th gen
     # Must detect by brand string pattern: i[3579]-14xxx (e.g., i9-14900T, i7-14700K)
+    # NOTE: Intel has moved to "Core Ultra" branding - no 15th Gen+ Core i-series planned
     if re.search(r"core.*i[3579]-14\d{3}", brand_lower):  # 14xxx: i3/i5/i7/i9-14000 series
         return "Raptor Lake-S Refresh", "14th Gen Core", "Core", "unknown"
-    elif re.search(r"core.*i[3579]-1[5-9]\d{3}", brand_lower):  # 15xxx, 16xxx, etc. (future)
-        gen_match = re.search(r"i[3579]-(1[5-9])\d{3}", brand_lower)
-        if gen_match:
-            gen_num = gen_match.group(1)
-            return f"Unknown ({gen_num}th Gen)", f"{gen_num}th Gen Core", "Core", "unknown"
-        return "Unknown (15th+ Gen)", "15th Gen Core", "Core", "unknown"
     elif re.search(r"core.*i[3579]-13\d{3}", brand_lower):  # 13xxx: i3/i5/i7/i9-13000 series
         return "Raptor Lake-S", "13th Gen Core", "Core", "unknown"
     elif re.search(r"core.*i[3-9]-1[2]\d{3}", brand_lower):  # 12xxx
@@ -1156,43 +1161,87 @@ def _detect_generation_from_brand(brand: str) -> Tuple[Optional[str], Optional[s
         elif "max" in brand_lower:
             return "Sapphire Rapids-HBM", "4th Gen", "Xeon Scalable", "server"
 
-        # Xeon 6 (2024 branding) - replaces "6th Gen Xeon Scalable"
-        # Xeon 6 has TWO segments: Server AND Workstation
+        # Xeon 6+ (2024+ branding) - replaces "6th Gen Xeon Scalable"
+        # Xeon 6 has THREE variants: Server (AP/SP), Server (D-Edge), and Workstation
         # Model numbering pattern:
-        # - 6XXXP (P suffix): Server segment, P-cores (Granite Rapids)
+        # - 6XXXP (P suffix): Server segment, P-cores (Granite Rapids-AP/SP)
+        # - 6XXXP-B (P-B suffix): Server segment, Edge computing (Granite Rapids-D)
         # - 6XXXE (E suffix): Server segment, E-cores (Sierra Forest)
-        # - 678X, 677X: Workstation segment (Granite Rapids-WS)
+        # - Workstation: 698X, 696X, 678X, 676X, 674X, 658X, 656, 654, 638, 636, 634
         # CRITICAL: This is different from "Xeon W" which is a separate legacy product collection
-        # Pattern: "Xeon" + 4-digit number starting with 6, NO metal tier keyword
+        # FORWARD COMPATIBILITY: Also supports Xeon 7, Xeon 8+ (future platforms)
+        # Pattern: "Xeon" + digit (6-9) + optional 2-3 more digits, NO metal tier keyword
         # Pattern allows for (R) trademark symbol between Xeon and model number
-        elif re.search(r"xeon.*?\s+6\d{3}", brand_lower):
-            # Extract model number to determine segment
-            # Pattern: "Xeon" followed by optional "(R)" then 4-digit model number starting with 6
-            # Examples: "Xeon(R) 6787P" (server), "Xeon(R) 6780" (workstation), "Xeon(R) 6766E" (server)
-            model_match = re.search(r"xeon.*?(\d{4}\w?)", brand_lower)
+        elif re.search(r"xeon.*?\s+[6-9]\d{2,3}", brand_lower):
+            # Extract model number to determine segment and generation
+            # Pattern: "Xeon" followed by optional "(R)" then 3-4 digit model number + optional suffix
+            # Examples: "Xeon(R) 6787P" (server), "Xeon(R) 6513P-B" (edge), "Xeon(R) 698X" (workstation)
+            # Captures full model including -B suffix for Granite Rapids-D edge processors
+            model_match = re.search(r"xeon.*?([6-9]\d{2,3}[a-z]?(?:-[a-z])?)", brand_lower)
             if model_match:
-                model_number = model_match.group(1)
-                # Workstation models: 6780, 6781, etc. (starts with 678 or 677, no P/E suffix)
-                # Server models: 6787P, 6730P (P suffix), 6766E (E suffix)
-                if (model_number.startswith("678") or model_number.startswith("677")) and not (
-                    model_number.endswith("p") or model_number.endswith("e")
-                ):
-                    # Xeon 6 Workstation segment (e.g., 6780, 6781)
-                    logger.debug(f"Detected Xeon 6 Workstation segment from model: {model_number}")
-                    return "Granite Rapids-WS", "Xeon 6", "Xeon 6", "workstation"
-                elif model_number.endswith("p"):
-                    # P-core server processors (Granite Rapids)
-                    logger.debug(f"Detected Xeon 6 P-core Server (Granite Rapids) from model: {model_number}")
-                    return "Granite Rapids", "Xeon 6", "Xeon 6", "server"
-                elif model_number.endswith("e"):
-                    # E-core server processors (Sierra Forest)
-                    logger.debug(f"Detected Xeon 6 E-core Server (Sierra Forest) from model: {model_number}")
-                    return "Sierra Forest", "Xeon 6", "Xeon 6", "server"
+                model_number_full = model_match.group(1)
+                # Remove -B suffix (Granite Rapids-D) for segment detection, but note it's edge variant
+                model_number = model_number_full.replace("-b", "")
+                xeon_series = model_number[0]  # First digit: 6, 7, 8, 9
+
+                # For Xeon 6 (known patterns)
+                if xeon_series == "6":
+                    # Check for -B suffix (Granite Rapids-D edge computing variant)
+                    is_edge_variant = "-b" in model_number_full
+
+                    # Workstation models follow pattern: 6 + [3579] + [468] + optional X
+                    # Examples: 698X, 696X, 678X, 676X, 674X, 658X, 656, 654, 638, 636, 634
+                    # Server models: 6787P, 6730P (P suffix), 6766E (E suffix), 6513P-B (P-B edge)
+                    if re.match(r"6[3579][468][x]?$", model_number, re.IGNORECASE):
+                        # Xeon 6 Workstation segment
+                        logger.debug(f"Detected Xeon 6 Workstation segment from model: {model_number}")
+                        return "Granite Rapids-WS", "Xeon 6", "Xeon 6", "workstation"
+                    elif model_number.endswith("p"):
+                        # P-core server processors (Granite Rapids or Granite Rapids-D)
+                        if is_edge_variant:
+                            logger.debug(
+                                f"Detected Xeon 6 P-core Server Edge (Granite Rapids-D) from model: {model_number_full}"
+                            )
+                            return "Granite Rapids-D", "Xeon 6", "Xeon 6", "server"
+                        else:
+                            logger.debug(f"Detected Xeon 6 P-core Server (Granite Rapids) from model: {model_number}")
+                            return "Granite Rapids", "Xeon 6", "Xeon 6", "server"
+                    elif model_number.endswith("e"):
+                        # E-core server processors (Sierra Forest)
+                        logger.debug(f"Detected Xeon 6 E-core Server (Sierra Forest) from model: {model_number}")
+                        return "Sierra Forest", "Xeon 6", "Xeon 6", "server"
+                    else:
+                        # Unknown Xeon 6 model - assume workstation for forward compatibility
+                        # (Most new models without P/E are likely workstation)
+                        logger.debug(f"Detected Xeon 6 - assumed workstation from model: {model_number}")
+                        return "Granite Rapids-WS", "Xeon 6", "Xeon 6", "workstation"
+
+                # FORWARD COMPATIBILITY: Xeon 7, 8, 9 (future platforms)
                 else:
-                    # Unknown variant, default to Granite Rapids (most common)
-                    logger.debug(f"Detected Xeon 6 Server (default to Granite Rapids) from model: {model_number}")
-                    return "Granite Rapids", "Xeon 6", "Xeon 6", "server"
-            # Fallback: if no model number detected, assume Granite Rapids server
+                    # Check for -B suffix (edge computing variant)
+                    is_edge_variant = "-b" in model_number_full
+
+                    # For future Xeon platforms, determine segment by suffix
+                    if model_number.endswith("p"):
+                        segment = "server"
+                        variant = " Edge" if is_edge_variant else ""
+                        logger.debug(
+                            f"Detected future Xeon {xeon_series} P-core Server{variant} from model: {model_number_full}"
+                        )
+                    elif model_number.endswith("e"):
+                        segment = "server"
+                        logger.debug(f"Detected future Xeon {xeon_series} E-core Server from model: {model_number}")
+                    elif model_number.endswith("x") or re.match(r"[6-9][3579][468][x]?$", model_number, re.IGNORECASE):
+                        segment = "workstation"
+                        logger.debug(f"Detected future Xeon {xeon_series} Workstation from model: {model_number}")
+                    else:
+                        segment = "workstation"  # Default to workstation for unknown patterns
+                        logger.debug(
+                            f"Detected future Xeon {xeon_series} - assumed workstation from model: {model_number}"
+                        )
+                    return f"Unknown (Xeon {xeon_series})", f"Xeon {xeon_series}", f"Xeon {xeon_series}", segment
+
+            # Fallback: if no model number detected, assume newest known generation
             return "Granite Rapids", "Xeon 6", "Xeon 6", "server"
 
         # Traditional Xeon Scalable with explicit "scalable" keyword (legacy branding, pre-2024)
@@ -1492,26 +1541,46 @@ def _detect_generation(
                     codename = "Alder Lake-N"
             # Special handling: Xeon 6 model 173 shared by Sierra Forest and Granite Rapids
             # Distinguish by suffix in brand string:
-            #   E = Sierra Forest, P = Granite Rapids, X/no-suffix = Granite Rapids WS
-            # CRITICAL: Xeon 6 has TWO segments: Server (6XXXP, 6XXXE) AND Workstation (678X)
+            #   E = Sierra Forest, P = Granite Rapids, P-B = Granite Rapids-D (edge), X/no-suffix = Granite Rapids WS
+            # CRITICAL: Xeon 6 has TWO segments: Server (6XXXP, 6XXXE, 6XXXP-B) AND Workstation (6XXX/6XXXX)
             # This is different from "Xeon W" which is a separate legacy product collection
             if family == 6 and model == 173 and brand:
                 # First check for P/E suffixes (server segment) - these take priority
+                # Check for P-B suffix (Granite Rapids-D edge computing variant)
+                # Examples: 6776P-B, 6768P-B, 6766P-B, 6756P-B, 6716P-B, 6513P-B
+                if re.search(r"Xeon\(R\) \d{4}P-B\b", brand, re.IGNORECASE):
+                    codename = "Granite Rapids-D"
+                    logger.debug(f"Detected Granite Rapids-D (P-core Edge) Server from brand: {brand}")
                 # Check if this is a Xeon 6 processor with P suffix (Granite Rapids Server)
                 # Examples: 6787P (64 cores), 6730P (32 cores), 6761P (64 cores)
-                if re.search(r"Xeon\(R\) \d{4}P\b", brand, re.IGNORECASE):
+                elif re.search(r"Xeon\(R\) \d{4}P\b", brand, re.IGNORECASE):
                     codename = "Granite Rapids"
                     logger.debug(f"Detected Granite Rapids (P-core) Server from brand: {brand}")
-                # E suffix processors (Sierra Forest) use the default from CPU_GENERATION_MAP
+                # E suffix processors (Sierra Forest) - explicitly check for E suffix
                 elif re.search(r"Xeon\(R\) \d{4}E\b", brand, re.IGNORECASE):
-                    logger.debug(f"Detected Sierra Forest (E-core) from brand: {brand}")
-                # Finally check for workstation models (678X - no P/E suffix)
-                # Examples: 6780 (48 cores, 2.4GHz, workstation segment)
-                # Pattern: "Xeon(R) 678[0-9]" without P or E suffix at the end
-                elif re.search(r"Xeon\(R\) 678\d(?![PE])", brand, re.IGNORECASE):
+                    codename = "Sierra Forest"
+                    logger.debug(f"Detected Sierra Forest (E-core) Server from brand: {brand}")
+                # Check for known workstation models (no P/E suffix)
+                # Examples 698X, 696X, 678X, 676X, 674X, 658X, 656, 654, 638, 636, 634
+                # All workstation models follow pattern: 6 + [3579] + [468] + optional X
+                # Pattern ensures: second digit is odd (3,5,7,9), third digit is even (4,6,8)
+                # Wikipedia: https://en.wikipedia.org/wiki/Granite_Rapids#Granite_Rapids-WS_(for_workstations)
+                elif re.search(r"Xeon\(R\) 6[3579][468][X]?\b", brand, re.IGNORECASE):
                     codename = "Granite Rapids-WS"
                     segment_hint = "workstation"
-                    logger.debug(f"Detected Granite Rapids Workstation from brand: {brand}, model 678X")
+                    logger.debug(f"Detected Granite Rapids Workstation from brand: {brand}")
+                # FORWARD COMPATIBILITY: Check for any other 6XXX or 6XX model (no P/E suffix)
+                # Assume it's a newer workstation variant not yet in our pattern
+                # This ensures new Xeon 6 workstation models work without code updates
+                # Pattern matches: 699X, 655, 6990, etc. (but not 6787P or 6766E)
+                elif re.search(r"Xeon\(R\) 6\d{2,3}[X]?(?![PE])\b", brand, re.IGNORECASE):
+                    codename = "Granite Rapids-WS"
+                    segment_hint = "workstation"
+                    logger.debug(f"Detected newer Xeon 6 Workstation (forward compatibility) from brand: {brand}")
+                elif re.search(r"Xeon\(R\) 6\d{2,3}(?![PE])\b", brand, re.IGNORECASE):
+                    codename = "Granite Rapids-WS"
+                    segment_hint = "workstation"
+                    logger.debug(f"Detected newer Xeon 6 Workstation (forward compatibility) from brand: {brand}")
 
             # Extract product collection from generation string
             product_collection = _extract_product_collection_from_generation(generation)

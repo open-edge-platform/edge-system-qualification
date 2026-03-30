@@ -14,6 +14,7 @@ params:
   tiers:
     - entry
     - mainstream
+    - mainstream_core_ultra
     - efficiency_optimized
     # Xeon based specific tier
     - scalable_performance
@@ -317,6 +318,33 @@ suites:
                       reference: 10.0
                       enabled: true
 
+              # Mainstream Core Ultra
+              - test_id: "AES-GEN-001"
+                display_name: "Gen AI LLM Serving Benchmark - Phi-4-mini-reasoning 3.8B INT4"
+                model_id: "microsoft/Phi-4-mini-reasoning"
+                model_precision: "int4"
+                devices: [cpu, igpu, npu]
+                tiers:
+                  - mainstream_core_ultra
+                kpi_refs:
+                  - throughput_cpu
+                  - throughput_igpu
+                  - throughput_npu
+                kpi_validation_mode: "any"
+                kpi_override:
+                  throughput_cpu:
+                    validation:
+                      reference: 10.0
+                      enabled: true
+                  throughput_igpu:
+                    validation:
+                      reference: 10.0
+                      enabled: true
+                  throughput_npu:
+                    validation:
+                      reference: 10.0
+                      enabled: true
+
               # Efficiency Optimized
               - test_id: "AES-GEN-001"
                 display_name: "Gen AI LLM Serving Benchmark - DeepSeek-R1-Distill-Qwen-7B INT4"
@@ -484,6 +512,7 @@ suites:
                 devices: [cpu, igpu, dgpu, npu]
                 tiers:
                   - mainstream
+                  - mainstream_core_ultra
                 kpi_refs:
                   - streams_max
                 kpi_override:

@@ -79,9 +79,17 @@ tiers:
       cpu_ultra_mobile_required: true
       igpu_required: true
 
-  mainstream:
+  mainstream_core_ultra:
     name: "Mainstream"
     priority: 11
+    requirements:
+      cpu_entry_excluded: true
+      igpu_required: true
+      npu_required: true
+
+  mainstream:
+    name: "Mainstream"
+    priority: 12
     requirements:
       cpu_core_required: true
       cpu_entry_excluded: true
@@ -89,7 +97,7 @@ tiers:
 
   entry:
     name: "Entry"
-    priority: 12
+    priority: 13
     requirements:
       cpu_entry_required: true
       igpu_required: true

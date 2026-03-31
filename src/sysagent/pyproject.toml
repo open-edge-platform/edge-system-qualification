@@ -35,7 +35,7 @@ dependencies = [
     "matplotlib>=3.10.3",
     "psutil>=7.0.0",
     "py-cpuinfo>=9.0.0",
-    "requests>=2.32.4",
+    "requests>=2.33.1",
     "openvino>=2025.2.0",
 ]
 

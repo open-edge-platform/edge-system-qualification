@@ -503,10 +503,10 @@ index 000000000..2722f1005
 +}
 diff --git a/packages/web-awesome/src/components/Summary/index.tsx b/packages/web-awesome/src/components/Summary/index.tsx
 new file mode 100644
-index 000000000..daee113c8
+index 000000000..264556c21
 --- /dev/null
 +++ b/packages/web-awesome/src/components/Summary/index.tsx
-@@ -0,0 +1,3407 @@
+@@ -0,0 +1,3385 @@
 +import { useEffect, useState } from "preact/hooks";
 +import { fetchAttachment } from "@allurereport/web-commons";
 +import * as styles from "./styles.scss";
@@ -963,20 +963,6 @@ index 000000000..daee113c8
 +  const { data: kpisData, validationMode } = transformResult;
 +  const isExpanded = expandedSections.has('kpis');
 +
-+  // Helper function to get status badge color
-+  const getStatusColor = (status: string) => {
-+    switch (status) {
-+      case 'PASSED':
-+        return 'passed';
-+      case 'FAILED':
-+        return 'failed';
-+      case 'SKIPPED':
-+        return 'skipped';
-+      default:
-+        return 'unknown';
-+    }
-+  };
-+
 +  return (
 +    <div className={styles["kpis-section"]}>
 +      <div 
@@ -1016,9 +1002,6 @@ index 000000000..daee113c8
 +                <th className={`${styles["kpis-table-header"]} ${styles["col-20"]}`}>
 +                  Value
 +                </th>
-+                <th className={`${styles["kpis-table-header"]} ${styles["center"]} ${styles["col-20"]}`}>
-+                  Status
-+                </th>
 +              </tr>
 +            </thead>
 +            <tbody>
@@ -1032,11 +1015,6 @@ index 000000000..daee113c8
 +                  </td>
 +                  <td className={`${styles["kpis-table-cell"]} ${styles["value-cell"]}`}>
 +                    {kpi.value}
-+                  </td>
-+                  <td className={`${styles["kpis-table-cell"]} ${styles["center"]}`}>
-+                    <span className={`${styles["kpis-status-badge"]} ${styles[getStatusColor(kpi.status)]}`}>
-+                      {kpi.status}
-+                    </span>
 +                  </td>
 +                </tr>
 +              ))}

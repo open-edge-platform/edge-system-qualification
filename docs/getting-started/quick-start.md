@@ -179,7 +179,7 @@ Run all tests and review the generated test report:
     
     This ensures that leftover data from previous ESQ versions does not interfere with the new installation. If you have uninstalled ESQ but the `esq_data` folder still exists, remove it using the above command before running any new ESQ commands. Otherwise, ESQ may not work as expected.
 
-!!! info "Alternative Download Source"
+!!! info "Download Source"
     Intel® ESQ uses HuggingFace* as the default download source. For ModelScope*, you can configure it with:
     
     ```bash

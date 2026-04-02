@@ -21,6 +21,67 @@ from sysagent.utils.reporting import update_allure_title_with_metrics
 logger = logging.getLogger(__name__)
 
 
+def _validate_result_for_caching(results: Union[Result, Dict[str, Any]], test_name: str) -> bool:
+    """
+    Validate if a test result should be cached.
+
+    Returns False if:
+    - Overall test status is False
+    - Any metric has value=-1 (error state)
+
+    This prevents caching invalid results that should be re-run.
+    The -1 check is universal and works for all test types (single-device, multi-device, etc.)
+
+    Args:
+        results: Test result to validate
+        test_name: Name of the test for logging
+
+    Returns:
+        bool: True if result is valid and should be cached, False otherwise
+    """
+    try:
+        # Get result data as dict
+        if isinstance(results, Result):
+            result_dict = results.to_dict()
+        else:
+            result_dict = results
+
+        # Check overall status (primary check)
+        status = result_dict.get("metadata", {}).get("status", False)
+        if not status:
+            logger.debug(f"Skipping cache for '{test_name}': overall status is False")
+            return False
+
+        # Check if any metric has error value (-1)
+        # This is the universal check that works for all test types
+        metrics = result_dict.get("metrics", {})
+        error_metrics = []
+        for metric_name, metric_data in metrics.items():
+            # Handle both Metrics object and dict format
+            if isinstance(metric_data, dict):
+                value = metric_data.get("value", 0)
+            else:
+                value = getattr(metric_data, "value", 0)
+
+            if value == -1:
+                error_metrics.append(metric_name)
+
+        if error_metrics:
+            logger.debug(
+                f"Skipping cache for '{test_name}': "
+                f"found {len(error_metrics)} metric(s) with error value (-1): {error_metrics}"
+            )
+            return False
+
+        logger.debug(f"Result is valid for caching: '{test_name}'")
+        return True
+
+    except Exception as e:
+        logger.error(f"Error validating result for '{test_name}': {e}")
+        # On validation error, skip caching to be safe
+        return False
+
+
 def _make_serializable(obj):
     """
     Recursively convert objects to JSON-serializable types.
@@ -230,9 +291,16 @@ def execute_test_with_cache():
                     logger.error(f"Test {test_name} failed or is broken")
                     # pytest.fail(f"{results.parameters.get('error', 'Unknown error')}")
                 else:
-                    # Cache the result if status is pass
-                    cache_result(results, cache_configs=cache_configs)
-                    logger.debug(f"Cached '{name}' result for {test_name}")
+                    # Validate result before caching to ensure all devices/metrics are valid
+                    # This prevents caching results with any device errors (-1) or failures
+                    if _validate_result_for_caching(results, test_name):
+                        cache_result(results, cache_configs=cache_configs)
+                        logger.debug(f"Cached '{name}' result for {test_name}")
+                    else:
+                        logger.warning(
+                            f"Skipping cache for '{name}' - result validation failed. "
+                            f"Test will re-run on next execution."
+                        )
 
                 if update_title_with_metrics:
                     update_title(configs, results)
@@ -369,13 +437,16 @@ def prepare_test():
 
                 # Cache the result only if it's not an error state
                 # Don't cache results with status=False (failed/error states)
+                # Also validate for device-level errors in multi-device scenarios
                 should_cache = True
                 if cache_result:
-                    if isinstance(results, Result):
-                        status = results.metadata.get("status", True)
-                        if status is False:
-                            should_cache = False
-                            logger.debug(f"Skipping cache for '{name}' due to failed status (status={status})")
+                    # Use the same validation logic as main test execution
+                    if not _validate_result_for_caching(results, test_name):
+                        should_cache = False
+                        logger.debug(
+                            f"Skipping cache for '{name}' - result validation failed "
+                            f"(status, metrics, or device errors detected)"
+                        )
 
                     if should_cache:
                         cache_result(results, cache_configs=cache_configs)

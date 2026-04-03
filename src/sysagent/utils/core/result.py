@@ -210,6 +210,7 @@ class Result:
         validation_results: Optional[Dict[str, Any]] = None,
         kpi_validation_mode: str = "all",
         device_count: int = 1,
+        metric_direction: str = "higher_is_better",
     ):
         """
         Automatically determine and set the key metric based on validation results and context.
@@ -227,21 +228,52 @@ class Result:
             validation_results: KPI validation results
             kpi_validation_mode: Validation mode ('all', 'any', 'skip')
             device_count: Number of devices being tested
+            metric_direction: Direction for determining "best" metric value
+                            - "higher_is_better": Select metric with highest value (default, for throughput/fps)
+                            - "lower_is_better": Select metric with lowest value (for latency/error rates)
         """
         if not self.metrics:
             logger.debug("No metrics available for key metric selection")
             return
 
         logger.debug(f"Auto-determining key metric from available metrics: {list(self.metrics.keys())}")
-        logger.debug(f"KPI validation mode: {kpi_validation_mode}, Device count: {device_count}")
+        logger.debug(
+            f"KPI validation mode: {kpi_validation_mode}, Device count: {device_count}, Direction: {metric_direction}"
+        )
 
-        # Strategy 1: KPI validation mode "any" - use the first passed metric (highest priority)
+        # Determine comparison function based on metric direction
+        is_better = (
+            (lambda new_val, current_best: new_val > current_best)
+            if metric_direction == "higher_is_better"
+            else (lambda new_val, current_best: new_val < current_best and new_val > 0)
+        )
+        initial_value = -float("inf") if metric_direction == "higher_is_better" else float("inf")
+
+        # Strategy 1: KPI validation mode "any" - use the best passed metric based on direction
         if kpi_validation_mode == "any" and validation_results and validation_results.get("validations"):
+            passed_metrics = []
             for metric_name in self.metrics.keys():
                 validation_data = validation_results["validations"].get(metric_name)
                 if validation_data and validation_data.get("passed", False):
-                    self.set_key_metric(metric_name)
-                    logger.debug(f"Set key metric to '{metric_name}' based on KPI validation mode 'any'")
+                    passed_metrics.append(metric_name)
+
+            if passed_metrics:
+                # Select the best passed metric based on direction
+                best_metric = None
+                best_value = initial_value
+                for metric_name in passed_metrics:
+                    metric_value = getattr(self.metrics[metric_name], "value", initial_value)
+                    if isinstance(metric_value, (int, float)) and is_better(metric_value, best_value):
+                        best_value = metric_value
+                        best_metric = metric_name
+
+                if best_metric:
+                    direction_text = "highest" if metric_direction == "higher_is_better" else "lowest"
+                    self.set_key_metric(best_metric)
+                    logger.debug(
+                        f"Set key metric to '{best_metric}' (value: {best_value}) - {direction_text} among "
+                        f"{len(passed_metrics)} passed metrics in 'any' mode"
+                    )
                     return
 
         # Strategy 2: Multi-device scenario - prioritize aggregate metrics over individual device metrics
@@ -285,19 +317,22 @@ class Result:
                 )
                 return
 
-            # If no aggregate metrics but have device-specific metrics, choose the highest value one
+            # If no aggregate metrics but have device-specific metrics, choose the best value based on direction
             elif device_specific_metrics:
                 best_metric = None
-                best_value = -1
+                best_value = initial_value
                 for metric_name in device_specific_metrics:
-                    metric_value = getattr(self.metrics[metric_name], "value", 0)
-                    if isinstance(metric_value, (int, float)) and metric_value > best_value:
+                    metric_value = getattr(self.metrics[metric_name], "value", initial_value)
+                    if isinstance(metric_value, (int, float)) and is_better(metric_value, best_value):
                         best_value = metric_value
                         best_metric = metric_name
 
                 if best_metric:
+                    direction_text = "highest" if metric_direction == "higher_is_better" else "lowest"
                     self.set_key_metric(best_metric)
-                    logger.debug(f"Set key metric to highest-value device metric '{best_metric}' = {best_value}")
+                    logger.debug(
+                        f"Set key metric to {direction_text}-value device metric '{best_metric}' = {best_value}"
+                    )
                     return
 
         # Strategy 3: Single device scenario - prioritize main performance metrics
@@ -312,23 +347,26 @@ class Result:
                         )
                         return
 
-        # Strategy 4: Fallback - use the first metric with highest value
+        # Strategy 4: Fallback - use the best metric based on direction
         metric_names = list(self.metrics.keys())
         if metric_names:
             best_metric = None
-            best_value = -1
+            best_value = initial_value
 
-            # Try to find metric with numeric value > 0
+            # Find the best metric based on direction
             for metric_name in metric_names:
-                metric_value = getattr(self.metrics[metric_name], "value", 0)
-                if isinstance(metric_value, (int, float)) and metric_value > best_value:
+                metric_value = getattr(self.metrics[metric_name], "value", initial_value)
+                if isinstance(metric_value, (int, float)) and is_better(metric_value, best_value):
                     best_value = metric_value
                     best_metric = metric_name
 
             # If we found a good metric, use it; otherwise use the first one
             selected_metric = best_metric if best_metric else metric_names[0]
+            direction_text = "highest" if metric_direction == "higher_is_better" else "lowest"
             self.set_key_metric(selected_metric)
-            logger.debug(f"Set key metric to fallback selection '{selected_metric}'")
+            logger.debug(
+                f"Set key metric to fallback selection '{selected_metric}' ({direction_text} value: {best_value})"
+            )
 
     def apply_config_metadata(self, configs: Dict[str, Any]):
         """

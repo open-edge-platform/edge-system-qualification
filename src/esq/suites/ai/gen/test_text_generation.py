@@ -414,7 +414,14 @@ def test_text_generation(
             results.update_kpi_validation_status(validation_results, kpi_validation_mode)
 
             # Automatically set key metric based on validation results and mode
-            results.auto_set_key_metric(validation_results, kpi_validation_mode)
+            # Pass device_count to help with multi-device key metric selection
+            # Throughput metrics: higher is better
+            results.auto_set_key_metric(
+                validation_results,
+                kpi_validation_mode,
+                device_count=len(device_list),
+                metric_direction="higher_is_better",
+            )
 
             # Add KPI configuration and validation results to the Result object
             current_kpi_refs = configs.get("kpi_refs", [])

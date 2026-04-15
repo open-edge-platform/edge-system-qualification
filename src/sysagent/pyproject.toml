@@ -26,7 +26,7 @@ classifiers = [
 requires-python = ">=3.10"
 dependencies = [
     "pyyaml>=6.0.2",
-    "pytest>=8.4.1",
+    "pytest>=9.0.3",
     "allure-pytest>=2.14.3",
     "pytest-check>=2.5.3",
     "rich>=14.0.0",

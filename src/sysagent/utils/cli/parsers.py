@@ -231,6 +231,11 @@ For available profiles, use: {cli_name} list
         "--venvs", action="store_true", help="Clean isolated virtual environments for test suites"
     )
     additional_group.add_argument(
+        "--docker",
+        action="store_true",
+        help="Remove Docker images built by this CLI (labeled group=esq)",
+    )
+    additional_group.add_argument(
         "--all",
         "-a",
         action="store_true",
@@ -250,6 +255,11 @@ For available profiles, use: {cli_name} list
     )
     specific_group.add_argument(
         "--venvs-only", action="store_true", help="Clean only virtual environments (do not clean results/logs)"
+    )
+    specific_group.add_argument(
+        "--docker-only",
+        action="store_true",
+        help="Remove only Docker images built by this CLI (do not clean results/logs)",
     )
 
     # Report command

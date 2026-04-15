@@ -193,14 +193,12 @@ esq --version
 
 Run all tests and review the generated test report:
 
-!!! tip "Newer Version"
-    Before running a new version of Intel® ESQ, run the following command to clean up any previously created `esq_data` folder:
+!!! tip "Upgrading Intel® ESQ"
+    Before running a new version of Intel® ESQ, clean up any previously created `esq_data` folder to prevent leftover data from interfering with the new installation:
     
     ```bash
     esq clean --all
     ```
-    
-    This ensures that leftover data from previous ESQ versions does not interfere with the new installation. If you have uninstalled ESQ but the `esq_data` folder still exists, remove it using the above command before running any new ESQ commands. Otherwise, ESQ may not work as expected.
 
 !!! info "Download Source"
     Intel® ESQ uses HuggingFace* as the default download source. For ModelScope*, you can configure it with:
@@ -244,6 +242,22 @@ By default, this command will:
 
 !!! note "Virtualization"
     Running in virtual machines may impact performance and hardware acceleration capabilities. Bare metal installation is recommended for accurate testing results.
+
+---
+
+## Uninstall
+
+Before uninstalling, clean up all data created by Intel® ESQ, including Docker images built during test execution:
+
+```bash
+esq clean --all
+```
+
+Then remove Intel® ESQ:
+
+```bash
+uv tool uninstall esq
+```
 
 ---
 

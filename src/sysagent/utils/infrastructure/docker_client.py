@@ -173,6 +173,10 @@ class DockerClient:
             build_log_text = ""
             logger.info("Initiating Docker build")
 
+            from sysagent.utils.config.config_loader import get_cli_aware_project_name
+
+            cli_name = get_cli_aware_project_name().lower()
+
             build_stream = api_client.build(
                 path=path,
                 dockerfile=dockerfile,
@@ -182,6 +186,7 @@ class DockerClient:
                 forcerm=True,
                 decode=True,
                 buildargs=buildargs,
+                labels={"group": cli_name},
             )
 
             image_id = None
@@ -1141,6 +1146,75 @@ class DockerClient:
 
         except Exception as e:
             logger.warning(f"Failed to cleanup containers by pattern '{name_pattern}': {e}")
+
+    def remove_labeled_images(self, label: str = None) -> dict:
+        """Remove Docker images matching a label filter.
+
+        Only removes images that carry the specified label. Images without
+        the label (e.g. base/source images from FROM lines) are untouched.
+
+        Args:
+            label: Docker label filter string. Defaults to
+                ``group=<cli_name>`` derived from the active CLI.
+
+        Returns:
+            dict with keys ``removed``, ``skipped``, ``failed`` – each a
+            list of image references.
+        """
+        if label is None:
+            from sysagent.utils.config.config_loader import get_cli_aware_project_name
+
+            cli_name = get_cli_aware_project_name().lower()
+            label = f"group={cli_name}"
+        result = {"removed": [], "skipped": [], "failed": []}
+
+        try:
+            labeled_images = self.client.images.list(filters={"label": label})
+        except Exception as e:
+            logger.error(f"Failed to query Docker images: {e}")
+            return result
+
+        if not labeled_images:
+            logger.info(f"No Docker images found with label={label}")
+            return result
+
+        # Collect all tagged references (or short IDs for untagged images)
+        refs_to_remove = []
+        for img in labeled_images:
+            if img.tags:
+                refs_to_remove.extend(img.tags)
+            else:
+                refs_to_remove.append(img.short_id)
+
+        logger.info(f"Found {len(refs_to_remove)} Docker image(s) with label={label}")
+
+        for ref in sorted(refs_to_remove):
+            try:
+                self.client.images.remove(ref, force=False)
+                result["removed"].append(ref)
+                logger.info(f"  [REMOVED] {ref}")
+            except docker.errors.ImageNotFound:
+                result["skipped"].append(ref)
+                logger.debug(f"  [SKIPPED] {ref} (already removed)")
+            except docker.errors.APIError as e:
+                if "conflict" in str(e).lower() or "in use" in str(e).lower():
+                    result["skipped"].append(ref)
+                    logger.warning(f"  [SKIPPED] {ref} (in use by container)")
+                else:
+                    result["failed"].append(ref)
+                    logger.error(f"  [FAILED] {ref}: {e}")
+            except Exception as e:
+                result["failed"].append(ref)
+                logger.error(f"  [FAILED] {ref}: {e}")
+
+        if result["removed"]:
+            logger.info(f"Successfully removed {len(result['removed'])} Docker image(s)")
+        if result["skipped"]:
+            logger.info(f"Skipped {len(result['skipped'])} Docker image(s)")
+        if result["failed"]:
+            logger.warning(f"Failed to remove {len(result['failed'])} Docker image(s)")
+
+        return result
 
     def copy_to_container(self, container_name, src_path, dst_path):
         """

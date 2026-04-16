@@ -6,37 +6,37 @@ tiers:
     name: "Scalable AI Graphics Media"
     priority: 1
     requirements:
-      dgpu_min_vram_gb: 52.0
+      dgpu_min_vram_gib: 52.0
       dgpu_min_devices: 2
 
   scalable_ai_graphics_media_hetero_24gb:
     name: "Scalable AI Graphics Media"
     priority: 2
     requirements:
-      dgpu_min_vram_gb: 24.0
-      dgpu_max_vram_gb: 51.9
+      dgpu_min_vram_gib: 24.0
+      dgpu_max_vram_gib: 51.9
       dgpu_min_devices: 2
 
   scalable_ai_graphics_media_hetero_10gb:
     name: "Scalable AI Graphics Media"
     priority: 3
     requirements:
-      dgpu_min_vram_gb: 10.0
-      dgpu_max_vram_gb: 23.9
+      dgpu_min_vram_gib: 10.0
+      dgpu_max_vram_gib: 23.9
       dgpu_min_devices: 2
 
   scalable_ai_graphics_media_hetero:
     name: "Scalable AI Graphics Media"
     priority: 4
     requirements:
-      dgpu_max_vram_gb: 9.9
+      dgpu_max_vram_gib: 9.9
       dgpu_min_devices: 2
 
   scalable_ai_graphics_media_52gb:
     name: "Scalable AI Graphics Media"
     priority: 5
     requirements:
-      dgpu_min_vram_gb: 52.0
+      dgpu_min_vram_gib: 52.0
       dgpu_min_devices: 1
       dgpu_max_devices: 1
 
@@ -44,8 +44,8 @@ tiers:
     name: "Scalable AI Graphics Media"
     priority: 6
     requirements:
-      dgpu_min_vram_gb: 24.0
-      dgpu_max_vram_gb: 51.9
+      dgpu_min_vram_gib: 24.0
+      dgpu_max_vram_gib: 51.9
       dgpu_min_devices: 1
       dgpu_max_devices: 1
 
@@ -53,8 +53,8 @@ tiers:
     name: "Scalable AI Graphics Media"
     priority: 7
     requirements:
-      dgpu_min_vram_gb: 10.0
-      dgpu_max_vram_gb: 23.9
+      dgpu_min_vram_gib: 10.0
+      dgpu_max_vram_gib: 23.9
       dgpu_min_devices: 1
       dgpu_max_devices: 1
 
@@ -62,7 +62,7 @@ tiers:
     name: "Scalable AI Graphics Media"
     priority: 8
     requirements:
-      dgpu_max_vram_gb: 9.9
+      dgpu_max_vram_gib: 9.9
       dgpu_min_devices: 1
       dgpu_max_devices: 1
 

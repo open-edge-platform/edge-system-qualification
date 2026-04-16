@@ -367,71 +367,71 @@ class SystemValidator:
             )
 
         # Memory minimum free requirement
-        if "memory_min_gb" in hw_requirements:
-            min_memory = hw_requirements["memory_min_gb"]
+        if "memory_min_gib" in hw_requirements:
+            min_memory = hw_requirements["memory_min_gib"]
             memory_info = hardware.get("memory", {})
             total_bytes = memory_info.get("total", 0)
             available_bytes = memory_info.get("available", 0)
-            actual_memory_gb = total_bytes / (1000**3)  # Use GB (1000^3) standard
-            available_memory_gb = available_bytes / (1000**3)
-            passed = available_memory_gb >= min_memory
+            actual_memory_gib = total_bytes / (1024**3)  # Use GiB (1024^3) standard
+            available_memory_gib = available_bytes / (1024**3)
+            passed = available_memory_gib >= min_memory
             results.append(
                 {
                     "name": f"Available memory >= {min_memory} GB",
                     "passed": passed,
-                    "actual": f"{available_memory_gb:.2f} GB",
+                    "actual": f"{available_memory_gib:.2f} GB",
                     "required": f"At least {min_memory} GB available memory",
                     "category": "hardware.memory.available",
                 }
             )
 
         # Memory minimum total requirement
-        if "memory_total_min_gb" in hw_requirements:
-            min_total_memory = hw_requirements["memory_total_min_gb"]
+        if "memory_total_min_gib" in hw_requirements:
+            min_total_memory = hw_requirements["memory_total_min_gib"]
             memory_info = hardware.get("memory", {})
             total_bytes = memory_info.get("total", 0)
             available_bytes = memory_info.get("available", 0)
-            actual_memory_gb = total_bytes / (1000**3)  # Use GB (1000^3) standard
-            passed = actual_memory_gb >= min_total_memory
+            actual_memory_gib = total_bytes / (1024**3)  # Use GiB (1024^3) standard
+            passed = actual_memory_gib >= min_total_memory
             results.append(
                 {
                     "name": f"Total memory >= {min_total_memory} GB",
                     "passed": passed,
-                    "actual": f"{actual_memory_gb:.2f} GB",
+                    "actual": f"{actual_memory_gib:.2f} GB",
                     "required": f"At least {min_total_memory} GB total memory",
                     "category": "hardware.memory.total",
                 }
             )
 
         # Storage minimum free requirement
-        if "storage_min_gb" in hw_requirements:
-            min_storage = hw_requirements["storage_min_gb"]
+        if "storage_min_gib" in hw_requirements:
+            min_storage = hw_requirements["storage_min_gib"]
             storage_info = hardware.get("storage", {})
             total_free_bytes = storage_info.get("total_free", 0)
-            actual_storage_gb = total_free_bytes / (1000**3)  # Use GB (1000^3) standard
-            passed = actual_storage_gb >= min_storage
+            actual_storage_gib = total_free_bytes / (1024**3)  # Use GiB (1024^3) standard
+            passed = actual_storage_gib >= min_storage
             results.append(
                 {
                     "name": f"Free storage >= {min_storage} GB",
                     "passed": passed,
-                    "actual": f"{actual_storage_gb:.2f} GB",
+                    "actual": f"{actual_storage_gib:.2f} GB",
                     "required": f"At least {min_storage} GB free storage",
                     "category": "hardware.storage.free",
                 }
             )
 
         # Storage minimum total requirement
-        if "storage_total_min_gb" in hw_requirements:
-            min_total_storage = hw_requirements["storage_total_min_gb"]
+        if "storage_total_min_gib" in hw_requirements:
+            min_total_storage = hw_requirements["storage_total_min_gib"]
             storage_info = hardware.get("storage", {})
             total_bytes = storage_info.get("total_size", 0)
-            actual_total_storage_gb = total_bytes / (1000**3)  # Use GB (1000^3) standard
-            passed = actual_total_storage_gb >= min_total_storage
+            actual_total_storage_gib = total_bytes / (1024**3)  # Use GiB (1024^3) standard
+            passed = actual_total_storage_gib >= min_total_storage
             results.append(
                 {
                     "name": f"Total storage >= {min_total_storage} GB",
                     "passed": passed,
-                    "actual": f"{actual_total_storage_gb:.2f} GB",
+                    "actual": f"{actual_total_storage_gib:.2f} GB",
                     "required": f"At least {min_total_storage} GB total storage",
                     "category": "hardware.storage.total",
                 }
@@ -536,64 +536,64 @@ class SystemValidator:
             )
 
         # Discrete GPU minimum VRAM
-        if "dgpu_min_vram_gb" in hw_requirements:
-            min_vram = hw_requirements["dgpu_min_vram_gb"]
+        if "dgpu_min_vram_gib" in hw_requirements:
+            min_vram = hw_requirements["dgpu_min_vram_gib"]
             gpu_info = hardware.get("gpu", {})
             gpu_devices = gpu_info.get("devices", [])
 
             # Calculate total VRAM from discrete GPUs using new structure
-            total_vram_gb = 0
+            total_vram_gib = 0
             for device in gpu_devices:
                 if device.get("is_discrete", False):
                     # Get VRAM from OpenVINO info in new structure
                     openvino_info = device.get("openvino", {})
-                    if openvino_info and "memory_gb" in openvino_info:
-                        vram_gb = openvino_info["memory_gb"]
-                        total_vram_gb += vram_gb
-                        logger.debug(f"Found discrete GPU VRAM: {vram_gb:.1f} GB")
+                    if openvino_info and "memory_gib" in openvino_info:
+                        vram_gib = openvino_info["memory_gib"]
+                        total_vram_gib += vram_gib
+                        logger.debug(f"Found discrete GPU VRAM: {vram_gib:.1f} GB")
 
-            passed = total_vram_gb >= min_vram
+            passed = total_vram_gib >= min_vram
             results.append(
                 {
                     "name": f"Discrete GPU VRAM >= {min_vram} GB",
                     "passed": passed,
-                    "actual": f"{total_vram_gb:.1f} GB",
+                    "actual": f"{total_vram_gib:.1f} GB",
                     "required": f"At least {min_vram} GB total discrete GPU VRAM",
                     "category": "hardware.gpu.vram_min",
                 }
             )
 
         # Discrete GPU maximum VRAM
-        if "dgpu_max_vram_gb" in hw_requirements:
-            max_vram = hw_requirements["dgpu_max_vram_gb"]
+        if "dgpu_max_vram_gib" in hw_requirements:
+            max_vram = hw_requirements["dgpu_max_vram_gib"]
             gpu_info = hardware.get("gpu", {})
             gpu_devices = gpu_info.get("devices", [])
 
             # Calculate total VRAM from discrete GPUs using new structure
-            total_vram_gb = 0
+            total_vram_gib = 0
             for device in gpu_devices:
                 if device.get("is_discrete", False):
                     # Get VRAM from OpenVINO info in new structure
                     openvino_info = device.get("openvino", {})
-                    if openvino_info and "memory_gb" in openvino_info:
-                        vram_gb = openvino_info["memory_gb"]
-                        total_vram_gb += vram_gb
-                        logger.debug(f"Found discrete GPU VRAM: {vram_gb:.1f} GB")
+                    if openvino_info and "memory_gib" in openvino_info:
+                        vram_gib = openvino_info["memory_gib"]
+                        total_vram_gib += vram_gib
+                        logger.debug(f"Found discrete GPU VRAM: {vram_gib:.1f} GB")
 
-            passed = total_vram_gb <= max_vram
+            passed = total_vram_gib <= max_vram
             results.append(
                 {
                     "name": f"Discrete GPU VRAM <= {max_vram} GB",
                     "passed": passed,
-                    "actual": f"{total_vram_gb:.1f} GB",
+                    "actual": f"{total_vram_gib:.1f} GB",
                     "required": f"At most {max_vram} GB total discrete GPU VRAM",
                     "category": "hardware.gpu.vram_max",
                 }
             )
 
         # Discrete GPU minimum VRAM per device (each GPU must have minimum VRAM)
-        if "dgpu_min_vram_per_device_gb" in hw_requirements:
-            min_vram_per_device = hw_requirements["dgpu_min_vram_per_device_gb"]
+        if "dgpu_min_vram_per_device_gib" in hw_requirements:
+            min_vram_per_device = hw_requirements["dgpu_min_vram_per_device_gib"]
             gpu_info = hardware.get("gpu", {})
             gpu_devices = gpu_info.get("devices", [])
 
@@ -603,16 +603,16 @@ class SystemValidator:
             for device in gpu_devices:
                 if device.get("is_discrete", False):
                     openvino_info = device.get("openvino", {})
-                    if openvino_info and "memory_gb" in openvino_info:
-                        vram_gb = openvino_info["memory_gb"]
+                    if openvino_info and "memory_gib" in openvino_info:
+                        vram_gib = openvino_info["memory_gib"]
                         device_name = device.get("name", "Unknown")
-                        discrete_gpus.append({"name": device_name, "vram_gb": vram_gb})
-                        if vram_gb < min_vram_per_device:
-                            insufficient_gpus.append(f"{device_name} ({vram_gb:.1f} GB)")
-                        logger.debug(f"Discrete GPU {device_name}: {vram_gb:.1f} GB VRAM")
+                        discrete_gpus.append({"name": device_name, "vram_gib": vram_gib})
+                        if vram_gib < min_vram_per_device:
+                            insufficient_gpus.append(f"{device_name} ({vram_gib:.1f} GB)")
+                        logger.debug(f"Discrete GPU {device_name}: {vram_gib:.1f} GB VRAM")
 
             passed = len(insufficient_gpus) == 0 and len(discrete_gpus) > 0
-            actual_info = ", ".join([f"{gpu['name']}: {gpu['vram_gb']:.1f} GB" for gpu in discrete_gpus])
+            actual_info = ", ".join([f"{gpu['name']}: {gpu['vram_gib']:.1f} GB" for gpu in discrete_gpus])
             if not actual_info:
                 actual_info = "No discrete GPUs found"
 
@@ -627,8 +627,8 @@ class SystemValidator:
             )
 
         # Discrete GPU maximum VRAM per device (each GPU must not exceed maximum VRAM)
-        if "dgpu_max_vram_per_device_gb" in hw_requirements:
-            max_vram_per_device = hw_requirements["dgpu_max_vram_per_device_gb"]
+        if "dgpu_max_vram_per_device_gib" in hw_requirements:
+            max_vram_per_device = hw_requirements["dgpu_max_vram_per_device_gib"]
             gpu_info = hardware.get("gpu", {})
             gpu_devices = gpu_info.get("devices", [])
 
@@ -638,16 +638,16 @@ class SystemValidator:
             for device in gpu_devices:
                 if device.get("is_discrete", False):
                     openvino_info = device.get("openvino", {})
-                    if openvino_info and "memory_gb" in openvino_info:
-                        vram_gb = openvino_info["memory_gb"]
+                    if openvino_info and "memory_gib" in openvino_info:
+                        vram_gib = openvino_info["memory_gib"]
                         device_name = device.get("name", "Unknown")
-                        discrete_gpus.append({"name": device_name, "vram_gb": vram_gb})
-                        if vram_gb > max_vram_per_device:
-                            excessive_gpus.append(f"{device_name} ({vram_gb:.1f} GB)")
-                        logger.debug(f"Discrete GPU {device_name}: {vram_gb:.1f} GB VRAM")
+                        discrete_gpus.append({"name": device_name, "vram_gib": vram_gib})
+                        if vram_gib > max_vram_per_device:
+                            excessive_gpus.append(f"{device_name} ({vram_gib:.1f} GB)")
+                        logger.debug(f"Discrete GPU {device_name}: {vram_gib:.1f} GB VRAM")
 
             passed = len(excessive_gpus) == 0 and len(discrete_gpus) > 0
-            actual_info = ", ".join([f"{gpu['name']}: {gpu['vram_gb']:.1f} GB" for gpu in discrete_gpus])
+            actual_info = ", ".join([f"{gpu['name']}: {gpu['vram_gib']:.1f} GB" for gpu in discrete_gpus])
             if not actual_info:
                 actual_info = "No discrete GPUs found"
 

@@ -270,18 +270,34 @@ def collect_power_info() -> Dict[str, Any]:
     if rapl_info:
         power_info["control_types"].append(rapl_info)
 
-    # Check for permission issues
-    if power_info["available"] and not power_info["control_types"]:
-        # Powercap exists but we couldn't read any zones - likely a permission issue
-        test_file = f"{INTEL_RAPL_PATH}/intel-rapl:0/energy_uj"
-        if os.path.exists(test_file):
-            try:
-                with open(test_file, "r") as f:
-                    f.read()
-            except PermissionError:
-                power_info["permission_issue"] = True
-                logger.warning(
-                    "Permission denied reading powercap files. See documentation for setting up non-root access."
-                )
+    # Check for permission issues — energy_uj has stricter permissions (640 on top-level
+    # zones, 400 on subzones) than all other zone files (644: name, enabled,
+    # max_energy_range_uj, constraint_*).  Zones may be fully populated with readable
+    # metadata even when live energy readings are blocked.
+    #
+    # "available" means the powercap RAPL subsystem exists on this hardware.
+    # "permission_issue" means energy_uj (live energy counter) requires additional setup.
+    # control_types is kept populated with all readable zone metadata regardless.
+    has_energy_data = any(
+        zone.get("energy_uj") is not None for ct in power_info["control_types"] for zone in ct.get("zones", [])
+    )
+
+    if power_info["available"] and not has_energy_data:
+        for test_path in [
+            f"{INTEL_RAPL_PATH}/intel-rapl:0/energy_uj",
+            f"{INTEL_RAPL_MMIO_PATH}/intel-rapl-mmio:0/energy_uj",
+        ]:
+            if os.path.exists(test_path):
+                try:
+                    with open(test_path, "r") as f:
+                        f.read()
+                except PermissionError:
+                    power_info["permission_issue"] = True
+                    # Do NOT clear control_types — zone metadata (name, enabled,
+                    # max_energy_range_uj, constraints) is still readable and useful.
+                    logger.warning(
+                        "Permission denied reading powercap energy_uj files. Run: sudo scripts/system-setup.sh"
+                    )
+                break
 
     return power_info

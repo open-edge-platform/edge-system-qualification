@@ -77,8 +77,8 @@ tests:
           - events_per_second
           - latency_avg_ms
         requirements:
-          memory_min_gb: 5.0
-          storage_min_gb: 0.2
+          memory_min_gib: 5.0
+          storage_min_gib: 0.2
         
       - name: "memory_basic"
         display_name: "Docker Memory Performance Test - Basic"
@@ -100,8 +100,8 @@ tests:
           - events_per_second
           - latency_avg_ms
         requirements:
-          memory_min_gb: 1.0
-          storage_min_gb: 0.2
+          memory_min_gib: 1.0
+          storage_min_gib: 0.2
         
       - name: "fileio_basic"
         display_name: "Docker File I/O Performance Test - Basic"
@@ -123,5 +123,5 @@ tests:
           - events_per_second
           - latency_avg_ms
         requirements:
-          memory_min_gb: 0.5
-          storage_min_gb: 1.0
+          memory_min_gib: 0.5
+          storage_min_gib: 1.0

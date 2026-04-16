@@ -40,7 +40,7 @@ def validate_profile_requirements(
             "params": {
                 "requirements": {
                     "cpu_min_cores": 4,
-                    "memory_min_gb": 8.0,
+                    "memory_min_gib": 8.0,
                     "os_type": ["linux"],
                     "docker_required": true
                 }
@@ -223,12 +223,12 @@ def _convert_profile_requirements_to_system_format(
                 system_format["hardware"][cpu_field] = profile_requirements[cpu_field]
 
         # Memory requirements - direct mapping
-        for memory_field in ["memory_min_gb", "memory_total_min_gb"]:
+        for memory_field in ["memory_min_gib", "memory_total_min_gib"]:
             if memory_field in profile_requirements:
                 system_format["hardware"][memory_field] = profile_requirements[memory_field]
 
         # Storage requirements - direct mapping
-        for storage_field in ["storage_min_gb", "storage_total_min_gb"]:
+        for storage_field in ["storage_min_gib", "storage_total_min_gib"]:
             if storage_field in profile_requirements:
                 system_format["hardware"][storage_field] = profile_requirements[storage_field]
 
@@ -237,7 +237,7 @@ def _convert_profile_requirements_to_system_format(
             "igpu_required",
             "dgpu_required",
             "dgpu_min_devices",
-            "dgpu_min_vram_gb",
+            "dgpu_min_vram_gib",
         ]:
             if gpu_field in profile_requirements:
                 system_format["hardware"][gpu_field] = profile_requirements[gpu_field]

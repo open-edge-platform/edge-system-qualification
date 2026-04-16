@@ -23,7 +23,7 @@ from ..core.process import (
     run_command_with_output,
     run_git_command,
 )
-from . import formatter, hardware, power, software
+from . import formatter, hardware, memory, power, software
 from .cache import SystemInfoCache
 from .formatter import (
     format_hardware_summary,
@@ -31,6 +31,7 @@ from .formatter import (
     generate_simple_report,
 )
 from .info import collect_hardware_info, collect_software_info, collect_system_info
+from .memory import collect_memory_dimm_info, collect_memory_info
 from .power import collect_power_info
 
 __all__ = [
@@ -40,6 +41,8 @@ __all__ = [
     "collect_system_info",
     "collect_hardware_info",
     "collect_software_info",
+    "collect_memory_info",
+    "collect_memory_dimm_info",
     "collect_power_info",
     # Formatting functions
     "generate_simple_report",
@@ -57,6 +60,7 @@ __all__ = [
     "cleanup_processes",
     # Submodules
     "hardware",
+    "memory",
     "software",
     "power",
     "formatter",

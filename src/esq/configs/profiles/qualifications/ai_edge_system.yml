@@ -28,7 +28,7 @@ params:
     - scalable_ai_graphics_media_hetero_24gb
     - scalable_ai_graphics_media_hetero_52gb
   requirements:
-    memory_min_gb: 8.0
+    memory_min_gib: 8.0
     os_type:
       - "linux"
     docker_required: true

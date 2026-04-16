@@ -80,10 +80,69 @@ def format_system_summary(hardware_info: Dict[str, Any], software_info: Dict[str
 
     # Memory Information
     memory = hardware_info.get("memory", {})
-    if memory.get("total_gb") and memory["total_gb"] != "Unknown":
-        lines.append(f"Memory: {memory['total_gb']} GB total")
-        if memory.get("used_percent") and memory["used_percent"] != "Unknown":
-            lines.append(f"  Usage: {memory['used_percent']}%")
+    if memory.get("total_gib") and memory["total_gib"] != "Unknown":
+        # Build the memory headline.
+        # installed_ram_gib: sum of DIMM capacities from SMBIOS/dmidecode (GiB).
+        # usable_ram_gib: psutil total / 1024^3 — what the OS sees (GiB).
+        installed_ram_gib = memory.get("installed_ram_gib")
+        usable_ram_gib = memory.get("usable_ram_gib")
+        if installed_ram_gib is not None and usable_ram_gib is not None:
+            installed_str = f"{installed_ram_gib:.1f} GB"
+            usable_str = f"{usable_ram_gib:.1f} GB"
+            lines.append(f"Memory: {installed_str} Installed ({usable_str} usable)")
+        elif installed_ram_gib is not None:
+            installed_str = f"{installed_ram_gib:.1f} GB"
+            lines.append(f"Memory: {installed_str} Installed")
+        else:
+            lines.append(f"Memory: {memory['total_gib']} GB total")
+
+        used_gib = memory.get("used_gib")
+        available_gib = memory.get("available_gib")
+        used_percent = memory.get("used_percent")
+        if used_gib is not None and available_gib is not None and used_percent is not None:
+            lines.append(f"  Usage: {used_gib} GB used ({used_percent}%) / {available_gib} GB available")
+        elif used_percent and used_percent != "Unknown":
+            lines.append(f"  Usage: {used_percent}%")
+
+        # Show detailed DIMM configuration if available
+        dimms = memory.get("dimms", {})
+        if dimms.get("available"):
+            arrays = dimms.get("arrays", [])
+            if arrays:
+                arr = arrays[0]
+                if arr.get("error_correction") and arr["error_correction"] not in ("Unknown", "None"):
+                    lines.append(f"  ECC: {arr['error_correction']}")
+
+            installed_count = dimms.get("installed_count", 0)
+            slot_count = dimms.get("slot_count", 0)
+            if slot_count > 0:
+                lines.append(f"  Slots: {installed_count}/{slot_count} populated")
+
+            for device in dimms.get("devices", []):
+                locator = device.get("locator", "")
+                if not device.get("installed"):
+                    lines.append(f"  [{locator}] (empty)")
+                    continue
+                size = device.get("size", "")
+                mem_type = device.get("type", "")
+                configured_speed = device.get("configured_speed_mts")
+                speed = configured_speed or device.get("speed_mts")
+                manufacturer = device.get("manufacturer", "")
+                part_number = device.get("part_number", "")
+
+                size_display = size
+                slot_line = f"  [{locator}] {size_display}"
+                if mem_type and mem_type != "Unknown":
+                    slot_line += f" {mem_type}"
+                if speed:
+                    slot_line += f" @ {speed} MT/s"
+                if manufacturer and manufacturer not in ("Unknown", "Not Specified"):
+                    slot_line += f" - {manufacturer}"
+                if part_number and part_number not in ("Unknown", "Not Specified"):
+                    slot_line += f" {part_number}"
+                lines.append(slot_line)
+        elif dimms.get("reason") == "permission_denied":
+            lines.append("  DIMM details unavailable (run setup: sudo scripts/system-setup.sh)")
 
     # GPU Information
     gpu = hardware_info.get("gpu", {})
@@ -92,8 +151,16 @@ def format_system_summary(hardware_info: Dict[str, Any], software_info: Dict[str
         devices = gpu.get("devices", [])
         for i, device in enumerate(devices):  # Show all GPU devices
             name = device.get("full_name", "Unknown")
-            discrete = " (Discrete)" if device.get("is_discrete") else " (Integrated)"
-            lines.append(f"  {i + 1}. {name}{discrete}")
+            memory_gib = device.get("memory_gib")
+            is_discrete = device.get("is_discrete", True)
+            if memory_gib:
+                # iGPU memory is GPU-accessible shared system RAM (CL_DEVICE_GLOBAL_MEM_SIZE),
+                # not dedicated VRAM. Label it "(shared)" to avoid confusion with dGPU VRAM.
+                mem_label = "GB" if is_discrete else "GB (shared)"
+                mem_str = f" - {memory_gib:.1f} {mem_label}"
+            else:
+                mem_str = ""
+            lines.append(f"  {i + 1}. {name}{mem_str}")
 
     # NPU Information
     npu = hardware_info.get("npu", {})
@@ -112,7 +179,7 @@ def format_system_summary(hardware_info: Dict[str, Any], software_info: Dict[str
         for i, device in enumerate(devices):  # Show all storage devices
             name = device.get("model", "Unknown")
             interface = device.get("interface", "")
-            size = device.get("size_gb", "")
+            size = device.get("size_gib", "")
 
             device_line = f"  {i + 1}. {name}"
             if interface:
@@ -143,7 +210,12 @@ def format_system_summary(hardware_info: Dict[str, Any], software_info: Dict[str
     # Power Information
     power = hardware_info.get("power", {})
     if power.get("available") and power.get("control_types"):
-        lines.append("Power: RAPL power monitoring available")
+        # Zone metadata (name, enabled, max_energy_range, constraints) is always readable.
+        # Only energy_uj (live energy counter) requires additional setup.
+        if power.get("permission_issue"):
+            lines.append("Power: RAPL power monitoring available (energy readings require setup)")
+        else:
+            lines.append("Power: RAPL power monitoring available")
 
         # Show all zones with constraints
         for control_type in power.get("control_types", []):
@@ -202,7 +274,11 @@ def format_system_summary(hardware_info: Dict[str, Any], software_info: Dict[str
                             constraint_info += f" (window: {time_window})"
 
                         lines.append(constraint_info)
-    elif power.get("permission_issue"):
+
+        if power.get("permission_issue"):
+            lines.append("  (Live energy readings unavailable - run: sudo scripts/system-setup.sh)")
+    elif power.get("available") and power.get("permission_issue"):
+        # Powercap exists but zone directories were unreadable entirely
         lines.append("Power: Available (setup required for non-root access)")
 
     # Network Information
@@ -233,6 +309,130 @@ def format_system_summary(hardware_info: Dict[str, Any], software_info: Dict[str
     return "\n".join(lines)
 
 
+def build_display_summary(hardware: Dict[str, Any], software: Dict[str, Any]) -> tuple:
+    """
+    Convert raw hardware/software dicts from SystemInfoCache into display-ready
+    summary dicts for use with format_system_summary().
+
+    This is the single source of truth for converting system info to display format,
+    used by both generate_simple_report() and the test summary generator.
+
+    Args:
+        hardware: Raw hardware info dict from SystemInfoCache
+        software: Raw software info dict from SystemInfoCache
+
+    Returns:
+        Tuple of (summary_hardware, summary_software) ready for format_system_summary()
+    """
+    summary_hardware = {}
+    summary_software = {}
+
+    # Convert CPU info
+    if "cpu" in hardware:
+        cpu = hardware["cpu"]
+        summary_hardware["cpu"] = {
+            "brand": cpu.get("brand", "Unknown"),
+            "logical_cores": cpu.get("logical_count", cpu.get("count", "Unknown")),
+            "frequency_mhz": cpu.get("frequency", {}).get("max", 0),
+            "generation_info": cpu.get("generation_info", {}),
+        }
+
+    # Convert Memory info
+    if "memory" in hardware:
+        memory = hardware["memory"]
+        dimms = memory.get("dimms", {})
+        summary_hardware["memory"] = {
+            "total_gib": round(memory.get("total", 0) / (1024**3)),
+            "used_percent": round(memory.get("percent", 0), 1),
+            "used_gib": memory.get("used_gib", round(memory.get("used", 0) / (1024**3), 1)),
+            "available_gib": memory.get("available_gib", round(memory.get("available", 0) / (1024**3), 1)),
+            "usable_ram_gib": memory.get("usable_ram_gib"),
+            "installed_ram_gib": dimms.get("installed_ram_gib") if dimms.get("available") else None,
+            "dimms": dimms,
+        }
+
+    # Convert GPU info
+    if "gpu" in hardware:
+        gpu = hardware["gpu"]
+        summary_hardware["gpu"] = {
+            "device_count": gpu.get("total_count", 0),
+            "devices": [],
+        }
+        for device in gpu.get("devices", []):
+            device_summary = {
+                "full_name": device.get("device_name", "Unknown"),
+                "is_discrete": device.get("is_discrete", False),
+            }
+            # Check for OpenVINO enhanced name and VRAM size
+            if "openvino" in device:
+                ov = device["openvino"]
+                full_name = ov.get("full_device_name") or ov.get("quick_access", {}).get("full_name")
+                if full_name and full_name != "Unknown":
+                    device_summary["full_name"] = full_name
+                memory_gib = ov.get("memory_gib")
+                if memory_gib:
+                    device_summary["memory_gib"] = round(memory_gib, 1)
+            summary_hardware["gpu"]["devices"].append(device_summary)
+
+    # Convert NPU info
+    if "npu" in hardware:
+        npu = hardware["npu"]
+        summary_hardware["npu"] = {
+            "device_count": npu.get("count", 0),
+            "devices": [],
+        }
+        for device in npu.get("devices", []):
+            device_summary = {"full_name": device.get("device_name", "Unknown")}
+            # Check for OpenVINO enhanced name
+            if "openvino" in device and "quick_access" in device["openvino"]:
+                device_summary["full_name"] = device["openvino"]["quick_access"].get(
+                    "full_name", device_summary["full_name"]
+                )
+            summary_hardware["npu"]["devices"].append(device_summary)
+
+    # Convert Storage info
+    if "storage" in hardware:
+        storage = hardware["storage"]
+        summary_hardware["storage"] = {
+            "device_count": len(storage.get("devices", [])),
+            "devices": [],
+        }
+        for device in storage.get("devices", []):
+            device_summary = {
+                "model": device.get("model", "Unknown"),
+                "interface": device.get("interface", ""),
+                "size_gib": round(device.get("size", 0) / (1024**3), 1) if device.get("size") else 0,
+            }
+            summary_hardware["storage"]["devices"].append(device_summary)
+
+    # Convert DMI info (pass through as-is)
+    if "dmi" in hardware:
+        summary_hardware["dmi"] = hardware["dmi"]
+
+    # Convert Power info (pass through as-is)
+    if "power" in hardware:
+        summary_hardware["power"] = hardware["power"]
+
+    # Convert Network info (pass through as-is)
+    if "network" in hardware:
+        summary_hardware["network"] = hardware["network"]
+
+    # Convert OS info
+    if "os" in software:
+        os_info = software["os"]
+        dist = os_info.get("distribution", {})
+        os_summary = {
+            "name": dist.get("name", "Unknown") if isinstance(dist, dict) else str(dist),
+            "version": dist.get("version_id", "") if isinstance(dist, dict) else "",
+            "release": os_info.get("release", ""),
+        }
+        if isinstance(dist, dict) and dist.get("pretty_name"):
+            os_summary["pretty_name"] = dist["pretty_name"]
+        summary_software["os"] = os_summary
+
+    return summary_hardware, summary_software
+
+
 def generate_simple_report(system_info: Dict[str, Any]) -> str:
     """
     Generate a simple text report of system information.
@@ -255,99 +455,7 @@ def generate_simple_report(system_info: Dict[str, Any]) -> str:
     if hardware and software:
         # Convert raw hardware/software to summary format for unified display
         try:
-            summary_hardware = {}
-            summary_software = {}
-
-            # Convert CPU info
-            if "cpu" in hardware:
-                cpu = hardware["cpu"]
-                summary_hardware["cpu"] = {
-                    "brand": cpu.get("brand", "Unknown"),
-                    "logical_cores": cpu.get("logical_count", cpu.get("count", "Unknown")),
-                    "frequency_mhz": cpu.get("frequency", {}).get("max", 0),
-                    "generation_info": cpu.get("generation_info", {}),
-                }
-
-            # Convert Memory info
-            if "memory" in hardware:
-                memory = hardware["memory"]
-                summary_hardware["memory"] = {
-                    "total_gb": round(memory.get("total", 0) / (1000**3)),
-                    "used_percent": round(memory.get("percent", 0), 1),
-                }
-
-            # Convert GPU info
-            if "gpu" in hardware:
-                gpu = hardware["gpu"]
-                summary_hardware["gpu"] = {
-                    "device_count": gpu.get("total_count", 0),
-                    "devices": [],
-                }
-                for device in gpu.get("devices", []):
-                    device_summary = {
-                        "full_name": device.get("device_name", "Unknown"),
-                        "is_discrete": device.get("is_discrete", False),
-                    }
-                    # Check for OpenVINO enhanced name
-                    if "openvino" in device and "quick_access" in device["openvino"]:
-                        device_summary["full_name"] = device["openvino"]["quick_access"].get(
-                            "full_name", device_summary["full_name"]
-                        )
-                    summary_hardware["gpu"]["devices"].append(device_summary)
-
-            # Convert NPU info
-            if "npu" in hardware:
-                npu = hardware["npu"]
-                summary_hardware["npu"] = {
-                    "device_count": npu.get("count", 0),
-                    "devices": [],
-                }
-                for device in npu.get("devices", []):
-                    device_summary = {"full_name": device.get("device_name", "Unknown")}
-                    # Check for OpenVINO enhanced name
-                    if "openvino" in device and "quick_access" in device["openvino"]:
-                        device_summary["full_name"] = device["openvino"]["quick_access"].get(
-                            "full_name", device_summary["full_name"]
-                        )
-                    summary_hardware["npu"]["devices"].append(device_summary)
-
-            # Convert Storage info
-            if "storage" in hardware:
-                storage = hardware["storage"]
-                summary_hardware["storage"] = {
-                    "device_count": len(storage.get("devices", [])),
-                    "devices": [],
-                }
-                for device in storage.get("devices", []):
-                    device_summary = {
-                        "model": device.get("model", "Unknown"),
-                        "interface": device.get("interface", ""),
-                        "size_gb": round(device.get("size", 0) / (1000**3)) if device.get("size") else 0,
-                    }
-                    summary_hardware["storage"]["devices"].append(device_summary)
-
-            # Convert DMI info
-            if "dmi" in hardware:
-                summary_hardware["dmi"] = hardware["dmi"]
-
-            # Convert Power info (pass through as-is)
-            if "power" in hardware:
-                summary_hardware["power"] = hardware["power"]
-
-            # Convert Network info (pass through as-is)
-            if "network" in hardware:
-                summary_hardware["network"] = hardware["network"]
-
-            # Convert OS info
-            if "os" in software:
-                os_info = software["os"]
-                summary_software["os"] = {
-                    "name": os_info.get("distribution", {}).get("name", "Unknown"),
-                    "version": os_info.get("distribution", {}).get("version_id", ""),
-                    "release": os_info.get("release", ""),
-                }
-
-            # Use the consolidated formatter
+            summary_hardware, summary_software = build_display_summary(hardware, software)
             system_summary_text = format_system_summary(summary_hardware, summary_software)
             report_lines.append("\n" + system_summary_text)
 
@@ -409,8 +517,8 @@ def format_hardware_summary(hardware_info: Dict[str, Any]) -> str:
     # Memory
     memory = hardware_info.get("memory", {})
     if memory and not memory.get("error"):
-        total_gb = memory.get("total", 0) / (1000**3)
-        summary_parts.append(f"RAM: {total_gb:.0f} GB")
+        total_gib = memory.get("total", 0) / (1024**3)
+        summary_parts.append(f"RAM: {total_gib:.1f} GB")
 
     return " | ".join(summary_parts) if summary_parts else "Hardware information unavailable"
 

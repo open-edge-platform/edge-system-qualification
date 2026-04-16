@@ -615,10 +615,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#5-platform-power-monitoring" class="md-nav__link">
+  <a href="#5-system-setup" class="md-nav__link">
     <span class="md-ellipsis">
       
-        5. Platform Power Monitoring
+        5. System Setup
       
     </span>
   </a>
@@ -666,6 +666,17 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#uninstall" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Uninstall
+      
+    </span>
+  </a>
   
 </li>
       
@@ -1214,10 +1225,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#5-platform-power-monitoring" class="md-nav__link">
+  <a href="#5-system-setup" class="md-nav__link">
     <span class="md-ellipsis">
       
-        5. Platform Power Monitoring
+        5. System Setup
       
     </span>
   </a>
@@ -1265,6 +1276,17 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#uninstall" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Uninstall
+      
+    </span>
+  </a>
   
 </li>
       
@@ -1464,65 +1486,48 @@
 <p class="admonition-title">Additional Reference</p>
 <p>For detailed <code>uv</code> installation instructions, see the official <a href="https://docs.astral.sh/uv/getting-started/installation/">uv Installation</a> documentation.</p>
 </div>
-<h3 id="5-platform-power-monitoring">5. Platform Power Monitoring<a class="headerlink" href="#5-platform-power-monitoring" title="Permanent link">&para;</a></h3>
-<p>Configure non-root access to RAPL (Running Average Power Limit) powercap files for platform power monitoring:</p>
-<div class="admonition info">
-<p class="admonition-title">About RAPL Power Monitoring</p>
-<p>RAPL provides energy consumption data for Intel® processors. This step enables Intel® ESQ to collect power configuration information without requiring root privileges.</p>
-</div>
-<p>Run the automated setup script to configure group-based permissions:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>sudo<span class="w"> </span>bash<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>wget<span class="w"> </span>-qLO<span class="w"> </span>-<span class="w"> </span>https://raw.githubusercontent.com/open-edge-platform/edge-system-qualification/refs/heads/main/scripts/setup-powercap-permissions.sh<span class="k">)</span><span class="s2">&quot;</span>
+<h3 id="5-system-setup">5. System Setup<a class="headerlink" href="#5-system-setup" title="Permanent link">&para;</a></h3>
+<p>Run the setup script to configure system settings required for full functionality:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>sudo<span class="w"> </span>bash<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>wget<span class="w"> </span>-qLO<span class="w"> </span>-<span class="w"> </span>https://raw.githubusercontent.com/open-edge-platform/edge-system-qualification/refs/heads/main/scripts/system-setup.sh<span class="k">)</span><span class="s2">&quot;</span>
 </span></code></pre></div>
-<p>This setup script:</p>
-<ul>
-<li><strong>Auto-detects</strong> all powercap energy files on your system</li>
-<li>Creates a <code>powercap</code> group for secure, user-specific access</li>
-<li>Adds your user to the <code>powercap</code> group</li>
-<li>Configures persistent permissions via <code>/etc/sysfs.d/powercap.conf</code> (applied automatically on boot)</li>
-<li>Applies permissions immediately for the current session</li>
-</ul>
+<div class="admonition note">
+<p class="admonition-title">Feature Availability</p>
+<p>Some features configured by this script are optional. Intel® ESQ will still run if skipped, but certain metrics and capabilities may be unavailable.</p>
+</div>
 <div class="admonition note">
 <p class="admonition-title">Security &amp; Persistence</p>
-<p>This configuration uses group-based permissions (mode 0440, owner root:powercap) to grant read-only access to RAPL powercap files exclusively to users in the <code>powercap</code> group. Permissions are automatically reapplied on boot via the sysfs configuration.</p>
-</div>
-<div class="admonition tip">
-<p class="admonition-title">Verification</p>
-<p>Verify access with:
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>cat<span class="w"> </span>/sys/class/powercap/intel-rapl/intel-rapl:0/energy_uj
-</span></code></pre></div>
-If this command prints a number without requiring sudo, the setup was successful.</p>
+<p>Each module applies the minimum permissions required and documents its persistence behavior. Re-run this script after system or package updates that may reset configured settings.</p>
 </div>
 <h3 id="6-intel-esq">6. Intel® ESQ<a class="headerlink" href="#6-intel-esq" title="Permanent link">&para;</a></h3>
 <div class="admonition info">
 <p class="admonition-title">Development Version</p>
 <p>To access the latest features that may not be available in the current release, you can install the development version from the main branch:
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>uv<span class="w"> </span>tool<span class="w"> </span>install<span class="w"> </span>--force<span class="w"> </span>--refresh<span class="w"> </span>git+https://github.com/open-edge-platform/edge-system-qualification.git@main
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>uv<span class="w"> </span>tool<span class="w"> </span>install<span class="w"> </span>--force<span class="w"> </span>--refresh<span class="w"> </span>git+https://github.com/open-edge-platform/edge-system-qualification.git@main
 </span></code></pre></div></p>
 </div>
 <p>Install Intel® ESQ from GitHub*:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>uv<span class="w"> </span>tool<span class="w"> </span>install<span class="w"> </span>--force<span class="w"> </span>--refresh<span class="w"> </span>git+https://github.com/open-edge-platform/edge-system-qualification.git@main
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>uv<span class="w"> </span>tool<span class="w"> </span>install<span class="w"> </span>--force<span class="w"> </span>--refresh<span class="w"> </span>git+https://github.com/open-edge-platform/edge-system-qualification.git@main
 </span></code></pre></div>
 <p>Verify that Intel® ESQ is working correctly:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>esq<span class="w"> </span>--version
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>esq<span class="w"> </span>--version
 </span></code></pre></div>
 <h2 id="quick-start_1">Quick Start<a class="headerlink" href="#quick-start_1" title="Permanent link">&para;</a></h2>
 <p>Run all tests and review the generated test report:</p>
 <div class="admonition tip">
-<p class="admonition-title">Newer Version</p>
-<p>Before running a new version of Intel® ESQ, run the following command to clean up any previously created <code>esq_data</code> folder:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>esq<span class="w"> </span>clean<span class="w"> </span>--all
+<p class="admonition-title">Upgrading Intel® ESQ</p>
+<p>Before running a new version of Intel® ESQ, clean up any previously created <code>esq_data</code> folder to prevent leftover data from interfering with the new installation:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>esq<span class="w"> </span>clean<span class="w"> </span>--all
 </span></code></pre></div>
-<p>This ensures that leftover data from previous ESQ versions does not interfere with the new installation. If you have uninstalled ESQ but the <code>esq_data</code> folder still exists, remove it using the above command before running any new ESQ commands. Otherwise, ESQ may not work as expected.</p>
 </div>
 <div class="admonition info">
 <p class="admonition-title">Download Source</p>
 <p>Intel® ESQ uses HuggingFace* as the default download source. For ModelScope*, you can configure it with:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">PREFER_MODELSCOPE</span><span class="o">=</span><span class="m">1</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">PREFER_MODELSCOPE</span><span class="o">=</span><span class="m">1</span>
 </span></code></pre></div>
 </div>
 <h3 id="1-run-intel-esq">1. Run Intel® ESQ<a class="headerlink" href="#1-run-intel-esq" title="Permanent link">&para;</a></h3>
 <p>Run qualification and vertical (recommended) test profiles to generate a test report:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>esq<span class="w"> </span>run
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>esq<span class="w"> </span>run
 </span></code></pre></div>
 <p>By default, this command will:</p>
 <ol>
@@ -1533,14 +1538,14 @@ If this command prints a number without requiring sudo, the setup was successful
 <div class="admonition tip">
 <p class="admonition-title">Verbose Output</p>
 <p>Use the <code>--verbose</code> option to see detailed information while running tests:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>esq<span class="w"> </span>--verbose<span class="w"> </span>run
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>esq<span class="w"> </span>--verbose<span class="w"> </span>run
 </span></code></pre></div>
 <p>This provides real-time feedback on test progress, system information collection, and detailed execution logs.</p>
 </div>
 <div class="admonition tip">
 <p class="admonition-title">Run All Profile Types</p>
 <p>Use the <code>--all</code> option to run all available profile types (qualification, vertical, and suite):</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>esq<span class="w"> </span>--verbose<span class="w"> </span>run<span class="w"> </span>--all
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>esq<span class="w"> </span>--verbose<span class="w"> </span>run<span class="w"> </span>--all
 </span></code></pre></div>
 </div>
 <div class="admonition info">
@@ -1551,6 +1556,14 @@ If this command prints a number without requiring sudo, the setup was successful
 <p class="admonition-title">Virtualization</p>
 <p>Running in virtual machines may impact performance and hardware acceleration capabilities. Bare metal installation is recommended for accurate testing results.</p>
 </div>
+<hr />
+<h2 id="uninstall">Uninstall<a class="headerlink" href="#uninstall" title="Permanent link">&para;</a></h2>
+<p>Before uninstalling, clean up all data created by Intel® ESQ, including Docker images built during test execution:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>esq<span class="w"> </span>clean<span class="w"> </span>--all
+</span></code></pre></div>
+<p>Then remove Intel® ESQ:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>uv<span class="w"> </span>tool<span class="w"> </span>uninstall<span class="w"> </span>esq
+</span></code></pre></div>
 <hr />
 <p>Ready to explore all test suites? Continue to the <a href="../suites/">Test Suites</a> →</p>
 

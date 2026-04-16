@@ -503,10 +503,10 @@ index 000000000..2722f1005
 +}
 diff --git a/packages/web-awesome/src/components/Summary/index.tsx b/packages/web-awesome/src/components/Summary/index.tsx
 new file mode 100644
-index 000000000..264556c21
+index 000000000..d3496d2a6
 --- /dev/null
 +++ b/packages/web-awesome/src/components/Summary/index.tsx
-@@ -0,0 +1,3385 @@
+@@ -0,0 +1,3424 @@
 +import { useEffect, useState } from "preact/hooks";
 +import { fetchAttachment } from "@allurereport/web-commons";
 +import * as styles from "./styles.scss";
@@ -2571,9 +2571,9 @@ index 000000000..264556c21
 +    }
 +  }, [loadingTests, individualTestResults]);
 +
-+  // Helper function to convert bytes to GB (decimal, like physical disk labels)
++  // Helper function to convert bytes to GiB, rendered with 1 decimal place and labelled as "GB"
 +  const bytesToGB = (bytes: number): string => {
-+    return (bytes / 1000000000).toFixed(2); // Convert to GB (decimal, not binary)
++    return (bytes / 1073741824).toFixed(1); // 1 GiB = 1024³ bytes
 +  };
 +
 +  // Helper function to map internal tier names to display tier names
@@ -2632,7 +2632,7 @@ index 000000000..264556c21
 +      }
 +      coreFreqLine += `${cpu.count} cores • ${cpu.logical_count} threads`;
 +      if (cpu.frequency) {
-+        coreFreqLine += ` • Current: ${cpu.frequency.current.toFixed(0)} MHz • Range: ${cpu.frequency.min}-${cpu.frequency.max} MHz`;
++        coreFreqLine += ` • Current: ${cpu.frequency.current.toFixed(0)} MHz • Range: ${Number(cpu.frequency.min).toFixed(0)}-${Number(cpu.frequency.max).toFixed(0)} MHz`;
 +      }
 +      cpuDetails.push(coreFreqLine);
 +      
@@ -2651,7 +2651,9 @@ index 000000000..264556c21
 +        gpuLine += `${deviceName}`;
 +        
 +        // Add VRAM information from openvino if available
-+        if (gpu.openvino?.memory_bytes) {
++        if (gpu.openvino?.memory_gib !== undefined) {
++          gpuLine += ` • ${gpu.openvino.memory_gib.toFixed(1)} GB VRAM`;
++        } else if (gpu.openvino?.memory_bytes) {
 +          gpuLine += ` • ${bytesToGB(gpu.openvino.memory_bytes)} GB VRAM`;
 +        }
 +        
@@ -2677,13 +2679,13 @@ index 000000000..264556c21
 +        if (device.interface) {
 +          storageLine += ` (${device.interface})`;
 +        }
-+        storageLine += ` • ${parseInt(bytesToGB(device.size))} GB capacity`;
++        storageLine += ` • ${bytesToGB(device.size)} GB capacity`;
 +        
 +        // Check if this device has partitions and show root partition info
 +        if (device.partitions && device.partitions.length > 0) {
 +          const rootPartition = device.partitions.find((p: any) => p.mountpoint === '/');
 +          if (rootPartition) {
-+            storageLine += ` • ${parseInt(bytesToGB(rootPartition.free))} GB available (${rootPartition.percent.toFixed(0)}% used)`;
++            storageLine += ` • ${bytesToGB(rootPartition.free)} GB available (${rootPartition.percent.toFixed(0)}% used)`;
 +          }
 +        }
 +        
@@ -2693,14 +2695,51 @@ index 000000000..264556c21
 +      hardwareInfoData.push({ component: "Storage", details: allStorageDetails });
 +    }
 +    
-+    // Memory information - simplified presentation
++    // Memory information - with DIMM slot information if available
 +    if (hardware.memory) {
 +      const memory = hardware.memory;
 +      const memoryDetails: string[] = [];
-+      
-+      // Single line with total, available, and usage percentage
-+      memoryDetails.push(`${bytesToGB(memory.total)} GB total • ${bytesToGB(memory.available)} GB available (${memory.percent.toFixed(0)}% used)`);
-+      
++      const dimms = memory.dimms;
++
++      const installedRamGib = dimms?.installed_ram_gib;
++      const usableRamGib = memory.usable_ram_gib;
++      const availableRamGib = memory.available_gib;
++      if (installedRamGib !== undefined && usableRamGib !== undefined) {
++        let memLine = `${installedRamGib.toFixed(1)} GB (${usableRamGib.toFixed(1)} GB usable)`;
++        if (availableRamGib !== undefined) {
++          memLine += ` • ${availableRamGib.toFixed(1)} GB available (${memory.percent.toFixed(0)}% used)`;
++        }
++        if (dimms?.available && dimms.slot_count !== undefined) {
++          memLine += ` • ${dimms.installed_count} of ${dimms.slot_count} slots`;
++        }
++        memoryDetails.push(memLine);
++      } else {
++        memoryDetails.push(`${bytesToGB(memory.total)} GB • ${bytesToGB(memory.available)} GB available (${memory.percent.toFixed(0)}% used)`);
++      }
++
++      // Per-slot details
++      if (dimms?.available && dimms.slot_count !== undefined) {
++        // Per-slot details if devices are available
++        if (dimms.devices && dimms.devices.length > 0) {
++          dimms.devices.forEach((dimm: any, idx: number) => {
++            const locator = dimm.locator || `Slot ${idx + 1}`;
++            const isInstalled = dimm.installed === true || (dimm.size && dimm.size !== 'No Module Installed' && dimm.type !== 'Unknown');
++
++            if (isInstalled) {
++              let slotLine = `${locator}`;
++              if (dimm.size) slotLine += ` • ${dimm.size}`;
++              if (dimm.type) slotLine += ` ${dimm.type}`;
++              if (dimm.speed_mts) slotLine += ` @ ${dimm.speed_mts} MT/s`;
++              if (dimm.manufacturer) slotLine += ` • ${dimm.manufacturer.trim()}`;
++              if (dimm.part_number) slotLine += ` ${dimm.part_number.trim()}`;
++              memoryDetails.push(slotLine);
++            } else {
++              memoryDetails.push(`${locator} • No Module Installed`);
++            }
++          });
++        }
++      }
++
 +      hardwareInfoData.push({ component: "Memory", details: memoryDetails });
 +    }
 +

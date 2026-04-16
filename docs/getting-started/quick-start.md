@@ -138,36 +138,19 @@ curl -LsSf https://astral.sh/uv/install.sh | sh && source $HOME/.local/bin/env
     For detailed `uv` installation instructions, see the official [uv Installation](https://docs.astral.sh/uv/getting-started/installation/) documentation.
 
 
-### 5. Platform Power Monitoring
+### 5. System Setup
 
-Configure non-root access to RAPL (Running Average Power Limit) powercap files for platform power monitoring:
-
-!!! info "About RAPL Power Monitoring"
-    RAPL provides energy consumption data for Intel® processors. This step enables Intel® ESQ to collect power configuration information without requiring root privileges.
-
-Run the automated setup script to configure group-based permissions:
+Run the setup script to configure system settings required for full functionality:
 
 ```bash
-sudo bash -c "$(wget -qLO - https://raw.githubusercontent.com/open-edge-platform/edge-system-qualification/refs/heads/main/scripts/setup-powercap-permissions.sh)"
+sudo bash -c "$(wget -qLO - https://raw.githubusercontent.com/open-edge-platform/edge-system-qualification/refs/heads/main/scripts/system-setup.sh)"
 ```
 
-This setup script:
-
-- **Auto-detects** all powercap energy files on your system
-- Creates a `powercap` group for secure, user-specific access
-- Adds your user to the `powercap` group
-- Configures persistent permissions via `/etc/sysfs.d/powercap.conf` (applied automatically on boot)
-- Applies permissions immediately for the current session
+!!! note "Feature Availability"
+    Some features configured by this script are optional. Intel® ESQ will still run if skipped, but certain metrics and capabilities may be unavailable.
 
 !!! note "Security & Persistence"
-    This configuration uses group-based permissions (mode 0440, owner root:powercap) to grant read-only access to RAPL powercap files exclusively to users in the `powercap` group. Permissions are automatically reapplied on boot via the sysfs configuration.
-
-!!! tip "Verification"
-    Verify access with:
-    ```bash
-    cat /sys/class/powercap/intel-rapl/intel-rapl:0/energy_uj
-    ```
-    If this command prints a number without requiring sudo, the setup was successful.
+    Each module applies the minimum permissions required and documents its persistence behavior. Re-run this script after system or package updates that may reset configured settings.
 
 
 ### 6. Intel® ESQ

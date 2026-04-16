@@ -246,7 +246,7 @@ tests:
           - accuracy
         requirements:
           cpu_min_cores: 4
-          memory_min_gb: 8.0
+          memory_min_gib: 8.0
           docker_required: false
       
       - test_id: "MF-002"
@@ -258,7 +258,7 @@ tests:
           - accuracy
         requirements:
           igpu_required: true
-          memory_min_gb: 8.0
+          memory_min_gib: 8.0
 ```
 
 ### Step 4: Create a Profile
@@ -278,8 +278,8 @@ params:
     type: "suite"
   requirements:
     cpu_min_cores: 4
-    memory_min_gb: 8.0
-    storage_min_gb: 5.0
+    memory_min_gib: 8.0
+    storage_min_gib: 5.0
     os_type:
       - "linux"
     docker_required: false
@@ -340,8 +340,8 @@ params:
   requirements:
     # Hardware requirements
     cpu_min_cores: 4
-    memory_min_gb: 8.0
-    storage_min_gb: 10.0
+    memory_min_gib: 8.0
+    storage_min_gib: 10.0
     
     # Software requirements
     os_type: ["linux"]
@@ -619,10 +619,10 @@ requirements:
 ```yaml
 requirements:
   # Minimum total memory
-  memory_min_gb: 8.0
+  memory_min_gib: 8.0
   
   # Maximum memory (for constrained tests)
-  memory_max_gb: 32.0
+  memory_max_gib: 32.0
 ```
 
 #### Storage Requirements
@@ -630,10 +630,10 @@ requirements:
 ```yaml
 requirements:
   # Total storage capacity
-  storage_total_min_gb: 64.0
+  storage_total_min_gib: 64.0
   
   # Free storage for test execution
-  storage_min_gb: 10.0
+  storage_min_gib: 10.0
 ```
 
 #### Device Requirements
@@ -711,8 +711,8 @@ requirements:
   # Hardware
   cpu_min_cores: 8
   cpu_xeon_required: true
-  memory_min_gb: 16.0
-  storage_min_gb: 20.0
+  memory_min_gib: 16.0
+  storage_min_gib: 20.0
   dgpu_required: true
   dgpu_min_count: 2
   
@@ -1435,7 +1435,7 @@ name: "profile.base"
 params:
   requirements:
     cpu_min_cores: 4
-    memory_min_gb: 8.0
+    memory_min_gib: 8.0
 
 # extended_profile.yml
 extends: "profile.base"

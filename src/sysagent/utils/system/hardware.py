@@ -18,6 +18,7 @@ import cpuinfo
 import psutil
 
 from .cpu import detect_cpu_generation_and_segment
+from .memory import collect_memory_info
 from .ov_helper import collect_openvino_devices
 from .pci_helper import get_pci_devices
 from .power import collect_power_info
@@ -417,7 +418,7 @@ def collect_gpu_info(pci_devices, openvino_gpu=None) -> dict:
             mem_size = all_props["GPU_DEVICE_TOTAL_MEM_SIZE"]
             if isinstance(mem_size, (int, float)):
                 normalized_device["memory_bytes"] = mem_size
-                normalized_device["memory_gb"] = mem_size / (1000**3)  # Use GB (1000^3) standard
+                normalized_device["memory_gib"] = mem_size / (1024**3)  # Use GiB (1024^3) standard
 
         # Extract performance-related properties
         if "GPU_EXECUTION_UNITS_COUNT" in all_props:
@@ -720,7 +721,7 @@ def collect_npu_info(pci_devices, openvino_npu=None) -> dict:
             mem_size = all_props["NPU_DEVICE_TOTAL_MEM_SIZE"]
             if isinstance(mem_size, (int, float)):
                 normalized_device["memory_bytes"] = mem_size
-                normalized_device["memory_gb"] = mem_size / (1000**3)  # Use GB (1000^3) standard
+                normalized_device["memory_gib"] = mem_size / (1024**3)  # Use GiB (1024^3) standard
 
         # Extract performance-related properties
         if "NPU_DEVICE_ARCHITECTURE" in all_props:
@@ -891,38 +892,6 @@ def collect_npu_info(pci_devices, openvino_npu=None) -> dict:
     npu_info["count"] = len(all_npus)
 
     return npu_info
-
-
-def collect_memory_info() -> Dict[str, Any]:
-    """
-    Collect memory information including physical and virtual memory details.
-
-    Returns:
-        Dict containing memory information
-    """
-    try:
-        memory = psutil.virtual_memory()
-        swap = psutil.swap_memory()
-
-        memory_info = {
-            "total": memory.total,
-            "available": memory.available,
-            "used": memory.used,
-            "free": memory.free,
-            "percent": memory.percent,
-            "swap": {
-                "total": swap.total,
-                "used": swap.used,
-                "free": swap.free,
-                "percent": swap.percent,
-            },
-        }
-
-        return memory_info
-
-    except Exception as e:
-        logger.warning(f"Failed to collect memory info: {e}")
-        return {"error": str(e)}
 
 
 def _get_disk_mapping() -> Dict[str, Dict[str, str]]:

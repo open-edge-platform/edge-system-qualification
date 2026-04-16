@@ -15,8 +15,8 @@ params:
     # Hardware requirements
     cpu_min_cores: 2
     cpu_min_sockets: 1
-    memory_min_gb: 4.0
-    storage_min_gb: 10.0
+    memory_min_gib: 4.0
+    storage_min_gib: 10.0
     # GPU device requirements using PCI IDs
     gpu_integrated_devices:
       - "64A0"  # Intel® Arc™ Graphics
@@ -36,7 +36,7 @@ params:
       - "5692"  # Intel® Arc™ A550M Graphics
     
     # dGPU memory requirements (applies to all dGPU devices)
-    dgpu_min_vram_gb: 4.0  # Minimum dGPU memory in GB for Docker performance testing
+    dgpu_min_vram_gib: 4.0  # Minimum dGPU memory in GB for Docker performance testing
     
     # Software requirements
     os_type:
@@ -177,8 +177,8 @@ suites:
                   - latency_avg_ms
                   - latency_max_ms
                 requirements:
-                  memory_min_gb: 6.0
-                  storage_min_gb: 0.5
+                  memory_min_gib: 6.0
+                  storage_min_gib: 0.5
                   cpu_min_cores: 4
                 
               - display_name: "Memory Throughput Performance"
@@ -196,8 +196,8 @@ suites:
                   - latency_avg_ms
                   - latency_max_ms
                 requirements:
-                  memory_min_gb: 4.0
-                  storage_min_gb: 0.5
+                  memory_min_gib: 4.0
+                  storage_min_gib: 0.5
                 
               - display_name: "File I/O Throughput Performance"
                 description: "File I/O performance qualification test using sysbench"
@@ -216,8 +216,8 @@ suites:
                   - latency_avg_ms
                   - latency_max_ms
                 requirements:
-                  memory_min_gb: 2.0
-                  storage_min_gb: 3.0
+                  memory_min_gib: 2.0
+                  storage_min_gib: 3.0
                 kpi_override:
                   performance_score:
                     validation:
@@ -242,6 +242,6 @@ suites:
                   - latency_avg_ms
                   - latency_max_ms
                 requirements:
-                  memory_min_gb: 6.0
-                  storage_min_gb: 3.0
+                  memory_min_gib: 6.0
+                  storage_min_gib: 3.0
                   cpu_min_cores: 4

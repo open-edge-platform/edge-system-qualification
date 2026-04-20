@@ -204,24 +204,25 @@ By default, this command will:
 2. Run vertical profiles (unless you choose to skip them at the prompt)
 3. Collect metrics and generate a test report
 
-!!! tip "Verbose Output"
-    Use the `--verbose` option to see detailed information while running tests:
-    
-    ```bash
-    esq --verbose run
-    ```
-    
-    This provides real-time feedback on test progress, system information collection, and detailed execution logs.
+!!! tip "Verbose Output and Profile Types"
+    Use `--verbose` to show detailed execution logs. Add `--all` to include all profile types (qualification, vertical, and suite).
 
-!!! tip "Run All Profile Types"
-    Use the `--all` option to run all available profile types (qualification, vertical, and suite):
-    
     ```bash
+    # Verbose output with default profile selection
+    esq --verbose run
+
+    # Verbose output with all profile types
     esq --verbose run --all
     ```
 
-!!! info "Driver Requirements"
+!!! info "Driver Requirements and Hardware Changes"
     Intel® GPU and NPU tests require specific drivers. Ensure you have the latest Intel® drivers installed for your hardware configuration.
+
+    If you run tests on different hardware or swap system components (such as different CPUs), clean up the cache before rerunning tests:
+
+    ```bash
+    esq --verbose clean --cache-only
+    ```
 
 !!! note "Virtualization"
     Running in virtual machines may impact performance and hardware acceleration capabilities. Bare metal installation is recommended for accurate testing results.

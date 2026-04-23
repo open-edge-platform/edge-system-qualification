@@ -52,6 +52,7 @@ def run_tests(
     extra_args: List[str] = None,
     run_all_profiles: bool = None,
     qualification_only: bool = None,
+    telemetry_interval: int = None,
 ) -> int:
     """
     Run tests based on profiles, suites, or specific test cases.
@@ -100,6 +101,13 @@ def run_tests(
 
     if no_mask:
         os.environ["CORE_MASK_DATA"] = "false"
+
+    if telemetry_interval is not None:
+        if telemetry_interval >= 1:
+            os.environ["CORE_TELEMETRY_INTERVAL"] = str(telemetry_interval)
+            logger.info("Telemetry interval overridden via CLI: %ds", telemetry_interval)
+        else:
+            logger.warning("--telemetry-interval must be >= 1 second; ignoring value %d", telemetry_interval)
 
     # Reset the interrupt flags at the start using the shared_state module
     shared_state.INTERRUPT_OCCURRED = False
@@ -195,6 +203,10 @@ def run_tests(
         # Clean up filter environment variable
         if "CORE_TEST_FILTERS" in os.environ:
             del os.environ["CORE_TEST_FILTERS"]
+
+        # Clean up telemetry interval override (only if it was set by this invocation)
+        if telemetry_interval is not None and "CORE_TELEMETRY_INTERVAL" in os.environ:
+            del os.environ["CORE_TELEMETRY_INTERVAL"]
 
         # Check if any interrupt was detected
         if interrupt_occurred or shared_state.INTERRUPT_OCCURRED:

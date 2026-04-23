@@ -119,7 +119,7 @@ def get_and_clear_container_logs_for_consolidation():
 
 
 @pytest.fixture(scope="function")
-def execute_test_with_cache():
+def execute_test_with_cache(request):
     """
     Fixture that provides a function to execute tests with caching support.
 
@@ -198,6 +198,19 @@ def execute_test_with_cache():
                 )
             if update_title_with_metrics:
                 update_title(configs, cached_result_data)
+            # Mark this node as a cache-hit so that summarize_test_results
+            # does not overwrite the cached telemetry data with the short
+            # near-empty collection produced during this cache-hit run.
+            setattr(request.node, "_result_from_cache", True)
+            # Stash cached telemetry so summarize_test_results can apply it
+            # to the outer Result object (which may be a fresh container that
+            # only has metrics/metadata merged in from this per-device result).
+            if isinstance(cached_result_data, Result):
+                _cached_telemetry = cached_result_data.extended_metadata.get("telemetry")
+                if _cached_telemetry:
+                    _existing = getattr(request.node, "_cached_telemetry", None)
+                    if not _existing:
+                        setattr(request.node, "_cached_telemetry", _cached_telemetry)
             return cached_result_data
 
         # Execute the test
@@ -294,6 +307,21 @@ def execute_test_with_cache():
                     # Validate result before caching to ensure all devices/metrics are valid
                     # This prevents caching results with any device errors (-1) or failures
                     if _validate_result_for_caching(results, test_name):
+                        # Snapshot telemetry into the result before caching so that
+                        # extended_metadata["telemetry"] is preserved in the cache.
+                        # Uses get_summary() which is non-destructive (collector keeps running);
+                        # summarize_test_results will later call apply_to_result() to
+                        # overwrite with the final complete summary for the live run.
+                        try:
+                            from sysagent.utils.plugins.pytest_telemetry import get_telemetry_collector
+
+                            _tel_collector = get_telemetry_collector(request.node)
+                            if _tel_collector is not None and isinstance(results, Result):
+                                _tel_summary = _tel_collector.get_summary()
+                                if _tel_summary:
+                                    results.extended_metadata["telemetry"] = _tel_summary
+                        except Exception as _tel_exc:
+                            logger.debug("Could not snapshot telemetry for caching: %s", _tel_exc)
                         cache_result(results, cache_configs=cache_configs)
                         logger.debug(f"Cached '{name}' result for {test_name}")
                     else:

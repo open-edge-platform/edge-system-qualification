@@ -640,10 +640,21 @@ def apply_profile_param_merging(profile_configs: Dict[str, Any]) -> Dict[str, An
                         if merged_reqs:
                             param_copy["requirements"] = merged_reqs
 
-                        # Merge other profile-level params (if any)
+                        # Merge other profile-level params (if any).
+                        # For dict-typed values (e.g. telemetry), perform a deep
+                        # merge so that a test-level partial override (e.g. only
+                        # "interval") is applied on top of the profile-level base
+                        # rather than replacing it entirely.
                         for k, v in profile_params.items():
-                            if k != "requirements" and k not in param_copy:
+                            if k == "requirements":
+                                continue
+                            if k not in param_copy:
                                 param_copy[k] = copy.deepcopy(v)
+                            elif isinstance(v, dict) and isinstance(param_copy[k], dict):
+                                # Base = profile-level; override with test-level values
+                                merged_val = copy.deepcopy(v)
+                                deep_update(merged_val, param_copy[k])
+                                param_copy[k] = merged_val
 
                         merged_params.append(param_copy)
 

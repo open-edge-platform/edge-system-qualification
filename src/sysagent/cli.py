@@ -109,6 +109,7 @@ def main() -> int:
                 no_mask=args.no_mask,
                 set_prompt=getattr(args, "set_prompt", None),
                 extra_args=[],  # Placeholder for any future extra args
+                telemetry_interval=getattr(args, "telemetry_interval", None),
             )
         elif args.command == "info":
             run_system_info = get_command_function("run_system_info")

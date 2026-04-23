@@ -18,6 +18,7 @@ import cpuinfo
 import psutil
 
 from .cpu import detect_cpu_generation_and_segment
+from .gpu import collect_gpu_sysfs_info
 from .memory import collect_memory_info
 from .ov_helper import collect_openvino_devices
 from .pci_helper import get_pci_devices
@@ -662,6 +663,20 @@ def collect_gpu_info(pci_devices, openvino_gpu=None) -> dict:
 
     gpu_info["devices"] = all_gpus
     gpu_info["total_count"] = len(all_gpus)
+
+    # Enrich each GPU device with static configuration from sysfs:
+    # frequency caps (rp0, max, min, rpe, rpn per GT) and power limits
+    # (cap_w, crit_w, max_w from hwmon).  This provides reference bounds
+    # for live telemetry comparison without requiring any special permissions.
+    try:
+        gpu_sysfs = collect_gpu_sysfs_info()
+        for gpu in all_gpus:
+            pci_slot = gpu.get("pci_slot")
+            if pci_slot and pci_slot in gpu_sysfs:
+                gpu["sysfs"] = gpu_sysfs[pci_slot]
+        logger.debug("GPU sysfs info merged for %d device(s)", len(gpu_sysfs))
+    except Exception as exc:
+        logger.debug("GPU sysfs info collection failed (non-fatal): %s", exc)
 
     return gpu_info
 

@@ -36,6 +36,7 @@ from .pytest_execution import execute_test_with_cache, prepare_test
 from .pytest_parameterization import pytest_generate_tests, request_fixture
 from .pytest_suite import get_kpi_config, suite_configs
 from .pytest_summarization import summarize_test_results
+from .pytest_telemetry import _auto_telemetry, get_telemetry_collector
 from .pytest_validation import (
     validate_system_requirements_from_configs,
     validate_test_results,
@@ -74,4 +75,7 @@ __all__ = [
     # Parameterization
     "pytest_generate_tests",
     "request_fixture",
+    # Telemetry
+    "_auto_telemetry",
+    "get_telemetry_collector",
 ]

@@ -58,6 +58,7 @@ esq = "sysagent.cli:main"
 [project.entry-points.sysagent]
 sysagent_suites = "esq"
 sysagent_configs = "esq"
+sysagent_telemetry = "esq.utils.telemetry.modules"
 
 [project.entry-points.pytest11]
 sysagent_plugin = "sysagent.utils.plugins"

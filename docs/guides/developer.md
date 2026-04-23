@@ -16,6 +16,7 @@ Comprehensive guide for developers integrating their own pytest tests into the I
 - [Working with Results and Metrics](#working-with-results-and-metrics)
 - [KPI Validation](#kpi-validation)
 - [Asset Management](#asset-management)
+- [Modular Telemetry](#modular-telemetry)
 - [Best Practices](#best-practices)
 - [Advanced Topics](#advanced-topics)
 
@@ -32,6 +33,7 @@ The Intel® ESQ framework provides a comprehensive pytest-based testing infrastr
 - **Asset management** for models, videos, and files
 - **Allure reporting** with rich visualizations
 - **Docker integration** for containerized tests
+- **Modular telemetry** for automatic background collection of CPU, memory, power, GPU, and NPU metrics during test execution — enabled entirely through profile YAML, requiring no test code changes
 
 This guide will help you integrate your own tests into this framework and leverage its powerful features.
 
@@ -953,6 +955,62 @@ results.update_timestamps()
 results_dict = results.to_dict()
 ```
 
+### Result Fields
+
+| Field | Type | Purpose |
+|-------|------|---------|
+| `name` | `str` | Test identifier (e.g. `"T001 - My Test"`) |
+| `parameters` | `Dict[str, Any]` | Human-readable test configuration shown in reports |
+| `metrics` | `Dict[str, Metrics]` | Measured performance values with units |
+| `metadata` | `Dict[str, Any]` | Flat key-value pairs for high-level reporting (auto-populated with timestamps and KPI status) |
+| `extended_metadata` | `Dict[str, Any]` | Structured complex objects for programmatic access (not constrained to simple key-value pairs) |
+| `kpis` | `Dict[str, Any]` | KPI configurations and validation results |
+
+### `metadata` vs `extended_metadata`
+
+Use **`metadata`** for simple property-value pairs that appear in Allure and the JSON summary as human-readable fields:
+
+```python
+results.metadata["model_version"] = "1.0.0"
+results.metadata["benchmark_duration_seconds"] = 48.4
+results.metadata["status"] = True
+```
+
+Use **`extended_metadata`** for structured or complex objects — nested dicts, lists, time-series data — that are intended for programmatic analysis rather than direct display:
+
+```python
+# Store a structured benchmark breakdown
+results.extended_metadata["device_breakdown"] = {
+    "CPU": {
+        "throughput": 51.2,
+        "ttft_ms": 224.0,
+        "tpot_ms": 18.5,
+        "samples": [...]
+    }
+}
+
+# Store raw iteration data
+results.extended_metadata["iterations"] = [
+    {"step": 0, "latency_ms": 220.1},
+    {"step": 1, "latency_ms": 218.4},
+]
+```
+
+> **Note:** Telemetry data collected during test execution is automatically placed in `extended_metadata["telemetry"]` — see [Modular Telemetry](#modular-telemetry).
+
+### Automatic Metadata
+
+The `Result` class automatically includes the following keys in `metadata`:
+
+```python
+{
+    "created_at": "2025-12-29T10:00:00+00:00",
+    "updated_at": "2025-12-29T10:05:30+00:00",
+    "total_duration_seconds": 330.0,
+    "kpi_validation_status": "passed"  # or "failed", "skipped"
+}
+```
+
 ### Metrics Class
 
 The `Metrics` dataclass structures metric data:
@@ -1009,19 +1067,6 @@ if key_metric_name:
     print(f"Key metric: {key_metric_name}")
 ```
 
-### Automatic Metadata
-
-The `Result` class automatically includes:
-
-```python
-{
-    "created_at": "2025-12-29T10:00:00+00:00",
-    "updated_at": "2025-12-29T10:05:30+00:00",
-    "total_duration_seconds": 330.0,
-    "kpi_validation_status": "passed"  # or "failed", "skipped"
-}
-```
-
 ### Complete Example
 
 ```python
@@ -1029,12 +1074,12 @@ def execute_benchmark():
     """Execute benchmark and return results."""
     # Create result object
     results = Result(name=f"{test_id} - {test_display_name}")
-    
+
     # Run benchmark
     start_time = time.time()
     throughput, latency = run_inference(model, data)
     elapsed = time.time() - start_time
-    
+
     # Add metrics
     results.metrics["throughput"] = Metrics(
         value=throughput,
@@ -1049,19 +1094,24 @@ def execute_benchmark():
         value=elapsed,
         unit="seconds"
     )
-    
-    # Add parameters
+
+    # Add parameters (shown in Allure report)
     results.parameters["Model"] = "yolo11n"
     results.parameters["Precision"] = "INT8"
     results.parameters["Device"] = "GPU"
-    
-    # Add custom metadata
+
+    # Add flat metadata (simple key-value, shown in summary)
     results.metadata["model_version"] = "1.0.0"
-    results.metadata["batch_size"] = 8
-    
+    results.metadata["benchmark_duration_seconds"] = elapsed
+
+    # Add structured data to extended_metadata (complex objects, not shown directly in summary)
+    results.extended_metadata["per_iteration"] = [
+        {"step": i, "latency_ms": v} for i, v in enumerate(latency_trace)
+    ]
+
     # Update timestamps
     results.update_timestamps()
-    
+
     return results
 ```
 
@@ -1292,6 +1342,136 @@ model_path = os.path.join(models_dir, "yolo11n", "int8", "yolo11n.xml")
 
 # Video path
 video_path = os.path.join(videos_dir, "sample_1920_1080_30fps.h264")
+```
+
+---
+
+## Modular Telemetry
+
+The framework automatically collects system metrics as a background daemon thread during test execution. No test code changes are required — telemetry is enabled entirely through profile YAML.
+
+### Enabling Telemetry in a Profile
+
+Add a `telemetry` block inside `params` in your profile YAML:
+
+```yaml
+params:
+  telemetry:
+    enabled: true
+    interval: 10         # seconds between samples (integer, minimum 1)
+    modules:
+      - name: cpu_freq          # CPU frequency (current_mhz, min_mhz, max_mhz)
+        enabled: true
+      - name: cpu_usage         # CPU utilisation (total_percent)
+        enabled: true
+        thresholds:
+          total_percent:
+            warning: 95         # log WARNING if CPU usage exceeds 95%
+      - name: memory_usage      # RAM usage (used_percent, available_gib, used_gib)
+        enabled: true
+        thresholds:
+          used_percent:
+            warning: 90
+      - name: package_power     # Intel® RAPL CPU package power (hardware-dependent)
+        enabled: true
+      - name: gpu_usage         # Intel® GPU engine utilization (%)
+        enabled: true
+      - name: gpu_freq          # Intel® GPU operating frequency (MHz)
+        enabled: true
+      - name: gpu_temp          # Intel® GPU temperature (°C)
+        enabled: true
+      - name: gpu_power         # Intel® GPU power (W)
+        enabled: true
+      - name: npu_usage         # Intel® NPU busy utilization (%) and memory (MB)
+        enabled: true
+      - name: npu_freq          # Intel® NPU operating frequency (MHz)
+        enabled: true
+```
+
+To disable telemetry, remove the block or set `enabled: false`.
+
+**Optional per-module keys:**
+
+| Key | Description |
+|-----|-------------|
+| `metrics` | Restrict collection to a subset (e.g., `metrics: [current_mhz]`) |
+| `thresholds` | Log a `WARNING` when a metric exceeds the configured value (does not fail the test) |
+| `chart_type` | Chart hint for the report renderer: `line` (default), `area`, or `bar_vertical` |
+| `title` / `scales` | Display labels and units for chart axes |
+
+### Overriding the Telemetry Interval at Runtime
+
+Priority order (highest to lowest):
+
+1. **`--telemetry-interval SECONDS`** CLI option
+2. **`CORE_TELEMETRY_INTERVAL`** environment variable
+3. **`interval`** in the profile YAML
+
+The value must be a whole number of seconds (minimum 1).
+
+```bash
+esq run --profile profile.suite.ai.gen --telemetry-interval 10
+CORE_TELEMETRY_INTERVAL=10 esq run --profile profile.suite.ai.gen
+```
+
+### Available Modules
+
+| Module | Metrics collected | Notes |
+|--------|-------------------|-------|
+| `cpu_freq` | `current_mhz`, `min_mhz`, `max_mhz` | |
+| `cpu_usage` | `total_percent` | |
+| `cpu_temp` | `package_c`, `core_max_c` | |
+| `memory_usage` | `used_percent`, `available_gib`, `used_gib` | |
+| `package_power` | `package_power_w`, `core_power_w`, `uncore_power_w`, `dram_power_w` | Requires RAPL; run `scripts/system-setup.sh` |
+| `gpu_temp` | `gpu_{N}_pkg_c`, `gpu_{N}_vram_c` (per GPU) | Skipped if no Intel® GPU present |
+| `gpu_freq` | `gpu_{N}_gt{M}_mhz` (per GPU and GT) | Skipped if no Intel® GPU present |
+| `gpu_power` | `gpu_{N}_w`, `gpu_{N}_card_w` (per GPU) | Skipped if no Intel® GPU present |
+| `gpu_usage` | `gpu_{N}_render_pct`, `gpu_{N}_compute_pct`, `gpu_{N}_copy_pct`, `gpu_{N}_video_pct`, `gpu_{N}_video_enh_pct` (Arc/xe); `gpu_{N}_gt{M}_pct` (iGPU/i915) | Requires `perf_event_paranoid ≤ 0` for Arc engine metrics; run `scripts/system-setup.sh` |
+| `npu_usage` | `npu_{N}_busy_pct`, `npu_{N}_mem_mib` (per NPU) | Requires `intel_vpu` driver |
+| `npu_freq` | `npu_{N}_freq_mhz` (per NPU) | Requires `intel_vpu` driver |
+
+### Creating a Custom Module
+
+Implement `BaseTelemetryModule` and register it in `src/esq/utils/telemetry/modules/`.
+
+**Step 1 — Create the module file:**
+
+```python
+import time
+from sysagent.utils.telemetry.base import BaseTelemetryModule, TelemetrySample
+
+class DiskIoModule(BaseTelemetryModule):
+    module_name = "disk_io"
+
+    def is_available(self) -> bool:
+        return True  # check dependencies here
+
+    def collect_sample(self) -> TelemetrySample:
+        raw = {"read_mb_s": 0.0}  # populate with real readings
+        values = self._filter_values(raw)
+        sample = TelemetrySample(timestamp=time.time(), values=values)
+        self.check_thresholds(values)
+        return sample
+```
+
+**Step 2 — Register in `src/esq/utils/telemetry/modules/__init__.py`:**
+
+```python
+from esq.utils.telemetry.modules.disk_io import DiskIoModule
+from sysagent.utils.telemetry.registry import register as _register
+
+_register("disk_io", DiskIoModule)
+```
+
+**Step 3 — Enable in a profile:**
+
+```yaml
+telemetry:
+  enabled: true
+  interval: 10
+  modules:
+    - name: disk_io
+      enabled: true
 ```
 
 ---

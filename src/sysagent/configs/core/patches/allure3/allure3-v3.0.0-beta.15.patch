@@ -171,6 +171,124 @@ index 19b0c689d..3db189b07 100644
      allureVersion,
      reportUuid,
      reportName,
+diff --git a/packages/plugin-log/src/plugin.ts b/packages/plugin-log/src/plugin.ts
+index d5da4afb0..f3b8fb6fb 100644
+--- a/packages/plugin-log/src/plugin.ts
++++ b/packages/plugin-log/src/plugin.ts
+@@ -1,50 +1,14 @@
+ import type { AllureStore, Plugin, PluginContext } from "@allurereport/plugin-api";
+ import * as console from "node:console";
+-import { gray } from "yoctocolors";
+ import type { LogPluginOptions } from "./model.js";
+-import { printSummary, printTest } from "./utils.js";
++import { printSummary } from "./utils.js";
+ 
+ export class LogPlugin implements Plugin {
+   constructor(readonly options: LogPluginOptions = {}) {}
+ 
+   done = async (context: PluginContext, store: AllureStore) => {
+-    const { groupBy = "suite" } = this.options ?? {};
+     const allTestResults = await store.allTestResults();
+ 
+-    if (groupBy === "none") {
+-      allTestResults.forEach((test) => {
+-        printTest(test, this.options);
+-      });
+-
+-      console.log("");
+-
+-      printSummary(Array.from(allTestResults));
+-      return;
+-    }
+-
+-    const groupedTests = await store.testResultsByLabel(groupBy);
+-
+-    Object.keys(groupedTests).forEach((key) => {
+-      const tests = groupedTests[key];
+-
+-      if (tests.length === 0) {
+-        // skip empty groups
+-        return;
+-      }
+-
+-      if (key === "_") {
+-        console.info(gray("uncategorized"));
+-      } else {
+-        console.info(key);
+-      }
+-
+-      tests.forEach((test) => {
+-        printTest(test, this.options, 1);
+-      });
+-
+-      console.log("");
+-    });
+-
+     printSummary(Array.from(allTestResults));
+   };
+ }
+diff --git a/packages/plugin-log/src/utils.ts b/packages/plugin-log/src/utils.ts
+index 4ff96015c..0fd90ac3b 100644
+--- a/packages/plugin-log/src/utils.ts
++++ b/packages/plugin-log/src/utils.ts
+@@ -118,57 +118,17 @@ export const printStep = (step: DefaultTestStepResult, options?: PrintFunctionOp
+ };
+ 
+ export const printSummary = (results: TestResult[]) => {
+-  const statsCounters = {
+-    passed: 0,
+-    failed: 0,
+-    broken: 0,
+-    skipped: 0,
+-  };
+   let totalDuration = 0;
+ 
+   results.forEach((test) => {
+     totalDuration += test.duration || 0;
+-
+-    switch (test.status) {
+-      case "passed":
+-        statsCounters.passed++;
+-        break;
+-      case "failed":
+-        statsCounters.failed++;
+-        break;
+-      case "broken":
+-        statsCounters.broken++;
+-        break;
+-      case "skipped":
+-        statsCounters.skipped++;
+-        break;
+-    }
+   });
+ 
+-  const stringifiedCounters: string[] = [];
+-
+-  if (statsCounters.passed > 0) {
+-    stringifiedCounters.push(green(`${statsCounters.passed} passed`));
+-  }
+-
+-  if (statsCounters.failed > 0) {
+-    stringifiedCounters.push(red(`${statsCounters.failed} failed`));
+-  }
+-
+-  if (statsCounters.broken > 0) {
+-    stringifiedCounters.push(red(`${statsCounters.broken} broken`));
+-  }
+-
+-  if (statsCounters.skipped > 0) {
+-    stringifiedCounters.push(yellow(`${statsCounters.skipped} skipped`));
+-  }
+-
+   if (results.length === 0) {
+     console.info("No test results found to show");
+     return;
+   }
+ 
+   console.info(`Total tests: ${results.length}`);
+-  console.info(`Tests: ${stringifiedCounters.join(" | ")}`);
+   console.info(`Duration: ${yellow((totalDuration / 1000).toString())}s`);
+ };
 diff --git a/packages/web-awesome/src/components/Footer/FooterLogo.tsx b/packages/web-awesome/src/components/Footer/FooterLogo.tsx
 index 782b09f88..97c3ff1a4 100644
 --- a/packages/web-awesome/src/components/Footer/FooterLogo.tsx
@@ -501,19 +619,1667 @@ index 000000000..2722f1005
 +  transform: translateX(-50%);
 +  z-index: 4;
 +}
+diff --git a/packages/web-awesome/src/components/Summary/TelemetryChart.tsx b/packages/web-awesome/src/components/Summary/TelemetryChart.tsx
+new file mode 100644
+index 000000000..460aa4216
+--- /dev/null
++++ b/packages/web-awesome/src/components/Summary/TelemetryChart.tsx
+@@ -0,0 +1,822 @@
++import { FunctionComponent } from "preact";
++import { useState, useRef, useEffect } from "preact/hooks";
++import * as styles from "./TelemetryChartStyle.scss";
++
++// ─── Blue → Teal → Purple palette ────────────────────────────────────────────
++const SERIES_COLORS = [
++  "#0071c5", // Intel Blue primary        (blue 1)
++  "#00b0ff", // Light-blue A400           (blue 2 — noticeably lighter/brighter)
++  "#1565c0", // Blue 800                  (blue 3 — deep navy)
++  "#00acc1", // Cyan 600                  (teal 1)
++  "#00838f", // Cyan 800                  (teal 2 — deeper teal)
++  "#00695c", // Teal 800                  (teal 3 — green-teal)
++  "#8e24aa", // Purple 600                (purple 1)
++  "#4a148c", // Purple 900                (purple 2 — deep violet)
++];
++
++// ─── Layout constants ─────────────────────────────────────────────────────────
++const CARD_M  = { top: 10, right: 12, bottom: 40, left: 54 };
++const CARD_H  = 230;
++const MODAL_M = { top: 16, right: 18, bottom: 50, left: 64 };
++const MODAL_H = 520;
++const MODAL_W = 980;
++
++// ─── Types ────────────────────────────────────────────────────────────────────
++export interface TelemetrySample {
++  timestamp: number;
++  values: Record<string, number>;
++}
++export interface TelemetryScaleConfig {
++  display?: boolean;
++  label?: string;
++  unit?: string;
++}
++export interface TelemetryTitleConfig {
++  display?: boolean;
++  text?: string;
++}
++export interface TelemetryAxisConfig {
++  id: string;
++  position: "left" | "right";
++  metrics: string[];
++  label?: string;
++}
++interface TtEntry {
++  key: string; label: string; value: number; unit: string; color: string;
++}
++interface Tooltip {
++  svgX: number; cX: number; cY: number; time: string; entries: TtEntry[];
++}
++export interface TelemetryChartProps {
++  moduleName: string;
++  chartType: "line" | "area" | "bar_vertical";
++  samples: TelemetrySample[];
++  averages?: Record<string, number>;
++  minMax?: Record<string, { min: number; max: number }>;
++  thresholds?: Record<string, { warning?: number }>;
++  visibleMetrics?: string[];
++  configTitle?: TelemetryTitleConfig;
++  configScales?: Record<string, TelemetryScaleConfig>;
++  axes?: TelemetryAxisConfig[];
++  summaryMeta?: { cliName: string; platform: string; timestamp: string } | null;
++  testId?: string;
++}
++
++// ─── Helpers ─────────────────────────────────────────────────────────────────
++function fmtY(v: number): string {
++  if (Math.abs(v) >= 1000) return `${(v / 1000).toFixed(1)}k`;
++  if (Math.abs(v) < 10) return v.toFixed(1);
++  return v.toFixed(0);
++}
++
++function exportFullPng(
++  svgEl: SVGSVGElement,
++  w: number,
++  chartH: number,
++  filename: string,
++  title: string,
++  metricKeys: string[],
++  chartType: "line" | "area" | "bar_vertical",
++  configScales?: Record<string, TelemetryScaleConfig>,
++  averages?: Record<string, number>,
++  minMax?: Record<string, { min: number; max: number }>,
++) {
++  const FONT         = "Arial, Helvetica, sans-serif";
++  const TITLE_H      = 36;
++  const hasStats     = metricKeys.some(k => averages?.[k] !== undefined || minMax?.[k] !== undefined);
++  const ROW_H        = hasStats ? 42 : 26;
++  const LEG_PAD      = 16;
++  const EXTRA_RIGHT  = 64;  // room for "warn" threshold labels that overflow the chart right edge
++  const EXTRA_BOTTOM = 16;  // breathing room between bottom x-axis label and legend
++  const PER_ROW      = Math.min(metricKeys.length, 2);  // max 2 per row to prevent label overlap
++  const legRows      = Math.ceil(metricKeys.length / PER_ROW);
++  const LEG_H        = LEG_PAD + legRows * ROW_H + LEG_PAD;
++  const exportW      = w + EXTRA_RIGHT;
++  const legStartY    = TITLE_H + chartH + EXTRA_BOTTOM;
++  const totalH       = legStartY + LEG_H;
++  const ns           = "http://www.w3.org/2000/svg";
++
++  const root = document.createElementNS(ns, "svg");
++  root.setAttribute("xmlns", ns);
++  root.setAttribute("width", String(exportW));
++  root.setAttribute("height", String(totalH));
++  root.setAttribute("font-family", FONT);
++
++  // White background
++  const bg = document.createElementNS(ns, "rect");
++  bg.setAttribute("width", String(exportW)); bg.setAttribute("height", String(totalH)); bg.setAttribute("fill", "#fff");
++  root.appendChild(bg);
++
++  // Chart title
++  const tEl = document.createElementNS(ns, "text");
++  tEl.setAttribute("x", String(exportW / 2)); tEl.setAttribute("y", "24");
++  tEl.setAttribute("text-anchor", "middle"); tEl.setAttribute("font-size", "14");
++  tEl.setAttribute("font-weight", "600"); tEl.setAttribute("fill", "#1a1a1a");
++  tEl.textContent = title;
++  root.appendChild(tEl);
++
++  // Chart content (shifted down below title)
++  const chartG = document.createElementNS(ns, "g");
++  chartG.setAttribute("transform", `translate(0,${TITLE_H})`);
++  const clone = svgEl.cloneNode(true) as SVGSVGElement;
++  while (clone.firstChild) chartG.appendChild(clone.firstChild);
++  root.appendChild(chartG);
++
++  // Legend separator
++  const sep = document.createElementNS(ns, "line");
++  sep.setAttribute("x1", "16"); sep.setAttribute("y1", String(legStartY + 2));
++  sep.setAttribute("x2", String(exportW - 16)); sep.setAttribute("y2", String(legStartY + 2));
++  sep.setAttribute("stroke", "#e0e0e0"); sep.setAttribute("stroke-width", "1");
++  root.appendChild(sep);
++
++  // Legend items
++  const ITEM_W = (exportW - 32) / PER_ROW;
++  const baseY  = legStartY + LEG_PAD;
++
++  metricKeys.forEach((key, i) => {
++    const color      = SERIES_COLORS[i % SERIES_COLORS.length];
++    const label      = configScales?.[key]?.label ?? key.replace(/_/g, " ");
++    const unit       = configScales?.[key]?.unit;
++    const avg        = averages?.[key];
++    const mm         = minMax?.[key];
++    const unitSuffix = unit ? ` ${unit}` : "";
++    const row        = Math.floor(i / PER_ROW);
++    const col        = i % PER_ROW;
++    const ix         = 16 + col * ITEM_W;
++    const labelY     = baseY + row * ROW_H + (hasStats ? 13 : ROW_H / 2);
++
++    // Symbol rect
++    const sym = document.createElementNS(ns, "rect");
++    if (chartType === "line") {
++      sym.setAttribute("x", String(ix)); sym.setAttribute("y", String(labelY - 1));
++      sym.setAttribute("width", "16"); sym.setAttribute("height", "2"); sym.setAttribute("rx", "1");
++    } else if (chartType === "area") {
++      sym.setAttribute("x", String(ix)); sym.setAttribute("y", String(labelY - 4));
++      sym.setAttribute("width", "12"); sym.setAttribute("height", "8"); sym.setAttribute("rx", "1");
++      sym.setAttribute("opacity", "0.65");
++    } else {
++      sym.setAttribute("x", String(ix)); sym.setAttribute("y", String(labelY - 5));
++      sym.setAttribute("width", "10"); sym.setAttribute("height", "10"); sym.setAttribute("rx", "1");
++      sym.setAttribute("opacity", "0.82");
++    }
++    sym.setAttribute("fill", color);
++    root.appendChild(sym);
++
++    // Label text
++    const txt = document.createElementNS(ns, "text");
++    txt.setAttribute("x", String(ix + 22)); txt.setAttribute("y", String(labelY));
++    txt.setAttribute("dominant-baseline", "middle");
++    txt.setAttribute("font-size", "11"); txt.setAttribute("fill", "#333");
++    txt.textContent = `${label}${unit ? ` (${unit})` : ""}`;
++    root.appendChild(txt);
++
++    // Min / Avg / Max stat badges (second row)
++    if (hasStats && (avg !== undefined || mm)) {
++      const badgeH   = 15;
++      const badgeW   = 80;
++      const badgeGap = 4;
++      const badgesY  = baseY + row * ROW_H + 26;
++      let   badgeX   = ix;
++
++      const drawBadge = (
++        bx: number,
++        badgeLabel: string,
++        badgeValue: string,
++        bgFill: string,
++        borderStroke: string,
++        textColor: string,
++      ) => {
++        const g = document.createElementNS(ns, "g");
++
++        const bg = document.createElementNS(ns, "rect");
++        bg.setAttribute("x", String(bx));          bg.setAttribute("y", String(badgesY));
++        bg.setAttribute("width", String(badgeW));  bg.setAttribute("height", String(badgeH));
++        bg.setAttribute("rx", "2");
++        bg.setAttribute("fill", bgFill);           bg.setAttribute("stroke", borderStroke);
++        bg.setAttribute("stroke-width", "0.5");
++        g.appendChild(bg);
++
++        const lbl = document.createElementNS(ns, "text");
++        lbl.setAttribute("x", String(bx + 4));    lbl.setAttribute("y", String(badgesY + badgeH / 2));
++        lbl.setAttribute("dominant-baseline", "middle");
++        lbl.setAttribute("font-size", "8");        lbl.setAttribute("font-weight", "700");
++        lbl.setAttribute("fill", textColor);       lbl.setAttribute("opacity", "0.75");
++        lbl.textContent = badgeLabel;
++        g.appendChild(lbl);
++
++        const val = document.createElementNS(ns, "text");
++        val.setAttribute("x", String(bx + badgeW - 4));  val.setAttribute("y", String(badgesY + badgeH / 2));
++        val.setAttribute("dominant-baseline", "middle");  val.setAttribute("text-anchor", "end");
++        val.setAttribute("font-size", "10");               val.setAttribute("font-weight", "600");
++        val.setAttribute("fill", textColor);
++        val.textContent = badgeValue;
++        g.appendChild(val);
++
++        root.appendChild(g);
++      };
++
++      if (mm) {
++        drawBadge(badgeX, "MIN", `${mm.min.toFixed(2)}${unitSuffix}`, "rgba(0,172,193,0.12)", "rgba(0,172,193,0.40)", "#00838f");
++        badgeX += badgeW + badgeGap;
++      }
++      if (avg !== undefined) {
++        drawBadge(badgeX, "AVG", `${avg.toFixed(2)}${unitSuffix}`, "rgba(0,113,197,0.10)", "rgba(0,113,197,0.35)", "#0071c5");
++        badgeX += badgeW + badgeGap;
++      }
++      if (mm) {
++        drawBadge(badgeX, "MAX", `${mm.max.toFixed(2)}${unitSuffix}`, "rgba(57,73,171,0.12)", "rgba(57,73,171,0.40)", "#3949ab");
++      }
++    }
++  });
++
++  // Serialize → canvas → download at 2× resolution
++  const svgStr = new XMLSerializer().serializeToString(root);
++  const url    = URL.createObjectURL(
++    new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" }),
++  );
++  const img = new Image();
++  img.onload = () => {
++    const scale = 2;
++    const cv    = document.createElement("canvas");
++    cv.width = exportW * scale; cv.height = totalH * scale;
++    const ctx = cv.getContext("2d");
++    if (!ctx) { URL.revokeObjectURL(url); return; }
++    ctx.scale(scale, scale); ctx.drawImage(img, 0, 0);
++    const a = document.createElement("a");
++    a.download = filename; a.href = cv.toDataURL("image/png"); a.click();
++    URL.revokeObjectURL(url);
++  };
++  img.src = url;
++}
++
++// ─── Component ────────────────────────────────────────────────────────────────
++export const TelemetryChart: FunctionComponent<TelemetryChartProps> = ({
++  moduleName, chartType, samples, averages, minMax, thresholds,
++  visibleMetrics, configTitle, configScales, axes,
++  summaryMeta, testId,
++}) => {
++  // All hooks must come before any conditional return ──────────────────────
++  const containerRef  = useRef<HTMLDivElement>(null);
++  const cardSvgRef    = useRef<SVGSVGElement>(null);
++  const modalSvgRef   = useRef<SVGSVGElement>(null);
++  const modalChartRef = useRef<HTMLDivElement>(null);
++
++  const [cardW, setCardW]         = useState(400);
++  const [cardTt, setCardTt]       = useState<Tooltip | null>(null);
++  const [modalTt, setModalTt]     = useState<Tooltip | null>(null);
++  const [modalOpen, setModalOpen] = useState(false);
++
++  useEffect(() => {
++    const el = containerRef.current;
++    if (!el) return;
++    const ro = new ResizeObserver((entries) => {
++      const w = entries[0]?.contentRect.width;
++      if (w) setCardW(w);
++    });
++    ro.observe(el);
++    setCardW(el.clientWidth);
++    return () => ro.disconnect();
++  }, []);
++
++  useEffect(() => {
++    if (!modalOpen) return;
++    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setModalOpen(false); };
++    document.addEventListener("keydown", onKey);
++    document.body.style.overflow = "hidden";
++    return () => {
++      document.removeEventListener("keydown", onKey);
++      document.body.style.overflow = "";
++    };
++  }, [modalOpen]);
++
++  // ── Guard ────────────────────────────────────────────────────────────────
++  if (!samples || samples.length === 0) return null;
++  // Collect all keys across all samples — the first sample may have `values: {}`
++  const allKeys = Array.from(new Set(samples.flatMap((s) => Object.keys(s.values))));
++  const metricKeys = visibleMetrics?.length ? allKeys.filter((k) => visibleMetrics.includes(k)) : allKeys;
++  if (metricKeys.length === 0) return null;
++
++  // ── Derived values ───────────────────────────────────────────────────────
++
++  // ── Multi-axis setup ─────────────────────────────────────────────────────
++  const leftAxisCfg  = axes?.find(a => a.position === "left");
++  const rightAxisCfg = axes?.find(a => a.position === "right");
++
++  // Map each visible metric key to its axis side (default: left)
++  const metricAxisMap: Record<string, "left" | "right"> = {};
++  metricKeys.forEach(k => { metricAxisMap[k] = "left"; });
++  if (axes && axes.length > 0) {
++    axes.forEach(ax => ax.metrics.forEach(m => {
++      if (metricKeys.includes(m)) metricAxisMap[m] = ax.position as "left" | "right";
++    }));
++  }
++
++  const leftMetrics  = metricKeys.filter(k => metricAxisMap[k] !== "right");
++  const rightMetrics = metricKeys.filter(k => metricAxisMap[k] === "right");
++  const hasRightAxis = rightMetrics.length > 0;
++
++  // Left Y domain (include warning thresholds so lines always stay in range)
++  const leftVals = samples.flatMap(s => leftMetrics.map(k => s.values[k] ?? 0));
++  const leftThreshVals = thresholds
++    ? Object.entries(thresholds as Record<string, { warning?: number }>).flatMap(([k, t]) =>
++        leftMetrics.includes(k) && t.warning !== undefined ? [t.warning] : [])
++    : [];
++  const leftRawMin = leftVals.length > 0 ? Math.min(...leftVals) : 0;
++  const leftRawMax = leftVals.length > 0 ? Math.max(...leftVals, ...leftThreshVals) : 1;
++  const leftPad    = (leftRawMax - leftRawMin) * 0.1 || 1;
++  const leftYMin   = Math.max(0, leftRawMin - leftPad);
++  const leftYMax   = leftRawMax + leftPad;
++
++  // Right Y domain (only meaningful when right-axis metrics exist)
++  const rightVals = hasRightAxis ? samples.flatMap(s => rightMetrics.map(k => s.values[k] ?? 0)) : [];
++  const rightThreshVals = hasRightAxis && thresholds
++    ? Object.entries(thresholds as Record<string, { warning?: number }>).flatMap(([k, t]) =>
++        rightMetrics.includes(k) && t.warning !== undefined ? [t.warning] : [])
++    : [];
++  const rightRawMin = rightVals.length > 0 ? Math.min(...rightVals) : 0;
++  const rightRawMax = rightVals.length > 0 ? Math.max(...rightVals, ...rightThreshVals) : 1;
++  const rightPad    = (rightRawMax - rightRawMin) * 0.1 || 1;
++  const rightYMin   = Math.max(0, rightRawMin - rightPad);
++  const rightYMax   = rightRawMax + rightPad;
++
++  // Per-axis unit labels (shown in tick values when no axis label overrides them)
++  const leftAxisUnit  = leftMetrics.length > 0 &&
++    leftMetrics.every(k => (configScales?.[k]?.unit ?? "") === (configScales?.[leftMetrics[0]]?.unit ?? ""))
++    ? (configScales?.[leftMetrics[0]]?.unit ?? "") : "";
++  const rightAxisUnit = rightMetrics.length > 0 &&
++    rightMetrics.every(k => (configScales?.[k]?.unit ?? "") === (configScales?.[rightMetrics[0]]?.unit ?? ""))
++    ? (configScales?.[rightMetrics[0]]?.unit ?? "") : "";
++
++  // Derive a meaningful axis label from axes config, scale label+unit, or unit alone.
++  // When the axis label is shown, tick values omit the unit suffix to avoid duplication.
++  const deriveAxisLabel = (
++    axisConfig: TelemetryAxisConfig | undefined,
++    metrics: string[],
++    unit: string,
++  ): string => {
++    if (axisConfig?.label) return axisConfig.label;
++    if (metrics.length === 0) return unit;
++    const firstLabel = configScales?.[metrics[0]]?.label ?? "";
++    const sharedLabel = firstLabel && metrics.every(k => (configScales?.[k]?.label ?? "") === firstLabel)
++      ? firstLabel : "";
++    if (sharedLabel) return unit ? `${sharedLabel} (${unit})` : sharedLabel;
++    return unit;
++  };
++
++  const leftAxisLabel  = deriveAxisLabel(leftAxisCfg,  leftMetrics,  leftAxisUnit);
++  const rightAxisLabel = deriveAxisLabel(rightAxisCfg, rightMetrics, rightAxisUnit);
++
++  const minTs = samples[0].timestamp;
++  const maxTs = samples[samples.length - 1].timestamp;
++
++  // X-axis: auto-switch to minutes when total elapsed > 60 s
++  const totalDuration = maxTs - minTs; // seconds
++  const useMinutes    = totalDuration > 60;
++  const xTimeUnit     = useMinutes ? "min" : "s";
++  const fmtElapsed    = (ts: number) => {
++    const elapsed = ts - minTs;
++    return useMinutes ? (elapsed / 60).toFixed(1) : elapsed.toFixed(0);
++  };
++
++  // Effective margins: widen right side when a second Y-axis is active;
++  // widen left side to accommodate rotated Y-axis label in single-axis mode too.
++  const RIGHT_AXIS_W  = 46; // px reserved for right-axis ticks + rotated label
++  const LEFT_LABEL_W  = 0;  // rotated label fits within base CARD_M/MODAL_M left margin
++  const cardMargin    = {
++    ...CARD_M,
++    left:  CARD_M.left  + LEFT_LABEL_W,
++    right: hasRightAxis ? RIGHT_AXIS_W : CARD_M.right,
++  };
++  const modalMargin   = {
++    ...MODAL_M,
++    left:  MODAL_M.left  + LEFT_LABEL_W,
++    right: hasRightAxis ? RIGHT_AXIS_W : MODAL_M.right,
++  };
++
++  const fallbackTitle = moduleName.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
++  const displayName   = configTitle?.display && configTitle?.text ? configTitle.text : fallbackTitle;
++  const sanitize      = (s: string) => s.toLowerCase().replace(/-/g, "_");
++  const safeModule    = sanitize(moduleName);
++  const pngFilename   = summaryMeta && testId
++    ? `${sanitize(summaryMeta.cliName)}_telemetry_${sanitize(testId)}_${safeModule}_${sanitize(summaryMeta.platform)}_${sanitize(summaryMeta.timestamp)}.png`
++    : `${safeModule}_telemetry.png`;
++
++  // ── Tooltip builder ──────────────────────────────────────────────────────
++  const buildTooltip = (
++    e: MouseEvent,
++    svgEl: SVGSVGElement,
++    containerEl: HTMLElement,
++    width: number,
++    margin: typeof CARD_M,
++  ): Tooltip | null => {
++    const innerW    = Math.max(10, width - margin.left - margin.right);
++    const barGroupW = innerW / samples.length;
++    const svgRect   = svgEl.getBoundingClientRect();
++    const cRect     = containerEl.getBoundingClientRect();
++    const mouseX    = e.clientX - svgRect.left;
++    const mouseY    = e.clientY - cRect.top;
++
++    const xScale = (ts: number) =>
++      maxTs === minTs
++        ? margin.left + innerW / 2
++        : margin.left + ((ts - minTs) / (maxTs - minTs)) * innerW;
++
++    let idx = 0;
++    if (chartType === "bar_vertical") {
++      idx = Math.max(0, Math.min(samples.length - 1, Math.floor((mouseX - margin.left) / barGroupW)));
++    } else {
++      let minD = Infinity;
++      samples.forEach((s, i) => {
++        const d = Math.abs(xScale(s.timestamp) - mouseX);
++        if (d < minD) { minD = d; idx = i; }
++      });
++    }
++
++    const s       = samples[idx];
++    const cursorX = chartType === "bar_vertical"
++      ? margin.left + idx * barGroupW + barGroupW / 2
++      : xScale(s.timestamp);
++
++    return {
++      svgX: cursorX, cX: cursorX, cY: mouseY,
++      time: new Date(s.timestamp * 1000).toLocaleTimeString(),
++      entries: metricKeys.map((k, i) => ({
++        key:   k,
++        label: configScales?.[k]?.label ?? k.replace(/_/g, " "),
++        value: s.values[k] ?? 0,
++        unit:  configScales?.[k]?.unit ?? "",
++        color: SERIES_COLORS[i % SERIES_COLORS.length],
++      })),
++    };
++  };
++
++  // ── Tooltip JSX ─────────────────────────────────────────────────────────
++  const Tip = ({ tt, containerWidth, isModal = false }: { tt: Tooltip; containerWidth: number; isModal?: boolean }) => (
++    <div
++      className={styles.tooltip}
++      style={{
++        left: tt.cX > containerWidth / 2 ? `${tt.cX - 175}px` : `${tt.cX + 10}px`,
++        top: `${Math.max(4, tt.cY - 28)}px`,
++      }}
++    >
++      <div className={styles.tooltipTime} style={isModal ? { fontSize: "10px" } : undefined}>{tt.time}</div>
++      {tt.entries.map((v) => (
++        <div key={v.key} className={styles.tooltipRow}>
++          <span className={styles.tooltipDot} style={{ background: v.color }} />
++          <span className={styles.tooltipKey} style={isModal ? { fontSize: "10px" } : undefined}>{v.label}</span>
++          <span className={styles.tooltipVal} style={isModal ? { fontSize: "11px" } : undefined}>{v.value.toFixed(2)}{v.unit ? ` ${v.unit}` : ""}</span>
++        </div>
++      ))}
++    </div>
++  );
++
++  // ── Legend JSX ───────────────────────────────────────────────────────────
++  const Legend = () => (
++    <div className={styles.legend}>
++      {metricKeys.map((key, i) => {
++        const color      = SERIES_COLORS[i % SERIES_COLORS.length];
++        const label      = configScales?.[key]?.label ?? key.replace(/_/g, " ");
++        const unit       = configScales?.[key]?.unit;
++        const avg        = averages?.[key];
++        const mm         = minMax?.[key];
++        const unitSuffix = unit ? ` ${unit}` : "";
++        return (
++          <div key={key} className={styles.legendItem}>
++            <div className={styles.legendItemHeader}>
++              {chartType === "line" && <span className={styles.legendLine} style={{ background: color }} />}
++              {chartType === "area" && <span className={styles.legendArea} style={{ background: color }} />}
++              {chartType === "bar_vertical" && <span className={styles.legendBar} style={{ background: color }} />}
++              <span className={styles.legendLabel}>{label}{unit ? ` (${unit})` : ""}</span>
++            </div>
++            {(avg !== undefined || mm) && (
++              <div className={styles.legendStatGroup}>
++                {mm && (
++                  <span className={`${styles.legendStat} ${styles.legendStatMin}`}>
++                    <span className={styles.legendStatLabel}>min</span>
++                    <span className={styles.legendStatValue}>{mm.min.toFixed(2)}{unitSuffix}</span>
++                  </span>
++                )}
++                {avg !== undefined && (
++                  <span className={`${styles.legendStat} ${styles.legendStatAvg}`}>
++                    <span className={styles.legendStatLabel}>avg</span>
++                    <span className={styles.legendStatValue}>{avg.toFixed(2)}{unitSuffix}</span>
++                  </span>
++                )}
++                {mm && (
++                  <span className={`${styles.legendStat} ${styles.legendStatMax}`}>
++                    <span className={styles.legendStatLabel}>max</span>
++                    <span className={styles.legendStatValue}>{mm.max.toFixed(2)}{unitSuffix}</span>
++                  </span>
++                )}
++              </div>
++            )}
++          </div>
++        );
++      })}
++    </div>
++  );
++
++  // ── SVG chart renderer ───────────────────────────────────────────────────
++  const ChartSVG = ({
++    width, chartH, margin, svgRef, tooltip, onMouseMove, onMouseLeave, tickFontSize = 10,
++  }: {
++    width: number;
++    chartH: number;
++    margin: typeof CARD_M;
++    svgRef: { current: SVGSVGElement | null };
++    tooltip: Tooltip | null;
++    onMouseMove: (e: MouseEvent) => void;
++    onMouseLeave: () => void;
++    tickFontSize?: number;
++  }) => {
++    const innerW    = Math.max(10, width - margin.left - margin.right);
++    const innerH    = chartH - margin.top - margin.bottom;
++    const barGroupW = innerW / samples.length;
++
++    const xScale = (ts: number) =>
++      maxTs === minTs
++        ? margin.left + innerW / 2
++        : margin.left + ((ts - minTs) / (maxTs - minTs)) * innerW;
++
++    // Per-axis Y scale factories
++    const makeYScale = (yMin: number, yMax: number) => (val: number) =>
++      margin.top + innerH - ((val - yMin) / (yMax - yMin)) * innerH;
++
++    const yScaleLeft  = makeYScale(leftYMin, leftYMax);
++    const yScaleRight = hasRightAxis ? makeYScale(rightYMin, rightYMax) : yScaleLeft;
++    const yScaleFor   = (key: string) => metricAxisMap[key] === "right" ? yScaleRight : yScaleLeft;
++    const yMinFor     = (key: string) => metricAxisMap[key] === "right" ? rightYMin : leftYMin;
++
++    const leftTicks  = Array.from({ length: 5 }, (_, i) => leftYMin  + (i / 4) * (leftYMax  - leftYMin));
++    const rightTicks = hasRightAxis
++      ? Array.from({ length: 5 }, (_, i) => rightYMin + (i / 4) * (rightYMax - rightYMin))
++      : [];
++
++    const maxXT = Math.min(7, samples.length);
++    const xTickIdxs =
++      samples.length <= maxXT
++        ? samples.map((_, i) => i)
++        : Array.from({ length: maxXT }, (_, i) =>
++            Math.round((i / (maxXT - 1)) * (samples.length - 1)),
++          );
++
++    const linePath = (key: string) =>
++      samples
++        .map((s, i) => `${i === 0 ? "M" : "L"}${xScale(s.timestamp).toFixed(1)},${yScaleFor(key)(s.values[key] ?? 0).toFixed(1)}`)
++        .join(" ");
++
++    const areaPath = (key: string) => {
++      const ys     = yScaleFor(key);
++      const lp     = linePath(key);
++      const lastX  = xScale(samples[samples.length - 1].timestamp).toFixed(1);
++      const firstX = xScale(samples[0].timestamp).toFixed(1);
++      const baseY  = ys(yMinFor(key)).toFixed(1);
++      return `${lp} L${lastX},${baseY} L${firstX},${baseY} Z`;
++    };
++
++    const rightAxisX = margin.left + innerW;
++
++    return (
++      <svg
++        ref={svgRef as any}
++        width={width}
++        height={chartH}
++        onMouseMove={onMouseMove as any}
++        onMouseLeave={onMouseLeave}
++        style={{ display: "block", overflow: "visible", fontFamily: "Arial, Helvetica, sans-serif" }}
++      >
++        {/* Grid (based on left Y ticks) */}
++        {leftTicks.map((tick, i) => (
++          <line key={`g${i}`}
++            x1={margin.left} y1={yScaleLeft(tick).toFixed(1)}
++            x2={(margin.left + innerW).toFixed(1)} y2={yScaleLeft(tick).toFixed(1)}
++            stroke="#e8ecf0" strokeWidth="0.5" />
++        ))}
++
++        {/* Left Y-axis ticks — omit unit suffix when the rotated axis label already carries it */}
++        {leftTicks.map((tick, i) => (
++          <text key={`yt${i}`}
++            x={margin.left - 5} y={yScaleLeft(tick).toFixed(1)}
++            textAnchor="end" dominantBaseline="middle" fontSize={tickFontSize} fill="#888">
++            {fmtY(tick)}{!leftAxisLabel && leftAxisUnit ? ` ${leftAxisUnit}` : ""}
++          </text>
++        ))}
++
++        {/* Left Y-axis label (rotated −90°, mirroring the right-axis gap so spacing looks symmetric) */}
++        {leftAxisLabel && (() => {
++          const lx = margin.left - (RIGHT_AXIS_W - 6); // mirrors right-axis: label center same distance from ticks
++          return (
++            <text
++              transform={`rotate(-90, ${lx.toFixed(1)}, ${(margin.top + innerH / 2).toFixed(1)})`}
++              x={lx.toFixed(1)}
++              y={(margin.top + innerH / 2).toFixed(1)}
++              textAnchor="middle"
++              fontSize={tickFontSize}
++              fill="#888">
++              {leftAxisLabel}
++            </text>
++          );
++        })()}
++
++        {/* Right Y-axis ticks — omit unit suffix when the axis label already carries it */}
++        {rightTicks.map((tick, i) => (
++          <text key={`ryt${i}`}
++            x={(rightAxisX + 5).toFixed(1)} y={yScaleRight(tick).toFixed(1)}
++            textAnchor="start" dominantBaseline="middle" fontSize={tickFontSize} fill="#888">
++            {fmtY(tick)}{!rightAxisLabel && rightAxisUnit ? ` ${rightAxisUnit}` : ""}
++          </text>
++        ))}
++
++        {/* Right Y-axis label (rotated +90°, at far-right edge of RIGHT_AXIS_W, clear of tick text) */}
++        {hasRightAxis && rightAxisLabel && (
++          <text
++            transform={`rotate(90, ${(rightAxisX + RIGHT_AXIS_W - 6).toFixed(1)}, ${(margin.top + innerH / 2).toFixed(1)})`}
++            x={(rightAxisX + RIGHT_AXIS_W - 6).toFixed(1)}
++            y={(margin.top + innerH / 2).toFixed(1)}
++            textAnchor="middle"
++            fontSize={tickFontSize}
++            fill="#888">
++            {rightAxisLabel}
++          </text>
++        )}
++
++        {xTickIdxs.map((idx) => {
++          const s = samples[idx];
++          const x = chartType === "bar_vertical"
++            ? margin.left + idx * barGroupW + barGroupW / 2
++            : xScale(s.timestamp);
++          return (
++            <text key={`xt${idx}`}
++              x={x.toFixed(1)} y={(margin.top + innerH + tickFontSize + 3).toFixed(1)}
++              textAnchor="middle" fontSize={tickFontSize} fill="#888">
++              {fmtElapsed(s.timestamp)}
++            </text>
++          );
++        })}
++
++        {/* X-axis label */}
++        <text
++          x={(margin.left + innerW / 2).toFixed(1)}
++          y={(margin.top + innerH + tickFontSize * 2 + 8).toFixed(1)}
++          textAnchor="middle" fontSize={tickFontSize} fill="#888">
++          Elapsed ({xTimeUnit})
++        </text>
++
++        {/* Axis lines */}
++        <line x1={margin.left} y1={margin.top} x2={margin.left} y2={margin.top + innerH} stroke="#ccc" strokeWidth="1" />
++        <line x1={margin.left} y1={margin.top + innerH} x2={(margin.left + innerW).toFixed(1)} y2={margin.top + innerH} stroke="#ccc" strokeWidth="1" />
++        {hasRightAxis && (
++          <line x1={rightAxisX.toFixed(1)} y1={margin.top} x2={rightAxisX.toFixed(1)} y2={margin.top + innerH} stroke="#ccc" strokeWidth="1" />
++        )}
++
++        {/* Series */}
++        {metricKeys.map((key, i) => {
++          const color = SERIES_COLORS[i % SERIES_COLORS.length];
++          if (chartType === "line") {
++            return <path key={key} d={linePath(key)} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />;
++          }
++          if (chartType === "area") {
++            return (
++              <g key={key}>
++                <path d={areaPath(key)} fill={color} fillOpacity="0.12" stroke="none" />
++                <path d={linePath(key)} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
++              </g>
++            );
++          }
++          if (chartType === "bar_vertical") {
++            const numS       = metricKeys.length;
++            const totalBarW  = barGroupW * 0.75;
++            const singleBarW = totalBarW / numS;
++            const groupOff   = -totalBarW / 2;
++            const ys         = yScaleFor(key);
++            const baseY      = ys(yMinFor(key));
++            return samples.map((s, sIdx) => {
++              const val = s.values[key] ?? 0;
++              const bY  = ys(val);
++              const bH  = Math.max(0, baseY - bY);
++              const bX  = margin.left + sIdx * barGroupW + barGroupW / 2 + groupOff + i * singleBarW;
++              return (
++                <rect key={`${key}-${sIdx}`}
++                  x={bX.toFixed(1)} y={bY.toFixed(1)}
++                  width={Math.max(1, singleBarW - 1).toFixed(1)} height={bH.toFixed(1)}
++                  fill={color} fillOpacity="0.82" rx="1" />
++              );
++            });
++          }
++          return null;
++        })}
++
++        {/* Thresholds — color reflects whether any sample exceeds the warning level */}
++        {thresholds && (() => {
++          // Orange→red tones when exceeded; muted grey (theme-neutral) when safe
++          const WARN_EXCEEDED = ["#f57c00", "#e53935", "#e65100", "#c62828", "#bf360c"];
++          const WARN_SAFE     = "#9e9e9e"; // grey-500, readable in both light & dark themes
++          const warnEntries = (Object.entries(thresholds as Record<string, { warning?: number }>)
++            .filter(([k, t]) => t.warning !== undefined && metricKeys.includes(k)));
++          return warnEntries.map(([key, thresh], wIdx) => {
++            const warnVal   = thresh.warning!;
++            const exceeded  = samples.some(s => (s.values[key] ?? 0) > warnVal);
++            const warnColor = exceeded ? WARN_EXCEEDED[wIdx % WARN_EXCEEDED.length] : WARN_SAFE;
++            const unit      = configScales?.[key]?.unit ?? "";
++            const warnText  = `warn: ${fmtY(warnVal)}${unit ? ` ${unit}` : ""}`;
++            return (
++              <g key={key}>
++                <line
++                  x1={margin.left} y1={yScaleFor(key)(warnVal).toFixed(1)}
++                  x2={(margin.left + innerW).toFixed(1)} y2={yScaleFor(key)(warnVal).toFixed(1)}
++                  stroke={warnColor} strokeWidth="1" strokeDasharray="5,3" />
++                <text
++                  x={(margin.left + 4).toFixed(1)}
++                  y={(yScaleFor(key)(warnVal) - 3).toFixed(1)}
++                  fontSize={tickFontSize - 1} fill={warnColor}>
++                  {warnText}
++                </text>
++              </g>
++            );
++          });
++        })()}
++
++        {/* Hover cursor */}
++        {tooltip && (
++          <line
++            x1={tooltip.svgX.toFixed(1)} y1={margin.top}
++            x2={tooltip.svgX.toFixed(1)} y2={margin.top + innerH}
++            stroke="#0071c5" strokeWidth="1" strokeDasharray="3,3" />
++        )}
++
++        {/* Mouse capture overlay */}
++        <rect x={margin.left} y={margin.top} width={innerW} height={innerH} fill="transparent" />
++      </svg>
++    );
++  };
++
++  // ── Event handlers ────────────────────────────────────────────────────────
++  const onCardMove = (e: MouseEvent) => {
++    if (!cardSvgRef.current || !containerRef.current) return;
++    setCardTt(buildTooltip(e, cardSvgRef.current, containerRef.current, cardW, cardMargin));
++  };
++  const onModalMove = (e: MouseEvent) => {
++    if (!modalSvgRef.current || !modalChartRef.current) return;
++    setModalTt(buildTooltip(e, modalSvgRef.current, modalChartRef.current, MODAL_W, modalMargin));
++  };
++
++  // ── Render ────────────────────────────────────────────────────────────────
++  return (
++    <div className={styles.chartCard} ref={containerRef}>
++      {/* Card header */}
++      <div className={styles.chartCardHeader}>
++        <span className={styles.chartCardTitle}>{displayName}</span>
++        <button className={styles.expandButton} type="button" onClick={() => setModalOpen(true)} title="Open larger view">
++          Expand
++        </button>
++      </div>
++
++      {/* Card chart */}
++      <div style={{ position: "relative" }}>
++        <ChartSVG
++          width={cardW} chartH={CARD_H} margin={cardMargin}
++          svgRef={cardSvgRef} tooltip={cardTt} tickFontSize={10}
++          onMouseMove={onCardMove} onMouseLeave={() => setCardTt(null)}
++        />
++        {cardTt && <Tip tt={cardTt} containerWidth={cardW} />}
++      </div>
++
++      {/* Card legend */}
++      <Legend />
++
++      {/* Modal */}
++      {modalOpen && (
++        <div
++          className={styles.modalOverlay}
++          onClick={(e) => { if ((e.target as HTMLElement) === e.currentTarget) setModalOpen(false); }}
++        >
++          <div className={styles.modalContent}>
++            <div className={styles.modalHeader}>
++              <span className={styles.modalTitle}>{displayName}</span>
++              <button
++                className={styles.pngButton}
++                type="button"
++                onClick={() => modalSvgRef.current && exportFullPng(modalSvgRef.current, MODAL_W, MODAL_H, pngFilename, displayName, metricKeys, chartType, configScales, averages, minMax)}
++                title={`Download ${displayName} chart as PNG`}
++              >
++                Download
++              </button>
++              <button className={styles.modalClose} type="button" onClick={() => setModalOpen(false)} title="Close (Esc)" aria-label="Close">
++                ×
++              </button>
++            </div>
++            <div style={{ position: "relative", overflow: "hidden" }} ref={modalChartRef}>
++              <ChartSVG
++                width={MODAL_W} chartH={MODAL_H} margin={modalMargin}
++                svgRef={modalSvgRef} tooltip={modalTt} tickFontSize={12}
++                onMouseMove={onModalMove} onMouseLeave={() => setModalTt(null)}
++              />
++              {modalTt && <Tip tt={modalTt} containerWidth={MODAL_W} isModal={true} />}
++            </div>
++            <Legend />
++          </div>
++        </div>
++      )}
++    </div>
++  );
++};
+diff --git a/packages/web-awesome/src/components/Summary/TelemetryChartStyle.scss b/packages/web-awesome/src/components/Summary/TelemetryChartStyle.scss
+new file mode 100644
+index 000000000..b36db6991
+--- /dev/null
++++ b/packages/web-awesome/src/components/Summary/TelemetryChartStyle.scss
+@@ -0,0 +1,399 @@
++// ─── Telemetry Section wrapper ────────────────────────────────────────────────
++
++.telemetrySection {
++  margin-top: 8px;
++  margin-bottom: 16px;
++  border: 1px solid var(--on-border-secondary);
++  border-radius: 4px;
++  overflow: hidden;
++}
++
++.telemetrySectionHeader {
++  display: flex;
++  align-items: center;
++  gap: 8px;
++  padding: 0 12px;
++  height: 44px;
++  background: var(--bg-base-secondary);
++  cursor: pointer;
++  user-select: none;
++  transition: background 0.15s;
++
++  &:hover {
++    background: var(--bg-base-neutral, #ececec);
++  }
++}
++
++.telemetryToggle {
++  background-color: var(--bg-base-modal);
++  border: 1px solid var(--bg-base-neutral);
++  color: var(--text-primary);
++  font-size: 12px;
++  font-weight: normal;
++  width: 22px;
++  height: 22px;
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  cursor: pointer;
++  border-radius: 4px;
++  padding: 0;
++  flex-shrink: 0;
++  transition: background-color 0.2s;
++
++  &:hover {
++    background-color: var(--bg-base-secondary);
++  }
++}
++
++.telemetrySectionTitle {
++  margin: 0;
++  font-size: 14px;
++  font-weight: 600;
++  color: var(--text-primary);
++  flex: 1;
++}
++
++// .modulesBadge — removed (no longer rendered)
++
++// ─── Charts grid ─────────────────────────────────────────────────────────────
++
++.chartsGrid {
++  display: grid;
++  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
++  gap: 28px;
++  padding: 16px;
++  background: var(--bg-base-primary);
++}
++
++// ─── Individual chart card ────────────────────────────────────────────────────
++
++.chartCard {
++  background: var(--bg-base-primary);
++  border: 1px solid var(--on-border-secondary);
++  border-radius: 4px;
++  padding: 10px 12px 8px;
++  position: relative;
++  min-width: 0;
++}
++
++.chartCardHeader {
++  display: flex;
++  align-items: center;
++  gap: 6px;
++  margin-bottom: 6px;
++}
++
++.chartCardTitle {
++  font-size: 12px;
++  font-weight: 600;
++  color: var(--text-primary);
++  flex: 1;
++  text-transform: capitalize;
++}
++
++// .chartTypeTag — removed from card header (kept for modal only)
++.chartTypeTag {
++  font-size: 9px;
++  color: #0071c5;
++  background: rgba(0, 113, 197, 0.08);
++  border: 1px solid rgba(0, 113, 197, 0.25);
++  border-radius: 3px;
++  padding: 1px 5px;
++  text-transform: uppercase;
++  letter-spacing: 0.4px;
++  font-weight: 600;
++  flex-shrink: 0;
++}
++
++.expandButton {
++  background-color: var(--bg-base-modal);
++  color: var(--text-primary);
++  border: 1px solid var(--bg-base-neutral);
++  padding: 3px 10px;
++  border-radius: 4px;
++  font-size: 11px;
++  font-weight: 500;
++  text-transform: capitalize;
++  cursor: pointer;
++  transition: background-color 0.2s;
++  white-space: nowrap;
++  flex-shrink: 0;
++  display: flex;
++  align-items: center;
++
++  &:hover {
++    background-color: var(--bg-base-secondary);
++  }
++}
++
++.pngButton {
++  font-size: 11px;
++  color: #0071c5;
++  background: transparent;
++  border: 1px solid #0071c5;
++  border-radius: 3px;
++  padding: 3px 8px;
++  cursor: pointer;
++  transition: background 0.15s, color 0.15s;
++  white-space: nowrap;
++  flex-shrink: 0;
++
++  &:hover {
++    background: #0071c5;
++    color: #fff;
++  }
++}
++
++// ─── Modal ────────────────────────────────────────────────────────────────────
++
++.modalOverlay {
++  position: fixed;
++  inset: 0;
++  background: rgba(0, 0, 0, 0.55);
++  z-index: 9999;
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  padding: 40px 32px;
++}
++
++.modalContent {
++  background: var(--bg-base-primary, #fff);
++  border-radius: 6px;
++  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.28);
++  padding: 20px 24px 18px;
++  max-width: min(1100px, 98vw);
++  width: 100%;
++  max-height: 96vh;
++  overflow: hidden;
++}
++
++.modalHeader {
++  display: flex;
++  align-items: center;
++  gap: 8px;
++  margin-bottom: 10px;
++  padding-bottom: 8px;
++  border-bottom: 1px solid var(--on-border-secondary);
++}
++
++.modalTitle {
++  flex: 1;
++  font-size: 13px;
++  font-weight: 600;
++  color: var(--text-primary);
++}
++
++.modalClose {
++  width: 24px;
++  height: 24px;
++  border: 1px solid var(--on-border-secondary);
++  border-radius: 3px;
++  background: transparent;
++  color: var(--text-secondary);
++  font-size: 16px;
++  line-height: 1;
++  cursor: pointer;
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  padding: 0;
++  flex-shrink: 0;
++  transition: background 0.15s, color 0.15s, border-color 0.15s;
++
++  &:hover {
++    background: #d32f2f;
++    color: #fff;
++    border-color: #d32f2f;
++  }
++}
++
++// ─── Tooltip ─────────────────────────────────────────────────────────────────
++
++.tooltip {
++  position: absolute;
++  background: var(--bg-base-primary, #fff);
++  border: 1px solid #0071c5;
++  border-radius: 4px;
++  padding: 6px 8px;
++  font-size: 10px;
++  pointer-events: none;
++  z-index: 20;
++  box-shadow: 0 2px 8px rgba(0, 113, 197, 0.18);
++  min-width: 140px;
++  max-width: 200px;
++}
++
++.tooltipTime {
++  font-size: 9px;
++  font-weight: 600;
++  color: #0071c5;
++  margin-bottom: 4px;
++  padding-bottom: 3px;
++  border-bottom: 1px solid rgba(0, 113, 197, 0.2);
++}
++
++.tooltipRow {
++  display: flex;
++  align-items: center;
++  gap: 4px;
++  margin-top: 3px;
++}
++
++.tooltipDot {
++  width: 6px;
++  height: 6px;
++  border-radius: 50%;
++  flex-shrink: 0;
++}
++
++.tooltipKey {
++  color: var(--text-secondary);
++  flex: 1;
++  text-transform: capitalize;
++  white-space: nowrap;
++  overflow: hidden;
++  text-overflow: ellipsis;
++  font-size: 9px;
++}
++
++.tooltipVal {
++  color: var(--text-primary);
++  font-weight: 600;
++  flex-shrink: 0;
++  font-size: 10px;
++}
++
++// ─── Legend ───────────────────────────────────────────────────────────────────
++
++.legend {
++  display: flex;
++  flex-wrap: wrap;
++  gap: 8px 20px;
++  margin-top: 8px;
++  padding-top: 8px;
++  border-top: 1px solid var(--on-border-secondary);
++}
++
++.legendItem {
++  display: flex;
++  flex-direction: column;
++  align-items: flex-start;
++  gap: 4px;
++}
++
++.legendItemHeader {
++  display: flex;
++  align-items: center;
++  gap: 5px;
++}
++
++// Thin horizontal line for "line" chart
++.legendLine {
++  display: inline-block;
++  width: 16px;
++  height: 2px;
++  border-radius: 1px;
++  flex-shrink: 0;
++  // background is set inline
++}
++
++// Filled+stroked rectangle for "area" chart
++.legendArea {
++  display: inline-block;
++  width: 12px;
++  height: 8px;
++  border-radius: 1px;
++  flex-shrink: 0;
++  opacity: 0.65;
++  // background is set inline
++}
++
++// Solid block for "bar_vertical" chart
++.legendBar {
++  display: inline-block;
++  width: 10px;
++  height: 10px;
++  border-radius: 1px;
++  flex-shrink: 0;
++  opacity: 0.82;
++  // background is set inline
++}
++
++.legendLabel {
++  font-size: 12px;
++  color: var(--text-primary);
++  text-transform: capitalize;
++}
++
++.legendAvg {
++  font-size: 12px;
++  color: var(--text-secondary);
++  font-style: italic;
++}
++
++.legendAvgBadge {
++  font-size: 10px;
++  font-style: italic;
++  color: var(--text-secondary);
++  background: var(--bg-base-secondary);
++  border: 1px solid var(--on-border-secondary);
++  border-radius: 3px;
++  padding: 1px 5px;
++  white-space: nowrap;
++  flex-shrink: 0;
++}
++
++// ─── Legend stat badges (avg / min / max) ────────────────────────────────────
++
++.legendStatGroup {
++  display: flex;
++  align-items: center;
++  gap: 4px;
++  flex-shrink: 0;
++}
++
++.legendStat {
++  display: inline-flex;
++  align-items: center;
++  gap: 3px;
++  border-radius: 3px;
++  padding: 2px 7px;
++  white-space: nowrap;
++  font-style: normal;
++}
++
++// min — teal/cyan: visually "low"
++.legendStatMin {
++  background: rgba(0, 172, 193, 0.12);
++  border: 1px solid rgba(0, 172, 193, 0.40);
++  color: #00838f;
++}
++
++// avg — Intel blue: the primary brand colour
++.legendStatAvg {
++  background: rgba(0, 113, 197, 0.10);
++  border: 1px solid rgba(0, 113, 197, 0.35);
++  color: #0071c5;
++}
++
++// max — deep indigo: visually "high"
++.legendStatMax {
++  background: rgba(57, 73, 171, 0.12);
++  border: 1px solid rgba(57, 73, 171, 0.40);
++  color: #3949ab;
++}
++
++.legendStatLabel {
++  font-size: 9px;
++  font-weight: 700;
++  text-transform: uppercase;
++  letter-spacing: 0.3px;
++  opacity: 0.75;
++}
++
++.legendStatValue {
++  font-size: 11px;
++  font-weight: 600;
++}
+diff --git a/packages/web-awesome/src/components/Summary/TelemetrySection.tsx b/packages/web-awesome/src/components/Summary/TelemetrySection.tsx
+new file mode 100644
+index 000000000..9112ccf20
+--- /dev/null
++++ b/packages/web-awesome/src/components/Summary/TelemetrySection.tsx
+@@ -0,0 +1,95 @@
++import { FunctionComponent } from "preact";
++import { useState } from "preact/hooks";
++import { TelemetryChart } from "./TelemetryChart";
++import * as styles from "./TelemetryChartStyle.scss";
++
++interface TelemetrySectionProps {
++  /** The `extended_metadata` object from the Core Metrics Test Results JSON */
++  extendedMetadata?: any;
++  /** Summary metadata (cli_name, platform, timestamp) from test_summary.json */
++  summaryMeta?: { cliName: string; platform: string; timestamp: string } | null;
++  /** The full UUID of the test result, used to generate unique PNG filenames */
++  testId?: string;
++}
++
++/**
++ * TelemetrySection
++ *
++ * Renders a collapsible section that displays one SVG chart per telemetry
++ * module found in `extended_metadata.telemetry.modules`.  The chart type
++ * (line | area | bar_vertical) is determined by each module's
++ * `config.chart_type` field.
++ */
++export const TelemetrySection: FunctionComponent<TelemetrySectionProps> = ({
++  extendedMetadata,
++  summaryMeta,
++  testId,
++}) => {
++  const [isExpanded, setIsExpanded] = useState(false);
++
++  const telemetry = extendedMetadata?.telemetry;
++
++  // Nothing to render if telemetry is disabled or has no modules
++  if (!telemetry?.enabled || !telemetry.modules) return null;
++
++  const moduleEntries = Object.entries(
++    telemetry.modules as Record<string, any>
++  );
++  if (moduleEntries.length === 0) return null;
++
++  const toggle = () => setIsExpanded((v) => !v);
++
++  return (
++    <div className={styles.telemetrySection}>
++      {/* ── Section header (click to expand / collapse) ── */}
++      <div
++        className={styles.telemetrySectionHeader}
++        onClick={toggle}
++        role="button"
++        aria-expanded={isExpanded}
++      >
++        <button
++          className={styles.telemetryToggle}
++          type="button"
++          tabIndex={-1}
++          aria-hidden="true"
++        >
++          {isExpanded ? "−" : "+"}
++        </button>
++        <h4 className={styles.telemetrySectionTitle}>Telemetry</h4>
++      </div>
++
++      {/* ── Charts grid (one card per module) ── */}
++      {isExpanded && (
++        <div className={styles.chartsGrid}>
++          {moduleEntries.map(([key, mod]) => {
++            const chartType = (
++              (mod?.config?.chart_type as string) || "line"
++            ) as "line" | "area" | "bar_vertical";
++
++            // If config.metrics is a non-empty array, restrict to those keys
++            const configMetrics: string[] = mod?.config?.metrics ?? [];
++
++            return (
++              <TelemetryChart
++                key={key}
++                moduleName={key}
++                chartType={chartType}
++                samples={mod?.samples ?? []}
++                averages={mod?.averages}
++                minMax={mod?.min_max}
++                thresholds={mod?.config?.thresholds}
++                visibleMetrics={configMetrics.length > 0 ? configMetrics : undefined}
++                configTitle={mod?.config?.title}
++                configScales={mod?.config?.scales}
++                axes={mod?.config?.axes}
++                summaryMeta={summaryMeta}
++                testId={testId}
++              />
++            );
++          })}
++        </div>
++      )}
++    </div>
++  );
++};
+diff --git a/packages/web-awesome/src/components/Summary/attachmentHelpers.ts b/packages/web-awesome/src/components/Summary/attachmentHelpers.ts
+new file mode 100644
+index 000000000..f91aa3b36
+--- /dev/null
++++ b/packages/web-awesome/src/components/Summary/attachmentHelpers.ts
+@@ -0,0 +1,300 @@
++/**
++ * Attachment helper functions for Summary components.
++ *
++ * These are standalone async utilities that fetch and parse specific JSON
++ * attachments produced by the CLI test runner (Core Metrics, System Info,
++ * test_summary.json, etc.).  Each function is pure (no component state)
++ * so they can be imported from any module.
++ */
++
++import { fetchAttachment } from "@allurereport/web-commons";
++
++// ─── Key metric ───────────────────────────────────────────────────────────────
++
++/**
++ * Returns the most important metric from a test result's "Core Metrics Test
++ * Results" attachment.  Prefers metrics flagged with `is_key_metric: true`;
++ * falls back to the first metric found.
++ */
++export async function getMetricsFromAttachment(
++  testResult: any,
++): Promise<{ metric: string; value: string; unit: string }> {
++  if (!testResult?.attachments || !Array.isArray(testResult.attachments)) {
++    return { metric: "N/A", value: "N/A", unit: "N/A" };
++  }
++
++  const metricsAttachment = testResult.attachments.find(
++    (attachment: any) =>
++      attachment.link?.name === "Core Metrics Test Results" &&
++      attachment.link?.contentType === "application/json",
++  );
++
++  if (!metricsAttachment) {
++    return { metric: "N/A", value: "N/A", unit: "N/A" };
++  }
++
++  try {
++    const result = await fetchAttachment(
++      metricsAttachment.link.id,
++      metricsAttachment.link.ext,
++      metricsAttachment.link.contentType,
++    );
++
++    if (!result || !result.text) {
++      return { metric: "N/A", value: "N/A", unit: "N/A" };
++    }
++
++    const metricsData = JSON.parse(result.text);
++
++    if (metricsData?.metrics && typeof metricsData.metrics === "object") {
++      const metrics = Object.entries(metricsData.metrics);
++      if (metrics.length > 0) {
++        let selectedMetric: [string, unknown] | null = null;
++
++        for (const [metricKey, metricValue] of metrics) {
++          if (
++            typeof metricValue === "object" &&
++            metricValue !== null &&
++            (metricValue as any).is_key_metric === true
++          ) {
++            selectedMetric = [metricKey, metricValue];
++            break;
++          }
++        }
++
++        if (!selectedMetric) {
++          selectedMetric = metrics[0];
++        }
++
++        const [metricKey, metricValue] = selectedMetric;
++        if (
++          typeof metricValue === "object" &&
++          metricValue !== null &&
++          "value" in metricValue &&
++          "unit" in metricValue
++        ) {
++          return {
++            metric: metricKey,
++            value: String((metricValue as any).value),
++            unit: String((metricValue as any).unit),
++          };
++        }
++        return { metric: metricKey, value: String(metricValue), unit: "" };
++      }
++    }
++  } catch (error) {
++    console.error("Error fetching metrics attachment:", error);
++  }
++
++  return { metric: "N/A", value: "N/A", unit: "N/A" };
++}
++
++// ─── Full metrics object ──────────────────────────────────────────────────────
++
++/**
++ * Returns the entire parsed JSON from the "Core Metrics Test Results"
++ * attachment (used by MetadataTable and for KPI / reference lookups).
++ */
++export async function getFullMetricsFromAttachment(
++  testResult: any,
++): Promise<any | null> {
++  if (!testResult?.attachments || !Array.isArray(testResult.attachments)) {
++    return null;
++  }
++
++  const metricsAttachment = testResult.attachments.find(
++    (attachment: any) =>
++      attachment.link?.name === "Core Metrics Test Results" &&
++      attachment.link?.contentType === "application/json",
++  );
++
++  if (!metricsAttachment) {
++    return null;
++  }
++
++  try {
++    const result = await fetchAttachment(
++      metricsAttachment.link.id,
++      metricsAttachment.link.ext,
++      metricsAttachment.link.contentType,
++    );
++
++    if (!result || !result.text) {
++      return null;
++    }
++
++    return JSON.parse(result.text);
++  } catch (error) {
++    console.error("Error fetching full metrics attachment:", error);
++  }
++
++  return null;
++}
++
++// ─── KPI reference value ──────────────────────────────────────────────────────
++
++/**
++ * Extracts the formatted reference/threshold string from the first KPI that
++ * has a `validation.reference` value (e.g. ">= 40 tokens/sec").
++ */
++export async function getReferenceFromAttachment(
++  testResult: any,
++): Promise<string> {
++  const fullMetrics = await getFullMetricsFromAttachment(testResult);
++
++  if (!fullMetrics?.kpis || Object.keys(fullMetrics.kpis).length === 0) {
++    return "N/A";
++  }
++
++  const operatorDisplayMap: Record<string, string> = {
++    eq: "==",
++    neq: "!=",
++    gt: ">",
++    gte: ">=",
++    lt: "<",
++    lte: "<=",
++    between: "between",
++    contains: "contains",
++    not_contains: "not contains",
++    matches: "matches",
++    in: "in",
++    not_in: "not in",
++  };
++
++  for (const [, kpiData] of Object.entries(fullMetrics.kpis)) {
++    if (kpiData && typeof kpiData === "object") {
++      const config = (kpiData as any).config || {};
++      const validation = config.validation || {};
++
++      if (validation.reference !== undefined) {
++        const operator = validation.operator || "gte";
++        const operatorSymbol = operatorDisplayMap[operator] || operator;
++        const reference = validation.reference;
++        const unit = config.unit || "";
++
++        return `${operatorSymbol} ${reference}${unit ? ` ${unit}` : ""}`;
++      }
++    }
++  }
++
++  return "N/A";
++}
++
++// ─── System information ───────────────────────────────────────────────────────
++
++/**
++ * Fetches the "Core CLI System Information" JSON attachment from the special
++ * `core / test_system` test result and returns the parsed system info object.
++ */
++export async function getSystemInfoFromAttachment(
++  individualTestResults: Record<string, any>,
++): Promise<any | null> {
++  if (Object.keys(individualTestResults).length === 0) {
++    return null;
++  }
++
++  const systemTest = Object.values(individualTestResults).find(
++    (testResult: any) => {
++      const suiteLabel = testResult.labels?.find(
++        (label: any) => label.name === "suite",
++      )?.value;
++      const packageLabel = testResult.labels?.find(
++        (label: any) => label.name === "package",
++      )?.value;
++      return suiteLabel === "core" && packageLabel === "test_system";
++    },
++  );
++
++  if (!systemTest) {
++    return null;
++  }
++
++  const systemAttachment = (systemTest as any)?.attachments?.find(
++    (attachment: any) =>
++      attachment.link?.name === "Core CLI System Information" &&
++      attachment.link?.contentType === "application/json",
++  );
++
++  if (!systemAttachment) {
++    return null;
++  }
++
++  try {
++    const result = await fetchAttachment(
++      systemAttachment.link.id,
++      systemAttachment.link.ext || ".json",
++      systemAttachment.link.contentType,
++    );
++
++    if (result?.text) {
++      const systemInfo = JSON.parse(result.text);
++      return systemInfo.system_info || systemInfo;
++    }
++  } catch (error) {
++    console.error("Error fetching system information attachment:", error);
++  }
++
++  return null;
++}
++
++// ─── Summary metadata ─────────────────────────────────────────────────────────
++
++/**
++ * Finds the `test_summary.json` attachment on the CLI Summary test
++ * (`package = "test_summary"`) and returns `{ cliName, platform, timestamp }`.
++ * These values are used to generate unique telemetry chart PNG filenames.
++ */
++export async function getSummaryMetaFromAttachment(
++  individualTestResults: Record<string, any>,
++): Promise<{ cliName: string; platform: string; timestamp: string } | null> {
++  if (Object.keys(individualTestResults).length === 0) {
++    return null;
++  }
++
++  const summaryTest = Object.values(individualTestResults).find(
++    (testResult: any) => {
++      const packageLabel = testResult.labels?.find(
++        (label: any) => label.name === "package",
++      )?.value;
++      return packageLabel === "test_summary";
++    },
++  );
++
++  if (!summaryTest) {
++    return null;
++  }
++
++  const summaryAttachment = (summaryTest as any)?.attachments?.find(
++    (attachment: any) =>
++      attachment.link?.name?.includes("test_summary.json") &&
++      attachment.link?.contentType === "application/json",
++  );
++
++  if (!summaryAttachment) {
++    return null;
++  }
++
++  try {
++    const result = await fetchAttachment(
++      summaryAttachment.link.id,
++      summaryAttachment.link.ext || ".json",
++      summaryAttachment.link.contentType,
++    );
++
++    if (result?.text) {
++      const data = JSON.parse(result.text);
++      const meta = data?.summary?.metadata;
++      if (meta?.cli_name && meta?.platform && meta?.timestamp) {
++        return {
++          cliName: String(meta.cli_name),
++          platform: String(meta.platform),
++          timestamp: String(meta.timestamp),
++        };
++      }
++    }
++  } catch (error) {
++    console.error("Error fetching summary metadata attachment:", error);
++  }
++
++  return null;
++}
 diff --git a/packages/web-awesome/src/components/Summary/index.tsx b/packages/web-awesome/src/components/Summary/index.tsx
 new file mode 100644
-index 000000000..d3496d2a6
+index 000000000..14f93c2b1
 --- /dev/null
 +++ b/packages/web-awesome/src/components/Summary/index.tsx
-@@ -0,0 +1,3424 @@
+@@ -0,0 +1,3306 @@
 +import { useEffect, useState } from "preact/hooks";
 +import { fetchAttachment } from "@allurereport/web-commons";
++import {
++  getMetricsFromAttachment,
++  getFullMetricsFromAttachment,
++  getReferenceFromAttachment,
++  getSystemInfoFromAttachment,
++  getSummaryMetaFromAttachment,
++} from "./attachmentHelpers";
 +import * as styles from "./styles.scss";
 +import { availableSections } from "../../stores/sections";
 +import { testResultNavStore, fetchTestResultNav, testResultStore, fetchTestResult } from "../../stores/testResults";
 +import { BulletChart } from "./BulletChart";
 +import * as bulletChartStyles from "./BulletChartStyle.scss";
++import { TelemetrySection } from "./TelemetrySection";
 +
 +// Summary table components
 +interface SortableTableProps {
@@ -1202,8 +2968,13 @@ index 000000000..d3496d2a6
 +                  {/* Details content */}
 +                  <div style={{ flex: 1 }}>
 +                    {row.details.map((detail, detailIdx) => (
-+                      <div key={detailIdx} className={styles["system-info-detail-line"]}>
-+                        {detail}
++                      <div
++                        key={detailIdx}
++                        className={detail.startsWith('\t')
++                          ? styles["system-info-sub-detail-line"]
++                          : styles["system-info-detail-line"]}
++                      >
++                        {detail.startsWith('\t') ? detail.slice(1) : detail}
 +                      </div>
 +                    ))}
 +                  </div>
@@ -1853,177 +3624,6 @@ index 000000000..d3496d2a6
 +    return `${minutes}m ${remainingSeconds.toFixed(1)}s`;
 +  };
 +
-+
-+
-+  // Helper function to get metrics from test attachment
-+  const getMetricsFromAttachment = async (testResult: any) => {
-+    if (!testResult?.attachments || !Array.isArray(testResult.attachments)) {
-+      return { metric: "N/A", value: "N/A", unit: "N/A" };
-+    }
-+
-+    // Find the "Core Metrics Test Results" JSON attachment
-+    const metricsAttachment = testResult.attachments.find((attachment: any) =>
-+      attachment.link?.name === "Core Metrics Test Results" &&
-+      attachment.link?.contentType === "application/json"
-+    );
-+
-+    if (!metricsAttachment) {
-+      return { metric: "N/A", value: "N/A", unit: "N/A" };
-+    }
-+
-+    try {
-+      const result = await fetchAttachment(
-+        metricsAttachment.link.id,
-+        metricsAttachment.link.ext,
-+        metricsAttachment.link.contentType
-+      );
-+
-+      if (!result || !result.text) {
-+        return { metric: "N/A", value: "N/A", unit: "N/A" };
-+      }
-+
-+      const metricsData = JSON.parse(result.text);
-+      
-+      if (metricsData?.metrics && typeof metricsData.metrics === "object") {
-+        const metrics = Object.entries(metricsData.metrics);
-+        if (metrics.length > 0) {
-+          // Look for a metric with is_key_metric: true first
-+          let selectedMetric = null;
-+          
-+          // Find the key metric if it exists
-+          for (const [metricKey, metricValue] of metrics) {
-+            if (typeof metricValue === "object" && metricValue !== null && (metricValue as any).is_key_metric === true) {
-+              selectedMetric = [metricKey, metricValue];
-+              break;
-+            }
-+          }
-+          
-+          // If no key metric found, use the first metric
-+          if (!selectedMetric) {
-+            selectedMetric = metrics[0];
-+          }
-+          
-+          const [metricKey, metricValue] = selectedMetric;
-+          if (typeof metricValue === "object" && metricValue !== null && "value" in metricValue && "unit" in metricValue) {
-+            return {
-+              metric: metricKey,
-+              value: String(metricValue.value),
-+              unit: String(metricValue.unit)
-+            };
-+          }
-+          return {
-+            metric: metricKey,
-+            value: String(metricValue),
-+            unit: ""
-+          };
-+        }
-+      }
-+    } catch (error) {
-+      console.error("Error fetching metrics attachment:", error);
-+    }
-+
-+    return { metric: "N/A", value: "N/A", unit: "N/A" };
-+  };
-+
-+  // Helper function to get full metrics data from test attachment for metadata table
-+  const getFullMetricsFromAttachment = async (testResult: any) => {
-+    if (!testResult?.attachments || !Array.isArray(testResult.attachments)) {
-+      return null;
-+    }
-+
-+    // Find the "Core Metrics Test Results" JSON attachment
-+    const metricsAttachment = testResult.attachments.find((attachment: any) =>
-+      attachment.link?.name === "Core Metrics Test Results" &&
-+      attachment.link?.contentType === "application/json"
-+    );
-+
-+    if (!metricsAttachment) {
-+      return null;
-+    }
-+
-+    try {
-+      const result = await fetchAttachment(
-+        metricsAttachment.link.id,
-+        metricsAttachment.link.ext,
-+        metricsAttachment.link.contentType
-+      );
-+
-+      if (!result || !result.text) {
-+        return null;
-+      }
-+
-+      return JSON.parse(result.text);
-+    } catch (error) {
-+      console.error("Error fetching full metrics attachment:", error);
-+    }
-+
-+    return null;
-+  };
-+
-+  // Helper function to get first metric from test results (deprecated - kept for backward compatibility)
-+  const getFirstMetric = (testName: string) => {
-+    // This function is now deprecated but kept for backward compatibility
-+    // The new approach uses getMetricsFromAttachment directly
-+    return { metric: "N/A", value: "N/A", unit: "N/A" };
-+  };
-+
-+  // Helper function to get image attachments from test results
-+  const getImageAttachments = (testResult: any) => {
-+    if (testResult?.attachments && Array.isArray(testResult.attachments)) {
-+      // Filter for image attachments (PNG and JPEG only)
-+      return testResult.attachments.filter((attachment: any) => 
-+        attachment.link?.contentType === "image/png" || 
-+        attachment.link?.contentType === "image/jpeg"
-+      );
-+    }
-+    
-+    return [];
-+  };
-+
-+  // Helper function to get reference value from KPIs in test attachment
-+  const getReferenceFromAttachment = async (testResult: any) => {
-+    const fullMetrics = await getFullMetricsFromAttachment(testResult);
-+    
-+    if (!fullMetrics?.kpis || Object.keys(fullMetrics.kpis).length === 0) {
-+      return "N/A";
-+    }
-+
-+    // Operator display mapping
-+    const operatorDisplayMap: Record<string, string> = {
-+      "eq": "==",
-+      "neq": "!=",
-+      "gt": ">",
-+      "gte": ">=",
-+      "lt": "<",
-+      "lte": "<=",
-+      "between": "between",
-+      "contains": "contains",
-+      "not_contains": "not contains",
-+      "matches": "matches",
-+      "in": "in",
-+      "not_in": "not in"
-+    };
-+
-+    // Find the first KPI with a reference value
-+    for (const [key, kpiData] of Object.entries(fullMetrics.kpis)) {
-+      if (kpiData && typeof kpiData === 'object') {
-+        const config = (kpiData as any).config || {};
-+        const validation = config.validation || {};
-+        
-+        if (validation.reference !== undefined) {
-+          const operator = validation.operator || "gte";
-+          const operatorSymbol = operatorDisplayMap[operator] || operator;
-+          const reference = validation.reference;
-+          const unit = config.unit || "";
-+          
-+          return `${operatorSymbol} ${reference}${unit ? ` ${unit}` : ""}`;
-+        }
-+      }
-+    }
-+
-+    return "N/A";
-+  };
-+
 +  // Create profile table data for test results (type: "suite")
 +  const createTestResultProfilesFromTestResults = (groupBy: "group" | "parentSuite" = "group") => {
 +    if (loadingTests || Object.keys(individualTestResults).length === 0) {
@@ -2510,64 +4110,33 @@ index 000000000..d3496d2a6
 +    };
 +  }).filter(profile => (profile as any).hasMatches || !verticalSearchTerm.trim());
 +
-+  // Helper function to get system information from test attachments
-+  const getSystemInfoFromAttachment = async () => {
-+    if (loadingTests || Object.keys(individualTestResults).length === 0) {
-+      return null;
-+    }
-+
-+    // Find the test with suite="core" and package="test_system"
-+    const systemTest = Object.values(individualTestResults).find((testResult: any) => {
-+      const suiteLabel = testResult.labels?.find((label: any) => label.name === "suite")?.value;
-+      const packageLabel = testResult.labels?.find((label: any) => label.name === "package")?.value;
-+      return suiteLabel === "core" && packageLabel === "test_system";
-+    });
-+
-+    if (!systemTest) {
-+      return null;
-+    }
-+
-+    // Find the "Core CLI System Information" JSON attachment
-+    const systemAttachment = (systemTest as any)?.attachments?.find((attachment: any) =>
-+      attachment.link?.name === "Core CLI System Information" &&
-+      attachment.link?.contentType === "application/json"
-+    );
-+
-+    if (!systemAttachment) {
-+      return null;
-+    }
-+
-+    try {
-+      // Fetch the attachment data
-+      const result = await fetchAttachment(
-+        systemAttachment.link.id,
-+        systemAttachment.link.ext || ".json",
-+        systemAttachment.link.contentType
-+      );
-+      
-+      if (result?.text) {
-+        const systemInfo = JSON.parse(result.text);
-+        return systemInfo.system_info || systemInfo;
-+      }
-+    } catch (error) {
-+      console.error("Error fetching system information attachment:", error);
-+    }
-+
-+    return null;
-+  };
-+
 +  // State for system information
 +  const [systemInfo, setSystemInfo] = useState<any>(null);
 +
 +  // Fetch system information on component mount
 +  useEffect(() => {
 +    const loadSystemInfo = async () => {
-+      const info = await getSystemInfoFromAttachment();
++      const info = await getSystemInfoFromAttachment(individualTestResults);
 +      setSystemInfo(info);
 +    };
 +
 +    if (!loadingTests && Object.keys(individualTestResults).length > 0) {
 +      loadSystemInfo();
++    }
++  }, [loadingTests, individualTestResults]);
++
++  // State for summary metadata (cli_name, platform, timestamp from test_summary.json)
++  const [summaryMeta, setSummaryMeta] = useState<{ cliName: string; platform: string; timestamp: string } | null>(null);
++
++  // Fetch summary metadata alongside system info
++  useEffect(() => {
++    const loadSummaryMeta = async () => {
++      const meta = await getSummaryMetaFromAttachment(individualTestResults);
++      setSummaryMeta(meta);
++    };
++
++    if (!loadingTests && Object.keys(individualTestResults).length > 0) {
++      loadSummaryMeta();
 +    }
 +  }, [loadingTests, individualTestResults]);
 +
@@ -2639,32 +4208,91 @@ index 000000000..d3496d2a6
 +      hardwareInfoData.push({ component: "CPU", details: cpuDetails });
 +    }
 +    
-+    // Graphics information with VRAM from openvino memory_bytes
++    // Graphics information with sysfs freq/power config
 +    if (hardware.gpu?.devices && hardware.gpu.devices.length > 0) {
 +      const allGpuDetails: string[] = [];
-+      
++
 +      hardware.gpu.devices.forEach((gpu: any, index: number) => {
-+        let gpuLine = '';
-+        
-+        // Use openvino full_device_name first, fallback to device_name
++        // Blank separator between devices
++        if (index > 0) allGpuDetails.push("");
++
++        // ── Header: name • VRAM • EUs • driver ──────────────────────────
 +        const deviceName = gpu.openvino?.full_device_name || gpu.device_name;
-+        gpuLine += `${deviceName}`;
-+        
-+        // Add VRAM information from openvino if available
++        const driver = gpu.driver || gpu.sysfs?.driver;
++        let headerLine = deviceName;
 +        if (gpu.openvino?.memory_gib !== undefined) {
-+          gpuLine += ` • ${gpu.openvino.memory_gib.toFixed(1)} GB VRAM`;
++          headerLine += ` • ${gpu.openvino.memory_gib.toFixed(1)} GB VRAM`;
 +        } else if (gpu.openvino?.memory_bytes) {
-+          gpuLine += ` • ${bytesToGB(gpu.openvino.memory_bytes)} GB VRAM`;
++          headerLine += ` • ${bytesToGB(gpu.openvino.memory_bytes)} GB VRAM`;
 +        }
-+        
-+        // Add execution units if available
 +        if (gpu.openvino?.execution_units) {
-+          gpuLine += ` • ${gpu.openvino.execution_units} EUs`;
++          headerLine += ` • ${gpu.openvino.execution_units} EUs`;
 +        }
-+        
-+        allGpuDetails.push(gpuLine);
++        if (driver) headerLine += ` • ${driver}`;
++        allGpuDetails.push(headerLine);
++
++        // ── Frequency limits — each GT engine as "Freq <gt> ..." segment ──
++        // Terms follow Linux sysfs / Intel GPU spec sheet conventions:
++        //   base  = rpn_mhz  hardware floor (shown only when ≠ configured min)
++        //   min   = min_mhz  configured minimum clock
++        //   eff   = rpe_mhz  efficient / balanced point (shown when distinct)
++        //   max   = max_mhz  configured maximum clock
++        //   boost = rp0_mhz  rated peak boost (shown only when > max_mhz)
++        const freqLimits = gpu.sysfs?.freq_limits;
++        if (freqLimits && Object.keys(freqLimits).length > 0) {
++          const gtSegments: string[] = [];
++          Object.entries(freqLimits).forEach(([gt, lim]: [string, any]) => {
++            const parts: string[] = [];
++            if (lim.rpn_mhz !== undefined && lim.rpn_mhz !== lim.min_mhz) {
++              parts.push(`base ${lim.rpn_mhz} MHz`);
++            }
++            if (lim.min_mhz !== undefined) parts.push(`min ${lim.min_mhz} MHz`);
++            if (lim.rpe_mhz !== undefined &&
++                lim.rpe_mhz !== lim.min_mhz &&
++                lim.rpe_mhz !== lim.rpn_mhz) {
++              parts.push(`eff ${lim.rpe_mhz} MHz`);
++            }
++            if (lim.max_mhz !== undefined) parts.push(`max ${lim.max_mhz} MHz`);
++            if (lim.rp0_mhz !== undefined && lim.rp0_mhz !== lim.max_mhz) {
++              parts.push(`boost ${lim.rp0_mhz} MHz`);
++            }
++            if (parts.length > 0) {
++              gtSegments.push(`\tFreq ${gt}  ${parts.join("  ")}`);
++            }
++          });
++          // Each GT gets its own sub-detail line
++          gtSegments.forEach(seg => allGpuDetails.push(seg));
++        }
++
++        // ── Power limits ─────────────────────────────────────────────────
++        // Linux hwmon power sysfs semantics (kernel docs):
++        //   cap_w  = power1_cap  — configurable power cap/limit (adjustable; ≤ max_w)
++        //   max_w  = power1_max  — hardware absolute power ceiling (cap cannot exceed this)
++        //   crit_w = power1_crit — critical threshold; triggers emergency throttle/shutdown
++        // NOTE: cap_w is NOT "TDP" — TDP is a fixed manufacturer spec.
++        //       The cap is a software-settable limit that defaults to TDP but can differ.
++        const pl = gpu.sysfs?.power_limits;
++        if (pl && Object.keys(pl).length > 0) {
++          const powerParts: string[] = [];
++          if (pl.cap_w !== undefined)  powerParts.push(`Power cap ${pl.cap_w} W`);
++          if (pl.max_w !== undefined)  powerParts.push(`Power max ${pl.max_w} W`);
++          if (pl.crit_w !== undefined) powerParts.push(`Power crit ${pl.crit_w} W`);
++
++          // Fallback: read from channels if top-level fields are absent
++          if (powerParts.length === 0 && pl.channels) {
++            Object.entries(pl.channels).forEach(([_ch, chLim]: [string, any]) => {
++              if (chLim.cap_w !== undefined)  powerParts.push(`Power cap ${chLim.cap_w} W`);
++              if (chLim.max_w !== undefined)  powerParts.push(`Power max ${chLim.max_w} W`);
++              if (chLim.crit_w !== undefined) powerParts.push(`Power crit ${chLim.crit_w} W`);
++            });
++          }
++
++          if (powerParts.length > 0) {
++            allGpuDetails.push(`\t${powerParts.join("  •  ")}`);
++          }
++        }
 +      });
-+      
++
 +      hardwareInfoData.push({ component: "Graphics", details: allGpuDetails });
 +    }
 +
@@ -2732,9 +4360,9 @@ index 000000000..d3496d2a6
 +              if (dimm.speed_mts) slotLine += ` @ ${dimm.speed_mts} MT/s`;
 +              if (dimm.manufacturer) slotLine += ` • ${dimm.manufacturer.trim()}`;
 +              if (dimm.part_number) slotLine += ` ${dimm.part_number.trim()}`;
-+              memoryDetails.push(slotLine);
++              memoryDetails.push(`\t${slotLine}`);
 +            } else {
-+              memoryDetails.push(`${locator} • No Module Installed`);
++              memoryDetails.push(`\t${locator} • No Module Installed`);
 +            }
 +          });
 +        }
@@ -3252,6 +4880,7 @@ index 000000000..d3496d2a6
 +                          renderExpandedContent={(rowIndex: number) => {
 +                            const test = profileData.testsData[rowIndex];
 +                            const testId = test.fullId; // Use the full ID to access individual test results
++                            const testAlias = individualTestResults[testId]?.parameters?.find((p: any) => p.name === "Test Id")?.value?.replace(/^'|'$/g, "").trim();
 +                            
 +                            return (
 +                              <div className={styles["test-details"]}>
@@ -3304,6 +4933,9 @@ index 000000000..d3496d2a6
 +
 +                                    {/* Metadata Section */}
 +                                    <MetadataTable metricsData={testFullMetrics[testId]} />
++
++                                    {/* Telemetry Section */}
++                                    <TelemetrySection extendedMetadata={testFullMetrics[testId]?.extended_metadata} summaryMeta={summaryMeta} testId={testAlias} />
 +
 +                                    {/* Attachments Section */}
 +                                    {(() => {
@@ -3504,6 +5136,7 @@ index 000000000..d3496d2a6
 +                          renderExpandedContent={(rowIndex: number) => {
 +                            const test = profileData.testsData[rowIndex];
 +                            const testId = test.fullId; // Use the full ID to access individual test results
++                            const testAlias = individualTestResults[testId]?.parameters?.find((p: any) => p.name === "Test Id")?.value?.replace(/^'|'$/g, "").trim();
 +                            
 +                            return (
 +                              <div className={styles["test-details"]}>
@@ -3556,6 +5189,9 @@ index 000000000..d3496d2a6
 +
 +                                    {/* Metadata Section */}
 +                                    <MetadataTable metricsData={testFullMetrics[testId]} />
++
++                                    {/* Telemetry Section */}
++                                    <TelemetrySection extendedMetadata={testFullMetrics[testId]?.extended_metadata} summaryMeta={summaryMeta} testId={testAlias} />
 +
 +                                    {/* Attachments Section */}
 +                                    {(() => {
@@ -3793,6 +5429,7 @@ index 000000000..d3496d2a6
 +                          renderExpandedContent={(rowIndex: number) => {
 +                            const test = profileData.testsData[rowIndex];
 +                            const testId = test.fullId; // Use the full ID to access individual test results
++                            const testAlias = individualTestResults[testId]?.parameters?.find((p: any) => p.name === "Test Id")?.value?.replace(/^'|'$/g, "").trim();
 +                            
 +                            return (
 +                              <div className={styles["test-details"]}>
@@ -3845,6 +5482,9 @@ index 000000000..d3496d2a6
 +
 +                                    {/* Metadata Section */}
 +                                    <MetadataTable metricsData={testFullMetrics[testId]} />
++
++                                    {/* Telemetry Section */}
++                                    <TelemetrySection extendedMetadata={testFullMetrics[testId]?.extended_metadata} summaryMeta={summaryMeta} testId={testAlias} />
 +
 +                                    {/* Attachments Section */}
 +                                    {(() => {
@@ -3933,10 +5573,10 @@ index 000000000..d3496d2a6
 +};
 diff --git a/packages/web-awesome/src/components/Summary/styles.scss b/packages/web-awesome/src/components/Summary/styles.scss
 new file mode 100644
-index 000000000..05441a53a
+index 000000000..3f5f1054b
 --- /dev/null
 +++ b/packages/web-awesome/src/components/Summary/styles.scss
-@@ -0,0 +1,1617 @@
+@@ -0,0 +1,1631 @@
 +// Overview container with larger horizontal padding
 +.overview {
 +  padding: 0 80px;
@@ -4319,7 +5959,21 @@ index 000000000..05441a53a
 +
 +.system-info-detail-line {
 +  margin-bottom: 4px;
-+  
++  white-space: pre-wrap;
++
++  &:last-child {
++    margin-bottom: 0;
++  }
++}
++
++.system-info-sub-detail-line {
++  margin-bottom: 3px;
++  margin-top: 1px;
++  border-left: 2px solid var(--on-border-secondary);
++  font-size: 12px;
++  color: var(--text-secondary);
++  white-space: pre-wrap;
++
 +  &:last-child {
 +    margin-bottom: 0;
 +  }

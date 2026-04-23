@@ -148,6 +148,16 @@ For available profiles, use: {cli_name} list
     )
     advanced_group.add_argument("--no-cache", "-nc", action="store_true", help="Run tests without using cached results")
     advanced_group.add_argument(
+        "--telemetry-interval",
+        metavar="SECONDS",
+        type=int,
+        default=None,
+        help=(
+            "Override the telemetry sampling interval (whole seconds, minimum 1). "
+            "Takes highest priority over CORE_TELEMETRY_INTERVAL env var and the profile YAML value."
+        ),
+    )
+    advanced_group.add_argument(
         "--filter",
         action="append",
         metavar="KEY=VALUE",

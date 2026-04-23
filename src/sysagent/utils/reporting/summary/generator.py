@@ -26,6 +26,10 @@ except ImportError:
     logger.warning("SystemInfoCache not available - system summary will be skipped")
 
 
+# Report metadata availability flag — lazy-evaluated on first use
+_REPORT_METADATA_AVAILABLE: Optional[bool] = None
+
+
 class CoreResultsSummaryGenerator:
     """Generator for core framework test results summary."""
 
@@ -87,6 +91,52 @@ class CoreResultsSummaryGenerator:
                 return True
 
         return False
+
+    def _collect_report_metadata(self) -> Dict[str, Any]:
+        """
+        Collect report filename metadata for inclusion in the summary.
+
+        Returns a dict with:
+        - ``cli_name``: the CLI application name (e.g. ``"esq"``, ``"test-esq"``).
+        - ``platform``: the platform portion of the report filename, i.e. everything
+          between the ``<appname>_report_`` prefix and the trailing ``_<timestamp>.html``
+          suffix (e.g. ``asus_core_ultra_9_285k_b60_a770``).
+        - ``timestamp``: short timestamp string in ``YYMMDD_HHMM`` format used as the
+          report filename suffix.  Stored here so that downstream tooling (e.g. Allure
+          download-link generation) can reconstruct the exact report filename without
+          scanning the filesystem.
+        """
+        global _REPORT_METADATA_AVAILABLE
+
+        if _REPORT_METADATA_AVAILABLE is False:
+            return {}
+
+        try:
+            from sysagent.utils.config import get_cli_aware_project_name
+            from sysagent.utils.reporting.allure.config import (
+                _generate_short_timestamp,
+                build_report_platform_string,
+                get_comprehensive_system_info_for_filename,
+            )
+            from sysagent.utils.reporting.allure.generator import get_app_name
+
+            cli_name = get_cli_aware_project_name() or "app"
+            app_name = get_app_name()
+            system_info = get_comprehensive_system_info_for_filename()
+            timestamp = _generate_short_timestamp()
+            platform = build_report_platform_string(app_name, system_info)
+
+            _REPORT_METADATA_AVAILABLE = True
+            return {
+                "cli_name": cli_name,
+                "platform": platform,
+                "timestamp": timestamp,
+            }
+
+        except Exception as exc:
+            logger.debug("Failed to collect report metadata: %s", exc)
+            _REPORT_METADATA_AVAILABLE = False
+            return {}
 
     def _collect_system_summary_data(self) -> Dict[str, Any]:
         """
@@ -400,11 +450,15 @@ class CoreResultsSummaryGenerator:
         logger.debug(f"Found {len(actual_current_run_uuids)} new test UUIDs in current run")
         logger.debug(f"Current run duration: {actual_current_run_duration:.3f} seconds")
 
+        # Collect report filename metadata (platform string + timestamp)
+        report_metadata = self._collect_report_metadata()
+
         summary = {
             "summary": {
                 "profile_name": profile_name,
                 "suite_name": suite_name,
                 "generated_timestamp": datetime.now().isoformat(),
+                "metadata": report_metadata,
                 "total_tests": total_tests,
                 "total_duration_seconds": round(total_duration, 3),
                 "current_run_duration_seconds": round(actual_current_run_duration, 3),

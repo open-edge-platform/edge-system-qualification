@@ -29,7 +29,7 @@ All utilities are now available through their respective hierarchical packages.
 # from .logging import *
 
 # Individual module imports for explicit access
-from . import config, core, infrastructure, logging, reporting, system, testing
+from . import config, core, infrastructure, logging, reporting, system, telemetry, testing
 
 # Export all available utilities
 __all__ = [
@@ -41,4 +41,5 @@ __all__ = [
     "infrastructure",
     "config",
     "logging",
+    "telemetry",
 ]

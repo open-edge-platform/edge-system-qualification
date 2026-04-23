@@ -9,10 +9,11 @@ This package contains AI and model-specific utilities that extend the core sysag
 - downloads: Model and dataset downloading from HuggingFace and ModelScope
 - servers: Server-specific utilities (OVMS, etc.)
 - references: Verified reference data handling and filtering
+- telemetry: ESQ-specific telemetry modules (e.g., package_power via Intel RAPL)
 """
 
 # Import ESQ-specific packages
-from . import downloads, models, references, servers
+from . import downloads, models, references, servers, telemetry
 
 __all__ = [
     # Modules
@@ -20,4 +21,5 @@ __all__ = [
     "downloads",
     "servers",
     "references",
+    "telemetry",
 ]

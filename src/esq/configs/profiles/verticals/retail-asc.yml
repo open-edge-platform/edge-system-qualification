@@ -46,6 +46,50 @@ params:
       dgpu: "pre-process-backend=va-surface-sharing model-instance-id=odmode"
     SINK_ELEMENT:
       default: "fakesink sync=false"
+  # Modular telemetry configuration
+  # Telemetry runs as a lightweight background thread during test execution.
+  # Set enabled: false (or remove this block) to disable entirely.
+  telemetry:
+    enabled: true
+    interval: 10  # seconds between samples
+    modules:
+      # Title, scales, thresholds and axes are defined as defaults within each module.
+      # Only specify these here to override the module defaults.
+      # --- sysagent core modules ---
+      - name: cpu_usage
+        enabled: true
+
+      - name: cpu_freq
+        enabled: true
+
+      - name: cpu_temp
+        enabled: true
+
+      - name: memory_usage
+        enabled: true
+
+      # --- ESQ package modules ---
+      - name: package_power
+        enabled: true
+
+      - name: gpu_temp
+        enabled: true
+
+      - name: gpu_freq
+        enabled: true
+
+      - name: gpu_power
+        enabled: true
+
+      - name: gpu_usage
+        enabled: true
+
+      - name: npu_usage
+        enabled: true
+
+      - name: npu_freq
+        enabled: true
+
 
 suites:
   - name: "ai"

@@ -134,7 +134,42 @@ def update_allure_config(
         raise
 
 
-def generate_final_report_filename(app_name: str, system_info: Dict) -> str:
+def build_report_platform_string(app_name: str, system_info: Dict) -> str:
+    """
+    Build the platform portion of the report filename.
+
+    This is the part between the ``<appname>_report_`` prefix and the
+    trailing ``_<timestamp>.html`` suffix, e.g. ``asus_core_ultra_9_285k_b60_a770``.
+
+    Args:
+        app_name: Name of the application (unused but kept for API symmetry)
+        system_info: Dictionary containing system information
+
+    Returns:
+        str: Platform string, or empty string if no system info is available
+    """
+    parts = []
+
+    vendor = system_info.get("vendor", "").strip()
+    product = system_info.get("product", "").strip()
+
+    if vendor and product:
+        parts.append(f"{vendor}_{product}")
+    elif vendor:
+        parts.append(vendor)
+    elif product:
+        parts.append(product)
+
+    if system_info.get("cpu_brand"):
+        parts.append(system_info["cpu_brand"])
+
+    if system_info.get("discrete_gpus"):
+        parts.append("_".join(system_info["discrete_gpus"]))
+
+    return "_".join(parts).lower()
+
+
+def generate_final_report_filename(app_name: str, system_info: Dict, timestamp: Optional[str] = None) -> str:
     """
     Generate a comprehensive filename for the final Allure report.
 
@@ -144,39 +179,23 @@ def generate_final_report_filename(app_name: str, system_info: Dict) -> str:
     Args:
         app_name: Name of the application
         system_info: Dictionary containing system information
+        timestamp: Optional short timestamp string (``YYMMDD_HHMM``).  When
+            provided the caller-supplied value is used verbatim so that the
+            report filename can be made to match the ``report_timestamp``
+            already stored in the test summary metadata.  When omitted a new
+            timestamp is generated from the current wall-clock time.
 
     Returns:
         str: Generated filename
     """
-    timestamp = _generate_short_timestamp()
+    if timestamp is None:
+        timestamp = _generate_short_timestamp()
 
-    # Construct final filename with format
+    platform = build_report_platform_string(app_name, system_info)
+
     filename_parts = [f"{app_name}_report"]
-
-    # Add system and product information (only if both are valid)
-    vendor = system_info.get("vendor", "").strip()
-    product = system_info.get("product", "").strip()
-
-    # Only include vendor/product if they have meaningful values
-    if vendor and product:
-        system_product = f"{vendor}_{product}"
-        filename_parts.append(system_product)
-    elif vendor:
-        filename_parts.append(vendor)
-    elif product:
-        filename_parts.append(product)
-
-    # Add CPU brand
-    if system_info.get("cpu_brand"):
-        filename_parts.append(system_info["cpu_brand"])
-
-    # Add discrete GPUs
-    if system_info.get("discrete_gpus"):
-        # Join multiple discrete GPUs with underscore
-        gpus_part = "_".join(system_info["discrete_gpus"])
-        filename_parts.append(gpus_part)
-
-    # Add timestamp at the end
+    if platform:
+        filename_parts.append(platform)
     filename_parts.append(timestamp)
 
     final_filename = "_".join(filename_parts) + ".html"

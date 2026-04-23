@@ -196,11 +196,7 @@ def _attach_log_file_to_report(log_file_path: str) -> None:
         with open(log_file_path, "r", encoding="utf-8", errors="ignore") as f:
             log_content = f.read()
 
-        attachment_name = f"📄 {file_name}"
-
-        # Add file size to attachment name if significant
-        if file_size_mb > 1.0:
-            attachment_name += f" ({file_size_mb:.1f} MB)"
+        attachment_name = file_name
 
         # Attach the log content
         allure.attach(log_content, name=attachment_name, attachment_type=allure.attachment_type.TEXT)

@@ -431,6 +431,7 @@ def run_tests(
     no_mask: bool = False,
     set_prompt: List[str] = None,
     extra_args: List[str] = None,
+    telemetry_interval: int = None,
 ) -> int:
     """
     ESQ-specific run command with Intel processor validation.
@@ -457,6 +458,13 @@ def run_tests(
 
     if no_mask:
         os.environ["CORE_MASK_DATA"] = "false"
+
+    if telemetry_interval is not None:
+        if telemetry_interval >= 1:
+            os.environ["CORE_TELEMETRY_INTERVAL"] = str(telemetry_interval)
+            logger.info("Telemetry interval overridden via CLI: %ds", telemetry_interval)
+        else:
+            logger.warning("--telemetry-interval must be >= 1 second; ignoring value %d", telemetry_interval)
 
     # Reset interrupt flags
     shared_state.INTERRUPT_OCCURRED = False
@@ -549,6 +557,10 @@ def run_tests(
         # Clean up filter environment variable
         if "CORE_TEST_FILTERS" in os.environ:
             del os.environ["CORE_TEST_FILTERS"]
+
+        # Clean up telemetry interval override (only if set by this invocation)
+        if telemetry_interval is not None and "CORE_TELEMETRY_INTERVAL" in os.environ:
+            del os.environ["CORE_TELEMETRY_INTERVAL"]
 
         # Check for interrupts
         if interrupt_occurred or shared_state.INTERRUPT_OCCURRED:

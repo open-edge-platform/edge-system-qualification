@@ -21,12 +21,13 @@ import allure
 import pytest
 
 from sysagent.utils.core import Result
+from sysagent.utils.plugins.pytest_telemetry import get_telemetry_collector
 
 logger = logging.getLogger(__name__)
 
 
 @pytest.fixture
-def summarize_test_results():
+def summarize_test_results(request):
     """
     Fixture that returns a function to summarize test results.
 
@@ -62,6 +63,31 @@ def summarize_test_results():
     ) -> None:
         logger.info(f"Generating test result summary for test: {test_name}")
         results_dict = results.to_dict()
+
+        # Apply telemetry data collected during this test (if telemetry was active).
+        # Skip when the result came from cache: the cached result already carries the
+        # full telemetry from the original run, and the current collector only has the
+        # short near-empty samples from the cache-hit overhead — overwriting would lose
+        # the original data.
+        try:
+            telemetry_collector = get_telemetry_collector(request.node)
+            result_from_cache = getattr(request.node, "_result_from_cache", False)
+            if telemetry_collector is not None and not result_from_cache:
+                telemetry_collector.apply_to_result(results)
+                results_dict = results.to_dict()  # refresh after telemetry merge
+            elif result_from_cache:
+                logger.debug("Cache hit: preserving cached telemetry data in result (skipping fresh apply).")
+                # The outer Result may be a fresh container (empty extended_metadata) whose
+                # per-device cached results were only partially merged (metrics + metadata).
+                # Restore cached telemetry from the stash set by execute_test_with_cache.
+                if not results.extended_metadata.get("telemetry"):
+                    _stashed_telemetry = getattr(request.node, "_cached_telemetry", None)
+                    if _stashed_telemetry:
+                        results.extended_metadata["telemetry"] = _stashed_telemetry
+                        logger.debug("Cache hit: restored stashed telemetry into outer Result.")
+                results_dict = results.to_dict()  # ensure dict reflects cached extended_metadata
+        except Exception as _tel_exc:
+            logger.debug("Could not apply telemetry to result: %s", _tel_exc)
 
         # Update result name
         if configs:

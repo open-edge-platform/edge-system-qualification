@@ -135,6 +135,8 @@ nav:
     - Quick Start: getting-started/quick-start.md
     - Test Suites:
       - getting-started/suites/index.md
+    - Background Telemetry:
+      - getting-started/telemetry/index.md
 
   - Guides:
     - guides/index.md

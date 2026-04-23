@@ -201,23 +201,12 @@ def _attach_summary_file_to_report(summary_file_path: str) -> None:
         with open(summary_file_path, "r", encoding="utf-8") as f:
             summary_content = f.read()
 
-        # Parse JSON to get summary information for attachment name
+        # Parse JSON content
+        attachment_name = file_name
         try:
             summary_data = json.loads(summary_content)
-            summary_section = summary_data.get("summary", {})
-            total_tests = summary_section.get("total_tests", 0)
-            pass_rate = summary_section.get("pass_rate", 0.0)
-
-            attachment_name = f"📊 {file_name}"
-
-            # Add summary info to attachment name
-            if total_tests > 0:
-                attachment_name += f" (Tests: {total_tests}, Pass: {pass_rate:.1f}%)"
-            else:
-                attachment_name += " (Empty Summary)"
-
         except (json.JSONDecodeError, KeyError):
-            attachment_name = f"📊 {file_name} (Invalid JSON)"
+            summary_data = None
 
         # Attach the summary content as JSON
         allure.attach(summary_content, name=attachment_name, attachment_type=allure.attachment_type.JSON)
@@ -227,7 +216,7 @@ def _attach_summary_file_to_report(summary_file_path: str) -> None:
             formatted_summary = _format_summary_for_display(summary_data)
             allure.attach(
                 formatted_summary,
-                name=f"📋 {file_name.replace('.json', '')} - Formatted Summary",
+                name=f"{file_name.replace('.json', '')} - Formatted Summary",
                 attachment_type=allure.attachment_type.TEXT,
             )
 

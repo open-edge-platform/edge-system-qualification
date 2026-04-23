@@ -413,8 +413,28 @@ def generate_final_report_copy(report_dir: str, debug: bool = False) -> Optional
         logger.debug(f"System info for filename: {system_info}")
         logger.debug(f"App name for filename: {app_name}")
 
-        # Generate final filename
-        final_filename = generate_final_report_filename(app_name, system_info)
+        # Reuse the report_timestamp already stored in the test summary so that
+        # the HTML filename matches the value advertised in summary["summary"]["metadata"].
+        existing_timestamp = None
+        try:
+            import json as _json
+            from sysagent.utils.config import setup_data_dir as _setup_data_dir
+
+            _data_dir = _setup_data_dir()
+            _summary_file = os.path.join(_data_dir, "results", "core", "test_summary.json")
+            if os.path.exists(_summary_file):
+                with open(_summary_file, "r", encoding="utf-8") as _f:
+                    _summary_data = _json.load(_f)
+                existing_timestamp = (
+                    _summary_data.get("summary", {}).get("metadata", {}).get("timestamp")
+                )
+                if existing_timestamp:
+                    logger.debug(f"Reusing report_timestamp from summary: {existing_timestamp}")
+        except Exception as _exc:
+            logger.debug("Could not read report_timestamp from summary: %s", _exc)
+
+        # Generate final filename (uses existing_timestamp when available)
+        final_filename = generate_final_report_filename(app_name, system_info, timestamp=existing_timestamp)
         final_report_path = os.path.join(report_dir, final_filename)
 
         # Copy the report file

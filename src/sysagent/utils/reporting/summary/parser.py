@@ -88,12 +88,18 @@ class AllureResultsParser:
         # Use test_title label if available, otherwise fall back to name
         display_name = label_dict.get("test_title", test_result.get("name", ""))
 
+        # Extract description from the allure result's top-level ``description`` field.
+        # Strip leading/trailing whitespace so docstrings with indentation are clean.
+        raw_description = test_result.get("description") or ""
+        description = raw_description.strip()
+
         metadata = {
             "uuid": test_result.get("uuid", ""),  # Unique execution ID
             "test_case_id": test_result.get("testCaseId", ""),  # Test case ID (base test file)
             "history_id": history_id,
             "test_name": display_name,
             "status": test_result.get("status", "unknown"),
+            "description": description,
             "duration_seconds": round(duration_seconds, 3),
             "start_timestamp": start_time,
             "stop_timestamp": stop_time,
@@ -155,5 +161,27 @@ class AllureResultsParser:
             metadata["metrics"] = test_metrics
         if test_extended_metadata:
             metadata["extended_metadata"] = test_extended_metadata
+
+        # Extract selected config fields from Allure parameters into a ``configs`` dict.
+        # Allure parameters follow the title-cased convention used throughout the codebase
+        # (e.g. ``display_name`` → "Display Name", ``test_id`` → "Test Id") so the map
+        # below converts them back to their snake_case config keys.
+        # Values may be wrapped in extra single quotes from Python's str() repr,
+        # so we strip them before storing.
+        config_field_map = {
+            "Test Id": "test_id",
+            "Display Name": "display_name",
+        }
+        test_config: Dict[str, Any] = {}
+        for param in test_result.get("parameters", []):
+            param_name = param.get("name", "")
+            if param_name in config_field_map:
+                raw_value = param.get("value", "")
+                # Strip surrounding single quotes added by str() on Python strings
+                if isinstance(raw_value, str) and raw_value.startswith("'") and raw_value.endswith("'"):
+                    raw_value = raw_value[1:-1]
+                test_config[config_field_map[param_name]] = raw_value
+        if test_config:
+            metadata["configs"] = test_config
 
         return metadata

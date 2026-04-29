@@ -328,6 +328,7 @@ class CoreResultsSummaryGenerator:
                 "history_id": history_id,
                 "test_name": latest_run.get("test_name", "Unknown"),
                 "status": latest_run.get("status", "unknown"),
+                "description": latest_run.get("description", ""),
                 "total_runs": total_runs,
                 "duration_seconds": latest_run.get("duration_seconds", 0),  # Latest run duration
                 "longest_duration_seconds": longest_duration,
@@ -351,9 +352,10 @@ class CoreResultsSummaryGenerator:
                 # Updated tracking fields
                 "latest_uuid": latest_uuid,
                 "all_run_uuids": all_uuids,  # Store all UUIDs for this test history
-                # Include metadata and metrics from latest run if available
+                # Include metadata, metrics, configs, and extended_metadata from latest run if available
                 "metadata": latest_run.get("metadata", {}),
                 "metrics": latest_run.get("metrics", {}),
+                "configs": latest_run.get("configs", {}),
                 "extended_metadata": latest_run.get("extended_metadata", {}),
             }
             unique_test_cases.append(unique_test_case)

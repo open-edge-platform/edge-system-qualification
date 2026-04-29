@@ -250,13 +250,15 @@ class BaseTelemetryModule(ABC):
         Get a summary dict containing averages, min/max, sample count, and configuration.
 
         Returns:
-            Dict with keys: module, config, sample_count, averages, min_max, samples (list of dicts).
+            Dict with keys: module, configs, sample_count, averages, min_max, samples (list of dicts).
+            The ``configs`` key holds chart/display configuration (metrics, thresholds,
+            chart_type, title, scales, axes).
         """
         averages = self.compute_averages()
         min_max = self.compute_min_max()
         return {
             "module": self.module_name,
-            "config": {
+            "configs": {
                 "metrics": self.config.metrics or [],
                 "thresholds": self.config.thresholds or {},
                 "chart_type": self.config.chart_type or "line",

@@ -546,6 +546,12 @@ suites:
               # Entry
               - test_id: "AES-VSN-001"
                 display_name: "Vision AI Analysis - multi-stream 1080p15 H.264 gvadetect YOLO11n INT8 gvatrack gvaclassify EfficientNet-B0 INT8"
+                description: >
+                  Runs a DL Streamer inference pipeline inside Docker containers across all available devices
+                  (dGPU, iGPU, NPU, CPU) simultaneously to find the maximum number of concurrent streams that
+                  sustain the target FPS threshold. A per-device baseline analysis first determines each all
+                  devices running in parallel. Reference data for individual per-device stream capacity is
+                  provided for comparison.
                 devices: [cpu, igpu, dgpu, npu]
                 tiers:
                   - entry
@@ -560,6 +566,12 @@ suites:
               # Mainstream
               - test_id: "AES-VSN-001"
                 display_name: "Vision AI Analysis - multi-stream 1080p15 H.264 gvadetect YOLO11n INT8 gvatrack gvaclassify EfficientNet-B0 INT8"
+                description: >
+                  Runs a DL Streamer inference pipeline inside Docker containers across all available devices
+                  (dGPU, iGPU, NPU, CPU) simultaneously to find the maximum number of concurrent streams that
+                  sustain the target FPS threshold. A per-device baseline analysis first determines each all
+                  devices running in parallel. Reference data for individual per-device stream capacity is
+                  provided for comparison.
                 devices: [cpu, igpu, dgpu, npu]
                 tiers:
                   - mainstream
@@ -575,6 +587,12 @@ suites:
               # Efficiency Optimized
               - test_id: "AES-VSN-001"
                 display_name: "Vision AI Analysis - multi-stream 1080p15 H.264 gvadetect YOLO11n INT8 gvatrack gvaclassify EfficientNet-B0 INT8"
+                description: >
+                  Runs a DL Streamer inference pipeline inside Docker containers across all available devices
+                  (dGPU, iGPU, NPU, CPU) simultaneously to find the maximum number of concurrent streams that
+                  sustain the target FPS threshold. A per-device baseline analysis first determines each all
+                  devices running in parallel. Reference data for individual per-device stream capacity is
+                  provided for comparison.
                 devices: [cpu, igpu, dgpu, npu]
                 tiers:
                   - efficiency_optimized
@@ -589,6 +607,12 @@ suites:
               # Scalable Performance
               - test_id: "AES-VSN-001"
                 display_name: "Vision AI Analysis - multi-stream 1080p15 H.264 gvadetect YOLO11n INT8 gvatrack gvaclassify EfficientNet-B0 INT8"
+                description: >
+                  Runs a DL Streamer inference pipeline inside Docker containers across all available devices
+                  (dGPU, iGPU, NPU, CPU) simultaneously to find the maximum number of concurrent streams that
+                  sustain the target FPS threshold. A per-device baseline analysis first determines each all
+                  devices running in parallel. Reference data for individual per-device stream capacity is
+                  provided for comparison.
                 devices: [cpu, igpu, dgpu, npu]
                 tiers:
                   - scalable_performance
@@ -603,6 +627,12 @@ suites:
               # Scalable AI Graphic Media
               - test_id: "AES-VSN-001"
                 display_name: "Vision AI Analysis - multi-stream 1080p15 H.264 gvadetect YOLO11n INT8 gvatrack gvaclassify EfficientNet-B0 INT8"
+                description: >
+                  Runs a DL Streamer inference pipeline inside Docker containers across all available devices
+                  (dGPU, iGPU, NPU, CPU) simultaneously to find the maximum number of concurrent streams that
+                  sustain the target FPS threshold. A per-device baseline analysis first determines each all
+                  devices running in parallel. Reference data for individual per-device stream capacity is
+                  provided for comparison.
                 devices: [cpu, igpu, dgpu, npu]
                 tiers:
                   # dGPU based specific tiers

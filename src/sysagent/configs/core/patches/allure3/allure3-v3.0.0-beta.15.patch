@@ -621,25 +621,67 @@ index 000000000..2722f1005
 +}
 diff --git a/packages/web-awesome/src/components/Summary/TelemetryChart.tsx b/packages/web-awesome/src/components/Summary/TelemetryChart.tsx
 new file mode 100644
-index 000000000..460aa4216
+index 000000000..e6022b583
 --- /dev/null
 +++ b/packages/web-awesome/src/components/Summary/TelemetryChart.tsx
-@@ -0,0 +1,822 @@
+@@ -0,0 +1,864 @@
 +import { FunctionComponent } from "preact";
 +import { useState, useRef, useEffect } from "preact/hooks";
 +import * as styles from "./TelemetryChartStyle.scss";
 +
-+// ─── Blue → Teal → Purple palette ────────────────────────────────────────────
-+const SERIES_COLORS = [
-+  "#0071c5", // Intel Blue primary        (blue 1)
-+  "#00b0ff", // Light-blue A400           (blue 2 — noticeably lighter/brighter)
-+  "#1565c0", // Blue 800                  (blue 3 — deep navy)
-+  "#00acc1", // Cyan 600                  (teal 1)
-+  "#00838f", // Cyan 800                  (teal 2 — deeper teal)
-+  "#00695c", // Teal 800                  (teal 3 — green-teal)
-+  "#8e24aa", // Purple 600                (purple 1)
-+  "#4a148c", // Purple 900                (purple 2 — deep violet)
++// ─── Series colour palette ───────────────────────────────────────────────────
++// Colours are ordered so adjacent indices rotate across four hue families
++// (blue → purple → teal → grey → …), maximising visual separation on line
++// and area charts.  For any series beyond the palette, getSeriesColor() falls
++// back to a golden-ratio HSL generator so the sequence extends indefinitely
++// without repeating.  Avoid bright green (≈ 90-150 ° hue) — it is reserved
++// for pass / fail status indicators in the rest of the UI.
++const SERIES_COLORS: readonly string[] = [
++  // Round 1 — vivid anchors, maximally spread
++  "#0071c5", // Blue       · Intel Blue (primary, vivid)
++  "#8e24aa", // Purple     · Purple 600 (vivid)
++  "#00838f", // Teal       · Cyan 800 (mid teal)
++  "#546e7a", // Grey       · Blue Grey 600 (mid)
++  // Round 2 — extreme lightness shift in each family
++  "#1a237e", // Blue       · Indigo 900 (near-black navy)
++  "#ce93d8", // Purple     · Purple 200 (very light / pastel)
++  "#26c6da", // Teal       · Cyan 400 (bright / vivid)
++  "#263238", // Grey       · Blue Grey 900 (near-black)
++  // Round 3 — bright / deep contrast
++  "#00b0ff", // Blue       · Light Blue A400 (bright sky)
++  "#4a148c", // Purple     · Purple 900 (very dark violet)
++  "#006064", // Teal       · Cyan 900 (very dark)
++  "#b0bec5", // Grey       · Blue Grey 200 (light silver)
++  // Round 4 — mid-range fillers
++  "#1565c0", // Blue       · Blue 800 (deep navy)
++  "#7b1fa2", // Purple     · Purple 800
++  "#00acc1", // Teal       · Cyan 600 (lighter)
++  "#78909c", // Grey       · Blue Grey 400 (medium-light)
++  // Round 5 — remaining distinct entries
++  "#0288d1", // Blue       · Light Blue 700
++  "#3949ab", // Purple     · Indigo 600 (blue-purple blend)
++  "#00695c", // Teal       · Teal 800 (dark green-teal)
++  "#37474f", // Grey       · Blue Grey 700 (medium-dark)
 +];
++
++/**
++ * Returns the series colour for the given 0-based index.
++ * Uses the hand-crafted palette for the first 20 entries;
++ * beyond that a golden-ratio HSL algorithm generates new colours
++ * so the sequence extends indefinitely without repeating.
++ */
++function getSeriesColor(index: number): string {
++  if (index < SERIES_COLORS.length) return SERIES_COLORS[index];
++  // Golden-angle hue distribution — spreads colours evenly around the wheel.
++  // Two lightness levels and three saturation bands give further variety.
++  const goldenAngle = 137.508;
++  const hue = Math.round((index * goldenAngle) % 360);
++  // Skip the green band (90-150°) reserved for status colours.
++  const adjustedHue = hue >= 90 && hue <= 150 ? (hue + 60) % 360 : hue;
++  const sat = 55 + (index % 3) * 12;  // 55 / 67 / 79 %
++  const lit = 38 + (index % 2) * 18;  // 38 / 56 %
++  return `hsl(${adjustedHue},${sat}%,${lit}%)`;
++}
 +
 +// ─── Layout constants ─────────────────────────────────────────────────────────
 +const CARD_M  = { top: 10, right: 12, bottom: 40, left: 54 };
@@ -761,7 +803,7 @@ index 000000000..460aa4216
 +  const baseY  = legStartY + LEG_PAD;
 +
 +  metricKeys.forEach((key, i) => {
-+    const color      = SERIES_COLORS[i % SERIES_COLORS.length];
++    const color      = getSeriesColor(i);
 +    const label      = configScales?.[key]?.label ?? key.replace(/_/g, " ");
 +    const unit       = configScales?.[key]?.unit;
 +    const avg        = averages?.[key];
@@ -1072,7 +1114,7 @@ index 000000000..460aa4216
 +        label: configScales?.[k]?.label ?? k.replace(/_/g, " "),
 +        value: s.values[k] ?? 0,
 +        unit:  configScales?.[k]?.unit ?? "",
-+        color: SERIES_COLORS[i % SERIES_COLORS.length],
++        color: getSeriesColor(i),
 +      })),
 +    };
 +  };
@@ -1101,7 +1143,7 @@ index 000000000..460aa4216
 +  const Legend = () => (
 +    <div className={styles.legend}>
 +      {metricKeys.map((key, i) => {
-+        const color      = SERIES_COLORS[i % SERIES_COLORS.length];
++        const color      = getSeriesColor(i);
 +        const label      = configScales?.[key]?.label ?? key.replace(/_/g, " ");
 +        const unit       = configScales?.[key]?.unit;
 +        const avg        = averages?.[key];
@@ -1298,7 +1340,7 @@ index 000000000..460aa4216
 +
 +        {/* Series */}
 +        {metricKeys.map((key, i) => {
-+          const color = SERIES_COLORS[i % SERIES_COLORS.length];
++          const color = getSeriesColor(i);
 +          if (chartType === "line") {
 +            return <path key={key} d={linePath(key)} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />;
 +          }
@@ -1854,7 +1896,7 @@ index 000000000..b36db6991
 +}
 diff --git a/packages/web-awesome/src/components/Summary/TelemetrySection.tsx b/packages/web-awesome/src/components/Summary/TelemetrySection.tsx
 new file mode 100644
-index 000000000..9112ccf20
+index 000000000..03995db4c
 --- /dev/null
 +++ b/packages/web-awesome/src/components/Summary/TelemetrySection.tsx
 @@ -0,0 +1,95 @@
@@ -1878,7 +1920,7 @@ index 000000000..9112ccf20
 + * Renders a collapsible section that displays one SVG chart per telemetry
 + * module found in `extended_metadata.telemetry.modules`.  The chart type
 + * (line | area | bar_vertical) is determined by each module's
-+ * `config.chart_type` field.
++ * `configs.chart_type` field.
 + */
 +export const TelemetrySection: FunctionComponent<TelemetrySectionProps> = ({
 +  extendedMetadata,
@@ -1924,11 +1966,11 @@ index 000000000..9112ccf20
 +        <div className={styles.chartsGrid}>
 +          {moduleEntries.map(([key, mod]) => {
 +            const chartType = (
-+              (mod?.config?.chart_type as string) || "line"
++              (mod?.configs?.chart_type as string) || "line"
 +            ) as "line" | "area" | "bar_vertical";
 +
-+            // If config.metrics is a non-empty array, restrict to those keys
-+            const configMetrics: string[] = mod?.config?.metrics ?? [];
++            // If configs.metrics is a non-empty array, restrict to those keys
++            const configMetrics: string[] = mod?.configs?.metrics ?? [];
 +
 +            return (
 +              <TelemetryChart
@@ -1938,11 +1980,11 @@ index 000000000..9112ccf20
 +                samples={mod?.samples ?? []}
 +                averages={mod?.averages}
 +                minMax={mod?.min_max}
-+                thresholds={mod?.config?.thresholds}
++                thresholds={mod?.configs?.thresholds}
 +                visibleMetrics={configMetrics.length > 0 ? configMetrics : undefined}
-+                configTitle={mod?.config?.title}
-+                configScales={mod?.config?.scales}
-+                axes={mod?.config?.axes}
++                configTitle={mod?.configs?.title}
++                configScales={mod?.configs?.scales}
++                axes={mod?.configs?.axes}
 +                summaryMeta={summaryMeta}
 +                testId={testId}
 +              />
@@ -1955,10 +1997,10 @@ index 000000000..9112ccf20
 +};
 diff --git a/packages/web-awesome/src/components/Summary/attachmentHelpers.ts b/packages/web-awesome/src/components/Summary/attachmentHelpers.ts
 new file mode 100644
-index 000000000..f91aa3b36
+index 000000000..b31ef8ece
 --- /dev/null
 +++ b/packages/web-awesome/src/components/Summary/attachmentHelpers.ts
-@@ -0,0 +1,300 @@
+@@ -0,0 +1,351 @@
 +/**
 + * Attachment helper functions for Summary components.
 + *
@@ -2201,6 +2243,57 @@ index 000000000..f91aa3b36
 +// ─── Summary metadata ─────────────────────────────────────────────────────────
 +
 +/**
++ * Finds the `test_summary.json` attachment and returns a map of
++ * Allure result UUID → description for every test entry in the summary.
++ * All UUIDs listed in `all_run_uuids` are mapped so that any historical
++ * run UUID resolves to its description.
++ */
++export async function getTestDescriptionsFromSummary(
++  individualTestResults: Record<string, any>,
++): Promise<Record<string, string>> {
++  const summaryTest = Object.values(individualTestResults).find(
++    (testResult: any) =>
++      testResult.labels?.find((l: any) => l.name === "package")?.value === "test_summary",
++  );
++
++  if (!summaryTest) return {};
++
++  const summaryAttachment = (summaryTest as any)?.attachments?.find(
++    (a: any) =>
++      a.link?.name?.includes("test_summary.json") &&
++      a.link?.contentType === "application/json",
++  );
++
++  if (!summaryAttachment) return {};
++
++  try {
++    const result = await fetchAttachment(
++      summaryAttachment.link.id,
++      summaryAttachment.link.ext || ".json",
++      summaryAttachment.link.contentType,
++    );
++
++    if (result?.text) {
++      const data = JSON.parse(result.text);
++      const map: Record<string, string> = {};
++      for (const test of (data?.tests ?? [])) {
++        const description: string = test?.description ?? "";
++        if (!description) continue;
++        // Key by test_name — matched against the Allure result's `name` field
++        if (test?.test_name) {
++          map[test.test_name] = description;
++        }
++      }
++      return map;
++    }
++  } catch (error) {
++    console.error("Error fetching test descriptions from summary:", error);
++  }
++
++  return {};
++}
++
++/**
 + * Finds the `test_summary.json` attachment on the CLI Summary test
 + * (`package = "test_summary"`) and returns `{ cliName, platform, timestamp }`.
 + * These values are used to generate unique telemetry chart PNG filenames.
@@ -2261,10 +2354,10 @@ index 000000000..f91aa3b36
 +}
 diff --git a/packages/web-awesome/src/components/Summary/index.tsx b/packages/web-awesome/src/components/Summary/index.tsx
 new file mode 100644
-index 000000000..14f93c2b1
+index 000000000..05657ad0e
 --- /dev/null
 +++ b/packages/web-awesome/src/components/Summary/index.tsx
-@@ -0,0 +1,3306 @@
+@@ -0,0 +1,3347 @@
 +import { useEffect, useState } from "preact/hooks";
 +import { fetchAttachment } from "@allurereport/web-commons";
 +import {
@@ -2273,6 +2366,7 @@ index 000000000..14f93c2b1
 +  getReferenceFromAttachment,
 +  getSystemInfoFromAttachment,
 +  getSummaryMetaFromAttachment,
++  getTestDescriptionsFromSummary,
 +} from "./attachmentHelpers";
 +import * as styles from "./styles.scss";
 +import { availableSections } from "../../stores/sections";
@@ -2788,6 +2882,30 @@ index 000000000..14f93c2b1
 +          </table>
 +        </>
 +      )}
++    </div>
++  );
++};
++
++/** Small show-more/show-less component for potentially long descriptions. */
++const DescriptionBlock = ({ text }: { text: string }) => {
++  const [expanded, setExpanded] = useState(false);
++  const LIMIT = 220;
++  const isTruncatable = text.length > LIMIT;
++  const truncated = !expanded && isTruncatable;
++  return (
++    <div className={styles["test-description"]}>
++      <span className={styles["test-description-text"]}>
++        {truncated ? text.slice(0, LIMIT).trimEnd() : text}
++        {isTruncatable && (
++          <button
++            type="button"
++            className={styles["test-description-toggle"]}
++            onClick={(e: MouseEvent) => { e.stopPropagation(); setExpanded(v => !v); }}
++          >
++            {expanded ? '\u00a0Show less' : '\u2026\u00a0Show more'}
++          </button>
++        )}
++      </span>
 +    </div>
 +  );
 +};
@@ -3408,6 +3526,9 @@ index 000000000..14f93c2b1
 +  const [expandedVerticalProfiles, setExpandedVerticalProfiles] = useState<Set<string>>(new Set());
 +  const [verticalSearchTerm, setVerticalSearchTerm] = useState<string>("");
 +
++  // Test descriptions keyed by Allure result UUID, loaded from test_summary.json
++  const [testDescriptions, setTestDescriptions] = useState<Record<string, string>>({});
++
 +  useEffect(() => {
 +    // Fetch navigation data and individual test results
 +    const fetchAllTestData = async () => {
@@ -3622,6 +3743,12 @@ index 000000000..14f93c2b1
 +    const minutes = Math.floor(seconds / 60);
 +    const remainingSeconds = seconds % 60;
 +    return `${minutes}m ${remainingSeconds.toFixed(1)}s`;
++  };
++
++  /** Returns the description string for a given testId, or null if absent. */
++  const getTestDescription = (testId: string): string | null => {
++    const testName = individualTestResults[testId]?.name;
++    return (testName && testDescriptions[testName]) || null;
 +  };
 +
 +  // Create profile table data for test results (type: "suite")
@@ -4128,15 +4255,19 @@ index 000000000..14f93c2b1
 +  // State for summary metadata (cli_name, platform, timestamp from test_summary.json)
 +  const [summaryMeta, setSummaryMeta] = useState<{ cliName: string; platform: string; timestamp: string } | null>(null);
 +
-+  // Fetch summary metadata alongside system info
++  // Fetch summary metadata and test descriptions from the same test_summary.json attachment
 +  useEffect(() => {
-+    const loadSummaryMeta = async () => {
-+      const meta = await getSummaryMetaFromAttachment(individualTestResults);
++    const loadSummaryData = async () => {
++      const [meta, descriptions] = await Promise.all([
++        getSummaryMetaFromAttachment(individualTestResults),
++        getTestDescriptionsFromSummary(individualTestResults),
++      ]);
 +      setSummaryMeta(meta);
++      setTestDescriptions(descriptions);
 +    };
 +
 +    if (!loadingTests && Object.keys(individualTestResults).length > 0) {
-+      loadSummaryMeta();
++      loadSummaryData();
 +    }
 +  }, [loadingTests, individualTestResults]);
 +
@@ -4913,6 +5044,7 @@ index 000000000..14f93c2b1
 +                                    {/* Overview Section */}
 +                                    <div className={styles["detail-section"]}>
 +                                      <h4 className={styles["detail-section-title"]}>Overview</h4>
++                                      {(() => { const desc = getTestDescription(testId); return desc ? <DescriptionBlock text={desc} /> : null; })()}
 +                                      <div className={styles["detail-grid-3col"]}>
 +                                        <div>
 +                                          <span className={styles["detail-label"]}>History: </span>
@@ -5169,6 +5301,7 @@ index 000000000..14f93c2b1
 +                                    {/* Overview Section */}
 +                                    <div className={styles["detail-section"]}>
 +                                      <h4 className={styles["detail-section-title"]}>Overview</h4>
++                                      {(() => { const desc = getTestDescription(testId); return desc ? <DescriptionBlock text={desc} /> : null; })()}
 +                                      <div className={styles["detail-grid-3col"]}>
 +                                        <div>
 +                                          <span className={styles["detail-label"]}>History: </span>
@@ -5462,6 +5595,7 @@ index 000000000..14f93c2b1
 +                                    {/* Overview Section */}
 +                                    <div className={styles["detail-section"]}>
 +                                      <h4 className={styles["detail-section-title"]}>Overview</h4>
++                                      {(() => { const desc = getTestDescription(testId); return desc ? <DescriptionBlock text={desc} /> : null; })()}
 +                                      <div className={styles["detail-grid-3col"]}>
 +                                        <div>
 +                                          <span className={styles["detail-label"]}>History: </span>
@@ -5573,10 +5707,10 @@ index 000000000..14f93c2b1
 +};
 diff --git a/packages/web-awesome/src/components/Summary/styles.scss b/packages/web-awesome/src/components/Summary/styles.scss
 new file mode 100644
-index 000000000..3f5f1054b
+index 000000000..0cec925d6
 --- /dev/null
 +++ b/packages/web-awesome/src/components/Summary/styles.scss
-@@ -0,0 +1,1631 @@
+@@ -0,0 +1,1647 @@
 +// Overview container with larger horizontal padding
 +.overview {
 +  padding: 0 80px;
@@ -5648,6 +5782,7 @@ index 000000000..3f5f1054b
 +  border-bottom: 1px solid var(--on-border-secondary);
 +  background: var(--bg-base-primary);
 +  color: var(--text-primary);
++  line-height: 1.5;
 +}
 +
 +.custom-table tr:last-child td {
@@ -5959,21 +6094,7 @@ index 000000000..3f5f1054b
 +
 +.system-info-detail-line {
 +  margin-bottom: 4px;
-+  white-space: pre-wrap;
-+
-+  &:last-child {
-+    margin-bottom: 0;
-+  }
-+}
-+
-+.system-info-sub-detail-line {
-+  margin-bottom: 3px;
-+  margin-top: 1px;
-+  border-left: 2px solid var(--on-border-secondary);
-+  font-size: 12px;
-+  color: var(--text-secondary);
-+  white-space: pre-wrap;
-+
++  
 +  &:last-child {
 +    margin-bottom: 0;
 +  }
@@ -6423,10 +6544,9 @@ index 000000000..3f5f1054b
 +.detail-section {
 +  margin-bottom: 16px;
 +  padding: 12px;
-+  // background-color: var(--bg-base-primary);
-+  background-color: var(--bg-base-secondary);
-+  border-radius: 4px;
-+  border: 1px solid var(--on-border-secondary);
++  background-color: var(--bg-base-primary);
++  border-radius: 8px;
++  border: 1px solid var(--bg-base-secondary);
 +}
 +
 +.detail-section-title {
@@ -6550,6 +6670,36 @@ index 000000000..3f5f1054b
 +  .dark & {
 +    background-color: rgba(253, 204, 107, 0.1);
 +    border-color: rgba(253, 204, 107, 0.3);
++  }
++}
++
++// ─── Test description (shown in Overview when expanded) ───────────────────────
++
++.test-description {
++  margin-bottom: 10px;
++  padding-bottom: 10px;
++  border-bottom: 1px solid var(--on-border-secondary);
++}
++
++.test-description-text {
++  font-size: 12px;
++  color: var(--text-secondary);
++  line-height: 1.5;
++  white-space: pre-wrap;
++}
++
++.test-description-toggle {
++  background: none;
++  border: none;
++  padding: 0;
++  font-size: 11px;
++  font-weight: 700;
++  color: #888;
++  cursor: pointer;
++  text-decoration: none;
++
++  &:hover {
++    color: #555;
 +  }
 +}
 +

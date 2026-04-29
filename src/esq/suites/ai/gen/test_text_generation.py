@@ -5,6 +5,7 @@ import json
 import logging
 import os
 
+import allure
 import pytest
 from esq.suites.ai.gen.src.text_generation.execution import process_device_results, run_device_test
 from esq.suites.ai.gen.src.text_generation.preparation import prepare_assets
@@ -27,6 +28,11 @@ from sysagent.utils.system.ov_helper import get_available_devices_by_category
 logger = logging.getLogger(__name__)
 
 
+@allure.description(
+    "Benchmarks LLM serving throughput by deploying the model via OpenVINO "
+    "Model Server (OVMS) in a Docker container and driving a synthetic ShareGPT "
+    "workload through a vLLM-compatible benchmark client."
+)
 def test_text_generation(
     request,
     configs,
@@ -39,9 +45,7 @@ def test_text_generation(
     execute_test_with_cache,
     prepare_test,
 ):
-    """
-    End-to-end Text Generation Test using a Docker container.
-    """
+    """Benchmarks LLM serving throughput via OVMS and a vLLM-compatible benchmark client."""
     # Request
     test_name = request.node.name.split("[")[0]
 

@@ -5,7 +5,15 @@ import logging
 import os
 from typing import Any, Dict
 
+import allure
 import pytest
+
+# Import from sysagent utilities
+from sysagent.utils.core import Metrics, Result, get_metric_name_for_device
+from sysagent.utils.infrastructure import DockerClient
+from sysagent.utils.system import SystemInfoCache
+from sysagent.utils.system.ov_helper import get_available_devices_by_category
+
 from esq.suites.ai.vision.src.dlstreamer.execution import (
     run_multi_device_test,
 )
@@ -29,17 +37,18 @@ from esq.utils.references import (
     attach_reference_data_to_allure,
 )
 
-# Import from sysagent utilities
-from sysagent.utils.core import Metrics, Result, get_metric_name_for_device
-from sysagent.utils.infrastructure import DockerClient
-from sysagent.utils.system import SystemInfoCache
-from sysagent.utils.system.ov_helper import get_available_devices_by_category
-
 # Pipeline info handling is now in execution module
 
 logger = logging.getLogger(__name__)
 
 
+@allure.description(
+    "Runs a DL Streamer inference pipeline inside Docker containers across one or more "
+    "available devices to find the maximum number of concurrent video streams that sustain "
+    "the target FPS. A per-device baseline analysis first determines each device's stream "
+    "capacity, then the full concurrent execution measures the combined streams_max across "
+    "all active devices."
+)
 def test_dlstreamer(
     request,
     configs,
@@ -52,9 +61,7 @@ def test_dlstreamer(
     execute_test_with_cache,
     prepare_test,
 ):
-    """
-    End-to-end DL Streamer Test using a Docker container.
-    """
+    """Runs DL Streamer pipelines across devices to find max concurrent streams above target FPS."""
     # Request
     test_name = request.node.name.split("[")[0]
 

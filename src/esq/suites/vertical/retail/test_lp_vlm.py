@@ -17,6 +17,11 @@ from sysagent.utils.system.ov_helper import get_available_devices_by_category
 logger = logging.getLogger(__name__)
 
 
+@allure.description(
+    "Run the containerized VLM workload to collect end-to-end inference performance "
+    "metrics. The workload combines YOLO-based object detection with a Visual Language "
+    "Model for scene understanding on the configured device."
+)
 def test_lp_vlm(
     request,
     configs,
@@ -27,18 +32,7 @@ def test_lp_vlm(
     execute_test_with_cache,
     prepare_test,
 ):
-    """
-    End-to-end Loss Prevention Visual Language Model Test.
-
-    This test executes the Loss Prevention VLM workload which combines:
-    - Object detection using YOLO models
-    - Visual Language Model analysis for enhanced understanding
-    - Message broker communication via RabbitMQ
-    - Object storage via MinIO
-
-    The test validates inference performance, accuracy, and system stability
-    under VLM workload conditions.
-    """
+    """Runs the Loss Prevention VLM sample app to collect inference performance metrics."""
     # Initialize variables for finally block (moved to top for broader coverage)
     test_failed = False
     test_interrupted = False

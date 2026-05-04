@@ -8,6 +8,7 @@ This package contains AI and model-specific utilities that extend the core sysag
 - models: Model batch processing, YOLO, OpenVINO, KaggleHub, media resources
 - downloads: Model and dataset downloading from HuggingFace and ModelScope
 - servers: Server-specific utilities (OVMS, etc.)
+- services: Shared multi-service orchestration helpers for suite deployments
 - references: Verified reference data handling and filtering
 - telemetry: ESQ-specific telemetry modules (e.g., package_power via Intel RAPL)
 """
@@ -20,6 +21,7 @@ __all__ = [
     "models",
     "downloads",
     "servers",
+    "services",
     "references",
     "telemetry",
 ]

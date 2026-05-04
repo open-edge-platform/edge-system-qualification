@@ -1,0 +1,51 @@
+# Copyright (C) 2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+# Configurations for the AI Timeseries tests
+
+tests:
+  test_wind_turbine:
+    params:
+      - display_name: "Timeseries Wind Turbine - Multi-Service Skeleton"
+        ingestion_mode: "opcua"
+        compute_device: "cpu"
+        sample_app: "wind-turbine-anomaly-detection"
+        num_streams: 1
+        num_data_points: 1000
+        number_of_data_points_per_stream: 1000
+        ingestion_interval: "1s"
+        platform: ""
+        ref_throughput: -1.0
+        ref_latency: -1.0
+        throughput_percent_delta_threshold: 5.0
+        throughput: -1.0
+        latency: -1.0
+        metric_source: "influx_auto"
+        influx_measurement: "wind-turbine-anomaly-data"
+        influx_processed_field: "wind_speed"
+        influx_throughput_field: ""
+        influx_latency_field: "end_end_time"
+        influx_latency_scale: 1000000000.0
+        influx_window_seconds: 30
+        influx_poll_timeout_seconds: 180
+        influx_poll_interval_seconds: 5
+        influx_startup_grace_seconds: 20
+        services_ready_timeout_seconds: 300
+        services_ready_poll_interval_seconds: 5
+        influx_database: "datain"
+        influx_server: "ia-influxdb"
+        influx_container_name: "ia-influxdb"
+        influx_query_timeout: 120
+        kapacitor_influx_url: "http://ia-influxdb:8086"
+        kapacitor_url: "http://localhost:9092"
+        debug_preserve_environment: false
+        enforce_ingestion_mode_services: true
+        compose_project_name: "esq-timeseries"
+        image_suffix: "1.1.0"
+        docker_registry: ""
+        reference_app_src_path: ""
+        simulation_data_dir: ""
+        telegraf_config_path: "/etc/telegraf/Telegraf.conf"
+        telegraf_input_plugin: "opcua"
+        ts_ms_server_url: "http://ia-time-series-analytics-microservice:9092"
+        log_level: "INFO"

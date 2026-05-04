@@ -165,7 +165,7 @@ def get_test_configs_for_test(test_func: Callable) -> List[Dict[str, Any]]:
         from sysagent.utils.config import load_test_configurations
 
         configs = load_test_configurations(test_name, config_path)
-        logger.info(f"Loaded {len(configs)} configurations for {test_name}")
+        logger.debug(f"Loaded {len(configs)} configurations for {test_name}")
         return configs
     except Exception as e:
         logger.error(f"Error loading test configurations for {test_name}: {e}")

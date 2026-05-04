@@ -1,0 +1,219 @@
+services:
+  ia-influxdb:
+    container_name: ia-influxdb
+    image: influxdb:1.12.2
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777
+      - /var/lib/influxdb:uid=1500,gid=1500,mode=0755
+      - /var/run/influxdb:uid=1500,gid=1500,mode=0755
+    environment:
+      INFLUXDB_HTTP_AUTH_ENABLED: "false"
+      INFLUXDB_DB: datain
+      INFLUXDB_ADMIN_USER: ${INFLUX_USER:-influxuser}
+      INFLUXDB_ADMIN_PASSWORD: ${INFLUX_PASSWORD:?INFLUX_PASSWORD must be set}
+      INFLUXDB_USER: ${INFLUX_USER:-influxuser}
+      INFLUXDB_USER_PASSWORD: ${INFLUX_PASSWORD:?INFLUX_PASSWORD must be set}
+    ports:
+      - "127.0.0.1:8086:8086"
+
+  ia-mqtt-broker:
+    container_name: ia-mqtt-broker
+    image: eclipse-mosquitto:2.0.22
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /mosquitto/log
+      - /mosquitto/data
+    ports:
+      - "127.0.0.1:1883:1883"
+    volumes:
+      - ${REFERENCE_APP_SRC_PATH:-${CORE_DATA_DIR:-./esq_data}/data/suites/ai/timeseries/wt/assets}/configs/mqtt-broker/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+
+  ia-opcua-server:
+    image: ${DOCKER_REGISTRY:-}intel/ia-opcua-server:${IMAGE_SUFFIX:-1.1.0}
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - DAC_OVERRIDE
+    read_only: true
+    tmpfs:
+      - /tmp
+    volumes:
+      - ${TIMESERIES_ASSETS_DIR:-${CORE_DATA_DIR:-./esq_data}/data/suites/ai/timeseries/wt/assets/apps/wind-turbine-anomaly-detection/simulation-data}:/app/simulation-data:ro
+    environment:
+      TS_MS_SERVER: ia-time-series-analytics-microservice
+      TS_MS_PORT: 9092
+      NUM_STREAMS: ${NUM_STREAMS:-1}
+      NUM_DATA_POINTS: ${NUM_DATA_POINTS:-1000}
+      INGESTION_INTERVAL: ${INGESTION_INTERVAL:-1s}
+      INGESTION_MODE: ${INGESTION_MODE:-opcua}
+      COMPUTE_DEVICE: ${COMPUTE_DEVICE:-cpu}
+      NO_PROXY: "127.0.0.1,localhost,ia-influxdb,ia-mqtt-broker,ia-time-series-analytics-microservice"
+      no_proxy: "127.0.0.1,localhost,ia-influxdb,ia-mqtt-broker,ia-time-series-analytics-microservice"
+    depends_on:
+      - ia-influxdb
+    restart: unless-stopped
+
+  ia-mqtt-publisher:
+    image: ${DOCKER_REGISTRY:-}intel/ia-mqtt-publisher:${IMAGE_SUFFIX:-1.1.0}
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - DAC_OVERRIDE
+    read_only: true
+    tmpfs:
+      - /tmp
+    command:
+      - --streams
+      - ${MQTT_PUBLISHER_STREAMS:-1}
+      - --sampling_rate
+      - ${MQTT_PUBLISHER_SAMPLING_RATE:-10}
+      - --subsample
+      - ${MQTT_PUBLISHER_SUBSAMPLE:-1}
+    volumes:
+      - ${TIMESERIES_ASSETS_DIR:-${CORE_DATA_DIR:-./esq_data}/data/suites/ai/timeseries/wt/assets/apps/wind-turbine-anomaly-detection/simulation-data}:/app/simulation-data:ro
+      - ${TIMESERIES_ASSETS_DIR:-${CORE_DATA_DIR:-./esq_data}/data/suites/ai/timeseries/wt/assets/apps/wind-turbine-anomaly-detection/simulation-data}:/simulation-data:ro
+    environment:
+      AppName: "mqtt-publisher"
+      HOST_IP: ${MQTT_BROKER_HOST:-ia-mqtt-broker}
+      SAMPLE_APP: ${SAMPLE_APP:-wind-turbine-anomaly-detection}
+      TS_MS_SERVER: ia-time-series-analytics-microservice
+      TS_MS_PORT: 9092
+      NUM_STREAMS: ${NUM_STREAMS:-1}
+      NUM_DATA_POINTS: ${NUM_DATA_POINTS:-1000}
+      INGESTION_INTERVAL: ${INGESTION_INTERVAL:-1s}
+      INGESTION_MODE: ${INGESTION_MODE:-mqtt}
+      COMPUTE_DEVICE: ${COMPUTE_DEVICE:-cpu}
+      CONTINUOUS_SIMULATOR_INGESTION: ${CONTINUOUS_SIMULATOR_INGESTION:-true}
+      NO_PROXY: "127.0.0.1,localhost,ia-influxdb,ia-mqtt-broker,ia-time-series-analytics-microservice"
+      no_proxy: "127.0.0.1,localhost,ia-influxdb,ia-mqtt-broker,ia-time-series-analytics-microservice"
+    depends_on:
+      - ia-mqtt-broker
+      - ia-influxdb
+    restart: unless-stopped
+
+  ia-time-series-analytics-microservice:
+    container_name: ia-time-series-analytics-microservice
+    image: ${DOCKER_REGISTRY:-}intel/ia-time-series-analytics-microservice:${IMAGE_SUFFIX:-1.1.0}
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - DAC_OVERRIDE
+    read_only: true
+    tmpfs:
+      - /tmp
+    environment:
+      SAMPLE_APP: ${SAMPLE_APP:-wind-turbine-anomaly-detection}
+      NUM_STREAMS: ${NUM_STREAMS:-1}
+      NUM_DATA_POINTS: ${NUM_DATA_POINTS:-1000}
+      INGESTION_INTERVAL: ${INGESTION_INTERVAL:-1s}
+      INGESTION_MODE: ${INGESTION_MODE:-opcua}
+      COMPUTE_DEVICE: ${COMPUTE_DEVICE:-cpu}
+      INFLUX_SERVER: ${INFLUX_SERVER:-ia-influxdb}
+      INFLUXDB_DBNAME: ${INFLUXDB_DBNAME:-datain}
+      KAPACITOR_URL: ${KAPACITOR_URL:-http://localhost:9092}
+      KAPACITOR_INFLUXDB_0_URLS_0: ${KAPACITOR_INFLUXDB_0_URLS_0:-http://ia-influxdb:8086}
+      KAPACITOR_INFLUXDB_0_USERNAME: ${INFLUXDB_USERNAME:-influxuser}
+      KAPACITOR_INFLUXDB_0_PASSWORD: ${INFLUXDB_PASSWORD:?INFLUXDB_PASSWORD must be set}
+      NO_PROXY: "127.0.0.1,localhost,ia-influxdb,ia-mqtt-broker,ia-time-series-analytics-microservice"
+      no_proxy: "127.0.0.1,localhost,ia-influxdb,ia-mqtt-broker,ia-time-series-analytics-microservice"
+    volumes:
+      - ${REFERENCE_APP_SRC_PATH:-${CORE_DATA_DIR:-./esq_data}/data/suites/ai/timeseries/wt/assets}/apps/${SAMPLE_APP:-wind-turbine-anomaly-detection}/time-series-analytics-config/udfs/:/tmp/${SAMPLE_APP:-wind-turbine-anomaly-detection}/udfs/:ro
+      - ./configs/empty-requirements.txt:/tmp/${SAMPLE_APP:-wind-turbine-anomaly-detection}/udfs/requirements.txt:ro
+      - ${REFERENCE_APP_SRC_PATH:-${CORE_DATA_DIR:-./esq_data}/data/suites/ai/timeseries/wt/assets}/apps/${SAMPLE_APP:-wind-turbine-anomaly-detection}/time-series-analytics-config/tick_scripts/:/tmp/${SAMPLE_APP:-wind-turbine-anomaly-detection}/tick_scripts/:ro
+      - ${REFERENCE_APP_SRC_PATH:-${CORE_DATA_DIR:-./esq_data}/data/suites/ai/timeseries/wt/assets}/apps/${SAMPLE_APP:-wind-turbine-anomaly-detection}/time-series-analytics-config/config.json:/app/config.json:ro
+      - ${REFERENCE_APP_SRC_PATH:-${CORE_DATA_DIR:-./esq_data}/data/suites/ai/timeseries/wt/assets}/apps/${SAMPLE_APP:-wind-turbine-anomaly-detection}/time-series-analytics-config/models/:/tmp/${SAMPLE_APP:-wind-turbine-anomaly-detection}/models/:ro
+    depends_on:
+      - ia-influxdb
+      - ia-mqtt-broker
+    restart: unless-stopped
+
+  ia-telegraf:
+    container_name: ia-telegraf
+    image: telegraf:1.37.2
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - DAC_OVERRIDE
+    read_only: true
+    tmpfs:
+      - /tmp
+    entrypoint: ["/bin/sh", "-c", "/entrypoint.sh"]
+    environment:
+      INFLUX_SERVER: ${INFLUX_SERVER:-ia-influxdb}
+      INFLUXDB_PORT: 8086
+      INFLUXDB_USERNAME: ${INFLUXDB_USERNAME:-influxuser}
+      INFLUXDB_PASSWORD: ${INFLUXDB_PASSWORD:?INFLUXDB_PASSWORD must be set}
+      INFLUXDB_DBNAME: ${INFLUXDB_DBNAME:-datain}
+      TELEGRAF_METRIC_BATCH_SIZE: ${TELEGRAF_METRIC_BATCH_SIZE:-100}
+      TELEGRAF_CONFIG_PATH: ${TELEGRAF_CONFIG_PATH:-/etc/telegraf/Telegraf.conf}
+      TELEGRAF_INPUT_PLUGIN: ${TELEGRAF_INPUT_PLUGIN:-opcua}
+      OPCUA_SERVER: opc.tcp://ia-opcua-server:4840/freeopcua/server/
+      MQTT_BROKER_HOST: ia-mqtt-broker
+      TS_MS_SERVER_URL: ${TS_MS_SERVER_URL:-http://ia-time-series-analytics-microservice:9092}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      NO_PROXY: "127.0.0.1,localhost,ia-influxdb,ia-mqtt-broker,ia-opcua-server,ia-time-series-analytics-microservice"
+      no_proxy: "127.0.0.1,localhost,ia-influxdb,ia-mqtt-broker,ia-opcua-server,ia-time-series-analytics-microservice"
+    volumes:
+      - ${REFERENCE_APP_SRC_PATH:-${CORE_DATA_DIR:-./esq_data}/data/suites/ai/timeseries/wt/assets}/configs/telegraf/entrypoint.sh:/entrypoint.sh:ro
+      - ${TELEGRAF_CONFIG_DIR:-${CORE_DATA_DIR:-./esq_data}/data/suites/ai/timeseries/wt/assets/apps/wind-turbine-anomaly-detection/telegraf-config}:/etc/telegraf:ro
+    depends_on:
+      - ia-influxdb
+      - ia-time-series-analytics-microservice
+    restart: unless-stopped
+
+  ia-grafana:
+    container_name: ia-grafana
+    image: grafana/grafana:12.1.1
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/lib/grafana
+    depends_on:
+      - ia-influxdb
+    ports:
+      - "127.0.0.1:3000:3000"
+
+  nginx:
+    container_name: ia-nginx
+    image: nginx:1.29-alpine
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - NET_BIND_SERVICE
+      - SETGID
+      - SETUID
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+      - /var/run
+    restart: unless-stopped

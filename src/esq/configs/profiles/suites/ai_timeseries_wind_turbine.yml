@@ -1,0 +1,279 @@
+# Copyright (C) 2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+name: "profile.suite.ai.timeseries-wind-turbine"
+description: "Timeseries AI suite profile - Wind Turbine Skeleton"
+version: "1.0.0"
+params:
+  labels:
+    profile_display_name: "Timeseries AI"
+    group: "ai.timeseries"
+    type: "suite"
+    display_status: false
+  requirements:
+    cpu_min_cores: 2
+    memory_min_gb: 4.0
+    storage_total_min_gb: 32.0
+    storage_min_gb: 5.0
+    os_type:
+      - "linux"
+    docker_required: true
+  assets_repo_ref: "2026.0"
+  assets:
+    - id: "timeseries_compose"
+      type: "file"
+      path: "./docker-compose.yml"
+      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-suites/2026.0/manufacturing-ai-suite/industrial-edge-insights-time-series/docker-compose.yml"
+    - id: "timeseries_env"
+      type: "file"
+      path: "./.env"
+      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-suites/2026.0/manufacturing-ai-suite/industrial-edge-insights-time-series/.env"
+    - id: "mqtt_broker_conf"
+      type: "file"
+      path: "./configs/mqtt-broker/mosquitto.conf"
+      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-suites/2026.0/manufacturing-ai-suite/industrial-edge-insights-time-series/configs/mqtt-broker/mosquitto.conf"
+    - id: "telegraf_entrypoint"
+      type: "file"
+      path: "./configs/telegraf/entrypoint.sh"
+      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-suites/2026.0/manufacturing-ai-suite/industrial-edge-insights-time-series/configs/telegraf/entrypoint.sh"
+    - id: "wind_turbine_csv"
+      type: "file"
+      path: "./apps/wind-turbine-anomaly-detection/simulation-data/wind-turbine-anomaly-detection.csv"
+      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-suites/2026.0/manufacturing-ai-suite/industrial-edge-insights-time-series/apps/wind-turbine-anomaly-detection/simulation-data/wind-turbine-anomaly-detection.csv"
+    - id: "telegraf_default_conf"
+      type: "file"
+      path: "./apps/wind-turbine-anomaly-detection/telegraf-config/Telegraf.conf"
+      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-suites/2026.0/manufacturing-ai-suite/industrial-edge-insights-time-series/apps/wind-turbine-anomaly-detection/telegraf-config/Telegraf.conf"
+    - id: "ts_config_json"
+      type: "file"
+      path: "./apps/wind-turbine-anomaly-detection/time-series-analytics-config/config.json"
+      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-suites/2026.0/manufacturing-ai-suite/industrial-edge-insights-time-series/apps/wind-turbine-anomaly-detection/time-series-analytics-config/config.json"
+    - id: "ts_model"
+      type: "file"
+      path: "./apps/wind-turbine-anomaly-detection/time-series-analytics-config/models/windturbine_anomaly_detector.pkl"
+      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-suites/2026.0/manufacturing-ai-suite/industrial-edge-insights-time-series/apps/wind-turbine-anomaly-detection/time-series-analytics-config/models/windturbine_anomaly_detector.pkl"
+    - id: "ts_tick_script"
+      type: "file"
+      path: "./apps/wind-turbine-anomaly-detection/time-series-analytics-config/tick_scripts/windturbine_anomaly_detector.tick"
+      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-suites/2026.0/manufacturing-ai-suite/industrial-edge-insights-time-series/apps/wind-turbine-anomaly-detection/time-series-analytics-config/tick_scripts/windturbine_anomaly_detector.tick"
+    - id: "ts_udf_requirements"
+      type: "file"
+      path: "./apps/wind-turbine-anomaly-detection/time-series-analytics-config/udfs/requirements.txt"
+      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-suites/2026.0/manufacturing-ai-suite/industrial-edge-insights-time-series/apps/wind-turbine-anomaly-detection/time-series-analytics-config/udfs/requirements.txt"
+    - id: "ts_udf_python"
+      type: "file"
+      path: "./apps/wind-turbine-anomaly-detection/time-series-analytics-config/udfs/windturbine_anomaly_detector.py"
+      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-suites/2026.0/manufacturing-ai-suite/industrial-edge-insights-time-series/apps/wind-turbine-anomaly-detection/time-series-analytics-config/udfs/windturbine_anomaly_detector.py"
+
+suites:
+  - name: "ai"
+    sub_suites:
+      - name: "timeseries"
+
+        tests:
+          test_wind_turbine:
+            params:
+              - test_id: "TS-WT-CONS-001"
+                display_name: "Wind Turbine Timeseries - Combined Functional Flow"
+                sample_app: "wind-turbine-anomaly-detection"
+                ingestion_mode: "opcua"
+                platform: "batch"
+                num_streams: 1
+                num_data_points: 10000
+                ingestion_interval: "1s"
+                ref_throughput: -1.0
+                ref_latency: -1.0
+                throughput_percent_delta_threshold: 5.0
+                influx_poll_timeout_seconds: 360
+                influx_poll_interval_seconds: 5
+                influx_min_collection_seconds: 240
+                influx_startup_grace_seconds: 20
+                scenario_matrix:
+                  - test_id: "TS-WT-001"
+                    display_name: "s40p500 CPU OPCUA"
+                    ingestion_mode: "opcua"
+                    compute_device: "cpu"
+                    influx_throughput_effective_mode: count
+                    platform: "ARL U7 255H 32GB"
+                    num_streams: 40
+                    num_data_points: 500
+                    ref_throughput: 9425.18
+                    ref_latency: 5.73
+                    throughput_percent_delta_threshold: 5.0
+                    metric_source: "influx"
+                  - test_id: "TS-WT-002"
+                    display_name: "s40p500 GPU OPCUA"
+                    ingestion_mode: "opcua"
+                    compute_device: "gpu"
+                    influx_throughput_effective_mode: count
+                    platform: "ARL U7 255H 32GB"
+                    num_streams: 40
+                    num_data_points: 500
+                    ref_throughput: 9404.8
+                    ref_latency: 6.18
+                    throughput_percent_delta_threshold: 5.0
+                    metric_source: "influx"
+                  - test_id: "TS-WT-003"
+                    display_name: "s40p500 CPU MQTT"
+                    ingestion_mode: "mqtt"
+                    compute_device: "cpu"
+                    mqtt_scale_publishers: true
+                    mqtt_publisher_streams_per_container: 1
+                    mqtt_publisher_sampling_rate: 50
+                    mqtt_publisher_subsample: 1
+                    continuous_simulator_ingestion: true
+                    influx_throughput_effective_mode: count
+                    platform: "ARL U7 255H 32GB"
+                    num_streams: 40
+                    num_data_points: 500
+                    ref_throughput: 13713.8
+                    ref_latency: 6.95
+                    throughput_percent_delta_threshold: 5.0
+                    metric_source: "influx"
+                  - test_id: "TS-WT-004"
+                    display_name: "s40p500 GPU MQTT"
+                    ingestion_mode: "mqtt"
+                    compute_device: "gpu"
+                    mqtt_scale_publishers: true
+                    mqtt_publisher_streams_per_container: 1
+                    mqtt_publisher_sampling_rate: 50
+                    mqtt_publisher_subsample: 1
+                    continuous_simulator_ingestion: true
+                    influx_throughput_effective_mode: count
+                    platform: "ARL U7 255H 32GB"
+                    num_streams: 40
+                    num_data_points: 500
+                    ref_throughput: 16016.7
+                    ref_latency: 7.04
+                    throughput_percent_delta_threshold: 5.0
+                    metric_source: "influx"
+                timeout: 600
+                compose_project_name: "esq-timeseries"
+                image_suffix: "1.1.0"
+                docker_registry: ""
+
+              - test_id: "TS-WT-001"
+                display_name: "TS Wind Turbine - s40p500 CPU OPCUA"
+                sample_app: "wind-turbine-anomaly-detection"
+                ingestion_mode: "opcua"
+                compute_device: "cpu"
+                influx_throughput_effective_mode: count
+                platform: "ARL U7 255H 32GB"
+                num_streams: 40
+                num_data_points: 500
+                ingestion_interval: "1s"
+                ref_throughput: 9425.18
+                ref_latency: 5.73
+                throughput_percent_delta_threshold: 5.0
+                metric_source: "influx"
+                influx_measurement: "wind-turbine-anomaly-data"
+                influx_processed_field: "wind_speed"
+                influx_latency_field: "end_end_time"
+                influx_latency_scale: 1000000000.0
+                debug_preserve_environment: false
+                enforce_ingestion_mode_services: true
+                influx_poll_timeout_seconds: 360
+                influx_poll_interval_seconds: 5
+                influx_min_collection_seconds: 240
+                influx_startup_grace_seconds: 20
+                timeout: 600
+                compose_project_name: "esq-timeseries"
+                image_suffix: "1.1.0"
+                docker_registry: ""
+
+              - test_id: "TS-WT-002"
+                display_name: "TS Wind Turbine - s40p500 GPU OPCUA"
+                sample_app: "wind-turbine-anomaly-detection"
+                ingestion_mode: "opcua"
+                compute_device: "gpu"
+                influx_throughput_effective_mode: count
+                platform: "ARL U7 255H 32GB"
+                num_streams: 40
+                num_data_points: 500
+                ingestion_interval: "1s"
+                ref_throughput: 9404.8
+                ref_latency: 6.18
+                throughput_percent_delta_threshold: 5.0
+                metric_source: "influx"
+                influx_measurement: "wind-turbine-anomaly-data"
+                influx_processed_field: "wind_speed"
+                influx_latency_field: "end_end_time"
+                influx_latency_scale: 1000000000.0
+                debug_preserve_environment: false
+                enforce_ingestion_mode_services: true
+                influx_poll_timeout_seconds: 360
+                influx_poll_interval_seconds: 5
+                influx_min_collection_seconds: 240
+                influx_startup_grace_seconds: 20
+                timeout: 600
+                compose_project_name: "esq-timeseries"
+                image_suffix: "1.1.0"
+                docker_registry: ""
+
+              - test_id: "TS-WT-003"
+                display_name: "TS Wind Turbine - s40p500 CPU MQTT"
+                sample_app: "wind-turbine-anomaly-detection"
+                ingestion_mode: "mqtt"
+                compute_device: "cpu"
+                mqtt_scale_publishers: true
+                mqtt_publisher_streams_per_container: 1
+                mqtt_publisher_sampling_rate: 50
+                mqtt_publisher_subsample: 1
+                continuous_simulator_ingestion: true
+                influx_throughput_effective_mode: count
+                platform: "ARL U7 255H 32GB"
+                num_streams: 40
+                num_data_points: 500
+                ingestion_interval: "1s"
+                ref_throughput: 13713.8
+                ref_latency: 6.95
+                throughput_percent_delta_threshold: 5.0
+                metric_source: "influx"
+                influx_measurement: "wind-turbine-anomaly-data"
+                influx_processed_field: "wind_speed"
+                influx_latency_field: "end_end_time"
+                influx_latency_scale: 1000000000.0
+                debug_preserve_environment: false
+                enforce_ingestion_mode_services: true
+                influx_poll_timeout_seconds: 360
+                influx_poll_interval_seconds: 5
+                influx_min_collection_seconds: 240
+                influx_startup_grace_seconds: 20
+                timeout: 600
+                compose_project_name: "esq-timeseries"
+                image_suffix: "1.1.0"
+                docker_registry: ""
+
+              - test_id: "TS-WT-004"
+                display_name: "TS Wind Turbine - s40p500 GPU MQTT"
+                sample_app: "wind-turbine-anomaly-detection"
+                ingestion_mode: "mqtt"
+                compute_device: "gpu"
+                mqtt_scale_publishers: true
+                mqtt_publisher_streams_per_container: 1
+                mqtt_publisher_sampling_rate: 50
+                mqtt_publisher_subsample: 1
+                continuous_simulator_ingestion: true
+                influx_throughput_effective_mode: count
+                platform: "ARL U7 255H 32GB"
+                num_streams: 40
+                num_data_points: 500
+                ingestion_interval: "1s"
+                ref_throughput: 16016.7
+                ref_latency: 7.04
+                throughput_percent_delta_threshold: 5.0
+                metric_source: "influx"
+                influx_measurement: "wind-turbine-anomaly-data"
+                influx_processed_field: "wind_speed"
+                influx_latency_field: "end_end_time"
+                influx_latency_scale: 1000000000.0
+                debug_preserve_environment: false
+                enforce_ingestion_mode_services: true
+                influx_poll_timeout_seconds: 360
+                influx_poll_interval_seconds: 5
+                influx_min_collection_seconds: 240
+                influx_startup_grace_seconds: 20
+                timeout: 600
+                compose_project_name: "esq-timeseries"
+                image_suffix: "1.1.0"
+                docker_registry: ""

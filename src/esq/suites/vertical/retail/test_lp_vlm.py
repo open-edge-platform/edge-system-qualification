@@ -535,13 +535,22 @@ def test_lp_vlm(
                                                     metric_value = float(metric_value_str)
 
                                                     # Extract VLM verification latency
-                                                    if "latency" in metric_name:
-                                                        results.metrics["latency"] = Metrics(
+                                                    if "vlm_verification_latency" in metric_name:
+                                                        results.metrics["application_latency"] = Metrics(
                                                             value=round(metric_value, 2),
                                                             unit="ms",
                                                         )
                                                         logger.info(
-                                                            f"Extracted VLM verification latency: {metric_value} ms"
+                                                            f"Extracted VLM verification/application latency: {metric_value} ms"
+                                                        )
+                                                    # Extract VLM average call duration
+                                                    if "VLM_AVERAGE_CALL_DURATION" in metric_name:
+                                                        results.metrics["avg_vlm_call_duration"] = Metrics(
+                                                            value=round(metric_value, 2),
+                                                            unit="ms",
+                                                        )
+                                                        logger.info(
+                                                            f"Extracted VLM average call duration: {metric_value} ms"
                                                         )
                                                 except ValueError:
                                                     # Skip non-numeric values

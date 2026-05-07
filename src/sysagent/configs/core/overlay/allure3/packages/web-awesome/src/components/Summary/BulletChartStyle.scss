@@ -1,0 +1,148 @@
+// Wrapper styling for bullet chart component
+.bulletChartWrapper {
+  background: var(--bg-base-primary);
+  border-radius: 4px;
+  padding: 12px;
+  border: 1px solid var(--on-border-secondary);
+}
+
+.bulletChartContainer {
+  width: 100%;
+  padding: 0;
+}
+
+.emptyState {
+  padding: 20px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.bulletRow {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  grid-template-rows: auto;
+  gap: 0;
+  margin-bottom: 60px; // Increased to accommodate labels
+  position: relative;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.metricTitle {
+  grid-column: 1;
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  padding-right: 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  text-align: right;
+  justify-content: flex-end;
+}
+
+.chartArea {
+  grid-column: 2;
+  grid-row: 1;
+  position: relative;
+  height: 24px;
+  margin-left: 0;
+  margin-right: 120px; // Reserve space on the right for value labels (same as D3 margin.right)
+}
+
+.backgroundRange {
+  position: relative;
+  width: 100%;
+  height: 24px;
+  // background-color: #f1f5f7ff;
+  background-color: var(--bg-base-secondary);
+  border: 1px solid var(--on-border-secondary);
+  border-radius: 2px;
+}
+
+.referenceZone {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  z-index: 1;
+
+  &.passed {
+    background-color: rgba(46, 125, 50, 0.15);
+  }
+
+  &.failed {
+    background-color: rgba(211, 47, 47, 0.15);
+  }
+}
+
+.actualBar {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 12px;
+  z-index: 2;
+  opacity: 0.9;
+
+  &.passed {
+    background-color: #2e7d32;
+  }
+
+  &.failed {
+    background-color: #d32f2f;
+  }
+}
+
+.referenceMarker {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  width: 2px;
+  background-color: var(--on-text-primary);
+  z-index: 3;
+}
+
+.scaleLabels {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  margin-top: 2px;
+  font-size: 9px;
+  color: var(--text-secondary);
+}
+
+.minLabel {
+  text-align: left;
+}
+
+.maxLabel {
+  text-align: right;
+}
+
+.actualLabel {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  z-index: 4;
+}
+
+.referenceLabel {
+  position: absolute;
+  bottom: 100%;
+  margin-bottom: 5px;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  transform: translateX(-50%);
+  z-index: 4;
+}

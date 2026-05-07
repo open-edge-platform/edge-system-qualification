@@ -1,0 +1,399 @@
+// ─── Telemetry Section wrapper ────────────────────────────────────────────────
+
+.telemetrySection {
+  margin-top: 8px;
+  margin-bottom: 16px;
+  border: 1px solid var(--on-border-secondary);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.telemetrySectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  height: 44px;
+  background: var(--bg-base-secondary);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s;
+
+  &:hover {
+    background: var(--bg-base-neutral, #ececec);
+  }
+}
+
+.telemetryToggle {
+  background-color: var(--bg-base-modal);
+  border: 1px solid var(--bg-base-neutral);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: normal;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 0;
+  flex-shrink: 0;
+  transition: background-color 0.2s;
+
+  &:hover {
+    background-color: var(--bg-base-secondary);
+  }
+}
+
+.telemetrySectionTitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  flex: 1;
+}
+
+// .modulesBadge — removed (no longer rendered)
+
+// ─── Charts grid ─────────────────────────────────────────────────────────────
+
+.chartsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 28px;
+  padding: 16px;
+  background: var(--bg-base-primary);
+}
+
+// ─── Individual chart card ────────────────────────────────────────────────────
+
+.chartCard {
+  background: var(--bg-base-primary);
+  border: 1px solid var(--on-border-secondary);
+  border-radius: 4px;
+  padding: 10px 12px 8px;
+  position: relative;
+  min-width: 0;
+}
+
+.chartCardHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.chartCardTitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  flex: 1;
+  text-transform: capitalize;
+}
+
+// .chartTypeTag — removed from card header (kept for modal only)
+.chartTypeTag {
+  font-size: 9px;
+  color: #0071c5;
+  background: rgba(0, 113, 197, 0.08);
+  border: 1px solid rgba(0, 113, 197, 0.25);
+  border-radius: 3px;
+  padding: 1px 5px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.expandButton {
+  background-color: var(--bg-base-modal);
+  color: var(--text-primary);
+  border: 1px solid var(--bg-base-neutral);
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: capitalize;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  white-space: nowrap;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+
+  &:hover {
+    background-color: var(--bg-base-secondary);
+  }
+}
+
+.pngButton {
+  font-size: 11px;
+  color: #0071c5;
+  background: transparent;
+  border: 1px solid #0071c5;
+  border-radius: 3px;
+  padding: 3px 8px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+
+  &:hover {
+    background: #0071c5;
+    color: #fff;
+  }
+}
+
+// ─── Modal ────────────────────────────────────────────────────────────────────
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 32px;
+}
+
+.modalContent {
+  background: var(--bg-base-primary, #fff);
+  border-radius: 6px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.28);
+  padding: 20px 24px 18px;
+  max-width: min(1100px, 98vw);
+  width: 100%;
+  max-height: 96vh;
+  overflow: hidden;
+}
+
+.modalHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--on-border-secondary);
+}
+
+.modalTitle {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.modalClose {
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--on-border-secondary);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+
+  &:hover {
+    background: #d32f2f;
+    color: #fff;
+    border-color: #d32f2f;
+  }
+}
+
+// ─── Tooltip ─────────────────────────────────────────────────────────────────
+
+.tooltip {
+  position: absolute;
+  background: var(--bg-base-primary, #fff);
+  border: 1px solid #0071c5;
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 10px;
+  pointer-events: none;
+  z-index: 20;
+  box-shadow: 0 2px 8px rgba(0, 113, 197, 0.18);
+  min-width: 140px;
+  max-width: 200px;
+}
+
+.tooltipTime {
+  font-size: 9px;
+  font-weight: 600;
+  color: #0071c5;
+  margin-bottom: 4px;
+  padding-bottom: 3px;
+  border-bottom: 1px solid rgba(0, 113, 197, 0.2);
+}
+
+.tooltipRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 3px;
+}
+
+.tooltipDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.tooltipKey {
+  color: var(--text-secondary);
+  flex: 1;
+  text-transform: capitalize;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 9px;
+}
+
+.tooltipVal {
+  color: var(--text-primary);
+  font-weight: 600;
+  flex-shrink: 0;
+  font-size: 10px;
+}
+
+// ─── Legend ───────────────────────────────────────────────────────────────────
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--on-border-secondary);
+}
+
+.legendItem {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.legendItemHeader {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+// Thin horizontal line for "line" chart
+.legendLine {
+  display: inline-block;
+  width: 16px;
+  height: 2px;
+  border-radius: 1px;
+  flex-shrink: 0;
+  // background is set inline
+}
+
+// Filled+stroked rectangle for "area" chart
+.legendArea {
+  display: inline-block;
+  width: 12px;
+  height: 8px;
+  border-radius: 1px;
+  flex-shrink: 0;
+  opacity: 0.65;
+  // background is set inline
+}
+
+// Solid block for "bar_vertical" chart
+.legendBar {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 1px;
+  flex-shrink: 0;
+  opacity: 0.82;
+  // background is set inline
+}
+
+.legendLabel {
+  font-size: 12px;
+  color: var(--text-primary);
+  text-transform: capitalize;
+}
+
+.legendAvg {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.legendAvgBadge {
+  font-size: 10px;
+  font-style: italic;
+  color: var(--text-secondary);
+  background: var(--bg-base-secondary);
+  border: 1px solid var(--on-border-secondary);
+  border-radius: 3px;
+  padding: 1px 5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+// ─── Legend stat badges (avg / min / max) ────────────────────────────────────
+
+.legendStatGroup {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.legendStat {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  border-radius: 3px;
+  padding: 2px 7px;
+  white-space: nowrap;
+  font-style: normal;
+}
+
+// min — teal/cyan: visually "low"
+.legendStatMin {
+  background: rgba(0, 172, 193, 0.12);
+  border: 1px solid rgba(0, 172, 193, 0.40);
+  color: #00838f;
+}
+
+// avg — Intel blue: the primary brand colour
+.legendStatAvg {
+  background: rgba(0, 113, 197, 0.10);
+  border: 1px solid rgba(0, 113, 197, 0.35);
+  color: #0071c5;
+}
+
+// max — deep indigo: visually "high"
+.legendStatMax {
+  background: rgba(57, 73, 171, 0.12);
+  border: 1px solid rgba(57, 73, 171, 0.40);
+  color: #3949ab;
+}
+
+.legendStatLabel {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  opacity: 0.75;
+}
+
+.legendStatValue {
+  font-size: 11px;
+  font-weight: 600;
+}

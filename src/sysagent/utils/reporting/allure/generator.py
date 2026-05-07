@@ -24,7 +24,9 @@ import shutil
 from typing import Optional
 
 # Import secure process execution utilities
+from sysagent.utils.config import get_thirdparty_dir
 from sysagent.utils.core.process import run_command
+from sysagent.utils.infrastructure import get_node_binary_paths
 
 logger = logging.getLogger(__name__)
 
@@ -42,8 +44,6 @@ def _verify_allure_installation(allure_repo_dir: str, node_dir: str) -> bool:
     Returns:
         bool: True if Allure is properly installed and functional
     """
-    from sysagent.utils.infrastructure import get_node_binary_paths
-
     # Check if critical files exist
     cli_dist_path = os.path.join(allure_repo_dir, "packages", "cli", "dist")
     index_js_path = os.path.join(cli_dist_path, "index.js")
@@ -82,8 +82,6 @@ def _cleanup_corrupted_allure(allure_repo_dir: str) -> None:
     Args:
         allure_repo_dir: Path to Allure repository to remove
     """
-    import shutil
-
     logger.debug(f"Removing corrupted Allure installation at {allure_repo_dir}")
 
     if not os.path.exists(allure_repo_dir):
@@ -112,9 +110,6 @@ def install_allure_cli_from_repo(node_dir: str, force_reinstall: bool = False) -
         FileNotFoundError: If Allure3 repository is not found
         subprocess.CalledProcessError: If installation fails
     """
-    from sysagent.utils.config import get_thirdparty_dir
-    from sysagent.utils.infrastructure import get_node_binary_paths
-
     from .patch import apply_patch
 
     # Get Node.js binary paths
@@ -195,6 +190,27 @@ def install_allure_cli_from_repo(node_dir: str, force_reinstall: bool = False) -
                 raise
     else:
         logger.warning(f"Patches directory not found: {patches_dir}")
+
+    # Copy Tier 2 component overlay files on top of the patched tree.
+    # These are full source files stored in overlay/allure3/ that replace
+    # or supplement the vanilla + core-patch content.
+    if core_dir:
+        overlay_dir = os.path.join(core_dir, "overlay", "allure3")
+        if os.path.isdir(overlay_dir):
+            import glob
+
+            overlay_files = [
+                p for p in glob.glob(os.path.join(overlay_dir, "**", "*"), recursive=True) if os.path.isfile(p)
+            ]
+            logger.debug(f"Applying {len(overlay_files)} component overlay file(s) from {overlay_dir}")
+            for src_path in overlay_files:
+                rel_path = os.path.relpath(src_path, overlay_dir)
+                dst_path = os.path.join(allure_repo_dir, rel_path)
+                os.makedirs(os.path.dirname(dst_path), exist_ok=True)
+                shutil.copy2(src_path, dst_path)
+                logger.debug(f"  overlay: {rel_path}")
+        else:
+            logger.debug(f"No component overlay directory found at {overlay_dir}")
 
     # Install dependencies and build the project
     env = os.environ.copy()
@@ -295,9 +311,6 @@ def generate_allure_report(
     Returns:
         int: Exit code (0 for success, non-zero for failure)
     """
-    from sysagent.utils.config import get_thirdparty_dir
-    from sysagent.utils.infrastructure import get_node_binary_paths
-
     from .config import update_allure_config
 
     # Get the Allure repository directory in thirdparty
@@ -418,6 +431,7 @@ def generate_final_report_copy(report_dir: str, debug: bool = False) -> Optional
         existing_timestamp = None
         try:
             import json as _json
+
             from sysagent.utils.config import setup_data_dir as _setup_data_dir
 
             _data_dir = _setup_data_dir()
@@ -425,9 +439,7 @@ def generate_final_report_copy(report_dir: str, debug: bool = False) -> Optional
             if os.path.exists(_summary_file):
                 with open(_summary_file, "r", encoding="utf-8") as _f:
                     _summary_data = _json.load(_f)
-                existing_timestamp = (
-                    _summary_data.get("summary", {}).get("metadata", {}).get("timestamp")
-                )
+                existing_timestamp = _summary_data.get("summary", {}).get("metadata", {}).get("timestamp")
                 if existing_timestamp:
                     logger.debug(f"Reusing report_timestamp from summary: {existing_timestamp}")
         except Exception as _exc:

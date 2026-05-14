@@ -201,7 +201,13 @@ class VenvManager:
             logger.error(error_msg)
             return False, error_msg
 
-    def install_requirements(self, venv_name: str, requirements_file: str, timeout: float = 600.0) -> Tuple[bool, str]:
+    def install_requirements(
+        self,
+        venv_name: str,
+        requirements_file: str,
+        timeout: float = 600.0,
+        extra_pip_args: Optional[List[str]] = None,
+    ) -> Tuple[bool, str]:
         """
         Install dependencies from requirements.txt into venv.
 
@@ -209,6 +215,8 @@ class VenvManager:
             venv_name: Name of the virtual environment
             requirements_file: Path to requirements.txt file
             timeout: Timeout for installation in seconds
+            extra_pip_args: Optional extra arguments appended to the uv pip install command
+                (e.g. ["--pre", "--index-strategy", "unsafe-best-match"])
 
         Returns:
             Tuple[bool, str]: (success, message)
@@ -233,6 +241,8 @@ class VenvManager:
 
         # Use uv pip to install requirements
         cmd = ["uv", "pip", "install", "-r", str(requirements_path), "--python", str(python_bin)]
+        if extra_pip_args:
+            cmd.extend(extra_pip_args)
 
         logger.info(f"Installing requirements into venv: {venv_name}")
         logger.debug(f"Requirements file: {requirements_file}")
@@ -453,6 +463,140 @@ class VenvManager:
 
         logger.info(f"Successfully installed {pkg_name} package (with sysagent as dependency) in: {venv_name}")
         return True, f"{pkg_name} package installed successfully"
+
+    def install_packages(
+        self,
+        venv_name: str,
+        packages: List[str],
+        extra_index_urls: Optional[List[str]] = None,
+        timeout: float = 600.0,
+    ) -> Tuple[bool, str]:
+        """
+        Install packages directly into a venv using uv pip install.
+
+        Args:
+            venv_name: Name of the virtual environment
+            packages: List of package specifications (e.g., ["requests>=2.28", "jinja2"])
+            extra_index_urls: Optional list of extra PyPI index URLs
+            timeout: Installation timeout in seconds
+
+        Returns:
+            Tuple[bool, str]: (success, message)
+        """
+        from sysagent.utils.core.process import run_command
+
+        if not self.venv_exists(venv_name):
+            error_msg = f"Virtual environment does not exist: {venv_name}"
+            logger.error(error_msg)
+            return False, error_msg
+
+        if not packages:
+            return True, "No packages to install"
+
+        venv_path = self.get_venv_path(venv_name)
+        python_bin = venv_path / "bin" / "python"
+
+        cmd = ["uv", "pip", "install", "--python", str(python_bin)]
+        for url in extra_index_urls or []:
+            cmd.extend(["--extra-index-url", url])
+        cmd.extend(packages)
+
+        logger.info(f"Installing {len(packages)} package(s) into venv: {venv_name}")
+        logger.debug(f"Command: {' '.join(cmd)}")
+
+        result = run_command(command=cmd, timeout=timeout, check=False, stream_output=True)
+
+        if result.success:
+            logger.info(f"Successfully installed packages into: {venv_name}")
+            return True, "Packages installed successfully"
+        else:
+            error_msg = f"Failed to install packages: {result.stderr}"
+            logger.error(error_msg)
+            return False, error_msg
+
+    def setup_named_venv(
+        self,
+        venv_name: str,
+        requirements_content: Optional[str] = None,
+        requirements_file: Optional[str] = None,
+        packages: Optional[List[str]] = None,
+        extra_index_urls: Optional[List[str]] = None,
+        python_version: Optional[str] = None,
+        force: bool = False,
+        install_timeout: float = 1800.0,
+        install_pip_args: Optional[List[str]] = None,
+    ) -> Tuple[bool, str]:
+        """
+        Setup a named virtual environment with specified requirements.
+
+        Unlike setup_venv (which derives a name from suite_path), this method takes
+        an explicit venv name. Useful for tool-specific venvs (e.g., model export tools)
+        that are not tied to a particular test suite path.
+
+        Requirements can be specified as:
+        - requirements_content: a multi-line string written to a temp file
+        - requirements_file: path to an existing requirements.txt
+        - packages: a list of package spec strings installed directly
+
+        Args:
+            venv_name: Explicit name for the virtual environment
+            requirements_content: Requirements as a multi-line string
+            requirements_file: Path to an existing requirements.txt file
+            packages: List of package specifications to install directly
+            extra_index_urls: Optional extra PyPI index URLs (applied to all installs)
+            python_version: Optional Python version (e.g., "3.11")
+            force: Whether to recreate if the venv already exists
+            install_timeout: Timeout for package installation in seconds
+
+        Returns:
+            Tuple[bool, str]: (success, message)
+        """
+        import tempfile
+
+        logger.info(f"Setting up named venv: {venv_name}")
+
+        # Create or reuse venv
+        success, message = self.create_venv(venv_name, python_version, force)
+        if not success:
+            return False, message
+
+        # Install from requirements content string (written to a temp file)
+        # Use mkstemp (creates with mode 0o600) to avoid flagging overly broad
+        # temp-file security checks that match any mode="..." pattern.
+        if requirements_content:
+            fd, tmp_path = tempfile.mkstemp(suffix=".txt")
+            try:
+                with os.fdopen(fd, "w") as tmp:
+                    tmp.write(requirements_content)
+                success, message = self.install_requirements(
+                    venv_name, tmp_path, timeout=install_timeout, extra_pip_args=install_pip_args
+                )
+            finally:
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
+            if not success:
+                return False, message
+
+        # Install from requirements file
+        if requirements_file:
+            success, message = self.install_requirements(
+                venv_name, requirements_file, timeout=install_timeout, extra_pip_args=install_pip_args
+            )
+            if not success:
+                return False, message
+
+        # Install explicit packages
+        if packages:
+            success, message = self.install_packages(
+                venv_name, packages, extra_index_urls=extra_index_urls, timeout=install_timeout
+            )
+            if not success:
+                return False, message
+
+        logger.info(f"Named venv setup complete: {venv_name}")
+        return True, f"Venv setup complete: {venv_name}"
 
     def setup_venv(
         self, suite_path: str, requirements_file: str, python_version: Optional[str] = None, force: bool = False

@@ -8,6 +8,7 @@ import logging
 import os
 from typing import Any, Dict, Optional
 
+from esq.utils.servers.ovms.ovms_utils import validate_openvino_model_export
 from sysagent.utils.core import Metrics, Result, get_metric_name_for_device
 from sysagent.utils.infrastructure import DockerClient
 
@@ -107,6 +108,7 @@ def run_device_test(
                     configs=configs,
                     export_timeout=export_timeout,
                     download_timeout=download_timeout,
+                    data_dir=data_dir,
                 )
             )
 
@@ -121,8 +123,6 @@ def run_device_test(
 
             # Validate that the exported model directory is ready for OVMS
             model_export_path = os.path.join(models_dir, actual_model_name)
-            from esq.utils.servers.ovms.export_model import validate_openvino_model_export
-
             if not validate_openvino_model_export(model_export_path, model_type="text_generation"):
                 error_message = (
                     f"Model export validation failed for {actual_model_name} at {model_export_path}. "
@@ -156,8 +156,6 @@ def run_device_test(
             # Validate that the pre-quantized model directory is ready for OVMS
             # Pre-quantized models use versioned structure: models/{model_name}/1/
             model_export_path = os.path.join(models_dir, ovms_model_name, "1")
-            from esq.utils.servers.ovms.export_model import validate_openvino_model_export
-
             if not validate_openvino_model_export(model_export_path, model_type="text_generation"):
                 error_message = (
                     f"Pre-quantized model validation failed for {ovms_model_name} at {model_export_path}. "

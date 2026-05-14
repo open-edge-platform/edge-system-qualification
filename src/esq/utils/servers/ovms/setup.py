@@ -15,6 +15,8 @@ import os
 import shutil
 import time
 
+from .ovms_utils import cleanup_incomplete_model_export, validate_openvino_model_export
+
 logger = logging.getLogger(__name__)
 
 
@@ -26,6 +28,7 @@ def export_ovms_model(
     configs=None,
     export_timeout=1800,
     download_timeout=1800,
+    data_dir=None,
 ) -> tuple[bool, float, dict, str]:
     """
     Export model to OpenVINO Model Server format.
@@ -249,17 +252,32 @@ def export_ovms_model(
         logger.info("=" * 80)
 
         try:
-            from .export_model import export_text_generation_model
+            from .export_runner import run_export_text_generation
 
-            export_text_generation_model(
-                source_model=actual_model_path,  # Use actual path (may be from ModelScope cache)
+            # Prefer the original HF hub ID so optimum-cli can infer the task from Hub
+            # metadata and use the already-downloaded local HF cache transparently.
+            # If model_id_or_path was already a local path (no download step), use it as-is.
+            if "/" in model_id_or_path and not os.path.exists(model_id_or_path):
+                # HF hub ID: the model was downloaded to HF cache; pass the original ID
+                export_source = model_id_or_path
+            else:
+                # Already a local path (ModelScope or direct): use the local path
+                export_source = actual_model_path
+
+            run_export_text_generation(
+                source_model=export_source,
                 model_name=model_safe_name_with_quant,
-                model_repository_path=models_dir,
+                models_dir=models_dir,
                 precision=model_precision,
-                task_parameters=task_parameters,
                 config_file_path=config_path,
-                overwrite_models=False,
+                target_device=task_parameters["target_device"],
+                extra_quantization_params=task_parameters.get("extra_quantization_params", ""),
+                enable_prefix_caching=task_parameters.get("enable_prefix_caching", True),
+                cache_size=task_parameters.get("cache_size", 2),
+                max_num_seqs=str(task_parameters.get("max_num_seqs", "2048")),
+                dynamic_split_fuse=task_parameters.get("dynamic_split_fuse", True),
                 export_timeout=export_timeout,
+                data_dir=data_dir,
             )
 
             logger.info("=" * 80)
@@ -268,8 +286,6 @@ def export_ovms_model(
 
             # Final validation check to ensure model is properly exported
             model_export_path = os.path.join(models_dir, model_safe_name_with_quant)
-            from .export_model import cleanup_incomplete_model_export, validate_openvino_model_export
-
             if not validate_openvino_model_export(model_export_path, model_type="text_generation"):
                 logger.error(f"Post-export validation failed for: {model_export_path}")
                 cleanup_incomplete_model_export(model_export_path)
@@ -283,24 +299,18 @@ def export_ovms_model(
             logger.error(error_msg)
             # Cleanup incomplete export
             model_export_path = os.path.join(models_dir, model_safe_name_with_quant)
-            from .export_model import cleanup_incomplete_model_export
-
             cleanup_incomplete_model_export(model_export_path)
             raise RuntimeError(error_msg) from timeout_error
         except ValueError:
             export_only_duration = time.time() - export_only_start_time
             # Cleanup on validation errors
             model_export_path = os.path.join(models_dir, model_safe_name_with_quant)
-            from .export_model import cleanup_incomplete_model_export
-
             cleanup_incomplete_model_export(model_export_path)
             raise
         except Exception as e:
             export_only_duration = time.time() - export_only_start_time
             # Ensure cleanup on unexpected errors
             model_export_path = os.path.join(models_dir, model_safe_name_with_quant)
-            from .export_model import cleanup_incomplete_model_export
-
             cleanup_incomplete_model_export(model_export_path)
             error_msg = f"Model export failed after {export_only_duration:.2f} seconds: {str(e)}"
             logger.error(error_msg)
@@ -428,7 +438,7 @@ def download_and_setup_prequantized_ovms_model(
         import jinja2
 
         # Load the text generation graph template
-        from .export_model import text_generation_graph_template
+        from .ovms_utils import text_generation_graph_template
 
         # Plugin configuration for performance
         plugin_config = {
@@ -471,7 +481,7 @@ def download_and_setup_prequantized_ovms_model(
 
         # Create OVMS config file with MediaPipe servable
         # For LLM serving, we use mediapipe_config_list instead of model_config_list
-        from .export_model import add_servable_to_config
+        from .ovms_utils import add_servable_to_config
 
         add_servable_to_config(
             config_path,

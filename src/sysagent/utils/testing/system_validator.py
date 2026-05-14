@@ -9,6 +9,7 @@ against the collected system information.
 """
 
 import logging
+import os
 import re
 from typing import Any, Dict, List, Optional
 
@@ -853,6 +854,24 @@ class SystemValidator:
                         "actual": "Installed" if is_installed else "Not installed",
                         "required": f"Package '{package}' installed",
                         "category": "software.python_packages.required",
+                    }
+                )
+
+        # Required environment variables
+        if "env" in sw_requirements:
+            required_vars = sw_requirements["env"]
+            if not isinstance(required_vars, list):
+                required_vars = [required_vars]
+
+            for var in required_vars:
+                is_set = var in os.environ and bool(os.environ[var])
+                results.append(
+                    {
+                        "name": f"Environment variable '{var}' required",
+                        "passed": is_set,
+                        "actual": "Set" if is_set else "Not set",
+                        "required": f"Environment variable '{var}' set",
+                        "category": "software.env.required",
                     }
                 )
 

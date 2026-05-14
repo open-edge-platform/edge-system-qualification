@@ -486,6 +486,7 @@ def validate_system_requirements_from_configs():
                     or key.startswith("os_")
                     or "_min_version" in key
                     or key.startswith("docker_")
+                    or key == "env"
                 ):
                     final_requirements["software"][key] = value
                     has_requirements = True
@@ -534,9 +535,19 @@ def validate_system_requirements_from_configs():
         validation_results = validator.validate_requirements(final_requirements)
 
         def format_check_details(check):
-            required = check["required"]
-            actual = check["actual"]
-            return f"Required: {required} | Actual: {actual}"
+            category = check.get("category", "")
+            # For binary presence checks the 'actual' value adds no information
+            # (e.g. "Not set", "Not available", "Not installed") — use the
+            # human-readable name only to keep the message concise.
+            _name_only_categories = {
+                "software.env.required",
+                "software.docker.required",
+                "software.system_packages.required",
+                "software.python_packages.required",
+            }
+            if category in _name_only_categories:
+                return check["name"]
+            return f"Required: {check['required']} | Actual: {check['actual']}"
 
         # Determine if we should fail or skip based on profile name
         profile_name = os.environ.get("ACTIVE_PROFILE", "none")

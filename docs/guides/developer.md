@@ -593,141 +593,91 @@ The framework provides comprehensive pytest fixtures automatically available to 
 
 ## System Requirements Flags
 
-The framework provides reusable requirement validation flags. Add these to your profile or test parameters under the `requirements` key.
+The framework provides reusable requirement validation flags. Add them to your profile or test parameters under the `requirements` key. The test is automatically skipped if any requirement is not met.
 
-### Hardware Requirements
+### All Available Flags
 
-#### CPU Requirements
+#### CPU
 
-```yaml
-requirements:
-  # Minimum CPU cores
-  cpu_min_cores: 4
-  
-  # Minimum CPU threads
-  cpu_min_threads: 8
-  
-  # CPU brand requirements
-  cpu_xeon_required: true     # Requires Intel® Xeon® processor
-  cpu_core_required: true     # Requires Intel® Core™ processor (includes Ultra Desktop)
-  cpu_ultra_required: true    # Requires Intel® Ultra processor
-  
-  # CPU socket count
-  cpu_min_sockets: 1
-  cpu_max_sockets: 2
-```
+| Flag | Type | Description | Example |
+|------|------|-------------|---------|
+| `cpu_min_cores` | `int` | Minimum logical CPU cores | `cpu_min_cores: 4` |
+| `cpu_xeon_required` | `bool` | Requires Intel® Xeon® processor | `cpu_xeon_required: true` |
+| `cpu_core_required` | `bool` | Requires Intel® Core™ processor (includes Ultra Desktop) | `cpu_core_required: true` |
+| `cpu_ultra_required` | `bool` | Requires Intel® Core™ Ultra processor | `cpu_ultra_required: true` |
+| `cpu_ultra_mobile_required` | `bool` | Requires Intel® Core™ Ultra mobile (H/U/V/HX/P suffix) | `cpu_ultra_mobile_required: true` |
+| `cpu_entry_required` | `bool` | Requires Intel® entry-level processor (N-series, Atom®) | `cpu_entry_required: true` |
+| `cpu_entry_excluded` | `bool` | Excludes entry-level processors (skips test on N-series, Atom®) | `cpu_entry_excluded: true` |
 
-#### Memory Requirements
+#### Memory
 
-```yaml
-requirements:
-  # Minimum total memory
-  memory_min_gib: 8.0
-  
-  # Maximum memory (for constrained tests)
-  memory_max_gib: 32.0
-```
+| Flag | Type | Description | Example |
+|------|------|-------------|---------|
+| `memory_min_gib` | `float` | Minimum available (free) RAM in GiB | `memory_min_gib: 8.0` |
+| `memory_total_min_gib` | `float` | Minimum total installed RAM in GiB | `memory_total_min_gib: 16.0` |
 
-#### Storage Requirements
+#### Storage
 
-```yaml
-requirements:
-  # Total storage capacity
-  storage_total_min_gib: 64.0
-  
-  # Free storage for test execution
-  storage_min_gib: 10.0
-```
+| Flag | Type | Description | Example |
+|------|------|-------------|---------|
+| `storage_min_gib` | `float` | Minimum free disk space in GiB | `storage_min_gib: 10.0` |
+| `storage_total_min_gib` | `float` | Minimum total disk capacity in GiB | `storage_total_min_gib: 64.0` |
 
-#### Device Requirements
+#### Devices (GPU / NPU)
 
-```yaml
-requirements:
-  # Integrated GPU (iGPU)
-  igpu_required: true
-  igpu_min_count: 1
-  igpu_max_count: 1
-  
-  # Discrete GPU (dGPU)
-  dgpu_required: true
-  dgpu_min_count: 1
-  dgpu_max_count: 4
-  
-  # Neural Processing Unit (NPU)
-  npu_required: true
-  npu_min_count: 1
-  npu_max_count: 1
-```
+Device detection uses OpenVINO*. Only Intel® devices detected by OpenVINO are counted. If a device is present but not detected, the error message suggests installing the relevant drivers.
 
-**Device Detection Logic:**
-- The framework automatically detects Intel devices using OpenVINO
-- Only Intel devices detected by OpenVINO are counted
-- Non-Intel devices are ignored for requirements validation
-- If Intel devices exist but aren't detected by OpenVINO, helpful error messages suggest driver installation
+| Flag | Type | Description | Example |
+|------|------|-------------|---------|
+| `igpu_required` | `bool` | Requires at least one Intel® integrated GPU | `igpu_required: true` |
+| `dgpu_required` | `bool` | Requires at least one Intel® discrete GPU | `dgpu_required: true` |
+| `dgpu_min_devices` | `int` | Minimum number of Intel® discrete GPUs | `dgpu_min_devices: 2` |
+| `dgpu_max_devices` | `int` | Maximum number of Intel® discrete GPUs | `dgpu_max_devices: 4` |
+| `dgpu_min_vram_gib` | `float` | Minimum total VRAM across all discrete GPUs (GiB) | `dgpu_min_vram_gib: 8.0` |
+| `dgpu_max_vram_gib` | `float` | Maximum total VRAM across all discrete GPUs (GiB) | `dgpu_max_vram_gib: 48.0` |
+| `dgpu_min_vram_per_device_gib` | `float` | Minimum VRAM per discrete GPU (each device must meet this) | `dgpu_min_vram_per_device_gib: 6.0` |
+| `dgpu_max_vram_per_device_gib` | `float` | Maximum VRAM per discrete GPU | `dgpu_max_vram_per_device_gib: 24.0` |
+| `npu_required` | `bool` | Requires at least one Intel® NPU | `npu_required: true` |
+| `npu_min_devices` | `int` | Minimum number of Intel® NPUs | `npu_min_devices: 1` |
 
-### Software Requirements
+#### Software
 
-#### Operating System
-
-```yaml
-requirements:
-  # Supported OS types
-  os_type:
-    - "linux"
-    - "windows"
-  
-  # Specific OS versions
-  os_version_min: "20.04"  # For Ubuntu
-  os_version_max: "24.04"
-```
-
-#### Docker Requirements
-
-```yaml
-requirements:
-  # Docker daemon required
-  docker_required: true
-  
-  # Minimum Docker version
-  docker_version_min: "20.10.0"
-```
-
-#### Software Dependencies
-
-```yaml
-requirements:
-  # Python version
-  python_version_min: "3.10"
-  
-  # Other software (validated via command presence)
-  software_required:
-    - name: "git"
-      command: "git --version"
-    - name: "ffmpeg"
-      command: "ffmpeg -version"
-```
+| Flag | Type | Description | Example |
+|------|------|-------------|---------|
+| `os_type` | `list[str]` | Allowed OS types (`"linux"`, `"windows"`) | `os_type: ["linux"]` |
+| `docker_required` | `bool` | Requires Docker* daemon to be available | `docker_required: true` |
+| `min_python_version` | `str` | Minimum Python* version | `min_python_version: "3.10"` |
+| `required_system_packages` | `list[str]` | System packages that must be installed | `required_system_packages: ["ffmpeg"]` |
+| `required_python_packages` | `list[str]` | Python packages that must be installed | `required_python_packages: ["torch"]` |
+| `env` | `list[str]` | Environment variables that must be set and non-empty | `env: [HF_TOKEN]` |
 
 ### Example: Complete Requirements Block
 
 ```yaml
 requirements:
-  # Hardware
+  # CPU
   cpu_min_cores: 8
-  cpu_xeon_required: true
+  cpu_entry_excluded: true      # Skip on entry-level CPUs
+
+  # Memory & Storage
   memory_min_gib: 16.0
   storage_min_gib: 20.0
+  storage_total_min_gib: 128.0
+
+  # Devices
   dgpu_required: true
-  dgpu_min_count: 2
-  
+  dgpu_min_vram_per_device_gib: 6.0
+
   # Software
   os_type: ["linux"]
   docker_required: true
-  python_version_min: "3.10"
-  
-  # Dependencies
-  software_required:
-    - name: "ffmpeg"
-      command: "ffmpeg -version"
+  required_system_packages:
+    - ffmpeg
+
+  # Environment variables
+  env:
+    - HF_TOKEN
+    - MY_API_KEY
 ```
 
 ### Using Requirements in Tests
@@ -740,21 +690,17 @@ validate_system_requirements_from_configs(configs)
 
 This will:
 1. Check all specified requirements against system capabilities
-2. Skip the test if requirements aren't met (using `pytest.skip`)
+2. Skip the test if requirements are not met (using `pytest.skip`)
 3. Provide detailed error messages for failed requirements
 4. Log fix suggestions for common issues
 
 **Example Validation Output:**
 ```
-Validation failed for profile: my-profile
-  CPU Requirements:
-    ✗ CPU cores >= 8 (Actual: 4 cores)
-  Device Requirements:
-    ✗ dGPU required (Actual: 1 Intel dGPU found but not detected by OpenVINO)
-    
-Suggestions:
-  - Upgrade to system with more CPU cores
-  - Install Intel GPU drivers: sudo apt install intel-gpu-tools
+╭─ Validation Failed: my-profile
+│  Missing requirements (2):
+│  • CPU cores >= 8: Upgrade to a CPU with more cores
+│  • Environment variable 'HF_TOKEN' required: Set the environment variable before running: export HF_TOKEN=<value>
+╰─
 ```
 
 ---

@@ -124,6 +124,9 @@ def _log_single_suggestion(
         logger.info(f"{prefix}• {name}: Ensure dependency is installed")
     elif "python_packages" in category:
         logger.info(f"{prefix}• {name}: Ensure dependency is installed")
+    elif category == "software.env.required":
+        var = name.split("'")[1] if "'" in name else "unknown"
+        logger.info(f"{prefix}• {name}: Set the environment variable before running: export {var}=<value>")
     else:
         logger.info(f"{prefix}• {name}: Check system documentation for {check['required']}")
 
@@ -143,9 +146,7 @@ def get_fix_suggestion_for_category(category: str, name: str, check: Dict[str, A
     suggestions = []
 
     if category == "software.docker.required":
-        suggestions.append(
-            f"{name}: Install Docker with 'sudo apt install docker.io' or 'curl -fsSL https://get.docker.com | sh'"
-        )
+        suggestions.append(f"{name}: Refer to the Docker official installation guide to install Docker")
         suggestions.append("Then add user to docker group: 'sudo usermod -aG docker $USER && newgrp docker'")
     elif category == "hardware.gpu.required":
         suggestions.append(f"{name}: This test requires any Intel GPU (iGPU or dGPU). Check if:")
@@ -172,13 +173,14 @@ def get_fix_suggestion_for_category(category: str, name: str, check: Dict[str, A
     elif category == "software.os.type":
         suggestions.append(f"{name}: This test requires a different operating system")
     elif category == "software.python.version":
-        suggestions.append(f"{name}: Upgrade Python with 'sudo apt install python3' or use pyenv/conda")
+        suggestions.append(f"{name}: Upgrade Python to the required version. Refer to project documentation.")
     elif "system_packages" in category:
-        package = name.split("'")[1] if "'" in name else "unknown"
-        suggestions.append(f"{name}: Install with 'sudo apt install {package}' (Ubuntu/Debian)")
+        suggestions.append(f"{name}: Ensure dependency is installed. Refer to project documentation.")
     elif "python_packages" in category:
-        package = name.split("'")[1] if "'" in name else "unknown"
-        suggestions.append(f"{name}: Install with 'pip install {package}' or 'uv pip install {package}'")
+        suggestions.append(f"{name}: Ensure dependency is installed. Refer to project documentation.")
+    elif category == "software.env.required":
+        var = name.split("'")[1] if "'" in name else "unknown"
+        suggestions.append(f"{name}: Set the environment variable before running: export {var}=<value>")
     else:
         suggestions.append(f"{name}: Check system documentation for {check['required']}")
 

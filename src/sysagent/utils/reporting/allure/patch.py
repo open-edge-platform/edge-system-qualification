@@ -138,8 +138,8 @@ def apply_patch(patch_path: str, cwd: str) -> bool:
     except (Exception, FileNotFoundError):
         raise Exception(
             f"patch command utility not found. Cannot apply {patch_name}. "
-            "Please install patch utility: "
-            "On Ubuntu/Debian: sudo apt-get install patch, On RHEL/Fedora: sudo yum install patch"
+            "Please install the 'patch' system utility. "
+            "Refer to your system package manager or project documentation."
         )
 
     # Use patch command utility

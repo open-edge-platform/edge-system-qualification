@@ -270,6 +270,10 @@ def _convert_profile_requirements_to_system_format(
             if package_field in profile_requirements:
                 system_format["software"][package_field] = profile_requirements[package_field]
 
+        # Environment variable requirements
+        if "env" in profile_requirements:
+            system_format["software"]["env"] = profile_requirements["env"]
+
     return system_format
 
 

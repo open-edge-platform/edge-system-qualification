@@ -43,14 +43,14 @@ class TestSummaryTableGenerator:
             return f"{duration_seconds:.3f} seconds"
         elif duration_seconds < 3600:  # Less than 1 hour
             minutes = int(duration_seconds // 60)
-            seconds = duration_seconds % 60
-            return f"{minutes}m {seconds:.3f}s"
+            seconds = int(duration_seconds % 60)
+            return f"{minutes}m {seconds}s"
         else:  # 1 hour or more
             hours = int(duration_seconds // 3600)
             remaining_seconds = duration_seconds % 3600
             minutes = int(remaining_seconds // 60)
-            seconds = remaining_seconds % 60
-            return f"{hours}h {minutes}m {seconds:.3f}s"
+            seconds = int(remaining_seconds % 60)
+            return f"{hours}h {minutes}m {seconds}s"
 
     def _format_system_summary(self, system_data: Dict[str, Any]) -> str:
         """
@@ -113,11 +113,7 @@ class TestSummaryTableGenerator:
         # Calculate pass rate
         total_current_tests = len(current_run_tests)
         passed_tests = status_counts["passed"]
-        pass_rate = (
-            (passed_tests / total_current_tests * 100)
-            if total_current_tests > 0
-            else 0.0
-        )
+        pass_rate = (passed_tests / total_current_tests * 100) if total_current_tests > 0 else 0.0
 
         return {"status_counts": status_counts, "pass_rate": pass_rate}
 
@@ -125,9 +121,7 @@ class TestSummaryTableGenerator:
         """Check if profile should be excluded from text summary."""
         if not profile_name:
             return False
-        return any(
-            profile_name.startswith(excluded) for excluded in self.EXCLUDED_PROFILES
-        )
+        return any(profile_name.startswith(excluded) for excluded in self.EXCLUDED_PROFILES)
 
     def generate_summary_table(self) -> str:
         """
@@ -154,9 +148,7 @@ class TestSummaryTableGenerator:
         if summary.get("suite_name"):
             table_lines.append(f"Suite: {summary['suite_name']}")
 
-        table_lines.append(
-            f"Generated: {summary.get('generated_timestamp', 'unknown')}"
-        )
+        table_lines.append(f"Generated: {summary.get('generated_timestamp', 'unknown')}")
         table_lines.append("")
 
         # Add system summary before overall statistics
@@ -174,10 +166,7 @@ class TestSummaryTableGenerator:
         table_lines.append("OVERALL STATISTICS")
         table_lines.append("-" * 40)
         table_lines.append(f"Total Tests: {summary.get('total_tests', 0)}")
-        table_lines.append(
-            f"Total Duration: "
-            f" {self._format_duration(summary.get('total_duration_seconds', 0))}"
-        )
+        table_lines.append(f"Total Duration:  {self._format_duration(summary.get('total_duration_seconds', 0))}")
         table_lines.append(f"Pass Rate: {summary.get('pass_rate', 0):.2f}%")
 
         # Add status breakdown with symbols to overall statistics
@@ -197,9 +186,7 @@ class TestSummaryTableGenerator:
             table_lines.append("CURRENT RUN STATISTICS")
             table_lines.append("-" * 40)
             table_lines.append(f"Total Tests: {current_run_count}")
-            table_lines.append(
-                f"Total Duration: {self._format_duration(current_run_duration)}"
-            )
+            table_lines.append(f"Total Duration: {self._format_duration(current_run_duration)}")
             table_lines.append(f"Pass Rate: {current_run_stats['pass_rate']:.2f}%")
 
             # Add current run status breakdown with symbols
@@ -210,6 +197,42 @@ class TestSummaryTableGenerator:
             table_lines.append("")
 
         return "\n".join(table_lines)
+
+    def _get_key_metric_display(self, test: Dict[str, Any], max_width: int = 21) -> str:
+        """
+        Get the key metric display string for a test.
+
+        Values are rounded to at most 2 decimal places. The result is truncated
+        with '..' if it exceeds max_width characters.
+
+        Args:
+            test: Test data dictionary containing metrics
+            max_width: Maximum display width before truncating with '..'
+
+        Returns:
+            Formatted string with key metric value and unit, or 'N/A'
+        """
+        metrics = test.get("metrics", {})
+        for metric_data in metrics.values():
+            if metric_data.get("is_key_metric", False):
+                value = metric_data.get("value")
+                unit = metric_data.get("unit", "") or ""
+                if value is not None:
+                    if isinstance(value, float):
+                        formatted = f"{round(value, 2):.2f}"
+                    elif isinstance(value, int):
+                        formatted = str(value)
+                    else:
+                        # For non-numeric, round if it looks numeric
+                        try:
+                            formatted = f"{round(float(value), 2):.2f}"
+                        except (TypeError, ValueError):
+                            formatted = str(value)
+                    display = f"{formatted} {unit}".strip() if unit else formatted
+                    if len(display) > max_width:
+                        display = display[: max_width - 2] + ".."
+                    return display
+        return "N/A"
 
     def _get_status_symbol(self, status: str) -> str:
         """
@@ -251,61 +274,56 @@ class TestSummaryTableGenerator:
         current_run_uuids = summary.get("current_run_test_uuids", [])
 
         table_lines = []
-        table_lines.append("-" * 137)
+        table_lines.append("-" * 134)
 
         # Header for unique test cases view
-        header = (
-            f"{'ID':<9} {'Test Name':<70} {'Total Runs':<12} "
-            f"{'Current (s)':<12} {'Longest (s)':<12} {'Status':<12}"
-        )
+        # Columns: TestName(74) + Metric(22) + Duration(15) + Runs(7) + Status(12) + 4 spaces = 134
+        header = f"{'Test Name':<74} {'Metric':<22} {'Duration':<15} {'Runs':<7} {'Status':<12}"
         table_lines.append(header)
-        table_lines.append("-" * 137)
+        table_lines.append("-" * 134)
 
         # Sort by test name alphabetically
-        sorted_tests = sorted(
-            unique_tests, key=lambda x: x.get("test_name", "Unknown").lower()
-        )
+        sorted_tests = sorted(unique_tests, key=lambda x: x.get("test_name", "Unknown").lower())
 
         for test in sorted_tests:
-            history_id = test.get("history_id", "Unknown")[:7]
-            test_name = test.get("test_name", "Unknown")[:68]
             total_runs = test.get("total_runs", 1)
-            current_duration = test.get("duration_seconds", 0)  # Latest run duration
-            longest_duration = test.get("longest_duration_seconds", 0)
+            duration_seconds = test.get("duration_seconds", 0)  # Latest run duration
             status = test.get("status", "unknown")
 
             # Check if this test was part of the current run
             test_uuids = test.get("all_run_uuids", [])
             is_current_run = any(uuid in current_run_uuids for uuid in test_uuids)
 
-            # Add current run indicator to test name if it was part of current run
-            if is_current_run:
-                # Add a "▶" symbol to indicate current run test
-                current_run_indicator = " ◼"
-                # Adjust the test name length to accommodate the indicator
-                available_name_length = 66  # Reduced to fit indicator
-                if len(test.get("test_name", "")) > available_name_length:
-                    test_name = (
-                        test.get("test_name", "Unknown")[:available_name_length] + ".."
-                    )
-                test_name_display = test_name + current_run_indicator
+            # Truncate test name to fit within 74-char column, leaving 4 chars of
+            # trailing space so the adjacent Metric column is easy to read
+            full_test_name = test.get("test_name", "Unknown")
+            if len(full_test_name) > 70:
+                test_name_display = full_test_name[:68] + ".."
             else:
-                test_name_display = test_name
-                # Truncate if too long for non-current run tests
-                if len(test.get("test_name", "")) > 68:
-                    test_name_display = test_name + ".."
+                test_name_display = full_test_name
 
-            # Add status symbol prefix
+            # Get key metric display and formatted duration
+            metric_display = self._get_key_metric_display(test)
+            duration_display = self._format_duration(duration_seconds)
+
+            # Add status symbol prefix; append ◼ to mark the current run.
+            # Placing it in the last column avoids any alignment issues caused by
+            # ◼ being rendered as a double-width character in some terminals.
             status_symbol = self._get_status_symbol(status)
-            status_display = f"{status_symbol} {status}"
+            if is_current_run:
+                status_display = f"{status_symbol} {status} \u25fc"
+            else:
+                status_display = f"{status_symbol} {status}"
+
+            runs_display = str(total_runs)
 
             row = (
-                f"{history_id:<9} {test_name_display:<70} {total_runs:<12} "
-                f"{current_duration:<12.3f} {longest_duration:<12.3f} "
+                f"{test_name_display:<74} {metric_display:<22} "
+                f"{duration_display:<15} {runs_display:<7} "
                 f"{status_display:<12}"
             )
             table_lines.append(row)
 
-        table_lines.append("-" * 137)
+        table_lines.append("-" * 134)
 
         return "\n".join(table_lines)

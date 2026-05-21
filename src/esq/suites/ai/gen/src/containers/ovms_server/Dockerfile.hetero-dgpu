@@ -1,7 +1,11 @@
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
+#
+# Dedicated Dockerfile for hetero-dgpu devices.
+# Uses openvino/model_server:2025.4.1-gpu due to compatibility issues with 2026.1-gpu
+# on hetero multi-GPU configurations.
 
-FROM openvino/model_server:2026.1-gpu
+FROM openvino/model_server:2025.4.1-gpu
 
 USER root
 RUN apt-get update \
@@ -18,4 +22,3 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 
 # Use the default OVMS entrypoint
 CMD ["/ovms/bin/ovms"]
-    

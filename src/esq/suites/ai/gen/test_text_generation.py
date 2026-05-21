@@ -69,9 +69,14 @@ def test_text_generation(
     hf_dataset_repo = configs.get("hf_dataset_repo", "anon8231489123/ShareGPT_Vicuna_unfiltered")
     ms_dataset_repo = configs.get("ms_dataset_repo", "gliang1001/ShareGPT_V3_unfiltered_cleaned_split")
     dataset_filename = configs.get("dataset_filename", "ShareGPT_V3_unfiltered_cleaned_split.json")
-    docker_image_tag = f"{configs.get('container_image_name', 'genai-ovms')}:{configs.get('container_tag', 'latest')}"
+    # hetero-dgpu uses a separate image built on an older OVMS release that is known to work
+    # with hetero multi-GPU configs. For all other devices the default (latest) image is used.
+    is_hetero_dgpu = "hetero-dgpu" in devices
+    default_image_name = "genai-ovms-hetero-dgpu" if is_hetero_dgpu else "genai-ovms"
+    docker_image_tag = f"{configs.get('container_image_name', default_image_name)}:{configs.get('container_tag', 'latest')}"
     benchmark_docker_base_image = f"{configs.get('benchmark_container_image', 'vllm/vllm-openai:v0.9.2')}"
-    ovms_docker_base_image = f"{configs.get('ovms_container_image', 'openvino/model_server:2025.4.1-gpu')}"
+    ovms_default_image = "openvino/model_server:2025.4.1-gpu" if is_hetero_dgpu else "openvino/model_server:2026.1-gpu"
+    ovms_docker_base_image = configs.get("ovms_container_image", ovms_default_image)
 
     # Setup
     test_dir = os.path.dirname(os.path.abspath(__file__))
@@ -164,6 +169,7 @@ def test_text_generation(
                 thirdparty_dir=thirdparty_dir,
                 src_dir=src_dir,
                 download_timeout=download_timeout,
+                devices=devices,
             ),
             configs=configs,
             name="Assets",

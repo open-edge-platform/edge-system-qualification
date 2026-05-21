@@ -69,6 +69,7 @@ def prepare_assets(
     src_dir: str,
     download_timeout: float = 300,
     docker_buildargs: Dict[str, str] = None,
+    devices: list = None,
 ) -> Dict[str, Any]:
     """
     Prepare all necessary assets for the Text Generation test.
@@ -87,6 +88,9 @@ def prepare_assets(
         src_dir: Source directory
         download_timeout: Timeout for dataset download in seconds (default: 300)
         docker_buildargs: Docker build arguments
+        devices: List of device categories (e.g. ["hetero-dgpu"]); used to select the
+            appropriate Dockerfile. When "hetero-dgpu" is present, Dockerfile.hetero-dgpu
+            is used instead of the default Dockerfile.
 
     Returns:
         Dict with preparation results and configuration
@@ -138,8 +142,20 @@ def prepare_assets(
         # Use containers folder for build context
         container_src_dir = os.path.join(os.path.dirname(src_dir), "containers", "ovms_server")
 
+        is_hetero_dgpu = devices and "hetero-dgpu" in devices
+
+        # Select Dockerfile based on device type: hetero-dgpu uses a dedicated Dockerfile
+        # that pins an older OVMS version known to work correctly with hetero multi-GPU configs.
+        ovms_dockerfile = "Dockerfile.hetero-dgpu" if is_hetero_dgpu else "Dockerfile"
+        if is_hetero_dgpu:
+            logger.info("Using Dockerfile.hetero-dgpu for hetero-dgpu build")
+
         build_result = docker_client.build_image(
-            path=container_src_dir, tag=docker_image_tag, buildargs=docker_buildargs, extract_base_image_info=True
+            path=container_src_dir,
+            tag=docker_image_tag,
+            dockerfile=ovms_dockerfile,
+            buildargs=docker_buildargs,
+            extract_base_image_info=True,
         )
 
         container_config = {

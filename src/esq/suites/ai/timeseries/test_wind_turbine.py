@@ -10,6 +10,9 @@ import string
 import time
 from pathlib import Path
 
+from sysagent.utils.core import Metrics, Result
+from sysagent.utils.infrastructure import download_file
+
 from esq.utils.services import (
     DockerHubTimeseriesAppManager,
     append_performance_row,
@@ -19,8 +22,6 @@ from esq.utils.services import (
     generate_presentation_csv,
 )
 from esq.utils.services.report_gen import _get_current_system_cpu
-from sysagent.utils.core import Metrics, Result
-from sysagent.utils.infrastructure import download_file
 
 try:
     import allure as _allure
@@ -51,6 +52,37 @@ def _short_test_id_suffix(test_id: str) -> str:
         return digits[-1].zfill(3)
     normalized = re.sub(r"[^a-zA-Z0-9]+", "_", text).strip("_").lower()
     return normalized or "run"
+
+
+# Bind-mount source sub-paths (relative to wt/assets) referenced by docker-compose.yml.
+# Docker auto-creates any missing host-side bind-mount source as a root-owned directory
+# before mounting, which then prevents non-root CI runners from deleting esq_data/.
+# Pre-creating these as the host user avoids that.
+_TIMESERIES_BIND_MOUNT_DIRS = (
+    "configs/mqtt-broker",
+    "configs/telegraf",
+    "apps/{sample_app}/simulation-data",
+    "apps/{sample_app}/telegraf-config",
+    "apps/{sample_app}/time-series-analytics-config",
+    "apps/{sample_app}/time-series-analytics-config/udfs",
+    "apps/{sample_app}/time-series-analytics-config/tick_scripts",
+    "apps/{sample_app}/time-series-analytics-config/models",
+)
+
+
+def _precreate_bind_mount_dirs(suite_assets_root, sample_app):
+    """Pre-create bind-mount source directories as the host user.
+
+    Prevents Docker daemon from creating missing bind-mount sources as root-owned
+    directories on host, which would break later filesystem cleanup (e.g. in CI).
+    """
+    assets_root = Path(suite_assets_root).expanduser().resolve()
+    sample_name = str(sample_app or "wind-turbine-anomaly-detection").strip() or "wind-turbine-anomaly-detection"
+    for relative in _TIMESERIES_BIND_MOUNT_DIRS:
+        try:
+            (assets_root / relative.format(sample_app=sample_name)).mkdir(parents=True, exist_ok=True)
+        except OSError as mkdir_error:
+            logger.debug("Skipping pre-create of bind-mount dir %s: %s", relative, mkdir_error)
 
 
 def _download_configured_assets(configs, suite_assets_root):
@@ -92,10 +124,7 @@ def _generate_project_telegraf_config(source_config, target_config, compose_proj
     source_text = Path(source_config).read_text(encoding="utf-8")
     generated_tail = ""
 
-    block_starts = [
-        match.start()
-        for match in re.finditer(r"(?m)^\[\[inputs\.opcua\]\]\s*$", source_text)
-    ]
+    block_starts = [match.start() for match in re.finditer(r"(?m)^\[\[inputs\.opcua\]\]\s*$", source_text)]
     if not block_starts:
         Path(target_config).parent.mkdir(parents=True, exist_ok=True)
         Path(target_config).write_text(source_text, encoding="utf-8")
@@ -121,8 +150,7 @@ def _generate_project_telegraf_config(source_config, target_config, compose_proj
             continue
 
         endpoint = (
-            f'endpoint = "opc.tcp://{compose_project_name}-ia-opcua-server-{stream_index}'
-            ':4840/freeopcua/server/"'
+            f'endpoint = "opc.tcp://{compose_project_name}-ia-opcua-server-{stream_index}:4840/freeopcua/server/"'
         )
         block = re.sub(r'(?m)^\s*endpoint\s*=\s*"[^"]*"\s*$', endpoint, block, count=1)
         block = re.sub(
@@ -143,8 +171,7 @@ def _generate_project_telegraf_config(source_config, target_config, compose_proj
             template_block = template_block[: tail_match.start()].rstrip() + "\n"
         for stream_index in range(1, max_streams + 1):
             endpoint = (
-                f'endpoint = "opc.tcp://{compose_project_name}-ia-opcua-server-{stream_index}'
-                ':4840/freeopcua/server/"'
+                f'endpoint = "opc.tcp://{compose_project_name}-ia-opcua-server-{stream_index}:4840/freeopcua/server/"'
             )
             block = re.sub(r'(?m)^\s*endpoint\s*=\s*"[^"]*"\s*$', endpoint, template_block, count=1)
             if re.search(r'(?m)^\s*name\s*=\s*"[^"]*"\s*$', block):
@@ -156,7 +183,7 @@ def _generate_project_telegraf_config(source_config, target_config, compose_proj
                 )
             else:
                 block = re.sub(
-                    r'(?m)^\[\[inputs\.opcua\]\]\s*$',
+                    r"(?m)^\[\[inputs\.opcua\]\]\s*$",
                     f'[[inputs.opcua]]\n  name = "opcua_stream_{stream_index}"',
                     block,
                     count=1,
@@ -234,11 +261,7 @@ def _services_for_ingestion_mode(requested_services, ingestion_mode_value, enfor
     if mode == "opcua":
         # Keep MQTT broker alive even for OPCUA ingestion because the
         # analytics task initializes MQTT alert outputs.
-        services = [
-            service
-            for service in services
-            if service not in {"ia-mqtt-publisher"}
-        ]
+        services = [service for service in services if service not in {"ia-mqtt-publisher"}]
     elif mode == "mqtt":
         services = [service for service in services if service != "ia-opcua-server"]
 
@@ -352,19 +375,19 @@ def test_wind_turbine(
         "INGESTION_INTERVAL": str(ingestion_interval),
         "INGESTION_MODE": str(ingestion_mode),
         "COMPUTE_DEVICE": str(compute_device),
-        "OPCUA_SERVER": (
-            f"opc.tcp://{compose_project_name}-ia-opcua-server-1:4840/freeopcua/server/"
-        ),
+        "OPCUA_SERVER": (f"opc.tcp://{compose_project_name}-ia-opcua-server-1:4840/freeopcua/server/"),
     }
 
-    simulation_data_dir = str(
-        configs.get("simulation_data_dir", os.environ.get("TIMESERIES_ASSETS_DIR", ""))
-    ).strip()
+    simulation_data_dir = str(configs.get("simulation_data_dir", os.environ.get("TIMESERIES_ASSETS_DIR", ""))).strip()
 
     core_data_dir = Path(os.environ.get("CORE_DATA_DIR", os.path.join(os.getcwd(), "esq_data"))).resolve()
     suite_runtime_root = core_data_dir / "data" / "suites" / "ai" / "timeseries" / "wt"
     suite_assets_root = suite_runtime_root / "assets"
     _download_configured_assets(configs=configs, suite_assets_root=suite_assets_root)
+    # Pre-create bind-mount source paths as the host user so the Docker daemon
+    # does not auto-create them as root-owned directories (which would later
+    # block non-root cleanup in CI runners).
+    _precreate_bind_mount_dirs(suite_assets_root=suite_assets_root, sample_app=sample_app)
 
     downloaded_reference_root = suite_assets_root if (configs.get("assets", []) or []) else None
 
@@ -436,8 +459,7 @@ def test_wind_turbine(
         os.chmod(telegraf_entrypoint, 0o750)
     except OSError as chmod_error:
         raise RuntimeError(
-            f"Unable to set executable permission on telegraf entrypoint: {telegraf_entrypoint}; "
-            f"error: {chmod_error}"
+            f"Unable to set executable permission on telegraf entrypoint: {telegraf_entrypoint}; error: {chmod_error}"
         ) from chmod_error
     if not telegraf_default_config.is_file():
         raise RuntimeError(f"Required telegraf config not found: {telegraf_default_config}")
@@ -500,6 +522,7 @@ def test_wind_turbine(
 
         def execute_logic():
             nonlocal measured_throughput, measured_latency, metric_details, resolved_metric_source
+
             def run_single_scenario(case: dict) -> dict:
                 case_test_id = str(case.get("test_id", configs.get("test_id", test_name)))
                 case_display_name = str(case.get("display_name", test_display_name))
@@ -659,8 +682,7 @@ def test_wind_turbine(
 
                 if not services_ready and "ia-influxdb" not in case_running_services:
                     raise RuntimeError(
-                        "Critical service ia-influxdb is not running after compose bring-up; "
-                        f"status={case_status_text}"
+                        f"Critical service ia-influxdb is not running after compose bring-up; status={case_status_text}"
                     )
 
                 startup_grace_seconds = int(
@@ -699,9 +721,7 @@ def test_wind_turbine(
                                 )
                             ),
                         )
-                        query_timeout = int(
-                            case.get("influx_query_timeout", configs.get("influx_query_timeout", 120))
-                        )
+                        query_timeout = int(case.get("influx_query_timeout", configs.get("influx_query_timeout", 120)))
                         throughput_window_seconds = int(
                             case.get(
                                 "influx_throughput_window_seconds",
@@ -817,12 +837,16 @@ def test_wind_turbine(
 
                         chosen_throughput_unit = "points/s"
                         default_effective_mode = "count" if case_ingestion_mode.lower() == "opcua" else "auto"
-                        throughput_effective_mode = str(
-                            case.get(
-                                "influx_throughput_effective_mode",
-                                configs.get("influx_throughput_effective_mode", default_effective_mode),
+                        throughput_effective_mode = (
+                            str(
+                                case.get(
+                                    "influx_throughput_effective_mode",
+                                    configs.get("influx_throughput_effective_mode", default_effective_mode),
+                                )
                             )
-                        ).strip().lower()
+                            .strip()
+                            .lower()
+                        )
                         if isinstance(case_metric_details, dict):
                             throughput_count = case_metric_details.get("throughput_count")
                             if throughput_count is not None and case_ref_throughput > 0:
@@ -895,9 +919,7 @@ def test_wind_turbine(
                 case_min_required_throughput = None
                 if case_threshold_enabled and case_throughput_percent_delta is not None:
                     # Throughput is a higher-is-better KPI; enforce only a lower bound.
-                    case_min_required_throughput = case_ref_throughput * (
-                        1.0 - (case_threshold / 100.0)
-                    )
+                    case_min_required_throughput = case_ref_throughput * (1.0 - (case_threshold / 100.0))
                     case_threshold_pass = (
                         case_measured_throughput is not None
                         and case_measured_throughput >= case_min_required_throughput
@@ -944,9 +966,7 @@ def test_wind_turbine(
                         logger.warning("Interrupted during batch scenario execution; forcing compose teardown")
                         _safe_teardown(active_cleanup_env, context="batch scenario interrupt")
                         raise
-                batch_configured_streams = max(
-                    float(case.get("num_streams", 0.0) or 0.0) for case in scenario_results
-                )
+                batch_configured_streams = max(float(case.get("num_streams", 0.0) or 0.0) for case in scenario_results)
                 batch_configured_data_points = max(
                     float(case.get("num_data_points", 0.0) or 0.0) for case in scenario_results
                 )
@@ -955,11 +975,10 @@ def test_wind_turbine(
                 )
                 throughput_units = {str(case.get("throughput_unit", "points/s")) for case in scenario_results}
                 batch_throughput_unit = "points/s" if len(throughput_units) != 1 else next(iter(throughput_units))
-                avg_latency = (
-                    sum(float(case.get("latency") or 0.0) for case in scenario_results)
-                    / len(scenario_results)
+                avg_latency = sum(float(case.get("latency") or 0.0) for case in scenario_results) / len(
+                    scenario_results
                 )
-                
+
                 # Extract best performer (highest throughput)
                 best_performer = _extract_best_performer(scenario_results)
 
@@ -1174,12 +1193,8 @@ def test_wind_turbine(
                 latency_plot_target = str(report_dir / f"ts_wt_latency_{short_test_id}.png")
                 throughput_grouped_plot_target = throughput_plot_target
                 latency_grouped_plot_target = latency_plot_target
-                throughput_scenario_plot_target = str(
-                    report_dir / f"ts_wt_throughput_by_scenario_{short_test_id}.png"
-                )
-                latency_scenario_plot_target = str(
-                    report_dir / f"ts_wt_latency_by_scenario_{short_test_id}.png"
-                )
+                throughput_scenario_plot_target = str(report_dir / f"ts_wt_throughput_by_scenario_{short_test_id}.png")
+                latency_scenario_plot_target = str(report_dir / f"ts_wt_latency_by_scenario_{short_test_id}.png")
 
                 single_csv_file = Path(active_csv_path)
                 if single_csv_file.exists():

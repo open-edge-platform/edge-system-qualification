@@ -27,15 +27,61 @@ logger = logging.getLogger(__name__)
 _TELEMETRY_ATTR = "_sysagent_telemetry_collector"
 
 
+def _resolve_scope(telemetry_cfg) -> str:
+    """
+    Resolve the telemetry collection scope.
+
+    Supported values:
+    - ``execution`` (default): collector is constructed during setup but the
+      sampling thread is only started around the actual test workload via
+      ``execute_test_with_cache``. Excludes preparation phases such as
+      Docker image build, asset/model download, container launch, and
+      result post-processing.
+    - ``test`` (legacy): sampling runs for the entire pytest function
+      lifecycle (setup -> body -> teardown), matching the historical
+      behavior prior to scoping support.
+
+    Resolution order (highest precedence first):
+    1. ``telemetry.scope`` in profile YAML.
+    2. ``CORE_TELEMETRY_SCOPE`` environment variable.
+    3. Default: ``execution``.
+    """
+    import os as _os
+
+    raw = telemetry_cfg.get("scope") if isinstance(telemetry_cfg, dict) else None
+    if not raw:
+        raw = _os.environ.get("CORE_TELEMETRY_SCOPE")
+    scope = str(raw or "execution").strip().lower()
+    if scope not in {"execution", "test"}:
+        logger.warning(
+            "Unsupported telemetry.scope '%s'; falling back to 'execution'.", scope
+        )
+        scope = "execution"
+    return scope
+
+
+# Attribute name used to stash the resolved scope on the pytest node so that
+# execute_test_with_cache can decide whether to start/stop the collector.
+_TELEMETRY_SCOPE_ATTR = "_sysagent_telemetry_scope"
+
+
 @pytest.fixture(scope="function", autouse=True)
 def _auto_telemetry(request, configs):
     """
-    Automatically start/stop telemetry collection for every test function.
+    Construct (and optionally run) the telemetry collector for a test.
 
     Reads ``configs["telemetry"]`` to determine whether collection is enabled
-    and which modules to activate.  The collector is attached to
-    ``request.node`` so that ``summarize_test_results`` can apply the
-    collected data to the ``Result`` without any changes to test code.
+    and which modules to activate. The collector is attached to ``request.node``
+    so that ``summarize_test_results`` can apply the collected data to the
+    ``Result`` without any changes to test code.
+
+    Scope (``telemetry.scope`` in profile YAML):
+    - ``execution`` (default): the collector is created here but its sampling
+      thread is started by ``execute_test_with_cache`` immediately before the
+      workload function runs and stopped immediately after. This excludes
+      docker build / asset preparation / teardown from the collected window.
+    - ``test`` (legacy): the collector starts here (during pytest setup) and
+      stops in teardown, matching the previous behavior.
 
     The fixture is a no-op when:
     - ``configs`` does not contain a ``telemetry`` key.
@@ -62,15 +108,30 @@ def _auto_telemetry(request, configs):
         yield
         return
 
-    # Stash collector on the node so summarize_test_results can find it
+    # Stash collector + scope on the node so other fixtures can find them
     setattr(request.node, _TELEMETRY_ATTR, collector)
+    scope = _resolve_scope(telemetry_cfg)
+    setattr(request.node, _TELEMETRY_SCOPE_ATTR, scope)
 
-    collector.start()
+    if scope == "test":
+        collector.start()
+    else:
+        logger.debug(
+            "Telemetry scope='execution': collector created but not started; "
+            "execute_test_with_cache will start/stop it around the workload."
+        )
+
     try:
         yield
     finally:
+        # Always stop in teardown as a safety net (no-op if never started, or
+        # already stopped by execute_test_with_cache).
         collector.stop()
-        logger.debug("Telemetry collection complete for test: %s", request.node.nodeid)
+        logger.debug(
+            "Telemetry collection complete for test: %s (scope=%s)",
+            request.node.nodeid,
+            scope,
+        )
 
 
 def get_telemetry_collector(request_node):
@@ -84,3 +145,13 @@ def get_telemetry_collector(request_node):
         The TelemetryCollector instance, or None if telemetry was not active.
     """
     return getattr(request_node, _TELEMETRY_ATTR, None)
+
+
+def get_telemetry_scope(request_node) -> str:
+    """
+    Retrieve the resolved telemetry scope for a pytest node.
+
+    Returns:
+        ``execution``, ``test``, or ``""`` if telemetry was not active.
+    """
+    return getattr(request_node, _TELEMETRY_SCOPE_ATTR, "") or ""

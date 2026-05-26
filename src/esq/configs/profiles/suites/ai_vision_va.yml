@@ -59,6 +59,40 @@ params:
   target_fps: 30
   force_run: false  # Set to true to re-run even if cached results exist
 
+  # Telemetry configuration — captures device load during the actual workload only.
+  telemetry:
+    enabled: true
+    interval: 2  # seconds between samples
+    # Telemetry collection window:
+    # - execution (default): only the actual workload (run_test_func) is sampled.
+    #   Excludes docker build, asset/model preparation, container launch, and
+    #   post-processing. Recommended for clean per-test load profiles.
+    # - test: legacy behavior — sampling spans the full pytest lifecycle
+    #   (setup -> body -> teardown), including preparation phases.
+    scope: execution
+    # Idle-baseline capture: collects telemetry for a short window immediately
+    # before the workload starts and overlays per-metric idle stats (min/avg/max)
+    # onto the chart as a reference band + dashed avg line. This lets end users
+    # compare workload load against the system's idle state at a glance.
+    # The band/line render on the workload time axis (no time-axis mismatch),
+    # so any idle/test duration ratio works.
+    prerun:
+      enabled: true
+      duration_s: 10   # idle baseline window before the test
+      interval_s: 1    # sample cadence during the idle window
+    # Video-analytics pipelines exercise CPU + iGPU/dGPU + NPU — the
+    # cost-per-fps and dominant-device hint are valuable here.
+    kpi_correlation: true
+    module_group: external
+    modules:
+      - name: platform_telemetry
+        enabled: true
+        group: external
+        options:
+          # target_devices: omit to auto-collect every CPU/iGPU/dGPU/NPU.
+          # To restrict, list canonical labels (quote any with brackets):
+          #   target_devices: [CPU, iGPU, "dGPU[0]"]
+
 suites:
   - name: "ai"
     sub_suites:

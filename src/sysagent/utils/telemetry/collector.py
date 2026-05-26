@@ -40,6 +40,8 @@ def _parse_module_configs(telemetry_cfg: Dict[str, Any]) -> List[Dict[str, Any]]
                 "title": entry.get("title", {}) or {},
                 "scales": entry.get("scales", {}) or {},
                 "axes": entry.get("axes", []) or [],
+                "options": entry.get("options", {}) or {},
+                "group": str(entry.get("group", "sysfs") or "sysfs").strip().lower(),
             }
         )
     return parsed
@@ -103,6 +105,13 @@ class TelemetryCollector:
         telemetry_cfg: Dict[str, Any] = configs.get("telemetry") or {}
         self.enabled: bool = bool(telemetry_cfg.get("enabled", False))
         self.interval: int = int(telemetry_cfg.get("interval", 10))
+        self.module_group: str = str(telemetry_cfg.get("module_group", "sysfs") or "sysfs").strip().lower()
+        if self.module_group not in {"sysfs", "external"}:
+            logger.warning(
+                "Telemetry module_group '%s' is not supported; defaulting to 'sysfs'.",
+                self.module_group,
+            )
+            self.module_group = "sysfs"
 
         # Allow env-var override of the configured interval.
         # CORE_TELEMETRY_INTERVAL takes precedence over the profile YAML value,
@@ -110,6 +119,7 @@ class TelemetryCollector:
         # CLI option --telemetry-interval sets this env var; it can also be set directly.
         # Priority: CLI option (highest) > CORE_TELEMETRY_INTERVAL env var > profile YAML (lowest).
         _env_interval = os.environ.get("CORE_TELEMETRY_INTERVAL", "").strip()
+        _env_group = os.environ.get("CORE_TELEMETRY_MODULE_GROUP", "").strip().lower()
         if _env_interval:
             try:
                 _override = int(_env_interval)
@@ -125,17 +135,90 @@ class TelemetryCollector:
             except ValueError:
                 logger.warning("CORE_TELEMETRY_INTERVAL='%s' is not a valid integer; ignoring override.", _env_interval)
 
+        if _env_group:
+            if _env_group in {"sysfs", "external"}:
+                logger.debug(
+                    "Telemetry module group overridden by CORE_TELEMETRY_MODULE_GROUP: %s (profile configured: %s)",
+                    _env_group,
+                    self.module_group,
+                )
+                self.module_group = _env_group
+            else:
+                logger.warning(
+                    "CORE_TELEMETRY_MODULE_GROUP='%s' must be one of: sysfs, external; ignoring override.",
+                    _env_group,
+                )
+
         self._modules: List[Any] = []  # List[BaseTelemetryModule]
         self._thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
         self._summary: Optional[Dict[str, Any]] = None
 
         if self.enabled:
+            self._validate_module_group_consistency(telemetry_cfg)
             self._load_modules(telemetry_cfg)
 
     # ------------------------------------------------------------------
     # Module loading
     # ------------------------------------------------------------------
+
+    def _validate_module_group_consistency(self, telemetry_cfg: Dict[str, Any]) -> None:
+        """Reject mixed sysfs + external telemetry configurations.
+
+        platform_telemetry (group=external) and the sysfs modules
+        (group=sysfs) are two separate, mutually-exclusive collection
+        paths.  Running both at once would double-sample the same hardware
+        from two different sampling pipelines and produce inconsistent
+        Allure charts.
+
+        This method enforces a single group per profile by inspecting the
+        enabled ``telemetry.modules`` list and the profile-level
+        ``module_group`` field.  It raises ``ValueError`` with a guidance
+        message before any sampling thread is started, so the run aborts
+        cleanly during pytest setup rather than mid-test.
+        """
+        raw_modules = telemetry_cfg.get("modules", []) or []
+        if not isinstance(raw_modules, list):
+            return
+
+        seen_groups: Dict[str, List[str]] = {}
+        for entry in raw_modules:
+            if not isinstance(entry, dict):
+                continue
+            if not entry.get("enabled", True):
+                continue
+            name = str(entry.get("name", "") or "<unnamed>")
+            group = str(entry.get("group", "sysfs") or "sysfs").strip().lower()
+            seen_groups.setdefault(group, []).append(name)
+
+        if not seen_groups:
+            return
+
+        guide_msg = (
+            "platform_telemetry (external) and the existing sysfs telemetry "
+            "modules cannot be enabled together in the same profile.  "
+            "Pick exactly one group per profile.  "
+            "See docs/getting-started/telemetry/ for the supported configurations."
+        )
+
+        # 1. Mixed groups in the modules list itself.
+        if len(seen_groups) > 1:
+            details = ", ".join(
+                f"group='{g}' -> [{', '.join(names)}]" for g, names in seen_groups.items()
+            )
+            raise ValueError(
+                f"Telemetry profile mixes mutually-exclusive module groups: {details}. "
+                f"{guide_msg}"
+            )
+
+        # 2. The single group present must match the profile-level selector.
+        only_group = next(iter(seen_groups))
+        if only_group != self.module_group:
+            raise ValueError(
+                f"Telemetry profile sets module_group='{self.module_group}' but "
+                f"the only enabled module(s) belong to group='{only_group}': "
+                f"{seen_groups[only_group]}.  {guide_msg}"
+            )
 
     def _load_modules(self, telemetry_cfg: Dict[str, Any]) -> None:
         """Instantiate and validate requested telemetry modules."""
@@ -190,6 +273,8 @@ class TelemetryCollector:
                 self._try_add_module(name, cls, cfg)
         else:
             for entry in module_entries:
+                if not self._is_group_selected(entry.get("group", "sysfs")):
+                    continue
                 name = entry["name"]
                 cls = registry_get(name)
                 if cls is None:
@@ -204,8 +289,21 @@ class TelemetryCollector:
                     title=entry["title"],
                     scales=entry["scales"],
                     axes=entry["axes"],
+                    options=entry["options"],
                 )
                 self._try_add_module(name, cls, cfg)
+
+    def _is_group_selected(self, module_group: str) -> bool:
+        """Return True when a module group should be loaded for the current run."""
+        selected = self.module_group
+        module_group = (module_group or "sysfs").strip().lower()
+
+        if selected == "external":
+            return module_group == "external"
+        if selected == "sysfs":
+            return module_group != "external"
+
+        return False
 
     def _try_add_module(self, name: str, cls: Type[Any], cfg: Any) -> None:
         """Instantiate a module and add it if it is available on this system."""
@@ -254,7 +352,24 @@ class TelemetryCollector:
         if self._thread is not None:
             self._thread.join(timeout=max(self.interval * 2, 5))
             self._thread = None
+        # Always capture an end-state sample so short tests (whose runtime is
+        # less than ``interval``) still yield enough points (>= 2) for the
+        # report renderer to draw a line/area chart instead of an empty plot.
+        self._collect_one()
         self._summary = self._build_summary()
+        # Module-level cleanup: providers that spawned daemons / docker compose
+        # stacks (platform_telemetry external group) reap them here so no
+        # background process survives the test session.  Failures must not
+        # mask the user's stop() call \u2014 swallow per-module errors.
+        for module in self._modules:
+            try:
+                module.close()
+            except Exception as exc:
+                logger.debug(
+                    "Telemetry module '%s' close() raised: %s",
+                    getattr(module, "module_name", type(module).__name__),
+                    exc,
+                )
         logger.debug("Telemetry collection stopped; %d module(s) summarised.", len(self._modules))
 
     def _collect_one(self) -> None:
@@ -306,7 +421,41 @@ class TelemetryCollector:
         per_module: Dict[str, Any] = {}
 
         for module in self._modules:
-            per_module[module.module_name] = module.get_summary()
+            module_summary = module.get_summary()
+            virtual = module_summary.get("virtual_modules")
+            prefer_virtual_only = bool(module_summary.get("prefer_virtual_modules")) and isinstance(virtual, dict)
+
+            if isinstance(virtual, dict):
+                # Preserve the module's original top-level identity (matching
+                # the filename in ``src/esq/utils/telemetry/modules/``) and
+                # nest per-device entries underneath as ``device_groups`` so
+                # the JSON shape remains ``modules: { platform_telemetry: { … } }``
+                # rather than fanning ``platform_telemetry_cpu`` /
+                # ``platform_telemetry_igpu`` out as separate top-level keys.
+                device_groups = [
+                    virtual_summary
+                    for virtual_summary in virtual.values()
+                    if isinstance(virtual_summary, dict)
+                ]
+                if prefer_virtual_only:
+                    # Carry forward the parent module's status/provider context
+                    # so the nested view is still self-describing.
+                    parent_view = {
+                        k: v
+                        for k, v in module_summary.items()
+                        if k not in ("virtual_modules", "prefer_virtual_modules")
+                    }
+                    parent_view["device_groups"] = device_groups
+                    per_module[module.module_name] = parent_view
+                else:
+                    # Module wants both its own metrics and the virtual cards.
+                    parent_view = dict(module_summary)
+                    parent_view.pop("virtual_modules", None)
+                    parent_view.pop("prefer_virtual_modules", None)
+                    parent_view["device_groups"] = device_groups
+                    per_module[module.module_name] = parent_view
+            else:
+                per_module[module.module_name] = module_summary
 
         return {
             "enabled": True,
@@ -354,6 +503,20 @@ class TelemetryCollector:
         summary = self.get_summary()
         if not summary:
             return
+
+        # Defensive guard: if the result already carries finalised telemetry
+        # (e.g. restored from cache with baseline + kpi_correlation already
+        # attached), do not overwrite it with a fresh live snapshot.
+        try:
+            existing = result.extended_metadata.get("telemetry") or {}
+            if existing.get("kpi_correlation") is not None:
+                logger.debug(
+                    "apply_to_result: existing telemetry has kpi_correlation; "
+                    "skipping overwrite to preserve cached/finalised data."
+                )
+                return
+        except Exception:
+            pass
 
         # Store full summary in extended_metadata only
         result.extended_metadata["telemetry"] = summary

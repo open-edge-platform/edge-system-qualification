@@ -60,10 +60,454 @@
 
 .chartsGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
-  gap: 28px;
-  padding: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+  padding: 12px;
+  background: transparent;
+}
+
+.telemetryToolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px 8px;
   background: var(--bg-base-primary);
+}
+
+.telemetryExportBtn {
+  border: 1px solid #0071c5;
+  color: #0071c5;
+  background: #fff;
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+
+  &:hover {
+    background: #0071c5;
+    color: #fff;
+  }
+
+  // Dark theme: white pill on dark background is visually jarring and
+  // the Intel-blue label loses contrast. Invert to a transparent chip
+  // with a lighter accent border/text, and flip hover to a filled chip.
+  :global([data-theme="dark"]) & {
+    background: transparent;
+    border-color: #4ea3e0;
+    color: #4ea3e0;
+
+    &:hover {
+      background: #4ea3e0;
+      color: var(--bg-base-primary, #1b1f24);
+    }
+  }
+}
+
+.deviceGroup {
+  margin: 0 0 14px;
+  // Use the same neutral border color as ``.kpiCard`` so the outer device
+  // group frame and the inner chart cards share one consistent grey in
+  // both light and dark themes (see dark override block below).
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f7fafc;
+  // No padding here so the device header bar can stretch edge-to-edge
+  // and visually match the per-device bars inside .telemetryMetricTableWrap.
+  padding: 0;
+  overflow: hidden;
+
+  &:last-of-type {
+    margin-bottom: 0;
+  }
+}
+
+.deviceGroupHeader {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 0 12px;
+  height: 44px;
+  border-radius: 0;
+  margin-bottom: 0;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s;
+
+  &:hover {
+    background: var(--bg-base-neutral, #ececec);
+  }
+  &:focus-visible {
+    outline: 2px solid #ffd166;
+    outline-offset: -2px;
+  }
+}
+
+// Device colour markers retained as no-op classes so existing JSX/markup
+// continues to compile, but visually all device bars now share the same
+// neutral grey backdrop used by the top-level Metrics / Metadata /
+// Telemetry section headers (var(--bg-base-secondary)). This keeps the
+// page feeling calm and consistent.
+.deviceCPU,
+.deviceiGPU,
+.devicedGPU,
+.deviceNPU,
+.deviceOther {
+  background: var(--bg-base-secondary);
+}
+
+.deviceGroupTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+// Leading +/- indicator. Rendered as a span inside the header button so
+// the entire bar (not just the glyph) is the click target. Styled to
+// mirror .telemetryToggle on the top-level section header.
+.deviceToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--bg-base-modal);
+  border: 1px solid var(--bg-base-neutral);
+  color: var(--text-primary);
+  border-radius: 4px;
+  width: 22px;
+  height: 22px;
+  font-size: 12px;
+  font-weight: normal;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.kpiCard {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(13, 37, 63, 0.05);
+  padding: 10px;
+}
+
+.kpiCardName {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1f2d3d;
+  margin-bottom: 8px;
+  // Reserve space on the right so the absolutely-positioned action
+  // toolbar (``.chartCardActionsCompact``, top: -26px) doesn't visually
+  // overlap the title text on long metric labels.
+  padding-right: 70px;
+}
+
+.metricSingleChart {
+  border-radius: 8px;
+  overflow: visible;       // allow .chartCardActionsCompact to escape upward into the kpiCardName row
+  min-height: 230px;
+  background: linear-gradient(180deg, #ffffff, #f8fbff);
+  position: relative;  // anchor for the idleChip overlay AND the action toolbar
+}
+
+// Compact "Idle" legend chip pinned to the chart's top-right corner.
+// Visually mirrors the in-chart dashed reference line so the user can tell at
+// a glance which line represents the pre-run idle baseline.
+.idleChip {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--tc-pill-idle-fg);
+  background: var(--tc-pill-idle-bg);
+  border: 1px solid var(--tc-pill-idle-bd);
+  border-radius: 10px;
+  pointer-events: none;
+}
+
+.idleChipSwatch {
+  // Inline-SVG dashed line. We render the swatch as an SVG ``<line>``
+  // with ``stroke-dasharray`` because:
+  //   1. CSS ``border-top: 1.5px dashed`` collapses to a solid hairline
+  //      at narrow widths in most engines (≈14-18px wide swatch fits
+  //      only 2-3 dashes which the rasteriser merges together).
+  //   2. ``background-image: linear-gradient(...)`` with a tiny
+  //      ``background-size`` is also rendered inconsistently — some
+  //      browsers anti-alias the colour stops, others fail to tile when
+  //      the element height is only 1-2px.
+  //   3. SVG ``stroke-dasharray`` is exact, theme-aware via
+  //      ``currentColor``, and matches the in-chart baseline line and
+  //      the PNG-export swatch (which both use the same SVG attributes).
+  //
+  // The SVG element keeps its intrinsic 18×8 size from the ``width``/
+  // ``height`` attributes (no CSS ``width``/``height`` here) so the
+  // dashes render at exactly 1.5px stroke / 3-2 dash pattern without
+  // any non-uniform scaling distortion that would balloon them into
+  // rectangles.
+  display: inline-block;
+  vertical-align: middle;
+  color: var(--tc-chart-baseline);   // drives stroke="currentColor"
+  opacity: 0.95;
+  flex: none;
+  overflow: visible;
+}
+
+.metricSingleChart :global(.chartCard) {
+  border: none;
+  padding: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.metricSingleChart :global(.chartCardHeader) {
+  display: none;
+}
+
+.metricSingleChart :global(.legend) {
+  display: none;
+}
+
+.emptyMetricState {
+  min-height: 230px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #72859a;
+  font-size: 12px;
+  border: 1px dashed #c9d8e6;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #fbfdff, #f1f7fc);
+}
+
+.kpiValueRow {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.kpiValue {
+  font-size: 22px;
+  font-weight: 700;
+  color: #0f3057;
+}
+
+.kpiUnit {
+  font-size: 12px;
+  color: #6b7f96;
+}
+
+.kpiStatsRow {
+  display: flex;
+  justify-content: space-between;
+  color: #6b7f96;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+// Idle-baseline summary row (rendered below kpiStatsRow when prerun
+// telemetry data is attached to the module). Left-aligned numeric idle
+// reference, right-aligned avg / peak deltas vs idle. The dashed legend
+// swatch lives in the chart corner (.idleChip), not here.
+.kpiBaselineRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: 11px;
+  color: #6b7f96;
+}
+
+.kpiBaselineLabel {
+  font-weight: 500;
+  color: #6b7f96;
+}
+
+// Tag attached to the bold kpi value clarifying it is the workload mean
+// (not min/max/peak). Small uppercase pill rendered to the left of the
+// headline number so the line reads "AVG <value> <unit>".
+.kpiAggregateTag {
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: #6b7f96;
+  background: #eef3f8;
+  border: 1px solid #d6e2ee;
+  border-radius: 8px;
+  padding: 1px 5px;
+  margin-right: 4px;
+  align-self: center;
+  line-height: 1.2;
+}
+
+// Bordered container for the avg/peak deltas so it visually reads as
+// "Over Idle: avg +X% · peak +Y%". The ::before tag labels the box so
+// users don't have to infer that the deltas are relative to idle.
+.kpiBaselineDeltaBox {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 8px 1px 4px;
+  border: 1px solid #c9d8e6;
+  border-radius: 10px;
+  background: #f7fbfe;
+}
+
+.kpiBaselineDeltaTag {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #ffffff;
+  background: #133b5c;
+  border-radius: 8px;
+  padding: 1px 6px;
+}
+
+.kpiBaselineDelta {
+  font-weight: 600;
+  color: #133b5c;
+}
+
+.telemetryMetricTableWrap {
+  margin: 8px 16px 16px;
+  background: transparent;
+}
+
+// Title block above the per-device tables. Mirrors the matching
+// .telemetryGraphsTitle so both stacks read as "named" sections.
+.telemetryGraphsWrap {
+  margin: 8px 16px 16px;
+  background: transparent;
+}
+
+.telemetryGraphsTitle,
+.telemetryMetricTableTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: #133b5c;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border: 1px solid #dfe5ef;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #f7fbff, #eef5fb);
+}
+
+// Subdued caption shown beneath each section title to disclose the
+// CPU-group inclusion rule (Package power + Memory metrics are folded
+// into the CPU device for primary-compute attribution).
+.telemetrySectionCaption {
+  font-size: 11.5px;
+  color: #5b6b80;
+  margin: -4px 4px 10px;
+  padding: 0 8px;
+  line-height: 1.4;
+
+  strong {
+    color: #133b5c;
+    font-weight: 600;
+  }
+
+  :global([data-theme="dark"]) & {
+    color: var(--on-text-secondary, #b5c0d0);
+
+    strong {
+      color: var(--on-text-primary, #e6ecf5);
+    }
+  }
+}
+
+.telemetryMetricTable {
+  width: 100%;
+  border-collapse: collapse;
+
+  th,
+  td {
+    font-size: 12px;
+    text-align: left;
+    padding: 8px 10px;
+    border-bottom: 1px solid #eef2f7;
+    color: #23364d;
+  }
+
+  thead th {
+    font-weight: 700;
+    background: #f8fbff;
+  }
+}
+
+.tableGroupRow td {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  color: #0d4c7d;
+  background: #eef5fb;
+}
+
+// Per-device sub-table inside the Device Metrics Table wrap. Each device
+// gets its own clickable header (full-width bar) and, when expanded, its
+// own <table> with its own <thead>. This avoids the "shared header above
+// device name" awkwardness of the previous flat table.
+.telemetryMetricTableDevice {
+  margin-bottom: 14px;
+  border: 1px solid #dfe5ef;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+
+  &:last-of-type {
+    margin-bottom: 0;
+  }
+}
+
+.tableGroupHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 0 12px;
+  height: 44px;
+  color: var(--text-primary);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s;
+
+  &:hover {
+    background: var(--bg-base-neutral, #ececec);
+  }
+  &:focus-visible {
+    outline: 2px solid #ffd166;
+    outline-offset: -2px;
+  }
+}
+
+.tableGroupTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.tableGroupToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--bg-base-modal);
+  border: 1px solid var(--bg-base-neutral);
+  color: var(--text-primary);
+  border-radius: 4px;
+  width: 22px;
+  height: 22px;
+  font-size: 12px;
+  font-weight: normal;
+  line-height: 1;
+  flex-shrink: 0;
 }
 
 // ─── Individual chart card ────────────────────────────────────────────────────
@@ -125,6 +569,76 @@
   &:hover {
     background-color: var(--bg-base-secondary);
   }
+}
+
+// Container for per-chart action buttons (Download, Expand) in the
+// card header so they pack tightly to the right and don't break the
+// flex layout used by ``.chartCardHeader``.
+.chartCardActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+// Compact-mode action strip — pinned to the top-right of the chart
+// container but with a NEGATIVE top offset so it visually sits in the
+// ``.kpiCardName`` row (the metric title row, above the chart). That
+// way Download / Expand are right-aligned beside the title and never
+// collide with the y-axis tick labels OR the ``.idleChip`` overlay.
+.chartCardActionsCompact {
+  position: absolute;
+  top: -26px;
+  right: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  z-index: 5;
+
+  button {
+    padding: 1px 6px;
+    font-size: 12px;
+    line-height: 1.2;
+    min-width: 22px;
+    background: rgba(255, 255, 255, 0.92);
+    opacity: 0.55;
+    transition: opacity 0.15s ease;
+  }
+
+  &:hover button {
+    opacity: 1;
+  }
+}
+
+// Hover anywhere on the parent kpiCard / chart wrapper to reveal the
+// toolbar fully — improves discoverability without crowding the small
+// chart visually.
+.metricSingleChart:hover .chartCardActionsCompact button,
+.kpiCard:hover .chartCardActionsCompact button {
+  opacity: 1;
+}
+
+// When the user mouses over the parent chart area, also reveal the
+// floating toolbar fully so it's discoverable without requiring direct
+// hover on the small icon buttons.
+.metricSingleChart:hover .chartCardActionsFloating,
+.chartCard:hover .chartCardActionsFloating {
+  opacity: 1;
+}
+
+// ── Modal stats summary block ────────────────────────────────────────────────
+// Wrapper that hosts the per-card metadata blocks (``.kpiValueRow``,
+// ``.kpiStatsRow``, ``.kpiBaselineRow``) inside the modal so the
+// expanded view has the exact same look-and-feel as the per-metric
+// ``kpiCard`` rendered in ``TelemetrySection``. The kpi* classes already
+// have all the typography / spacing rules; this wrapper only provides
+// the outer padding so the block visually sits beneath the chart and
+// above the legend.
+.modalKpiSummary {
+  padding: 8px 18px 0 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .pngButton {
@@ -385,6 +899,14 @@
   color: #3949ab;
 }
 
+// idle — slate/grey: pre-run baseline reference (matches the in-chart
+// dashed idle reference line and the ``.idleChip`` overlay).
+.legendStatIdle {
+  background: rgba(96, 125, 139, 0.10);
+  border: 1px solid rgba(96, 125, 139, 0.40);
+  color: #37474f;
+}
+
 .legendStatLabel {
   font-size: 9px;
   font-weight: 700;
@@ -396,4 +918,703 @@
 .legendStatValue {
   font-size: 11px;
   font-weight: 600;
+}
+
+// =====================================================================
+// KPI ↔ Resource Cost Profile (KpiCostProfile component)
+// Renders the kpi_correlation block emitted by the Python collector:
+//   1. Banner row (key metric + PASS/FAIL + target)
+//   2. Stacked attribution bar (% Δ-power per device)
+//   3. Cost-per-KPI-unit table
+// =====================================================================
+
+.kpiCostProfile {
+  margin: 12px 16px 4px;
+  background: #ffffff;
+  border: 1px solid #d6e2ee;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.kpiCostProfileHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: linear-gradient(180deg, #eef5fb, #e1ecf6);
+  border-bottom: 1px solid #d6e2ee;
+  cursor: pointer;
+  user-select: none;
+}
+
+.kpiCostProfileToggle {
+  width: 22px;
+  height: 22px;
+  border: 1px solid #b6c8d9;
+  background: #ffffff;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #133b5c;
+  cursor: pointer;
+}
+
+.kpiCostProfileTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f3057;
+  letter-spacing: 0.2px;
+}
+
+.kpiCostProfileBody {
+  padding: 12px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+// --- 1. Banner row ----------------------------------------------------
+.kpiBanner {
+  display: grid;
+  grid-template-columns: minmax(140px, 1.2fr) minmax(110px, 0.9fr) minmax(180px, 1.6fr) auto;
+  align-items: center;
+  gap: 10px 14px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid #d6e2ee;
+  background: #f7fbfe;
+}
+
+@media (max-width: 900px) {
+  .kpiBanner {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.kpiBannerPass {
+  background: linear-gradient(180deg, #f1faf1, #e6f5e9);
+  border-color: #b8dec1;
+}
+
+.kpiBannerFail {
+  background: linear-gradient(180deg, #fdf1f1, #f9e3e3);
+  border-color: #e7b8b8;
+}
+
+.kpiBannerSkipped {
+  background: linear-gradient(180deg, #fbfbfb, #f1f3f5);
+  border-color: #d6dbe0;
+}
+
+.kpiBannerKey {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.kpiBannerLabel {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #6b7f96;
+}
+
+.kpiBannerName {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f3057;
+  word-break: break-word;
+}
+
+.kpiBannerValueGroup {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.kpiBannerValue {
+  font-size: 24px;
+  font-weight: 700;
+  color: #0f3057;
+}
+
+.kpiBannerUnit {
+  font-size: 12px;
+  color: #6b7f96;
+}
+
+.kpiBannerMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  font-size: 11px;
+  color: #4a5b6f;
+}
+
+.kpiBannerDirection,
+.kpiBannerTarget,
+.kpiBannerDuration {
+  background: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 12px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
+.kpiBannerStatus {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  padding: 6px 14px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.75);
+  color: #133b5c;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.kpiBannerPass .kpiBannerStatus { color: #1e7d32; }
+.kpiBannerFail .kpiBannerStatus { color: #c0392b; }
+
+// --- 2. Stacked attribution bar --------------------------------------
+.kpiAttributionWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.kpiAttributionTitle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #0f3057;
+}
+
+.kpiDominantBadge {
+  font-size: 11px;
+  font-weight: 500;
+  color: #4a5b6f;
+  background: #fff7e0;
+  border: 1px solid #f0d894;
+  border-radius: 12px;
+  padding: 2px 8px;
+}
+
+.kpiDominantBadge strong {
+  color: #b08a1c;
+  font-weight: 700;
+}
+
+.kpiAttributionBar {
+  display: flex;
+  width: 100%;
+  height: 22px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid #d6e2ee;
+  background: #f0f4f8;
+}
+
+.kpiAttributionSegment {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: #ffffff;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.25);
+  white-space: nowrap;
+  transition: filter 0.15s ease;
+}
+
+.kpiAttributionSegment:hover {
+  filter: brightness(1.1);
+}
+
+.kpiAttributionLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 11px;
+  color: #4a5b6f;
+}
+
+.kpiAttributionLegendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.kpiAttributionSwatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+// --- 3. Cost table ----------------------------------------------------
+.kpiCostTableWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.kpiCostTableHeaderRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.kpiCostTableTitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: #0f3057;
+}
+
+.kpiCostTableToggle {
+  font-size: 11px;
+  font-weight: 500;
+  color: #0071c5;
+  background: transparent;
+  border: 1px solid #b6c8d9;
+  border-radius: 12px;
+  padding: 2px 10px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.kpiCostTableToggle:hover {
+  background: #eef5fb;
+}
+
+// Small +/- glyph rendered before the toggle label so the
+// expanded/collapsed state of the low-signal rows is obvious at a glance,
+// matching the convention used elsewhere in the report (collapsible
+// sections show a +/- affordance in the header).
+.kpiCostTableToggleIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #0071c5;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.kpiCostTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  background: #ffffff;
+  border: 1px solid #d6e2ee;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.kpiCostTable thead th {
+  background: #f1f7fc;
+  color: #0f3057;
+  font-weight: 700;
+  text-align: left;
+  padding: 6px 10px;
+  border-bottom: 1px solid #d6e2ee;
+  white-space: nowrap;
+}
+
+.kpiCostTable tbody td {
+  padding: 5px 10px;
+  border-bottom: 1px solid #eef3f8;
+  color: #2c3e50;
+}
+
+.kpiCostTable tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.kpiCostRowPrimary {
+  background: #fffbef;
+}
+
+.kpiDeviceDot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: middle;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.kpiCostUnitHint {
+  color: #6b7f96;
+  font-size: 11px;
+  font-weight: 400;
+  margin-left: 2px;
+}
+
+.kpiCostTableFootnote {
+  font-size: 10px;
+  color: #6b7f96;
+  font-style: italic;
+  margin-top: 4px;
+}
+
+// ─── Dark-theme overrides ────────────────────────────────────────────────────
+// Allure3 sets `:root[data-theme="dark"]`. Because class names in this file
+// are CSS-module scoped (hashed at build time), every dark-mode rule must be
+// nested under `:global([data-theme="dark"]) &` so the ancestor selector is
+// emitted literally while `&` keeps the scoped class hash.
+
+// SVG axis tick / axis label text — referenced via styles.axisTick on every
+// <text> tick element so they read clearly on both themes.
+.axisTick {
+  fill: #555;
+  font-weight: 500;
+  :global([data-theme="dark"]) & {
+    fill: #d0d6dc;
+    font-weight: 600;
+  }
+}
+
+.telemetryMetricTableWrap { :global([data-theme="dark"]) & { background: transparent; } }
+.telemetryGraphsWrap      { :global([data-theme="dark"]) & { background: transparent; } }
+
+.telemetryGraphsTitle {
+  :global([data-theme="dark"]) & {
+    color: var(--on-text-primary);
+    background: var(--bg-base-secondary);
+    border-color: var(--on-border-muted);
+  }
+}
+.telemetryMetricTableTitle {
+  :global([data-theme="dark"]) & {
+    color: var(--on-text-primary);
+    background: var(--bg-base-secondary);
+    border-color: var(--on-border-muted);
+  }
+}
+
+.telemetryMetricTable {
+  :global([data-theme="dark"]) & {
+    th,
+    td {
+      color: var(--on-text-primary);
+      border-bottom-color: var(--on-border-muted);
+    }
+    thead th {
+      background: var(--bg-base-neutral);
+      color: var(--on-text-primary);
+    }
+  }
+}
+
+.tableGroupRow td {
+  :global([data-theme="dark"]) & {
+    color: var(--on-text-primary);
+    background: var(--bg-base-neutral);
+  }
+}
+
+.telemetryMetricTableDevice {
+  :global([data-theme="dark"]) & {
+    background: var(--bg-base-primary);
+    border-color: var(--on-border-muted);
+  }
+}
+
+.tableGroupHeader { :global([data-theme="dark"]) & { color: var(--on-text-primary); } }
+.tableGroupTitle  { :global([data-theme="dark"]) & { color: var(--on-text-primary); } }
+.chartCardTitle   { :global([data-theme="dark"]) & { color: var(--on-text-primary); } }
+
+// KPI summary block (per-card stats: AVG <value>, Idle <value>, Over Idle …)
+// Use !important to defeat the originals which hard-code dark navy
+// (#0f3057, #6b7f96, #133b5c) — invisible on dark backgrounds.
+.kpiValue {
+  :global([data-theme="dark"]) & { color: var(--on-text-primary) !important; }
+}
+.kpiUnit {
+  :global([data-theme="dark"]) & { color: var(--on-text-primary) !important; }
+}
+.kpiBaselineLabel {
+  :global([data-theme="dark"]) & { color: var(--on-text-primary) !important; }
+}
+.kpiStatsRow {
+  :global([data-theme="dark"]) & {
+    color: var(--on-text-primary) !important;
+    span { color: var(--on-text-primary) !important; }
+  }
+}
+
+.kpiAggregateTag {
+  :global([data-theme="dark"]) & {
+    color: var(--on-text-primary);
+    background: var(--bg-base-neutral);
+    border-color: var(--on-border-muted);
+  }
+}
+
+.kpiBaselineDeltaBox {
+  :global([data-theme="dark"]) & {
+    background: var(--bg-base-neutral);
+    border-color: var(--on-border-muted);
+  }
+}
+
+.kpiBaselineDeltaTag {
+  :global([data-theme="dark"]) & {
+    background: var(--bg-support-castor, var(--bg-base-secondary));
+    color: var(--on-text-primary);
+  }
+}
+
+.kpiBaselineDelta {
+  :global([data-theme="dark"]) & {
+    color: var(--on-text-primary);
+  }
+}
+
+// Legend stat pills (min / avg / max / idle in chart legends).
+// Override BOTH parent (.legendStatMin/Avg/Max/Idle which sets color)
+// AND children (.legendStatLabel/Value) so dark text wins regardless of
+// inheritance / specificity.
+.legendStat {
+  :global([data-theme="dark"]) & {
+    color: var(--on-text-primary) !important;
+  }
+}
+.legendStatMin {
+  :global([data-theme="dark"]) & { color: var(--on-text-primary) !important; }
+}
+.legendStatAvg {
+  :global([data-theme="dark"]) & { color: var(--on-text-primary) !important; }
+}
+.legendStatMax {
+  :global([data-theme="dark"]) & { color: var(--on-text-primary) !important; }
+}
+.legendStatIdle {
+  :global([data-theme="dark"]) & { color: var(--on-text-primary) !important; }
+}
+.legendStatLabel {
+  :global([data-theme="dark"]) & {
+    color: var(--on-text-primary) !important;
+    opacity: 1 !important;
+  }
+}
+.legendStatValue {
+  :global([data-theme="dark"]) & { color: var(--on-text-primary) !important; }
+}
+
+// Expand / Download chart action buttons — were white-on-white in dark.
+.expandButton {
+  :global([data-theme="dark"]) & {
+    background-color: var(--bg-base-secondary);
+    color: var(--on-text-primary);
+    border-color: var(--on-border-muted);
+    &:hover { background-color: var(--bg-base-neutral); }
+  }
+}
+
+.chartCardActionsCompact {
+  :global([data-theme="dark"]) & button {
+    background: var(--bg-base-secondary);
+    color: var(--on-text-primary);
+    border-color: var(--on-border-muted);
+    opacity: 0.85;
+  }
+  :global([data-theme="dark"]) &:hover button {
+    opacity: 1;
+  }
+}
+
+// KPI Cost Profile section (banner, attribution legend, cost table)
+.kpiCostProfile {
+  :global([data-theme="dark"]) & {
+    background: var(--bg-base-primary);
+    border-color: var(--on-border-muted);
+    color: var(--on-text-primary);
+  }
+}
+
+.kpiCostProfileHeader { :global([data-theme="dark"]) & { color: var(--on-text-primary); } }
+.kpiCostProfileTitle  { :global([data-theme="dark"]) & { color: var(--on-text-primary); } }
+.kpiCostTableTitle    { :global([data-theme="dark"]) & { color: var(--on-text-primary); } }
+.kpiAttributionTitle  { :global([data-theme="dark"]) & { color: var(--on-text-primary); } }
+.kpiAttributionLegend { :global([data-theme="dark"]) & { color: var(--on-text-primary); } }
+.kpiAttributionLegendItem { :global([data-theme="dark"]) & { color: var(--on-text-primary); } }
+
+.kpiBanner {
+  :global([data-theme="dark"]) & {
+    background: var(--bg-base-secondary);
+    border-color: var(--on-border-muted);
+    color: var(--on-text-primary);
+  }
+}
+
+.kpiBannerName      { :global([data-theme="dark"]) & { color: var(--on-text-primary); } }
+.kpiBannerValue     { :global([data-theme="dark"]) & { color: var(--on-text-primary); } }
+.kpiBannerUnit      { :global([data-theme="dark"]) & { color: var(--on-text-primary); } }
+.kpiBannerLabel     { :global([data-theme="dark"]) & { color: var(--on-text-primary); } }
+// Dark-mode: the meta-pills (direction / target / duration) and status
+// chip have a near-white default background which made the previously-white
+// text invisible. Force dark backgrounds + light text + visible borders.
+.kpiBannerDirection {
+  :global([data-theme="dark"]) & {
+    background: var(--bg-base-secondary) !important;
+    border-color: var(--on-border-muted) !important;
+    color: var(--on-text-primary) !important;
+  }
+}
+.kpiBannerTarget {
+  :global([data-theme="dark"]) & {
+    background: var(--bg-base-secondary) !important;
+    border-color: var(--on-border-muted) !important;
+    color: var(--on-text-primary) !important;
+  }
+}
+.kpiBannerDuration {
+  :global([data-theme="dark"]) & {
+    background: var(--bg-base-secondary) !important;
+    border-color: var(--on-border-muted) !important;
+    color: var(--on-text-primary) !important;
+  }
+}
+.kpiBannerStatus {
+  :global([data-theme="dark"]) & {
+    background: var(--bg-base-secondary) !important;
+    border-color: var(--on-border-muted) !important;
+    color: var(--on-text-primary) !important;
+  }
+}
+// Pass/Fail status text needs to remain semantically coloured even on the
+// dark pill background — override the parent .kpiBannerStatus dark text.
+.kpiBannerPass .kpiBannerStatus {
+  :global([data-theme="dark"]) & { color: #66bb6a !important; }
+}
+.kpiBannerFail .kpiBannerStatus {
+  :global([data-theme="dark"]) & { color: #ef5350 !important; }
+}
+
+.kpiAttributionBar {
+  :global([data-theme="dark"]) & {
+    border-color: var(--on-border-muted);
+    background: var(--bg-base-neutral);
+  }
+}
+
+.kpiCostTable {
+  :global([data-theme="dark"]) & {
+    background: var(--bg-base-primary);
+    border-color: var(--on-border-muted);
+    thead th {
+      background: var(--bg-base-neutral);
+      color: var(--on-text-primary);
+      border-bottom-color: var(--on-border-muted);
+    }
+    tbody td {
+      color: var(--on-text-primary);
+      border-bottom-color: var(--on-border-muted);
+    }
+  }
+}
+
+.kpiCostRowPrimary {
+  :global([data-theme="dark"]) & {
+    background: var(--bg-base-secondary);
+  }
+}
+
+.kpiCostUnitHint      { :global([data-theme="dark"]) & { color: var(--on-text-secondary); } }
+.kpiCostTableFootnote { :global([data-theme="dark"]) & { color: var(--on-text-secondary); } }
+
+.chartCard {
+  :global([data-theme="dark"]) & {
+    background: var(--bg-base-primary);
+    border-color: var(--on-border-muted);
+    color: var(--on-text-primary);
+  }
+}
+
+// ─── Dark-mode: per-metric kpiCard backgrounds (root cause of white-on-white) ─
+// In light mode .kpiCard is solid #fff and .metricSingleChart is a near-white
+// gradient. With dark text rules already !important on the inner spans, the
+// missing piece was overriding the *backgrounds* so white text on dark wins.
+.kpiCard {
+  :global([data-theme="dark"]) & {
+    background: var(--bg-base-secondary) !important;
+    border-color: var(--on-border-muted) !important;
+ 
+// Match ``.kpiCard`` so the outer device group frame and the inner chart
+// cards share one consistent grey border in dark mode (light mode already
+// uses ``#e2e8f0`` on both — see the base ``.deviceGroup`` rule above).
+.deviceGroup {
+  :global([data-theme="dark"]) & {
+    background: var(--bg-base-primary) !important;
+    border-color: var(--on-border-muted) !important;
+  }
+}   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35) !important;
+    color: var(--on-text-primary) !important;
+  }
+}
+// Match ``.kpiCard`` so the outer device group frame and the inner chart
+// cards share one consistent grey border in dark mode (light mode already
+// uses ``#e2e8f0`` on both — see the base ``.deviceGroup`` rule above).
+.deviceGroup {
+  :global([data-theme="dark"]) & {
+    background: var(--bg-base-primary) !important;
+    border-color: var(--on-border-muted) !important;
+  }
+}
+.kpiCardName {
+  :global([data-theme="dark"]) & {
+    color: var(--on-text-primary) !important;
+  }
+}
+.metricSingleChart {
+  :global([data-theme="dark"]) & {
+    background: linear-gradient(180deg,
+                                var(--bg-base-primary),
+                                var(--bg-base-secondary)) !important;
+  }
+}
+.kpiValueRow {
+  :global([data-theme="dark"]) & { color: var(--on-text-primary) !important; }
+}
+.kpiBaselineRow {
+  :global([data-theme="dark"]) & { color: var(--on-text-primary) !important; }
+}
+
+// ─── Dark-mode: KPI Cost Profile header background ───────────────────────────
+// Header was a light-blue gradient (#eef5fb -> #e1ecf6) which made the
+// already-white title text invisible. Override the gradient to dark and
+// promote the title color to !important so nothing wins over it.
+.kpiCostProfileHeader {
+  :global([data-theme="dark"]) & {
+    background: linear-gradient(180deg,
+                                var(--bg-base-secondary),
+                                var(--bg-base-neutral)) !important;
+    border-bottom-color: var(--on-border-muted) !important;
+    color: var(--on-text-primary) !important;
+  }
+}
+.kpiCostProfileTitle {
+  :global([data-theme="dark"]) & {
+    color: var(--on-text-primary) !important;
+  }
+}
+.kpiCostProfileToggle {
+  :global([data-theme="dark"]) & {
+    background: var(--bg-base-primary) !important;
+    border-color: var(--on-border-muted) !important;
+    color: var(--on-text-primary) !important;
+  }
 }

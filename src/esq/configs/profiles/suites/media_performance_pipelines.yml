@@ -20,6 +20,26 @@ params:
     os_type:
       - "linux"
     docker_required: true
+  # Telemetry configuration
+  telemetry:
+    enabled: true
+    interval: 2  # seconds between samples
+    scope: execution    # execution = workload-only sampling; test = full pytest lifecycle
+    prerun:
+      enabled: true
+      duration_s: 10   # idle baseline window before the test
+      interval_s: 1    # sample cadence during the idle window
+    # primarily look at the raw telemetry charts for these tests — disable kpi_correlation
+    kpi_correlation: false
+    module_group: external
+    modules:
+      - name: platform_telemetry
+        enabled: true
+        group: external
+        options:
+          # target_devices: omit to auto-collect every CPU/iGPU/dGPU/NPU.
+          # To restrict, list canonical labels (quote any with brackets):
+          #   target_devices: [CPU, iGPU, "dGPU[0]"]
   container_image: "media_perf_runner"
   image_tag: "1.0"
   dockerfile_name: "Dockerfile"

@@ -2542,8 +2542,9 @@ export const Summary = () => {
                   })
               );
 
-              // Sanitize string fields using character-by-character copy to break
-              // Coverity taint chain from external JSON attachment data (DOM_XSS).
+              // Sanitize string fields using character-by-character copy to
+              // strip any HTML metacharacters from external JSON attachment
+              // data before rendering (defence-in-depth against DOM XSS).
               type SafeStatus = "passed" | "failed" | "broken" | "skipped" | "unknown";
               const SAFE_STATUSES: SafeStatus[] = ["passed", "failed", "broken", "skipped", "unknown"];
               const safeMetrics: Array<{metric: string; value: number; reference: number; unit: string; status: SafeStatus}> = [];

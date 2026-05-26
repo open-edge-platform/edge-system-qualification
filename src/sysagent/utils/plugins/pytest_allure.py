@@ -69,12 +69,9 @@ def _apply_allure_title_and_description(item):
     """
     Re-apply Allure title and description from test configurations during test execution.
 
-    This ensures that values configured in the profile YAML (``display_name`` and
-    ``description`` / ``description_html``) override the pytest docstring that
-    allure-pytest sets after the setup phase.
-
-    Called from ``pytest_runtest_call`` so that ``allure.dynamic`` updates happen
-    inside the active test lifecycle and are not subsequently overwritten.
+    Called from ``pytest_runtest_call`` so that ``allure.dynamic`` updates
+    happen inside the active test lifecycle and override the docstring
+    set by allure-pytest in the setup phase.
 
     Args:
         item: pytest test item containing configuration data
@@ -103,21 +100,15 @@ def _apply_allure_title_and_description(item):
             allure.dynamic.title(title)
             logger.debug(f"Re-applied Allure title during execution: {title}")
 
-        # Apply custom description from profile config, overriding the docstring.
-        # ``description_html`` takes precedence over plain ``description`` when both
-        # are present so that rich HTML descriptions are preferred.
-        # Guard against None/empty values: only override when the config provides a
-        # non-empty string so that tests without a custom description retain their
-        # pytest docstring (set by allure-pytest in the setup after-yield).
+        # Apply custom description: description_html takes precedence over
+        # description when both are non-empty; otherwise leave the docstring.
         description_html = configs.get("description_html")
         if description_html and str(description_html).strip():
             allure.dynamic.description_html(description_html)
-            logger.debug("Applied Allure description_html during execution")
         else:
             description = configs.get("description")
             if description and str(description).strip():
                 allure.dynamic.description(description)
-                logger.debug(f"Applied Allure description during execution: {description}")
 
     except ImportError:
         logger.debug("Allure not available, skipping title/description re-application")
@@ -238,11 +229,10 @@ def _apply_allure_metadata_from_configs(item):
 
             logger.debug(f"Set Allure title to: {title}")
 
-        # Note: description/description_html are NOT set here during setup.
-        # allure-pytest's setup hookwrapper overwrites any description set in this
-        # phase with the pytest docstring after-yield.  The call phase
-        # (see _apply_allure_title_and_description) is responsible for applying
-        # custom descriptions so they reliably override the docstring.
+        # description / description_html are intentionally NOT applied during
+        # setup: allure-pytest's setup hookwrapper overwrites them after-yield
+        # with the pytest docstring. The call phase
+        # (_apply_allure_title_and_description) handles them instead.
 
         # Only add tier metadata if explicitly defined in ACTIVE_PROFILE_HIGHEST_TIER
         active_tier = os.environ.get("ACTIVE_PROFILE_HIGHEST_TIER")

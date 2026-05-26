@@ -20,6 +20,22 @@ from sysagent.utils.core.process import (
 logger = logging.getLogger(__name__)
 
 
+def _is_already_applied(*texts: str) -> bool:
+    """Return True when patch output indicates the patch was previously applied."""
+    text = "\n".join(t or "" for t in texts).lower()
+    return any(
+        phrase in text
+        for phrase in [
+            "reversed (or previously applied)",
+            "already applied",
+            "previously applied",
+            "patch detected!  skipping patch",
+            "skipping patch",
+            "already exists",
+        ]
+    )
+
+
 def _apply_patch_with_patch_command(patch_path: str, cwd: str) -> bool:
     """
     Apply a patch file using the patch command utility.
@@ -36,7 +52,9 @@ def _apply_patch_with_patch_command(patch_path: str, cwd: str) -> bool:
     """
     patch_name = os.path.basename(patch_path)
 
-    # First, try to check if the patch can be applied using patch --dry-run
+    # First, run a dry-run for observability. Do not fail immediately on dry-run
+    # mismatch because `patch` often reports details on stdout and --forward apply
+    # can still provide the definitive result.
     try:
         result = run_command(
             ["patch", "--dry-run", "--strip=1", "--input=" + patch_path],
@@ -45,24 +63,20 @@ def _apply_patch_with_patch_command(patch_path: str, cwd: str) -> bool:
         )
 
         if result.success:
-            logger.debug(f"Patch {patch_name} passed dry run check")
+            logger.debug(f"Patch dry-run passed: {patch_name}")
         else:
-            # Check if this is because the patch is already applied
-            if any(
-                phrase in result.stderr.lower()
-                for phrase in [
-                    "reversed (or previously applied)",
-                    "already applied",
-                    "previously applied",
-                ]
-            ):
-                logger.debug(f"Patch {patch_name} appears to be already applied")
+            if _is_already_applied(result.stdout, result.stderr):
+                logger.debug(f"Patch already applied: {patch_name}")
                 return False
-            else:
-                logger.debug(f"Patch {patch_name} dry run failed: {result.stderr}")
-                # Continue to try applying anyway, as it might still work
+            logger.debug(
+                "Patch dry-run reported mismatches for %s; proceeding to --forward apply. "
+                "stdout: %s stderr: %s",
+                patch_name,
+                (result.stdout or "<empty>").strip(),
+                (result.stderr or "<empty>").strip(),
+            )
     except Exception as e:
-        logger.debug(f"Could not perform dry run for patch {patch_name}: {e}")
+        raise Exception(f"Could not validate patch {patch_name}: {e}") from e
 
     # Apply the patch using patch command
     try:
@@ -80,39 +94,19 @@ def _apply_patch_with_patch_command(patch_path: str, cwd: str) -> bool:
         )
 
         if result.success:
-            logger.debug(f"Successfully applied patch with patch command: {patch_name}")
+            logger.debug(f"Patch applied: {patch_name}")
             return True
         else:
-            # Check if this is because the patch is already applied
-            stderr_text = result.stderr.lower() if result.stderr else ""
-            if any(
-                phrase in stderr_text
-                for phrase in [
-                    "reversed (or previously applied)",
-                    "already applied",
-                    "previously applied",
-                    "patch detected!  skipping patch",
-                    "skipping patch",
-                    "already exists",
-                ]
-            ):
-                logger.debug(f"Patch {patch_name} appears to be already applied")
+            if _is_already_applied(result.stdout, result.stderr):
+                logger.debug(f"Patch already applied: {patch_name}")
                 return False
-
-            # If patch command returned non-zero but not because it's already applied,
-            # this might be a real error, but let's try to continue
-            logger.debug(f"patch command failed for {patch_name}: {result.stderr}")
-
-            # Consider failed patches as already applied
-            # This prevents build failures when patches have minor conflicts
-            logger.debug(f"Patch {patch_name} may already be applied (continuing)")
-            return False
+            raise Exception(
+                f"Patch apply failed for {patch_name}. "
+                f"stdout: {result.stdout or '<empty>'}; stderr: {result.stderr or '<empty>'}"
+            )
 
     except Exception as e:
-        logger.debug(f"patch command raised exception for {patch_name}: {e}")
-        # Also be lenient with exceptions - treat as already applied
-        logger.debug(f"Patch {patch_name} encountered exception, assuming already applied")
-        return False
+        raise Exception(f"Patch command raised exception for {patch_name}: {e}") from e
 
 
 def apply_patch(patch_path: str, cwd: str) -> bool:
@@ -134,7 +128,7 @@ def apply_patch(patch_path: str, cwd: str) -> bool:
     # Check if patch command utility is available
     try:
         check_command_available("patch")
-        logger.debug(f"patch command utility is available, using it for {patch_name}")
+        logger.debug(f"Using patch utility for: {patch_name}")
     except (Exception, FileNotFoundError):
         raise Exception(
             f"patch command utility not found. Cannot apply {patch_name}. "

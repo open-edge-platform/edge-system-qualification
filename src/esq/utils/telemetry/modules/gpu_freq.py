@@ -60,6 +60,10 @@ logger = logging.getLogger(__name__)
 
 MODULE_NAME = "gpu_freq"
 
+# Sentinel emitted when a sysfs read fails. Aggregation layers filter it
+# out so it never poisons averages or min/max.
+MISSING_VALUE: float = -1.0
+
 
 def _read_mhz(path):
     """Read a sysfs frequency file and return the value in MHz, or None."""
@@ -208,7 +212,12 @@ class GpuFreqModule(BaseTelemetryModule):
         raw: dict = {}
         for entry in self._freq_paths:
             metric = entry["metric"]
-            act_val = _read_mhz(entry["act_path"]) or 0.0
+            act_val = _read_mhz(entry["act_path"])
+            if act_val is None:
+                # Sysfs read failed — emit MISSING_VALUE so consumers know
+                # the reading is unavailable (not a real zero).
+                raw[metric] = MISSING_VALUE
+                continue
             if act_val > 0.0:
                 # Hardware is clocked and executing: use the actual frequency.
                 raw[metric] = act_val
@@ -232,7 +241,12 @@ class GpuFreqModule(BaseTelemetryModule):
                         # Use cur_freq (governor-requested frequency) as the best
                         # sysfs proxy for the true hardware clock, matching the
                         # non-zero reading that intel_gpu_top's PMU gives here.
-                        raw[metric] = _read_mhz(cur_path) or 0.0
+                        cur_val = _read_mhz(cur_path)
+                        if cur_val is None:
+                            # cur_freq read failed too — emit MISSING_VALUE.
+                            raw[metric] = MISSING_VALUE
+                            continue
+                        raw[metric] = cur_val
                 else:
                     # i915 driver: no instantaneous idle indicator available.
                     # rps_act_freq_mhz is 0 when in RC6 (clock stopped), which is

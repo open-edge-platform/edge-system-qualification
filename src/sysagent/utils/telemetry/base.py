@@ -16,6 +16,11 @@ from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
+# Sentinel used across the telemetry pipeline when a source could not be
+# read. Real metrics are non-negative, so -1 is safely out of range and
+# distinguishable from a genuine zero.
+MISSING_VALUE: float = -1.0
+
 
 @dataclass
 class TelemetryConfig:
@@ -38,6 +43,9 @@ class TelemetryConfig:
             Each entry defines one axis with keys: ``id`` (str), ``position``
             (``"left"``/``"right"``), ``metrics`` (list of metric names), ``label`` (str).
             When empty, all metrics share a single y-axis.
+        options: Optional module-specific runtime options.
+            This is intentionally untyped to support pluggable telemetry modules
+            that need backend/provider-specific configuration.
     """
 
     enabled: bool = True
@@ -48,6 +56,7 @@ class TelemetryConfig:
     title: Dict[str, Any] = field(default_factory=dict)
     scales: Dict[str, Any] = field(default_factory=dict)
     axes: List[Dict[str, Any]] = field(default_factory=list)
+    options: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -164,6 +173,18 @@ class BaseTelemetryModule(ABC):
         """
         ...
 
+    def close(self) -> None:
+        """Release module-owned external resources.
+
+        Called by ``TelemetryCollector.stop()`` after the sampling thread
+        joins and the final summary is built.  Default no-op for sysfs-only
+        modules; modules that delegate to providers (e.g. ``platform_telemetry``)
+        override this to fan out a ``close()`` call to every provider.
+
+        MUST be idempotent and safe to call multiple times.
+        """
+        return
+
     def _should_collect_metric(self, metric_name: str) -> bool:
         """Return True if this metric should be collected based on config."""
         if not self.config.metrics:
@@ -207,20 +228,37 @@ class BaseTelemetryModule(ABC):
         Returns:
             Dict of metric_name -> average_value for numeric metrics.
             Non-numeric metrics are excluded from averages.
+
+        Notes:
+            :data:`MISSING_VALUE` (-1) samples are excluded from the mean.
+            When every sample for a metric is the sentinel, the aggregate
+            is reported as :data:`MISSING_VALUE`.
         """
         if not self._samples:
             return {}
 
         sums: Dict[str, float] = {}
         counts: Dict[str, int] = {}
+        seen: Dict[str, int] = {}
 
         for sample in self._samples:
             for key, value in sample.values.items():
                 if isinstance(value, (int, float)):
+                    seen[key] = seen.get(key, 0) + 1
+                    if value == MISSING_VALUE:
+                        continue
                     sums[key] = sums.get(key, 0.0) + value
                     counts[key] = counts.get(key, 0) + 1
 
-        return {key: round(sums[key] / counts[key], 4) for key in sums if counts[key] > 0}
+        averages: Dict[str, float] = {}
+        for key, total_seen in seen.items():
+            valid = counts.get(key, 0)
+            if valid > 0:
+                averages[key] = round(sums[key] / valid, 4)
+            else:
+                # Every observation was the sentinel — preserve it.
+                averages[key] = MISSING_VALUE
+        return averages
 
     def compute_min_max(self) -> Dict[str, Dict[str, float]]:
         """
@@ -228,22 +266,38 @@ class BaseTelemetryModule(ABC):
 
         Returns:
             Dict of metric_name -> {"min": ..., "max": ...} for numeric metrics.
+
+        Notes:
+            :data:`MISSING_VALUE` (-1) samples are excluded from min/max.
+            When every sample for a metric is the sentinel, both ``min``
+            and ``max`` are reported as :data:`MISSING_VALUE`.
         """
         if not self._samples:
             return {}
 
         mins: Dict[str, float] = {}
         maxs: Dict[str, float] = {}
+        seen_keys: set = set()
 
         for sample in self._samples:
             for key, value in sample.values.items():
-                if isinstance(value, (int, float)):
-                    if key not in mins or value < mins[key]:
-                        mins[key] = value
-                    if key not in maxs or value > maxs[key]:
-                        maxs[key] = value
+                if not isinstance(value, (int, float)):
+                    continue
+                seen_keys.add(key)
+                if value == MISSING_VALUE:
+                    continue
+                if key not in mins or value < mins[key]:
+                    mins[key] = value
+                if key not in maxs or value > maxs[key]:
+                    maxs[key] = value
 
-        return {key: {"min": round(mins[key], 4), "max": round(maxs[key], 4)} for key in mins}
+        result: Dict[str, Dict[str, float]] = {}
+        for key in seen_keys:
+            if key in mins:
+                result[key] = {"min": round(mins[key], 4), "max": round(maxs[key], 4)}
+            else:
+                result[key] = {"min": MISSING_VALUE, "max": MISSING_VALUE}
+        return result
 
     def get_summary(self) -> Dict[str, Any]:
         """
@@ -252,7 +306,7 @@ class BaseTelemetryModule(ABC):
         Returns:
             Dict with keys: module, configs, sample_count, averages, min_max, samples (list of dicts).
             The ``configs`` key holds chart/display configuration (metrics, thresholds,
-            chart_type, title, scales, axes).
+            chart_type, title, scales, axes) consumed by the Allure report renderer.
         """
         averages = self.compute_averages()
         min_max = self.compute_min_max()

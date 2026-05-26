@@ -100,6 +100,102 @@ def _make_serializable(obj):
         return str(obj)
 
 
+def _collect_idle_baseline(configs: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Capture a short idle telemetry window before the workload runs.
+
+    Reads ``configs.telemetry.prerun = {enabled, duration_s, interval_s}`` and
+    returns ``{module: {device_name, metrics: {key: {min, avg, max}}, ...}}``
+    or ``None`` when prerun is disabled / collection fails.
+    """
+    telemetry_cfg = configs.get("telemetry") or {}
+    prerun_cfg = telemetry_cfg.get("prerun") or {}
+    if not prerun_cfg.get("enabled"):
+        return None
+
+    try:
+        duration_s = float(prerun_cfg.get("duration_s", 10) or 10)
+        interval_s = float(prerun_cfg.get("interval_s", 1) or 1)
+    except (TypeError, ValueError):
+        return None
+    if duration_s <= 0 or interval_s <= 0:
+        return None
+
+    import time as _time
+
+    try:
+        from sysagent.utils.telemetry.collector import TelemetryCollector
+    except ImportError:
+        return None
+
+    # Override only the sample interval; keep modules/providers identical to
+    # the workload collector so baseline metrics line up 1:1.
+    cfg_override = dict(configs)
+    tel_override = {**(cfg_override.get("telemetry") or {}), "interval": interval_s}
+    cfg_override["telemetry"] = tel_override
+
+    baseline = TelemetryCollector(cfg_override)
+    if not baseline._modules:
+        return None
+
+    baseline.start()
+    try:
+        _time.sleep(duration_s)
+    finally:
+        baseline.stop()
+
+    summary = baseline.get_summary() or {}
+    modules = summary.get("modules") or {}
+
+    def _iter_baseline_modules(mods):
+        """Flatten nested ``device_groups`` so baseline aggregation can index
+        per-device summaries by their original virtual module name
+        (e.g. ``platform_telemetry_cpu``) regardless of layout.
+        """
+        for name, data in mods.items():
+            if not isinstance(data, dict):
+                continue
+            nested = data.get("device_groups")
+            if isinstance(nested, list) and nested:
+                for sub in nested:
+                    if isinstance(sub, dict):
+                        yield str(sub.get("module") or name), sub
+                continue
+            yield str(name), data
+
+    reduced: Dict[str, Any] = {}
+    for mod_name, mod_summary in _iter_baseline_modules(modules):
+        averages = mod_summary.get("averages") or {}
+        min_max = mod_summary.get("min_max") or {}
+        per_metric: Dict[str, Any] = {}
+        for metric_key, avg_val in averages.items():
+            mm = min_max.get(metric_key) or {}
+            min_val = mm.get("min")
+            max_val = mm.get("max")
+            # Drop -1 (MISSING_VALUE) so unavailable readings don't end up
+            # in the idle baseline used for delta calculations.
+            avg_clean = None if isinstance(avg_val, (int, float)) and float(avg_val) == -1.0 else avg_val
+            min_clean = None if isinstance(min_val, (int, float)) and float(min_val) == -1.0 else min_val
+            max_clean = None if isinstance(max_val, (int, float)) and float(max_val) == -1.0 else max_val
+            if avg_clean is None and min_clean is None and max_clean is None:
+                continue
+            per_metric[metric_key] = {
+                "min": min_clean,
+                "avg": avg_clean,
+                "max": max_clean,
+            }
+        if not per_metric:
+            continue
+        reduced[mod_name] = {
+            "device_name": mod_summary.get("device_name"),
+            "metrics": per_metric,
+            "duration_s": duration_s,
+            "interval_s": interval_s,
+            "sample_count": mod_summary.get("sample_count", 0),
+        }
+
+    return reduced or None
+
+
 # Global container log collector for consolidation during test execution
 _CONTAINER_LOGS_COLLECTOR = []
 
@@ -198,14 +294,12 @@ def execute_test_with_cache(request):
                 )
             if update_title_with_metrics:
                 update_title(configs, cached_result_data)
-            # Mark this node as a cache-hit so that summarize_test_results
-            # does not overwrite the cached telemetry data with the short
-            # near-empty collection produced during this cache-hit run.
-            setattr(request.node, "_result_from_cache", True)
-            # Stash cached telemetry so summarize_test_results can apply it
-            # to the outer Result object (which may be a fresh container that
-            # only has metrics/metadata merged in from this per-device result).
+            # Stash cached telemetry on the node so summarize_test_results
+            # can apply it to the outer Result. Must run regardless of
+            # update_title_with_metrics so cache-hit reruns preserve the
+            # cached telemetry section in Allure.
             if isinstance(cached_result_data, Result):
+                setattr(request.node, "_result_from_cache", True)
                 _cached_telemetry = cached_result_data.extended_metadata.get("telemetry")
                 if _cached_telemetry:
                     _existing = getattr(request.node, "_cached_telemetry", None)
@@ -223,14 +317,54 @@ def execute_test_with_cache(request):
                 previous_flag = os.environ.get("CORE_SUPPRESS_CONTAINER_LOG_ATTACHMENTS", "")
                 os.environ["CORE_SUPPRESS_CONTAINER_LOG_ATTACHMENTS"] = "1"
 
+                # Scope telemetry sampling to the workload window when
+                # telemetry.scope == "execution" (default) so build/launch/
+                # post-processing phases are excluded.
+                _scoped_tel_collector = None
+                try:
+                    from sysagent.utils.plugins.pytest_telemetry import (
+                        get_telemetry_collector,
+                        get_telemetry_scope,
+                    )
+
+                    _candidate = get_telemetry_collector(request.node)
+                    if _candidate is not None and get_telemetry_scope(request.node) == "execution":
+                        _scoped_tel_collector = _candidate
+                except Exception as _tel_imp_exc:
+                    logger.debug("Telemetry scoping unavailable: %s", _tel_imp_exc)
+
                 test_exception = None
                 try:
+                    if _scoped_tel_collector is not None:
+                        # Optional pre-run idle baseline overlay for charts.
+                        try:
+                            _baseline = _collect_idle_baseline(configs)
+                            if _baseline:
+                                setattr(request.node, "_sysagent_telemetry_baseline", _baseline)
+                        except Exception as _bl_exc:
+                            logger.debug("Idle baseline capture skipped: %s", _bl_exc)
+
+                        try:
+                            _scoped_tel_collector.start()
+                        except Exception as _tel_start_exc:
+                            logger.debug(
+                                "Telemetry start failed; continuing without scoped collection: %s",
+                                _tel_start_exc,
+                            )
+                            _scoped_tel_collector = None
                     results = run_test_func()
                     logger.info(f"Test {test_name} executed successfully")
                 except Exception as e:
                     test_exception = e
                     results = None
                 finally:
+                    if _scoped_tel_collector is not None:
+                        try:
+                            _scoped_tel_collector.stop()
+                        except Exception as _tel_stop_exc:
+                            logger.debug(
+                                "Telemetry stop after workload failed: %s", _tel_stop_exc
+                            )
                     # Restore previous flag
                     if previous_flag:
                         os.environ["CORE_SUPPRESS_CONTAINER_LOG_ATTACHMENTS"] = previous_flag
@@ -307,19 +441,23 @@ def execute_test_with_cache(request):
                     # Validate result before caching to ensure all devices/metrics are valid
                     # This prevents caching results with any device errors (-1) or failures
                     if _validate_result_for_caching(results, test_name):
-                        # Snapshot telemetry into the result before caching so that
-                        # extended_metadata["telemetry"] is preserved in the cache.
-                        # Uses get_summary() which is non-destructive (collector keeps running);
-                        # summarize_test_results will later call apply_to_result() to
-                        # overwrite with the final complete summary for the live run.
+                        # Snapshot telemetry + idle baseline + KPI cost-profile
+                        # correlation into the result before caching, so cache-hit
+                        # reruns render the same Allure telemetry section.
                         try:
                             from sysagent.utils.plugins.pytest_telemetry import get_telemetry_collector
+                            from sysagent.utils.plugins.pytest_summarization import (
+                                _attach_kpi_correlation,
+                                _merge_idle_baseline,
+                            )
 
                             _tel_collector = get_telemetry_collector(request.node)
                             if _tel_collector is not None and isinstance(results, Result):
                                 _tel_summary = _tel_collector.get_summary()
                                 if _tel_summary:
                                     results.extended_metadata["telemetry"] = _tel_summary
+                                    _merge_idle_baseline(results, request.node)
+                                    _attach_kpi_correlation(results, configs)
                         except Exception as _tel_exc:
                             logger.debug("Could not snapshot telemetry for caching: %s", _tel_exc)
                         cache_result(results, cache_configs=cache_configs)

@@ -20,6 +20,28 @@ params:
     os_type:
       - "linux"
     docker_required: true
+  # Telemetry configuration
+  telemetry:
+    enabled: true
+    interval: 2  # seconds between samples
+    scope: execution    # execution = workload-only sampling; test = full pytest lifecycle
+    prerun:
+      enabled: true
+      duration_s: 10   # idle baseline window before the test
+      interval_s: 1    # sample cadence during the idle window
+    # STREAM is a single-device (CPU/DRAM) workload — the KPI cost-per-unit
+    # block is most useful when multiple devices contribute to the result.
+    # Disable it here to keep the Allure summary minimal.
+    kpi_correlation: false
+    module_group: external
+    modules:
+      - name: platform_telemetry
+        enabled: true
+        group: external
+        options:
+          # STREAM is a pure CPU/DRAM benchmark — restrict telemetry to CPU
+          # Quote any device with brackets, e.g. "dGPU[0]".
+          target_devices: [CPU]
   container_image: "stream_memory_benchmark"
   image_tag: "1.0"
   dockerfile_name: "Dockerfile"

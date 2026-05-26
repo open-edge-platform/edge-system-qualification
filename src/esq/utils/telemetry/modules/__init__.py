@@ -97,6 +97,13 @@ def get_telemetry_modules() -> Dict[str, Type[BaseTelemetryModule]]:
     except Exception:
         pass
 
+    try:
+        from esq.utils.telemetry.modules.platform_telemetry import PlatformTelemetryModule
+
+        modules["platform_telemetry"] = PlatformTelemetryModule
+    except Exception:
+        pass
+
     return modules
 
 

@@ -125,6 +125,12 @@ def install_allure_cli_from_repo(node_dir: str, force_reinstall: bool = False) -
 
     # Check if Allure3 repository is already built
     cli_dist_path = os.path.join(allure_repo_dir, "packages", "cli", "dist")
+    package_json_path = os.path.join(allure_repo_dir, "package.json")
+
+    # Force mode means a truly fresh repository state.
+    if force_reinstall and os.path.exists(allure_repo_dir):
+        logger.debug("Force reinstall requested, removing existing Allure directory")
+        _cleanup_corrupted_allure(allure_repo_dir)
 
     # Verify if Allure CLI is properly installed and functional (not just checking if folder exists)
     if not force_reinstall and os.path.exists(allure_repo_dir):
@@ -135,6 +141,11 @@ def install_allure_cli_from_repo(node_dir: str, force_reinstall: bool = False) -
         else:
             logger.debug("Existing Allure installation is corrupted or incomplete")
             _cleanup_corrupted_allure(allure_repo_dir)
+
+    # Recover from empty or partially created directories that do not contain repo files.
+    if os.path.exists(allure_repo_dir) and not os.path.exists(package_json_path):
+        logger.debug("Allure directory exists without package.json, cleaning for fresh download")
+        _cleanup_corrupted_allure(allure_repo_dir)
 
     logger.debug("Installing Allure CLI from repository")
 
@@ -171,8 +182,9 @@ def install_allure_cli_from_repo(node_dir: str, force_reinstall: bool = False) -
             patches_found = True
 
     if patches_found:
-        patch_files = [f for f in os.listdir(patches_dir) if f.endswith(".patch")]
-        logger.debug(f"Found {len(patch_files)} patch files in {patches_dir}")
+        assert patches_dir is not None
+        patch_files = sorted(f for f in os.listdir(patches_dir) if f.endswith(".patch"))
+        logger.debug(f"Found {len(patch_files)} patch file(s) in {patches_dir}")
 
         # Apply patches using subprocess
         for patch_file in patch_files:
@@ -182,9 +194,9 @@ def install_allure_cli_from_repo(node_dir: str, force_reinstall: bool = False) -
             try:
                 patch_applied = apply_patch(patch_path, allure_repo_dir)
                 if patch_applied:
-                    logger.debug(f"Successfully applied patch: {patch_file}")
+                    logger.debug(f"Patch applied successfully: {patch_file}")
                 else:
-                    logger.debug(f"Patch already applied or skipped: {patch_file}")
+                    logger.debug(f"Patch already applied: {patch_file}")
             except Exception as e:
                 logger.error(f"Failed to apply patch {patch_file}: {str(e)}")
                 raise
@@ -350,6 +362,13 @@ def generate_allure_report(
     try:
         cmd_str = f"{yarn_bin} allure generate {results_dir} -o {report_dir}"
 
+        # Remove existing index.html so allure generate always embeds the current bundle.
+        # Without this, allure3 silently skips regeneration if the output already exists.
+        _report_index = os.path.join(report_dir, "index.html")
+        if os.path.exists(_report_index):
+            os.remove(_report_index)
+            logger.debug(f"Removed stale report index at {_report_index}")
+
         if allure_config_path:
             logger.debug(f"Setting custom allure config path: {allure_config_path}")
             cmd_str += " -c allurerc.mjs"
@@ -419,9 +438,16 @@ def generate_final_report_copy(report_dir: str, debug: bool = False) -> Optional
         # Clean up old final reports first to keep only the latest
         cleanup_old_final_reports(report_dir, debug)
 
-        # Generate components for filename
+        # Generate components for filename. If system inspection is slow or
+        # unavailable, still emit the report using a generic fallback name.
         app_name = get_app_name()
-        system_info = get_comprehensive_system_info_for_filename()
+        try:
+            system_info = get_comprehensive_system_info_for_filename()
+        except Exception as exc:
+            logger.warning("Failed to collect system info for final report filename: %s", exc)
+            # ``generate_final_report_filename`` expects a dict; a single "system"
+            # token under a generic key keeps the resulting filename readable.
+            system_info = {"system": "system"}
 
         logger.debug(f"System info for filename: {system_info}")
         logger.debug(f"App name for filename: {app_name}")

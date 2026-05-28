@@ -18,8 +18,9 @@ Intel Naming Convention Updates (2024-2025):
   - Sierra Forest (E-cores): "Xeon 6" not "6th Gen Xeon Scalable"
   - Granite Rapids (P-cores): "Xeon 6" not "6th Gen Xeon Scalable"
   - Sapphire Rapids HBM: "Xeon Max Series" (still 4th Gen Xeon Scalable)
-- Core: Two distinct product lines in Series 2
-  - "Intel Core" (Series 2): Raptor Lake-based (Core 7/5 - 250U, 220U, etc.)
+- Core: Three distinct product lines in Series 2 and Series 3
+  - "Intel Core" (Series 2): Raptor Lake-based (Core 7/5 - 250U, 220U, etc.) and Bartlett Lake-S embedded
+  - "Intel Core" (Series 3): Wildcat Lake-based (Core 7/5/3 - 360, 330, 304, etc.) - mobile/entry, no suffix
   - "Intel Core Ultra" (Series 2): Arrow Lake/Lunar Lake (Core Ultra 7/5 - 265U, 235U, etc.)
 
 Data Sources:
@@ -45,6 +46,12 @@ logger = logging.getLogger(__name__)
 # generation: Actual Intel generation string (e.g., "Core Ultra (Series 2)", "12th Gen Core")
 # segment_hint: Market segment hint (server, desktop, mobile, embedded, entry)
 CPU_GENERATION_MAP = {
+    # Wildcat Lake (WCL) - Core (Series 3) - Mobile/Entry (NOT Core Ultra)
+    # CPUID: Family 6, Model 0xD5 (213), per Linux kernel intel-family.h INTEL_WILDCATLAKE_L
+    # Launched April 2026 as entry-level variant of Panther Lake platform
+    # Brand: Intel Core 7/5/3 with 3XX model numbers, no suffix (360, 350, 330, 320, 315, 305, 304)
+    # Product Collection: "Intel Core processors (Series 3)" - distinct from Core Ultra Series 3
+    (6, 213, range(0, 10)): ("Wildcat Lake", "Core (Series 3)", "mobile"),
     # Panther Lake (PTL) - Core Ultra Series 3 - Mobile only (H-series and low-power variants)
     # Models: Core Ultra X9 388H/386H, X7 368H/358H, 7 366H/356H, 5 338H/336H (H-series)
     #         Core Ultra 7 365/355, 5 335/332/325/322 (low-power variants)
@@ -634,9 +641,12 @@ SEGMENT_PATTERNS = {
             r"Intel\(R\) Core\(TM\) Ultra [X0-9]+ \d{3}$",
             r"Intel\(R\) Core\(TM\) i[3-9]-\d+[UHPG]",  # Core i-series Mobile
             r"Intel\(R\) Core\(TM\) [0-9]+-\d+[UHP]$",  # Core 9/7/5/3 Mobile
+            # Wildcat Lake (Core Series 3): 3XX model numbers, no suffix, mobile/entry
+            r"Intel\(R\) Core\(TM\) [3579] 3\d{2}$",
             r"Intel\(R\).*(?:Processor|Core\(TM\)).*\bN\d{2,3}\b",  # N-series (Alder Lake-N / Twin Lake-N)
         ],
         "model_patterns": [
+            213,  # WCL - Wildcat Lake (Core Series 3) - Mobile
             204,  # PTL - Panther Lake (Core Ultra Series 3) - All mobile
             197,  # ARL-H - Arrow Lake-H
             181,  # ARL-U - Arrow Lake-U
@@ -799,6 +809,15 @@ def _detect_generation_from_brand(brand: str) -> Tuple[Optional[str], Optional[s
             if model_match:
                 model_number = int(model_match.group(1))
                 suffix = model_match.group(2) if model_match.group(2) else ""
+
+                # Wildcat Lake (WCL): 3XX series (300-399) - mobile only, no suffix
+                # Brand examples: Core 7 360, Core 5 330, Core 5 315, Core 3 304
+                # Launched April 2026; product collection "Intel Core processors (Series 3)"
+                if 300 <= model_number <= 399:
+                    codename = "Wildcat Lake"
+                    segment = "mobile"  # All WCL are mobile/entry, no suffix
+                    logger.debug(f"Detected Wildcat Lake (Core Series 3) from model: {model_number}{suffix}")
+                    return codename, "Core (Series 3)", "Core", segment
 
                 # Bartlett Lake-S: 25X series (embedded processors)
                 # Based on Intel ARK: Core 7 251TE, Core 7 251E

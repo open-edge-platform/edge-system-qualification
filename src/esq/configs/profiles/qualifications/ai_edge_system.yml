@@ -352,12 +352,13 @@ suites:
                 display_name: "Gen AI LLM Serving Benchmark - Phi-4-mini-reasoning 3.8B INT4"
                 model_id: "microsoft/Phi-4-mini-reasoning"
                 model_precision: "int4"
-                devices: [cpu, igpu]
+                devices: [cpu, igpu, npu]
                 tiers:
                   - mainstream
                 kpi_refs:
                   - throughput_cpu
                   - throughput_igpu
+                  - throughput_npu
                 kpi_validation_mode: "any"
                 kpi_override:
                   throughput_cpu:
@@ -365,6 +366,10 @@ suites:
                       reference: 10.0
                       enabled: true
                   throughput_igpu:
+                    validation:
+                      reference: 10.0
+                      enabled: true
+                  throughput_npu:
                     validation:
                       reference: 10.0
                       enabled: true

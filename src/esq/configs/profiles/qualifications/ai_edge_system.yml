@@ -11,6 +11,7 @@ params:
     type: "qualification"
     display_reference: true
     kpi_enabled: true
+    system_compatibility: true
   tiers:
     - entry
     - mainstream

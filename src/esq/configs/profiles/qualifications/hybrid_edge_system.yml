@@ -1,0 +1,97 @@
+# Copyright (C) 2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+name: "profile.qualification.hybrid-edge-system"
+description: "Hybrid Edge Computing (HEC) system qualification"
+version: "1.0.0"
+params:
+  labels:
+    profile_display_name: "Hybrid Edge Computing"
+    group: "hybrid-edge-system"
+    type: "qualification"
+    display_reference: false
+    kpi_enabled: true
+    default_run: false
+  depends_on:
+    - "profile.suite.system.cpu-sku"
+  requirements:
+    # Hardware requirements
+    cpu_min_cores: 2
+    memory_min_gib: 4.0
+    # Software requirements
+    os_type:
+      - "linux"
+    docker_required: false
+
+suites:
+  - name: "system"
+    sub_suites:
+      - name: "cpu"
+        tests:
+          # -------------------------------------------------------------------
+          # HEC-CPU-001 — CPU Compatibility check.
+          #
+          # Verifies that the system CPU matches one of the allowed platform
+          # configurations.  Allowlist modes can be used individually or
+          # combined — a CPU passes when it satisfies ANY configured list.
+          #
+          #   processor_numbers  — exact SKU allowlist matched against the CPU
+          #     brand string (word-boundary, case-insensitive).  Use this when
+          #     qualifying by specific processor number (e.g. 155H, 285K).
+          #     Example:
+          #       processor_numbers: ["155H", "165H", "285K"]
+          #
+          #   exact_generations  — allowlist matched on generation + optional
+          #     segment/codename/product_collection fields.  No age-forward
+          #     inference; every specified field must match directly.
+          #     Example: see current config below.
+          #
+          #   supported_generations — minimum-and-above allowlist within the
+          #     same product family (age-forward comparison).
+          #     Example:
+          #       supported_generations: ["Core Ultra (Series 2)"]
+          #
+          # Combined-mode example — accept an entire generation AND specific
+          # processor numbers from other generations in one test:
+          #
+          #   exact_generations:
+          #     - generation: "Core Ultra (Series 1)"
+          #       segment: "mobile"
+          #   processor_numbers: ["285K", "265K"]  # specific desktop SKUs
+          #
+          # The current configuration uses exact_generations to accept only
+          # Meteor Lake mobile (Core Ultra Series 1, mobile) and Alder Lake
+          # desktop (12th Gen Core, desktop).
+          # -------------------------------------------------------------------
+          test_cpu:
+            params:
+              - test_id: "HEC-CPU-001"
+                display_name: "CPU Compatibility"
+                description: >
+                  Verifies the system CPU is one of the qualified platform configurations for
+                  Hybrid Edge Computing.
+                timeout: 60
+                # Strict allowlist — only these two specific platform variants
+                # qualify.  Each entry matches both the Intel generation string
+                # AND the market segment, so adjacent segments in the same
+                # generation (e.g. Core Ultra (Series 1) server or embedded)
+                # are NOT implicitly accepted.
+                #
+                # Alternative: use processor_numbers to qualify by SKU instead
+                # of generation, e.g. processor_numbers: ["155H", "165H", "285K"]
+                #
+                # Accepted platforms:
+                #   - Core Ultra (Series 1)  +  mobile  → Meteor Lake (MTL-H / MTL-U)
+                #   - 12th Gen Core          +  desktop → Alder Lake-S (ADL-S)
+                exact_generations:
+                  - generation: "Core Ultra (Series 1)"
+                    segment: "mobile"
+                  - generation: "12th Gen Core"
+                    segment: "desktop"
+                kpi_refs:
+                  - cpu_compatibility
+                kpi_override:
+                  cpu_compatibility:
+                    validation:
+                      reference: 1
+                      enabled: true

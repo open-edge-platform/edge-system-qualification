@@ -197,9 +197,9 @@ def collect_cpu_info(openvino_cpu=None) -> Dict[str, Any]:
             "logical_count": psutil.cpu_count(logical=True),  # Logical cores (including hyperthreading)
             "sockets": socket_count,  # Physical CPU sockets
             "frequency": {
-                "current": psutil.cpu_freq().current if psutil.cpu_freq() else None,
-                "min": psutil.cpu_freq().min if psutil.cpu_freq() else None,
-                "max": psutil.cpu_freq().max if psutil.cpu_freq() else None,
+                "current": round(psutil.cpu_freq().current, 2) if psutil.cpu_freq() else None,
+                "min": round(psutil.cpu_freq().min, 2) if psutil.cpu_freq() else None,
+                "max": round(psutil.cpu_freq().max, 2) if psutil.cpu_freq() else None,
             },
             "flags": cpu_info_data.get("flags", []),
             "vendor_id": cpu_info_data.get("vendor_id_raw", "Unknown"),

@@ -612,8 +612,11 @@ def _run_profile_tests_esq(
     profile_labels = profile_config.get("params", {}).get("labels", {})
     profile_type = profile_labels.get("type", "")
 
-    # Only run CPU validation for qualification profiles
-    if profile_type == "qualification" and not skip_system_check:
+    # Only run CPU validation for qualification profiles that opt-in to the
+    # system compatibility check.
+    # system_compatibility unset (defaults to false) so this gate is skipped.
+    requires_system_compatibility_check = profile_labels.get("system_compatibility", False)
+    if profile_type == "qualification" and not skip_system_check and requires_system_compatibility_check:
         is_cpu_supported, should_continue, skip_qual = _check_system_validation_esq(force, mode="qualification")
         if not should_continue:
             return 1, False
@@ -731,11 +734,15 @@ def _run_all_profiles_esq(
         logger.info("Running all profile types (qualifications, verticals, suites)")
 
     elif qualification_only:
-        # --qualification-only: Run qualification with ESQ validation
+        # --qualification-only: Run qualification profiles with ESQ validation.
+        # Use mode="all" so that on an unsupported CPU the user is offered the
+        # chance to continue running qualification profiles that do NOT require
+        # the ESQ-level system compatibility check.
         if not skip_system_check:
-            is_cpu_supported, should_continue, skip_qual = _check_system_validation_esq(force, mode="qualification")
+            is_cpu_supported, should_continue, skip_qual = _check_system_validation_esq(force, mode="all")
             if not should_continue:
                 return 1, False
+            skip_qualification = skip_qual
 
         include_all_types = False
         skip_vertical_profiles = True
@@ -782,8 +789,16 @@ def _run_all_profiles_esq(
                     profile_label_type = labels.get("type", "")
                     is_qualification = profile_type == "qualifications" or profile_label_type == "qualification"
 
+                    # Skip profiles that opt-out of automatic batch runs, unless
+                    # --all is used (which explicitly requests every profile).
+                    if not include_all_types and not labels.get("default_run", True):
+                        logger.debug(f"Skipping profile (default_run=false, use --all or -p to run): {profile_name}")
+                        continue
+
                     if include_all_types:
-                        if is_qualification and skip_qualification:
+                        # skip_qualification only applies to profiles that opted-in
+                        # to the ESQ-level UNSUPPORTED_GENERATIONS system compatibility check
+                        if is_qualification and skip_qualification and labels.get("system_compatibility", False):
                             logger.debug(
                                 f"Skipping qualification profile due to platform incompatibility: {profile_name}"
                             )
@@ -791,7 +806,10 @@ def _run_all_profiles_esq(
                         requested_profile_names.append(profile_name)
                     else:
                         is_vertical = profile_type == "verticals" or profile_label_type == "vertical"
-                        if is_qualification and not skip_qualification:
+                        # Include qualification profiles that either pass the system compatibility
+                        # check or do not opt-in to it
+                        requires_sys_compat = labels.get("system_compatibility", False)
+                        if is_qualification and (not skip_qualification or not requires_sys_compat):
                             requested_profile_names.append(profile_name)
                         elif is_vertical and not skip_vertical_profiles:
                             requested_profile_names.append(profile_name)

@@ -87,9 +87,7 @@ class SystemInfoCache:
             try:
                 hardware_data = json.loads(self._hardware_cache_file.read_text())
                 if time.time() - hardware_data.get("timestamp", 0) < self._cache_ttl:
-                    logger.debug(
-                        f"Using cached hardware info from {self._hardware_cache_file}"
-                    )
+                    logger.debug(f"Using cached hardware info from {self._hardware_cache_file}")
                     self._info["hardware"] = hardware_data.get("hardware", {})
                     self._info["timestamp"] = hardware_data.get("timestamp")
                     hardware_loaded = True
@@ -101,9 +99,7 @@ class SystemInfoCache:
             try:
                 software_data = json.loads(self._software_cache_file.read_text())
                 if time.time() - software_data.get("timestamp", 0) < self._cache_ttl:
-                    logger.debug(
-                        f"Using cached software info from {self._software_cache_file}"
-                    )
+                    logger.debug(f"Using cached software info from {self._software_cache_file}")
                     self._info["software"] = software_data.get("software", {})
                     if not hardware_loaded:
                         self._info["timestamp"] = software_data.get("timestamp")

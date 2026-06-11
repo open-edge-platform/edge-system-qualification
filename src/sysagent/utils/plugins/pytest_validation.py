@@ -23,6 +23,21 @@ from sysagent.utils.core import Result
 logger = logging.getLogger(__name__)
 
 
+def _fmt_value(value) -> str:
+    """Format a numeric KPI value without trailing decimal places for integers.
+
+    Whole numbers (e.g. 1, 0, 100) are rendered as plain integers (``"1"``,
+    ``"0"``, ``"100"``).  Values with a fractional part are rendered with two
+    decimal places (``"14.95"``, ``"3.50"``).  Non-numeric values are converted
+    via ``str()``.
+    """
+    if isinstance(value, (int, float)):
+        if isinstance(value, int) or float(value) == int(value):
+            return str(int(value))
+        return f"{value:.2f}"
+    return str(value)
+
+
 def mark_step_as_failed(step_name: str, error_msg: str, validation_mode: str = "all", result_json=None):
     """
     Mark an Allure step as failed but continue test execution.
@@ -361,24 +376,17 @@ def validate_test_results():
                         str(result.operator),
                     )
                     # Log the validation result
+                    _unit_sfx = f" {unit}" if unit else ""
                     if result.passed:
                         logger.info(
-                            f"KPI {kpi_name} PASSED: {result.actual_value} {unit} "
-                            f"{operator_str} {result.expected_value} {unit}"
+                            f"KPI {kpi_name} PASSED: {result.actual_value}{_unit_sfx} "
+                            f"{operator_str} {result.expected_value}{_unit_sfx}"
                         )
-                        actual_str = (
-                            f"{result.actual_value:.2f}"
-                            if isinstance(result.actual_value, (int, float))
-                            else str(result.actual_value)
-                        )
-                        expected_str = (
-                            f"{result.expected_value:.2f}"
-                            if isinstance(result.expected_value, (int, float))
-                            else str(result.expected_value)
-                        )
+                        actual_str = _fmt_value(result.actual_value)
+                        expected_str = _fmt_value(result.expected_value)
                         step_title = (
-                            f"🟢 Validate KPI: {kpi_name} - Actual: {actual_str} "
-                            f"{operator_str} Expected: {expected_str} {unit}"
+                            f"🟢 Validate KPI: {kpi_name} - Actual: {actual_str}{_unit_sfx} "
+                            f"{operator_str} Expected: {expected_str}{_unit_sfx}"
                         )
                         with allure.step(step_title):
                             result_json = result.to_dict()
@@ -390,30 +398,22 @@ def validate_test_results():
                             )
                     else:
                         logger.error(
-                            f"KPI {kpi_name} FAILED: {result.actual_value} {unit} "
-                            f"{operator_str} {result.expected_value} {unit}"
+                            f"KPI {kpi_name} FAILED: {result.actual_value}{_unit_sfx} "
+                            f"{operator_str} {result.expected_value}{_unit_sfx}"
                         )
-                        actual_str = (
-                            f"{result.actual_value:.2f}"
-                            if isinstance(result.actual_value, (int, float))
-                            else str(result.actual_value)
-                        )
-                        expected_str = (
-                            f"{result.expected_value:.2f}"
-                            if isinstance(result.expected_value, (int, float))
-                            else str(result.expected_value)
-                        )
+                        actual_str = _fmt_value(result.actual_value)
+                        expected_str = _fmt_value(result.expected_value)
                         error_msg = (
                             f"KPI validation failed: {kpi_name}. "
-                            f"Expected: {expected_str} {unit}, "
-                            f"Actual: {actual_str} {unit}, "
+                            f"Expected: {expected_str}{_unit_sfx}, "
+                            f"Actual: {actual_str}{_unit_sfx}, "
                             f"Operator: {operator_str}"
                         )
                         result_json = result.to_dict()
                         result_json["status"] = "FAILED"
                         failed_step_name = (
-                            f"Validate KPI: {kpi_name} - Actual: {actual_str} "
-                            f"{operator_str} Expected: {expected_str} {unit}"
+                            f"Validate KPI: {kpi_name} - Actual: {actual_str}{_unit_sfx} "
+                            f"{operator_str} Expected: {expected_str}{_unit_sfx}"
                         )
                         mark_step_as_failed(failed_step_name, error_msg, mode, result_json)
                     validation_count += 1

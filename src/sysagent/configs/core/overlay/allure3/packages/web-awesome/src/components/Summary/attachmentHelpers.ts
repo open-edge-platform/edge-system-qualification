@@ -73,10 +73,11 @@ export async function getMetricsFromAttachment(
           "value" in metricValue &&
           "unit" in metricValue
         ) {
+          const rawUnit = (metricValue as any).unit;
           return {
             metric: metricKey,
             value: String((metricValue as any).value),
-            unit: String((metricValue as any).unit),
+            unit: rawUnit != null && rawUnit !== "" ? String(rawUnit) : "N/A",
           };
         }
         return { metric: metricKey, value: String(metricValue), unit: "" };

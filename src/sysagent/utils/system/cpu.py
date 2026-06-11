@@ -69,10 +69,13 @@ CPU_GENERATION_MAP = {
     (6, 181, range(0, 10)): ("Arrow Lake-U", "Core Ultra (Series 2)", "mobile"),
     # Bartlett Lake-S (BTL-S) - 14th Gen Core
     (6, 183, range(4, 10)): ("Bartlett Lake-S", "14th Gen Core", "desktop"),
-    # Meteor Lake (MTL-H/U) - Core Ultra Series 1
-    # InstLatx64: 0xA06A4 = 170 decimal (covers both MTL-H and MTL-U)
+    # Meteor Lake (MTL) - Core Ultra Series 1
+    # InstLatx64: GenuineIntel00A06A4_MeteorLake_07 (Core Ultra 5 125H) and
+    #             GenuineIntel00A06A4_MeteorLake_09 (Core Ultra 7 155U) → BOTH are 0xA06A4
+    # All Meteor Lake variants (H, U, HL, UL, PS) share family 6, model 0xAA = 170.
+    # No separate model exists for MTL-U; H vs U distinction is marketing/TDP, not silicon.
+    # Segment (mobile for all) and H/U suffix are detected later via brand string parsing.
     (6, 170, range(0, 10)): ("Meteor Lake-H", "Core Ultra (Series 1)", "mobile"),
-    (6, 172, range(0, 10)): ("Meteor Lake-U", "Core Ultra (Series 1)", "mobile"),
     # Raptor Lake (RPL) - 13th Gen Core AND Raptor Lake Refresh (RPL-S Refresh) - 14th Gen Core
     # IMPORTANT: Model 183 is shared between 13th gen (RPL) and 14th gen (RPL Refresh)
     # Differentiation is done by brand string detection in _detect_generation_from_brand()

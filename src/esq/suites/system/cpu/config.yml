@@ -1,0 +1,84 @@
+# Copyright (C) 2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+kpi:
+  # ============================================================
+  # CPU Compatibility Check KPI
+  # Metric: cpu_compatibility (1 = compatible, 0 = incompatible)
+  # Enabled per-profile via kpi_override; disabled by default so
+  # suite runs collect data without enforcing pass/fail.
+  # ============================================================
+  cpu_compatibility:
+    name: "CPU Compatibility"
+    type: "numeric"
+    validation:
+      operator: "eq"
+      reference: 1
+      enabled: false
+    unit: null
+    severity: "normal"
+    description: "CPU passes the configured compatibility check (1=pass, 0=fail)"
+    default_value: 0
+
+  # ============================================================
+  # CPU Details KPIs
+  # ============================================================
+  physical_cores:
+    name: "Physical CPU Cores"
+    type: "numeric"
+    validation:
+      operator: "gte"
+      reference: 1
+      enabled: false
+    unit: "cores"
+    severity: "normal"
+    description: "Number of physical CPU cores"
+    default_value: 0
+
+  logical_cores:
+    name: "Logical CPU Cores"
+    type: "numeric"
+    validation:
+      operator: "gte"
+      reference: 1
+      enabled: false
+    unit: "cores"
+    severity: "normal"
+    description: "Number of logical CPU cores (including hyperthreading)"
+    default_value: 0
+
+  max_frequency_mhz:
+    name: "CPU Maximum Frequency"
+    type: "numeric"
+    validation:
+      operator: "gte"
+      reference: 0
+      enabled: false
+    unit: "MHz"
+    severity: "normal"
+    description: "Maximum CPU frequency"
+    default_value: 0
+
+  min_frequency_mhz:
+    name: "CPU Minimum Frequency"
+    type: "numeric"
+    validation:
+      operator: "gte"
+      reference: 0
+      enabled: false
+    unit: "MHz"
+    severity: "normal"
+    description: "Minimum (base) CPU frequency"
+    default_value: 0
+
+  sockets:
+    name: "CPU Sockets"
+    type: "numeric"
+    validation:
+      operator: "gte"
+      reference: 1
+      enabled: false
+    unit: null
+    severity: "normal"
+    description: "Number of physical CPU sockets installed"
+    default_value: 1

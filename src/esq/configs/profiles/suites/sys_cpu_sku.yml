@@ -1,0 +1,98 @@
+# Copyright (C) 2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+name: "profile.suite.system.cpu-sku"
+description: "CPU SKU characterisation suite — processor identification, generation, core counts, and frequency collection"
+version: "1.0.0"
+params:
+  labels:
+    profile_display_name: "System CPU"
+    group: "system.cpu"
+    type: "suite"
+    display_status: false
+  requirements:
+    # Hardware requirements
+    cpu_min_cores: 1
+    memory_min_gib: 1.0
+    # Software requirements
+    os_type:
+      - "linux"
+    docker_required: false
+
+suites:
+  - name: "system"
+    sub_suites:
+      - name: "cpu"
+        tests:
+          # -------------------------------------------------------------------
+          # CPU SKU data-collection tests.
+          #
+          # All tests run in audit / data-collection mode (no KPI thresholds
+          # enforced).  Every test always passes here.  Qualification profiles
+          # can reuse the same test_cpu function and enable enforcement by
+          # adding kpi_refs + kpi_override (see hybrid_edge_system.yml for an
+          # example with cpu_compatibility).
+          #
+          # Note: cpu_compatibility is intentionally omitted from this suite.
+          # In data-collection mode it always returns 1 (no allowlist active),
+          # which would mislead users comparing suite and qualification results
+          # on an unsupported platform — the suite shows 1 while the
+          # qualification shows 0 for the same metric.  cpu_compatibility is
+          # exercised exclusively via qualification profiles.
+          #
+          # Processor number is captured as metadata on every test; it does
+          # not need its own test entry.
+          #
+          # Test index:
+          #   CPU-SKU-001 — CPU Socket Count
+          #   CPU-SKU-002 — Physical Core Count
+          #   CPU-SKU-003 — Logical Core Count (threads)
+          #   CPU-SKU-004 — Maximum CPU Frequency
+          #   CPU-SKU-005 — Minimum CPU Frequency
+          # -------------------------------------------------------------------
+          test_cpu:
+            params:
+              - test_id: "CPU-SKU-001"
+                display_name: "CPU Socket Count"
+                timeout: 60
+                # Socket count — qualification use (single-socket enforcement):
+                #   kpi_refs: [sockets]
+                #   kpi_override: sockets: {validation: {operator: eq, reference: 1, enabled: true}}
+                key_metrics:
+                  - sockets
+
+              - test_id: "CPU-SKU-002"
+                display_name: "Physical Core Count"
+                timeout: 60
+                # Minimum physical cores — qualification use:
+                #   kpi_refs: [physical_cores]
+                #   kpi_override: physical_cores: {validation: {reference: 4, enabled: true}}
+                key_metrics:
+                  - physical_cores
+
+              - test_id: "CPU-SKU-003"
+                display_name: "Logical Core Count"
+                timeout: 60
+                # Logical cores (physical + hyperthreaded threads) — qualification use:
+                #   kpi_refs: [logical_cores]
+                #   kpi_override: logical_cores: {validation: {reference: 8, enabled: true}}
+                key_metrics:
+                  - logical_cores
+
+              - test_id: "CPU-SKU-004"
+                display_name: "Maximum CPU Frequency"
+                timeout: 60
+                # Maximum (boost) frequency — qualification use:
+                #   kpi_refs: [max_frequency_mhz]
+                #   kpi_override: max_frequency_mhz: {validation: {reference: 2400, enabled: true}}
+                key_metrics:
+                  - max_frequency_mhz
+
+              - test_id: "CPU-SKU-005"
+                display_name: "Minimum CPU Frequency"
+                timeout: 60
+                # Minimum (base) frequency — qualification use:
+                #   kpi_refs: [min_frequency_mhz]
+                #   kpi_override: min_frequency_mhz: {validation: {reference: 800, enabled: true}}
+                key_metrics:
+                  - min_frequency_mhz

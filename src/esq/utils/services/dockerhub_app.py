@@ -180,6 +180,61 @@ class DockerHubTimeseriesAppManager:
         if not result.success:
             logger.warning("Compose down reported issues: %s", result.stderr or result.stdout)
 
+    def stop_services(
+        self,
+        env: Optional[Dict[str, str]] = None,
+        timeout_seconds: int = 30,
+    ) -> None:
+        """Stop compose services using the configured compose project."""
+        sub_cmd = ["stop", "--timeout", str(max(1, int(timeout_seconds)))]
+        result = run_command(
+            self._compose_cmd(sub_cmd),
+            cwd=self.working_dir,
+            env=env,
+            timeout=self.timeout,
+        )
+        if not result.success:
+            logger.warning("Compose stop reported issues: %s", result.stderr or result.stdout)
+
+    def remove_services(
+        self,
+        env: Optional[Dict[str, str]] = None,
+        remove_volumes: bool = True,
+        force: bool = True,
+        stop: bool = True,
+    ) -> None:
+        """Remove compose service containers for the configured project."""
+        sub_cmd = ["rm"]
+        if force:
+            sub_cmd.append("--force")
+        if stop:
+            sub_cmd.append("--stop")
+        if remove_volumes:
+            sub_cmd.append("--volumes")
+
+        result = run_command(
+            self._compose_cmd(sub_cmd),
+            cwd=self.working_dir,
+            env=env,
+            timeout=self.timeout,
+        )
+        if not result.success:
+            logger.warning("Compose rm reported issues: %s", result.stderr or result.stdout)
+
+    def interrupt_cleanup(
+        self,
+        env: Optional[Dict[str, str]] = None,
+        stop_timeout_seconds: int = 30,
+    ) -> None:
+        """Best-effort cleanup for interrupted/cancelled runs.
+
+        Uses explicit stop/rm against the active compose file and project name,
+        then issues compose down to remove any remaining resources.
+        """
+        self.stop_services(env=env, timeout_seconds=stop_timeout_seconds)
+        self.remove_services(env=env, remove_volumes=True, force=True, stop=True)
+        self.bring_down(remove_volumes=True, remove_orphans=True, env=env)
+
     def status(self, env: Optional[Dict[str, str]] = None) -> str:
         """Return compose ps status output."""
         result = run_command(

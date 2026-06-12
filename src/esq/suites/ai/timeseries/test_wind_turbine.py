@@ -6,8 +6,11 @@ import math
 import os
 import re
 import secrets
+import signal
 import string
+import threading
 import time
+import atexit
 from pathlib import Path
 
 from sysagent.utils.core import Metrics, Result
@@ -69,6 +72,12 @@ _TIMESERIES_BIND_MOUNT_DIRS = (
     "apps/{sample_app}/time-series-analytics-config/models",
 )
 
+_TIMESERIES_REQUIRED_BIND_MOUNT_FILES = (
+    "configs/mqtt-broker/mosquitto.conf",
+    "configs/telegraf/entrypoint.sh",
+    "apps/{sample_app}/time-series-analytics-config/config.json",
+)
+
 
 def _precreate_bind_mount_dirs(suite_assets_root, sample_app):
     """Pre-create bind-mount source directories as the host user.
@@ -83,6 +92,28 @@ def _precreate_bind_mount_dirs(suite_assets_root, sample_app):
             (assets_root / relative.format(sample_app=sample_name)).mkdir(parents=True, exist_ok=True)
         except OSError as mkdir_error:
             logger.debug("Skipping pre-create of bind-mount dir %s: %s", relative, mkdir_error)
+
+
+def _validate_required_bind_mount_files(reference_root, sample_app):
+    """Fail fast when required bind-mount files are missing.
+
+    Docker may auto-create missing bind sources as root-owned paths on host,
+    which later prevents cleanup. Validate expected file mounts before up.
+    """
+    root_path = Path(reference_root).expanduser().resolve()
+    sample_name = str(sample_app or "wind-turbine-anomaly-detection").strip() or "wind-turbine-anomaly-detection"
+    missing_files = []
+
+    for relative in _TIMESERIES_REQUIRED_BIND_MOUNT_FILES:
+        candidate = root_path / relative.format(sample_app=sample_name)
+        if not candidate.is_file():
+            missing_files.append(str(candidate))
+
+    if missing_files:
+        raise RuntimeError(
+            "Missing required bind-mount source file(s) for timeseries compose: "
+            + ", ".join(missing_files)
+        )
 
 
 def _download_configured_assets(configs, suite_assets_root):
@@ -469,6 +500,11 @@ def test_wind_turbine(
     logger.debug("Resolved reference app root path: %s", reference_root_path)
     logger.debug("Resolved Telegraf multi-stream template path: %s", telegraf_multistream_template)
 
+    # Ensure all compose bind-mount source dirs/files exist before bringing up containers.
+    # This avoids Docker daemon creating missing host-side sources as root-owned paths.
+    _precreate_bind_mount_dirs(suite_assets_root=reference_root_path, sample_app=sample_app)
+    _validate_required_bind_mount_files(reference_root=reference_root_path, sample_app=sample_app)
+
     env_overrides["TIMESERIES_ASSETS_DIR"] = str(simulation_data_path)
     env_overrides["REFERENCE_APP_SRC_PATH"] = str(reference_root_path)
     env_overrides["SAMPLE_APP"] = str(sample_app)
@@ -488,13 +524,63 @@ def test_wind_turbine(
     )
     active_cleanup_env = dict(env_overrides)
 
-    def _safe_teardown(cleanup_env, context):
+    def _safe_teardown(cleanup_env, context, force_cleanup=False):
         if preserve_environment:
             return
         try:
-            app_manager.bring_down(env=cleanup_env)
+            if force_cleanup:
+                app_manager.interrupt_cleanup(env=cleanup_env)
+            else:
+                app_manager.bring_down(env=cleanup_env)
         except Exception as teardown_error:
             logger.warning("Compose teardown during %s failed: %s", context, teardown_error)
+
+    cleanup_lock = threading.Lock()
+    cleanup_completed = False
+    atexit_registered = False
+    signal_handlers_registered = False
+    previous_sigint_handler = None
+    previous_sigterm_handler = None
+
+    def _safe_teardown_once(context, force_cleanup=False):
+        nonlocal cleanup_completed
+        with cleanup_lock:
+            if cleanup_completed:
+                return
+            cleanup_completed = True
+        _safe_teardown(active_cleanup_env, context=context, force_cleanup=force_cleanup)
+
+    def _cleanup_on_process_exit():
+        _safe_teardown_once(context="process exit")
+
+    def _signal_cleanup_teardown(signum, frame):
+        signal_name = "SIGINT" if signum == signal.SIGINT else "SIGTERM"
+        logger.warning("Received %s; attempting interrupt-driven compose cleanup", signal_name)
+        _safe_teardown_once(context=f"{signal_name} signal", force_cleanup=True)
+
+        previous_handler = previous_sigint_handler if signum == signal.SIGINT else previous_sigterm_handler
+        if callable(previous_handler):
+            previous_handler(signum, frame)
+            return
+        if previous_handler == signal.SIG_IGN:
+            return
+
+        if signum == signal.SIGINT:
+            raise KeyboardInterrupt
+        raise SystemExit(128 + signum)
+
+    if not preserve_environment:
+        atexit.register(_cleanup_on_process_exit)
+        atexit_registered = True
+        try:
+            previous_sigint_handler = signal.getsignal(signal.SIGINT)
+            previous_sigterm_handler = signal.getsignal(signal.SIGTERM)
+            signal.signal(signal.SIGINT, _signal_cleanup_teardown)
+            signal.signal(signal.SIGTERM, _signal_cleanup_teardown)
+            signal_handlers_registered = True
+        except (ValueError, OSError) as signal_error:
+            # signal() can fail outside main thread; finalizers/atexit still cover normal exits.
+            logger.debug("Could not register timeseries signal handlers: %s", signal_error)
 
     validate_system_requirements_from_configs(configs)
 
@@ -964,7 +1050,7 @@ def test_wind_turbine(
                         scenario_results.append(run_single_scenario(case))
                     except KeyboardInterrupt:
                         logger.warning("Interrupted during batch scenario execution; forcing compose teardown")
-                        _safe_teardown(active_cleanup_env, context="batch scenario interrupt")
+                        _safe_teardown(active_cleanup_env, context="batch scenario interrupt", force_cleanup=True)
                         raise
                 batch_configured_streams = max(float(case.get("num_streams", 0.0) or 0.0) for case in scenario_results)
                 batch_configured_data_points = max(
@@ -1034,7 +1120,7 @@ def test_wind_turbine(
                 single_result = run_single_scenario(configs)
             except KeyboardInterrupt:
                 logger.warning("Interrupted during single scenario execution; forcing compose teardown")
-                _safe_teardown(active_cleanup_env, context="single scenario interrupt")
+                _safe_teardown(active_cleanup_env, context="single scenario interrupt", force_cleanup=True)
                 raise
             return Result.from_test_config(
                 configs=configs,
@@ -1105,8 +1191,8 @@ def test_wind_turbine(
                 },
             )
         except KeyboardInterrupt:
-            logger.warning("Test interrupted; attempting emergency compose teardown")
-            _safe_teardown(active_cleanup_env, context="test interrupt")
+            logger.warning("Test interrupted; attempting interrupt cleanup")
+            _safe_teardown(active_cleanup_env, context="test interrupt", force_cleanup=True)
             raise
         finally:
             if previous_no_cache is None:
@@ -1262,8 +1348,20 @@ def test_wind_turbine(
             logger.warning("Failed to update timeseries performance report artifacts: %s", report_error)
 
     finally:
+        if signal_handlers_registered:
+            try:
+                signal.signal(signal.SIGINT, previous_sigint_handler)
+                signal.signal(signal.SIGTERM, previous_sigterm_handler)
+            except (ValueError, OSError):
+                pass
+        if atexit_registered:
+            try:
+                atexit.unregister(_cleanup_on_process_exit)
+            except Exception:
+                pass
+
         if not preserve_environment:
-            _safe_teardown(active_cleanup_env, context="test finalization")
+            _safe_teardown_once(context="test finalization")
         else:
             logger.warning(
                 "debug_preserve_environment=true: skipping final compose teardown; "

@@ -14,6 +14,7 @@ params:
     default_run: false
   depends_on:
     - "profile.suite.system.cpu-sku"
+    - "profile.suite.system.peripheral"
   requirements:
     # Hardware requirements
     cpu_min_cores: 2

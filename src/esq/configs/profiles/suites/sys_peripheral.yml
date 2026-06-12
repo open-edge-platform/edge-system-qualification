@@ -1,0 +1,169 @@
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+name: "profile.suite.system.peripheral"
+description: "System Peripheral Device Detection and Enumeration"
+version: "1.0.0"
+params:
+  labels:
+    profile_display_name: "System Peripheral"
+    group: "system.peripheral"
+    type: "suite"
+    display_status: false
+  requirements:
+    # Hardware requirements
+    cpu_min_cores: 2
+    memory_min_gib: 4.0
+    storage_total_min_gib: 50.0
+    storage_min_gib: 5.0
+    # Software requirements
+    os_type:
+      - "linux"
+    docker_required: false  # Runs natively for hardware detection
+
+suites:
+  - name: "system"
+    sub_suites:
+      - name: "peripheral"
+        tests:
+          test_peripheral_detection:
+            params:
+              # --- USB ---
+              # Check for total USB controllers
+              - test_id: "PER-USB-001"
+                display_name: "USB - Controllers"
+                description: |
+                  Detects and enumerates USB host controllers on the system.
+                  Validates PCIe-connected USB controller hardware availability.
+                check_usb_controllers: true
+                timeout: 60
+
+              # Check for total connected USB devices
+              - test_id: "PER-USB-002"
+                display_name: "USB - Devices"
+                description: |
+                  Counts total connected USB peripheral devices.
+                  Includes keyboards, mouse, storage, audio, cameras, and hubs.
+                check_usb_devices: true
+                timeout: 60
+
+              # Check for USB keyboards
+              - test_id: "PER-USB-003"
+                display_name: "USB - Keyboards"
+                description: |
+                  Detects USB-connected keyboards.
+                  Enumerates all USB keyboard input devices on the system.
+                check_usb_keyboard: true
+                timeout: 60
+
+              # Check for USB mouse
+              - test_id: "PER-USB-004"
+                display_name: "USB - Mouse"
+                description: |
+                  Detects USB-connected mouse devices.
+                  Enumerates all USB mouse input devices on the system.
+                check_usb_mouse: true
+                timeout: 60
+
+              # Check for total connected USB storage devices
+              - test_id: "PER-USB-005"
+                display_name: "USB - Storage Devices"
+                description: |
+                  Enumerates USB mass storage devices.
+                  Detects external drives, USB sticks, and card readers.
+                check_usb_storage: true
+                timeout: 60
+
+              # Check for total connected USB audio devices
+              - test_id: "PER-USB-006"
+                display_name: "USB - Audio Devices"
+                description: |
+                  Detects USB audio devices.
+                  Includes headsets, speakers, microphones, and audio interfaces.
+                check_usb_audio: true
+                timeout: 60
+
+              # Check for total connected USB cameras
+              - test_id: "PER-USB-007"
+                display_name: "USB - Cameras"
+                description: |
+                  Enumerates USB cameras and webcams.
+                  Detects video capture devices connected via USB.
+                check_usb_camera: true
+                timeout: 60
+
+              # Check for total connected USB hubs (with connected device metadata)
+              - test_id: "PER-USB-008"
+                display_name: "USB - Hubs"
+                description: |
+                  Detects USB hubs and their topology.
+                  Identifies hub chipsets and port configurations.
+                check_usb_hub: true
+                timeout: 60
+
+              # --- PS/2 ---
+              # Check for PS/2 keyboards
+              - test_id: "PER-PS2-001"
+                display_name: "PS/2 - Keyboards (Wired)"
+                description: |
+                  Detects PS/2 wired keyboards.
+                  Checks physical PS/2 port connections via i8042 controller.
+                check_ps2_keyboard: true
+                timeout: 60
+
+              # Check for PS/2 mouse
+              - test_id: "PER-PS2-002"
+                display_name: "PS/2 - Mouse (Wired)"
+                description: |
+                  Detects PS/2 wired mouse devices.
+                  Checks physical PS/2 port connections via i8042 controller.
+                check_ps2_mouse: true
+                timeout: 60
+
+              # --- Network ---
+              # Check for total network controllers
+              - test_id: "PER-NET-001"
+                display_name: "Network - Controllers"
+                description: |
+                  Enumerates network controllers.
+                  Detects wired Ethernet and wireless network adapters.
+                check_network: true
+                timeout: 60
+
+              # --- Graphics ---
+              # Check for total graphics controllers
+              - test_id: "PER-GFX-001"
+                display_name: "Graphics - Controllers"
+                description: |
+                  Detects graphics controllers and GPU hardware.
+                  Identifies integrated GPU (iGPU) and discrete GPU (dGPU) devices.
+                check_graphics: true
+                timeout: 60
+
+              # Check for connected monitors
+              - test_id: "PER-GFX-002"
+                display_name: "Graphics - Connected Monitors"
+                description: |
+                  Detects physically connected monitors.
+                  Checks DisplayPort, HDMI, DVI, VGA, and eDP connections.
+                check_monitors: true
+                timeout: 60
+
+              # --- Input (Total) ---
+              # Check for total keyboards (all types)
+              - test_id: "PER-INPUT-001"
+                display_name: "Input - Total Keyboards (USB + PS/2)"
+                description: |
+                  Counts total keyboards across all connection types.
+                  Combines USB and PS/2 keyboard detection with breakdown.
+                check_total_keyboard: true
+                timeout: 60
+
+              # Check for total mouse (all types)
+              - test_id: "PER-INPUT-002"
+                display_name: "Input - Total Mouse (USB + PS/2)"
+                description: |
+                  Counts total mouse devices across all connection types.
+                  Combines USB and PS/2 mouse detection with breakdown.
+                check_total_mouse: true
+                timeout: 60

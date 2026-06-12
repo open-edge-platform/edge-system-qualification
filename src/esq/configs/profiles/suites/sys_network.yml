@@ -1,0 +1,53 @@
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+name: "profile.suite.system.network"
+description: "System network related tests"
+version: "1.0.0"
+params:
+  labels:
+    profile_display_name: "System Network"
+    group: "system.network"
+    type: "suite"
+    display_status: false
+  requirements:
+    # Hardware requirements
+    cpu_min_cores: 1
+    memory_min_gib: 2.0
+    storage_min_gib: 2.0
+    # Software requirements
+    os_type:
+      - "linux"
+    docker_required: false
+
+suites:
+  - name: "system"
+    sub_suites:
+      - name: "network"
+        tests:
+          test_network_connectivity:
+            params:
+              - test_id: "NET-CON-001"
+                display_name: "Network - Active Connections"
+                description: |
+                  Checks total active network connections across all interface types.
+                  Reports the number of interfaces that are UP with a valid IP address.
+                  Covers wired, wireless, and any other connected network interfaces.
+                check_all: true
+                timeout: 120
+
+              - test_id: "NET-CON-002"
+                display_name: "Network - Wired Connectivity"
+                description: |
+                  Checks active wired (Ethernet) network interface connectivity.
+                  Reports the number of wired interfaces that are UP with a valid IP address.
+                check_wired: true
+                timeout: 120
+
+              - test_id: "NET-CON-003"
+                display_name: "Network - Wireless Connectivity"
+                description: |
+                  Checks active wireless (WiFi) network interface connectivity.
+                  Reports the number of wireless interfaces that are UP with a valid IP address.
+                check_wireless: true
+                timeout: 120

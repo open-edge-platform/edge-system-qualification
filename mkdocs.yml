@@ -65,8 +65,6 @@ plugins:
       version_selector: true
       css_dir: css
       javascript_dir: js
-  # - minify:
-  #     minify_html: true
 
 # Customization
 extra:

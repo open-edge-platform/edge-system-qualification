@@ -1,0 +1,88 @@
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+name: "profile.suite.virtualization.kvm"
+description: "KVM/QEMU virtualization readiness validation"
+version: "1.0.0"
+params:
+  labels:
+    profile_display_name: "Virtualization"
+    group: "virtualization.kvm"
+    type: "suite"
+    display_status: false
+  requirements:
+    # Hardware requirements
+    cpu_min_cores: 2
+    memory_min_gib: 4.0
+    storage_min_gib: 2.0
+    # Software requirements
+    os_type:
+      - "linux"
+    docker_required: false
+
+suites:
+  - name: "virtualization"
+    sub_suites:
+      - name: "kvm"
+        tests:
+          test_virtualization_kvm:
+            params:
+              - test_id: "VIRT-KVM-001"
+                display_name: "Virtualization - Comprehensive KVM Check"
+                description: |
+                  Comprehensive KVM virtualization readiness check covering all features.
+                  Validates Intel VT-x (CPU virtualization support), Intel VT-d/IOMMU 
+                  (device passthrough), KVM and VFIO kernel modules, nested virtualization,
+                  and /dev/kvm device accessibility. Suitable for full system validation.
+                check_vt_x: true
+                check_vt_d: true
+                check_kvm_modules: true
+                check_vfio_modules: true
+                check_nested_virt: true
+                check_kvm_dev: true
+                timeout: 120
+
+              - test_id: "VIRT-KVM-002"
+                display_name: "Virtualization - Basic KVM Support"
+                description: |
+                  Basic KVM virtualization check focusing on essential features.
+                  Validates Intel VT-x CPU support, KVM kernel modules, and /dev/kvm
+                  device accessibility. Does not check IOMMU/VT-d or VFIO modules.
+                  Suitable for basic VM hosting without device passthrough requirements.
+                check_vt_x: true
+                check_vt_d: false
+                check_kvm_modules: true
+                check_vfio_modules: false
+                check_nested_virt: false
+                check_kvm_dev: true
+                timeout: 120
+
+              - test_id: "VIRT-KVM-003"
+                display_name: "Virtualization - Device Passthrough (VT-d/VFIO)"
+                description: |
+                  Device passthrough capability check for KVM virtualization.
+                  Validates Intel VT-d/IOMMU support, VFIO kernel modules (vfio, 
+                  vfio_pci, vfio_iommu_type1), and IOMMU group configuration.
+                  Required for GPU passthrough and other PCI device assignments to VMs.
+                check_vt_x: false
+                check_vt_d: true
+                check_kvm_modules: false
+                check_vfio_modules: true
+                check_nested_virt: false
+                check_kvm_dev: false
+                timeout: 120
+
+              - test_id: "VIRT-KVM-004"
+                display_name: "Virtualization - Nested Virtualization"
+                description: |
+                  Nested virtualization support check for running VMs inside VMs.
+                  Validates nested virtualization parameter in kvm_intel module.
+                  Required for cloud and development scenarios where nested hypervisors
+                  are needed (e.g., Docker in VM, Kubernetes with nested virtualization).
+                check_vt_x: false
+                check_vt_d: false
+                check_kvm_modules: false
+                check_vfio_modules: false
+                check_nested_virt: true
+                check_kvm_dev: false
+                timeout: 120

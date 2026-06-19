@@ -125,8 +125,8 @@ def format_system_summary(hardware_info: Dict[str, Any], software_info: Dict[str
                     continue
                 size = device.get("size", "")
                 mem_type = device.get("type", "")
+                speed = device.get("speed_mts")
                 configured_speed = device.get("configured_speed_mts")
-                speed = configured_speed or device.get("speed_mts")
                 manufacturer = device.get("manufacturer", "")
                 part_number = device.get("part_number", "")
 
@@ -136,6 +136,8 @@ def format_system_summary(hardware_info: Dict[str, Any], software_info: Dict[str
                     slot_line += f" {mem_type}"
                 if speed:
                     slot_line += f" @ {speed} MT/s"
+                    if configured_speed and configured_speed != speed:
+                        slot_line += f" (configured: {configured_speed} MT/s)"
                 if manufacturer and manufacturer not in ("Unknown", "Not Specified"):
                     slot_line += f" - {manufacturer}"
                 if part_number and part_number not in ("Unknown", "Not Specified"):

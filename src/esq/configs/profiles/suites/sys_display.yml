@@ -1,0 +1,53 @@
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+name: "profile.suite.system.display"
+description: "System display related tests"
+version: "1.0.0"
+params:
+  labels:
+    profile_display_name: "System Display"
+    group: "system.display"
+    type: "suite"
+    display_status: false
+  requirements:
+    # Hardware requirements
+    cpu_min_cores: 1
+    memory_min_gib: 2.0
+    storage_min_gib: 2.0
+    # Software requirements
+    os_type:
+      - "linux"
+    docker_required: false
+
+suites:
+  - name: "system"
+    sub_suites:
+      - name: "display"
+        tests:
+          test_display_connectivity:
+            params:
+              - test_id: "SYS-DISP-001"
+                display_name: "Display - All Ports"
+                description: |
+                  Checks all display ports (HDMI, DisplayPort, etc.) and their connection status.
+                  Reports the number of ports that have monitors connected.
+                  Uses the DRM subsystem to detect display hardware.
+                check_all: true
+                timeout: 120
+
+              - test_id: "SYS-DISP-002"
+                display_name: "Display - HDMI Ports"
+                description: |
+                  Checks HDMI display ports and their connection status.
+                  Reports the number of HDMI ports with monitors connected.
+                check_hdmi: true
+                timeout: 120
+
+              - test_id: "SYS-DISP-003"
+                display_name: "Display - DisplayPort"
+                description: |
+                  Checks DisplayPort connectors and their connection status.
+                  Reports the number of DisplayPort connectors with monitors connected.
+                check_displayport: true
+                timeout: 120

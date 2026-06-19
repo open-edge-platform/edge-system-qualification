@@ -49,6 +49,7 @@ dependencies = [
     "py-libnuma>=1.2",
     "nncf>=2.17.0",
     "timm>=1.0.22",
+    "torch>=2.12.1",
 ]
 
 [project.scripts]

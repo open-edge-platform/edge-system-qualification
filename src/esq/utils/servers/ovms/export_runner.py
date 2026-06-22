@@ -34,6 +34,24 @@ OVMS_EXPORT_SCRIPT_URL = f"{_OVMS_BASE_URL}/export_model.py"
 OVMS_REQUIREMENTS_URL = f"{_OVMS_BASE_URL}/requirements.txt"
 
 # ---------------------------------------------------------------------------
+# Forced export task
+# ---------------------------------------------------------------------------
+# OVMS continuous-batching LLM serving requires a *stateful* model that exposes
+# past key/value (KV) cache state so the SDPAToPagedAttention transformation can
+# run.  The upstream export_model.py never passes ``--task`` and instead relies
+# on optimum's automatic task inference.  With recent optimum/optimum-intel
+# releases that auto-inference is unreliable for several causal-LM repos (e.g.
+# DeepSeek-R1-Distill-Qwen): the Hub ``pipeline_tag`` is missing or generic, so
+# the task is mis-detected as ``feature-extraction`` and the model is exported
+# *stateless* (no ReadValue/Assign nodes).  OVMS then fails to load it with:
+#   "Model is supposed to be stateful, cannot perform the SDPAToPagedAttention
+#    transformation. ... run optimum-cli export openvino
+#    --task text-generation-with-past instead of --task text-generation".
+# Forcing the task explicitly guarantees a stateful, KV-cached export regardless
+# of the (often absent or wrong) Hub metadata.
+_FORCED_EXPORT_TASK = "text-generation-with-past"
+
+# ---------------------------------------------------------------------------
 # Per-commit package version overrides
 # ---------------------------------------------------------------------------
 # For each pinned upstream commit, define exact stable package versions to
@@ -472,8 +490,23 @@ def run_export_text_generation(
     if not dynamic_split_fuse:
         cmd.append("--disable_dynamic_split_fuse")
 
-    if extra_quantization_params:
-        cmd.extend(["--extra_quantization_params", extra_quantization_params])
+    # Force the text-generation-with-past task so OVMS gets a stateful (KV-cached)
+    # model.  The upstream script builds the optimum-cli command as:
+    #   optimum-cli export openvino --model M --weight-format W \
+    #       {extra_quantization_params} --trust-remote-code OUT
+    # and never injects ``--task`` itself, so ``--extra_quantization_params`` is
+    # the only channel through which the task flag can reach optimum-cli.  We
+    # prepend it (unless the caller already supplied an explicit ``--task``) so
+    # auto task-inference is bypassed entirely.
+    effective_extra_params = extra_quantization_params or ""
+    if "--task" not in effective_extra_params:
+        task_flag = f"--task {_FORCED_EXPORT_TASK}"
+        effective_extra_params = (
+            f"{task_flag} {effective_extra_params}".strip() if effective_extra_params else task_flag
+        )
+
+    if effective_extra_params:
+        cmd.extend(["--extra_quantization_params", effective_extra_params])
 
     logger.info(f"Running OVMS export_model.py (commit: {OVMS_COMMIT})")
     logger.debug(f"Export command: {' '.join(cmd)}")

@@ -31,7 +31,7 @@ Before writing or modifying tests, set up the repository in editable mode. This 
 |---|---|---|
 | **Command** | `uv tool install` | `uv pip install -e .` |
 | **Purpose** | Run qualification tests on an edge system | Develop, modify, and extend the framework |
-| **Source editable** | No — installed as a frozen package | Yes — source changes take effect immediately |
+| **Editable Source** | No — installed as a frozen package | Yes — source changes take effect immediately |
 | **Virtual environment** | Managed automatically by `uv tool` | Manually created with `uv venv` |
 | **Typical user** | System validator, end user | Framework developer, test author |
 
@@ -226,7 +226,7 @@ The framework reads YAML test keys (e.g., `test_dlstreamer`) and locates the cor
 
 ---
 
-## In This Section
+## In this Section
 
 | Page | Description |
 |------|-------------|

@@ -77,7 +77,7 @@ src/sysagent/configs/core/overlay/allure3/packages/web-awesome/src/
 
 ## Developer Workflow
 
-### Step 1 — One-time project setup
+### Step 1 — Set up a one-time project
 
 ```bash
 <cli> run

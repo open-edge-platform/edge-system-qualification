@@ -22,7 +22,7 @@ The Intel® ESQ framework provides a set of pytest fixtures that are automatical
 
 - **Type**: `Dict[str, Any]`
 - **Scope**: function
-- **Description**: Test configuration parameters merged from the active profile and `config.yml`.
+- **Description**: This function tests configuration parameters merged from the active profile and `config.yml`.
 - **Usage**:
   ```python
   test_id = configs.get("test_id", "T0000")
@@ -38,7 +38,7 @@ The Intel® ESQ framework provides a set of pytest fixtures that are automatical
 
 - **Type**: `Callable[[Optional[Dict]], Optional[Union[Result, Dict]]]`
 - **Scope**: function
-- **Description**: Retrieves cached test results if available. Returns `None` on a cache miss.
+- **Description**: This function retrieves cached test results if available and returns `None` on a cache miss.
 - **Usage**:
   ```python
   cached_data = cached_result(cache_configs={"key": "value"})
@@ -52,7 +52,7 @@ The Intel® ESQ framework provides a set of pytest fixtures that are automatical
 
 - **Type**: `Callable[[Union[Result, Dict], Optional[Dict]], None]`
 - **Scope**: function
-- **Description**: Stores test results in the cache for future runs.
+- **Description**: This function stores test results in the cache for future runs.
 - **Usage**:
   ```python
   cache_result(results, cache_configs={"key": "value"})
@@ -66,7 +66,7 @@ The Intel® ESQ framework provides a set of pytest fixtures that are automatical
 
 - **Type**: `Callable[[Dict[str, Any]], None]`
 - **Scope**: function
-- **Description**: Validates that the system meets all requirements defined in `configs`. Calls `pytest.skip` if any requirement is not met.
+- **Description**: This function validates that the system meets all requirements defined in `configs` and calls `pytest.skip` if any requirement is not met.
 - **Usage**:
   ```python
   validate_system_requirements_from_configs(configs)
@@ -80,7 +80,7 @@ See [System Requirements](requirements.md) for all available flags.
 
 - **Type**: `Callable[..., Dict[str, Any]]`
 - **Scope**: function
-- **Description**: Validates test results against KPI thresholds.
+- **Description**: This function validates test results against KPI thresholds.
 - **Parameters**:
 
   | Parameter | Description |
@@ -110,7 +110,7 @@ See [System Requirements](requirements.md) for all available flags.
 
 - **Type**: `Callable[..., Union[Result, Dict]]`
 - **Scope**: function
-- **Description**: Executes test logic with automatic caching support. Returns cached results on a cache hit; executes `run_test_func` on a cache miss and caches the result.
+- **Description**: This function executes test logic with automatic caching support and returns cached results on a cache hit. It also executes `run_test_func` on a cache miss and caches the result.
 - **Parameters**:
 
   | Parameter | Description |
@@ -140,7 +140,7 @@ See [System Requirements](requirements.md) for all available flags.
 
 - **Type**: `Callable[..., Any]`
 - **Scope**: function
-- **Description**: Runs an asset preparation function with Allure progress tracking. Use this to download models, videos, or set up other dependencies before the main test.
+- **Description**: This function runs an asset preparation function with Allure progress tracking. Use this to download models, videos, or set up other dependencies before the main test.
 - **Parameters**:
 
   | Parameter | Description |
@@ -168,7 +168,7 @@ See [System Requirements](requirements.md) for all available flags.
 
 - **Type**: `Callable[..., None]`
 - **Scope**: function
-- **Description**: Generates a test result summary and attaches it to the Allure report.
+- **Description**: This function generates a test result summary and attaches it to the Allure report.
 - **Parameters**:
 
   | Parameter | Description |
@@ -198,7 +198,7 @@ See [System Requirements](requirements.md) for all available flags.
 
 - **Type**: `Dict[str, Any]`
 - **Scope**: function
-- **Description**: Loads the suite-level configuration from `config.yml` in the test directory.
+- **Description**: This function loads the suite-level configuration from `config.yml` in the test directory.
 - **Usage**:
   ```python
   kpis = suite_configs.get("kpi", {})
@@ -210,7 +210,7 @@ See [System Requirements](requirements.md) for all available flags.
 
 - **Type**: `Callable[[str], Optional[Dict[str, Any]]]`
 - **Scope**: function
-- **Description**: Retrieves a KPI configuration dict by name from `config.yml`.
+- **Description**: This function retrieves a KPI configuration dict by name from `config.yml`.
 - **Usage**:
   ```python
   kpi_config = get_kpi_config("inference_time")

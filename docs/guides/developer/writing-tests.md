@@ -254,7 +254,7 @@ esq -d run -nc --profile profile.suite.my_feature
 
 ## Test Execution Pattern
 
-All ESQ tests follow a standardized 7-step pattern for consistency and reliability.
+All Intel® ESQ tests follow a standardized 7-step pattern for consistency and reliability.
 
 ### Full Pattern Example
 

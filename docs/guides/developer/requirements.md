@@ -10,11 +10,11 @@ The framework provides reusable requirement validation flags. Add them to a prof
 |------|------|-------------|---------|
 | `cpu_min_cores` | `int` | Minimum logical CPU cores | `cpu_min_cores: 4` |
 | `cpu_xeon_required` | `bool` | Requires Intel® Xeon® processor | `cpu_xeon_required: true` |
-| `cpu_core_required` | `bool` | Requires Intel® Core™ processor (includes Ultra Desktop) | `cpu_core_required: true` |
+| `cpu_core_required` | `bool` | Requires Intel® Core™ processor (includes Intel® Core™ Ultra Desktop) | `cpu_core_required: true` |
 | `cpu_ultra_required` | `bool` | Requires Intel® Core™ Ultra processor | `cpu_ultra_required: true` |
 | `cpu_ultra_mobile_required` | `bool` | Requires Intel® Core™ Ultra mobile (H/U/V/HX/P suffix) | `cpu_ultra_mobile_required: true` |
-| `cpu_entry_required` | `bool` | Requires Intel® entry-level processor (N-series, Intel® Atom®) | `cpu_entry_required: true` |
-| `cpu_entry_excluded` | `bool` | Excludes entry-level processors (skips test on N-series, Intel® Atom®) | `cpu_entry_excluded: true` |
+| `cpu_entry_required` | `bool` | Requires Intel® entry-level processor (N-series, Intel® Atom® processor) | `cpu_entry_required: true` |
+| `cpu_entry_excluded` | `bool` | Excludes entry-level processors (skips test on N-series, Intel® Atom® processor) | `cpu_entry_excluded: true` |
 
 ---
 

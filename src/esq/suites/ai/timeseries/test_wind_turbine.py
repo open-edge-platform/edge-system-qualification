@@ -522,6 +522,10 @@ def test_wind_turbine(
         project_name=compose_project_name,
         timeout=timeout,
     )
+    # Pre-create bind sources from the active compose file after env resolution.
+    # This keeps ownership user-scoped even if runtime compose introduces new
+    # bind mounts that are not part of the static pre-create list.
+    app_manager.precreate_bind_sources(env=env_overrides)
     active_cleanup_env = dict(env_overrides)
 
     def _safe_teardown(cleanup_env, context, force_cleanup=False):

@@ -67,7 +67,7 @@ services:
       no_proxy: "127.0.0.1,localhost,ia-influxdb,ia-mqtt-broker,ia-time-series-analytics-microservice"
     depends_on:
       - ia-influxdb
-    restart: unless-stopped
+    restart: "no"
 
   ia-mqtt-publisher:
     image: ${DOCKER_REGISTRY:-}intel/ia-mqtt-publisher:${IMAGE_SUFFIX:-1.1.0}
@@ -107,7 +107,7 @@ services:
     depends_on:
       - ia-mqtt-broker
       - ia-influxdb
-    restart: unless-stopped
+    restart: "no"
 
   ia-time-series-analytics-microservice:
     container_name: ia-time-series-analytics-microservice
@@ -145,7 +145,7 @@ services:
     depends_on:
       - ia-influxdb
       - ia-mqtt-broker
-    restart: unless-stopped
+    restart: "no"
 
   ia-telegraf:
     container_name: ia-telegraf
@@ -181,7 +181,7 @@ services:
     depends_on:
       - ia-influxdb
       - ia-time-series-analytics-microservice
-    restart: unless-stopped
+    restart: "no"
 
   ia-grafana:
     container_name: ia-grafana
@@ -216,4 +216,4 @@ services:
       - /tmp
       - /var/cache/nginx
       - /var/run
-    restart: unless-stopped
+    restart: "no"

@@ -20,10 +20,6 @@ params:
     docker_required: true
   assets_repo_ref: "2026.0"
   assets:
-    - id: "timeseries_compose"
-      type: "file"
-      path: "./docker-compose.yml"
-      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-suites/2026.0/manufacturing-ai-suite/industrial-edge-insights-time-series/docker-compose.yml"
     - id: "timeseries_env"
       type: "file"
       path: "./.env"

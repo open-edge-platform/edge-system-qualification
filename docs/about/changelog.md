@@ -2,6 +2,50 @@
 
 Intel® ESQ changelog and version history.
 
+## Version 2026.2.0 - June 2026
+### New Platform Support
+- Intel® Core™ Series 3 Processor, Products formerly Wildcat Lake
+
+### Changes
+- Integrated the latest Intel® DL Streamer with Metro test suites
+- Updated reference values for Metro test suites
+- Resolved zero stream reporting in Proxy VSaaS dGPU/iGPU
+- Fixed proxy test display checks failing based only on socket existence
+- Eliminated data duplication in the Media Decode and Decode+Compose CSV file
+- Fixed GPU frequency telemetry runtime data incorrectly matching reference data
+- Fixed Media/Proxy test runtime GPU/Package values being overwritten with reference values
+- Fixed proxy test cases returning no valid results in PTL/MTL when NPU is part of the pipeline
+- Fixed unsupported platform detection for Intel® Xeon® 6 Processors workstations
+- Fixed GenAI qualification handling for Intel® Core™ Ultra Desktop SKU for NPU
+- Removed the status column from the KPI table in the qualification report
+- Fixed multi-device test cases caching invalid -1 results
+- Fixed the highest performance result in GenAI qualification not showing as a key metric
+- Fixed intermittent Vision AI dGPU qualification failures caused by -1 or low stream results
+- Added a flag to `esq clean` to remove related container images
+- Added installed RAM module, channel, and speed information to reports
+- Fixed hardware info cache not always updating after hardware changes
+- Enabled reports to display test descriptions
+- Integrated the Wind Turbine Anomaly Detection time series AI sample app
+- Updated the key latency metric name for the Loss Prevention VLM test suite
+- Added modular telemetry support in the test framework
+- Updated B60 Gen AI verified reference data
+- Integrated Allure3* development workflow
+- Updated ONNX*, requests, pygments, and Transformers* packages
+- Added support for OpenVINO™ toolkit 2026.1 in the qualification test suite
+- Added full system telemetry during analysis
+
+### Known Issues
+- Cluttered download progress logs caused by a duplicate download function
+- GPU utilization and Package Power are not consistent with Linux* kernel 6.14
+- GitHub* resource download intermittently fails from the PRC network
+- Intel® DL Streamer pipeline instability causes timeouts and underreports dGPU stream performance
+- Redundant file detection in the Metro Media test case due to file copy during test/build
+- Pexels* video download intermittently fails from the PRC network
+- Memory is not released after Vision AI test cases complete on Panther Lake (PTL) systems
+- Gen-AI qualification tests may sometimes fail on systems with dual B60 GPUs
+- Vision-AI qualification tests may sometimes fail on systems with dual B60 GPUs
+- Qmassa Collector fallback logic incorrectly references a sysfs metric source
+
 ## Version 2026.1.0 - March 2026
 ### New Platform Support
 - Intel® Core™ Ultra Processors (Series 3), Products formerly Panther Lake

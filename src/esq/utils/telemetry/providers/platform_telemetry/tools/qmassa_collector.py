@@ -15,7 +15,6 @@ from typing import Dict, List, Optional
 from esq.utils.telemetry.providers.platform_telemetry.base import BaseCollector
 from esq.utils.telemetry.providers.platform_telemetry.tools.intel_gpu_top_utils import IntelGpuTopUtils
 from esq.utils.telemetry.providers.platform_telemetry.tools.metric_sources import (
-    METRIC_BANDWIDTH_MB_S,
     METRIC_FREQUENCY_MHZ,
     METRIC_MEMORY_UTILIZATION,
     METRIC_POWER_W,
@@ -176,8 +175,6 @@ class QmassaCollector(BaseCollector):
         power_origin: Dict[str, str] = {}
         temp_c: Dict[str, float] = {}        # GPU temperature in C
         temp_origin: Dict[str, str] = {}
-        bw_mb_s: Dict[str, float] = {}       # GPU memory bandwidth MB/s
-        bw_origin: Dict[str, str] = {}
         mem_used_bytes: Dict[str, Dict[str, float]] = {}
         mem_total_bytes: Dict[str, Dict[str, float]] = {}
 
@@ -238,22 +235,7 @@ class QmassaCollector(BaseCollector):
                     temp_c[device] = max(0.0, value)
                     temp_origin[device] = "qmmd"
 
-            elif metric in {
-                "qmmd_gpu_memory_bandwidth_bytes_per_second",
-                "qmmd_gpu_bandwidth_bytes_per_second",
-                "qmmd_gpu_memory_throughput_bytes_per_second",
-            }:
-                bw_mb_s[device] = max(0.0, value) / 1_000_000.0
-                bw_origin[device] = "qmmd"
-
-            elif metric in {
-                "qmmd_gpu_memory_read_bytes_per_second",
-                "qmmd_gpu_memory_write_bytes_per_second",
-            }:
-                bw_mb_s[device] = bw_mb_s.get(device, 0.0) + (max(0.0, value) / 1_000_000.0)
-                bw_origin[device] = "qmmd"
-
-        signal_devices = set(engine_util) | set(power_w) | set(power_pkg_w) | set(temp_c) | set(bw_mb_s)
+        signal_devices = set(engine_util) | set(power_w) | set(power_pkg_w) | set(temp_c)
         memory_devices = set(mem_used_bytes) | set(mem_total_bytes)
         # Ignore frequency-only ghost devices when richer telemetry exists.
         all_devices = signal_devices | memory_devices
@@ -351,15 +333,6 @@ class QmassaCollector(BaseCollector):
                     temperature_origin = "placeholder_sysfs_unavailable"
                     temp_available = False
 
-            if pci in bw_mb_s:
-                bandwidth_mb_s = round(max(0.0, bw_mb_s[pci]), 3)
-                bandwidth_origin = bw_origin.get(pci, "qmmd")
-                bw_available = True
-            else:
-                bandwidth_mb_s = None
-                bandwidth_origin = "qmmd_partial"
-                bw_available = False
-
             mem_pct, mem_origin, mem_domain, mem_available = self._memory_utilization_from_qmmd(
                 pci,
                 mem_used_bytes,
@@ -446,15 +419,6 @@ class QmassaCollector(BaseCollector):
                 value=temperature_c if (temp_available and temperature_c is not None) else MISSING_VALUE,
                 unit="\u00b0C",
                 tags={"vendor": "intel", "metric_origin": temperature_origin, "pci": pci},
-            ))
-            samples.append(MetricSample(
-                timestamp_utc=now,
-                collector=self.name,
-                device=friendly,
-                metric_name="gpu.bandwidth_mb_s",
-                value=bandwidth_mb_s if (bw_available and bandwidth_mb_s is not None) else MISSING_VALUE,
-                unit="MB/s",
-                tags={"vendor": "intel", "metric_origin": bandwidth_origin, "pci": pci},
             ))
         return samples
 
@@ -609,12 +573,6 @@ class QmassaCollector(BaseCollector):
                 temp_c[pci] = r.value
                 temp_origin[pci] = r.origin
 
-        # ── bandwidth ────────────────────────────────────────────────────
-        if pci not in bw_mb_s:
-            r = first_reading(METRIC_BANDWIDTH_MB_S)
-            if r is not None:
-                bw_mb_s[pci] = r.value
-                bw_origin[pci] = r.origin
     # ── sysfs fallback ───────────────────────────────────────────────────────
 
     def _collect_sysfs_fallback(self) -> List[MetricSample]:
@@ -642,7 +600,6 @@ class QmassaCollector(BaseCollector):
             (METRIC_FREQUENCY_MHZ,  "MHz",  "gpu.frequency_mhz",  "placeholder_sysfs_unavailable"),
             (METRIC_POWER_W,        "W",    "gpu.power_w",        "placeholder_sysfs_unavailable"),
             (METRIC_TEMPERATURE_C,  "°C",   "gpu.temperature_c",  "placeholder_sysfs_unavailable"),
-            (METRIC_BANDWIDTH_MB_S, "MB/s", "gpu.bandwidth_mb_s", "sysfs_partial"),
         )
 
         def first_reading(pci: str, card: Path, metric: str):

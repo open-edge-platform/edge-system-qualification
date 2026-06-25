@@ -18,7 +18,6 @@ CSV schema (from upstream ``npu-monitor-tool.py``)::
 
 * ``power``         – watts (float)
 * ``frequency``     – display frequency in Hz (int) — converted to MHz
-* ``bandwidth``     – MB/s (float)
 * ``temperature``   – °C (int)
 * ``utilization``   – percentage (int)
 * ``memory_usage``  – MiB (float, ``-1.0`` when unsupported)
@@ -206,20 +205,6 @@ class NpuMonitorToolCollector(BaseCollector):
                     metric_name="npu.frequency_mhz",
                     value=max(0.0, freq_hz / 1_000_000.0),
                     unit="MHz",
-                    tags=tags,
-                )
-            )
-
-        bandwidth_mb_s = self._to_float(row.get("bandwidth"))
-        if bandwidth_mb_s is not None:
-            samples.append(
-                MetricSample(
-                    timestamp_utc=now,
-                    collector=self.name,
-                    device="NPU",
-                    metric_name="npu.bandwidth_mb_s",
-                    value=max(0.0, bandwidth_mb_s),
-                    unit="MB/s",
                     tags=tags,
                 )
             )

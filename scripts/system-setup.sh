@@ -363,6 +363,7 @@ setup_telemetry_apt_packages() {
         intel-gpu-tools
         "linux-tools-$(uname -r)"
         linux-tools-generic
+        stress-ng
     )
 
     DEBIAN_FRONTEND=noninteractive apt-get update -qq || true

@@ -363,6 +363,9 @@ setup_telemetry_apt_packages() {
         intel-gpu-tools
         "linux-tools-$(uname -r)"
         linux-tools-generic
+        qemu-system-x86
+        qemu-utils
+        cloud-image-utils
         stress-ng
     )
 

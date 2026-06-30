@@ -546,11 +546,17 @@ class QmassaCollector(BaseCollector):
             return None
 
         # ── utilization (sources return percent, stored as fraction) ─────
-        if pci not in engine_util:
+        # Backfill when qmmd is missing utilization, and also when qmmd
+        # reports a persistent zero baseline while another source sees
+        # positive activity.
+        should_try_util_backfill = pci not in engine_util or engine_util.get(pci, 0.0) <= 0.0
+        if should_try_util_backfill:
             r = first_reading(METRIC_UTILIZATION)
             if r is not None:
-                engine_util[pci] = max(0.0, min(1.0, r.value / 100.0))
-                engine_util_origin[pci] = r.origin
+                backfill_fraction = max(0.0, min(1.0, r.value / 100.0))
+                if pci not in engine_util or backfill_fraction > engine_util.get(pci, 0.0):
+                    engine_util[pci] = backfill_fraction
+                    engine_util_origin[pci] = r.origin
 
         # ── frequency (sources return MHz, stored as Hz) ─────────────────
         if pci not in freq_hz:

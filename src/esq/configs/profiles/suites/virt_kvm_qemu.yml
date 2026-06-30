@@ -1,0 +1,67 @@
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+name: "profile.suite.virtualization.kvm-qemu"
+description: "QEMU/KVM VM reboot testing"
+version: "1.0.0"
+params:
+  labels:
+    profile_display_name: "Virtualization"
+    group: "virtualization.kvm"
+    type: "suite"
+    display_status: false
+  requirements:
+    # Hardware requirements
+    cpu_min_cores: 2
+    memory_min_gib: 4.0
+    storage_min_gib: 5.0
+    # Software requirements
+    os_type:
+      - "linux"
+    docker_required: false
+
+suites:
+  - name: "virtualization"
+    sub_suites:
+      - name: "kvm"
+        tests:
+          test_kvm_qemu:
+            params:
+              # ---------------------------------------------------------------
+              # VIRT-QEMU-001 — QEMU VM Reboot Stress (KVM, 10x)
+              #
+              # Stress reboot test. Creates a VM using
+              # hardware-accelerated KVM, performs 10 reboot cycles, and
+              # validates the VM reaches running state after each reboot.
+              #
+              # Key metric : avg_reboot_time (seconds)
+              # Pass/fail  : based on successful VM lifecycle (create → boot →
+              #              reboot x10 → cleanup). Fails if QEMU or KVM is
+              #              unavailable.
+              # ---------------------------------------------------------------
+              - test_id: "VIRT-QEMU-001"
+                display_name: "QEMU VM Reboot Stress (KVM, 10x)"
+                use_case: "kvm_reboot_stress_10"
+                description: |
+                  KVM reboot stress validation.
+                  Reboot cycles: 10.
+                  Creates a VM using KVM and validates VM lifecycle operations
+                  (create, start, reboot, cleanup) while ensuring the VM is
+                  running after every reboot.
+                  Reports avg_reboot_time as the primary key metric.
+                use_kvm: true
+                vm_cpu_count: 4
+                vm_memory_mb: 12288
+                vm_disk_mb: 61440
+                reboot_count: 10
+                guest_image_url: "https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img"
+                guest_ready_probe: "serial"
+                guest_ready_timeout: 300
+                guest_ssh_user: "ubuntu"
+                guest_ssh_host_port: 2222
+                verify_guest_os: true
+                require_ssh_for_os_check: false
+                expected_guest_os_contains: "Ubuntu"
+                enable_qga: true
+                enable_cloud_init_seed: true
+                timeout: 7200

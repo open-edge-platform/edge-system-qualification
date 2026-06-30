@@ -114,6 +114,11 @@ export const TelemetrySection: FunctionComponent<TelemetrySectionProps> = ({
     return [base === -1 ? 99 : base, 0, device];
   };
 
+  const isAcceleratorDevice = (device: string): boolean => {
+    const d = String(device || "");
+    return d === "iGPU" || d === "NPU" || d === "dGPU" || d.startsWith("dGPU[") || d.startsWith("NPU[");
+  };
+
   const canonicalMetricKey = (metric: string, moduleName?: string): string | null => {
     const m   = String(metric || "").toLowerCase();
     const mod = String(moduleName || "").toLowerCase();
@@ -426,7 +431,19 @@ export const TelemetrySection: FunctionComponent<TelemetrySectionProps> = ({
         .filter((metric) => metricCards.has(metric))
         .map((metric) => metricCards.get(metric) as MetricCard);
 
-      return { device, modules, metricRows };
+      const filteredMetricRows = metricRows.filter((row) => {
+        // Accelerator memory metrics are currently unreliable and often
+        // reported as hard zeros; hide them for iGPU/dGPU/NPU.
+        if (
+          (row.metric === "memory_used_mb" || row.metric === "memory_utilization")
+          && isAcceleratorDevice(device)
+        ) {
+          return false;
+        }
+        return true;
+      });
+
+      return { device, modules, metricRows: filteredMetricRows };
     });
   }, [moduleEntries]);
 

@@ -95,8 +95,8 @@ export const TelemetrySection: FunctionComponent<TelemetrySectionProps> = ({
         name === "gpu_power" || name === "gpu_usage") return "GPU";
     if (name.includes("npu")) return "NPU";
     if (name.startsWith("cpu_")) return "CPU";
-    // memory_usage and package_power (RAPL) are host-CPU side telemetry.
-    if (name === "memory_usage" || name.startsWith("package_") || name === "power") return "CPU";
+    // memory_usage and power/package rails are host-level telemetry.
+    if (name === "memory_usage" || name.startsWith("package_") || name === "power") return "System";
     return "Other";
   };
 
@@ -112,6 +112,11 @@ export const TelemetrySection: FunctionComponent<TelemetrySectionProps> = ({
     if (device === "NPU") return [4, 0, device];
     const base = DEVICE_ORDER.indexOf(device);
     return [base === -1 ? 99 : base, 0, device];
+  };
+
+  const isAcceleratorDevice = (device: string): boolean => {
+    const d = String(device || "");
+    return d === "iGPU" || d === "NPU" || d === "dGPU" || d.startsWith("dGPU[") || d.startsWith("NPU[");
   };
 
   const canonicalMetricKey = (metric: string, moduleName?: string): string | null => {
@@ -182,6 +187,13 @@ export const TelemetrySection: FunctionComponent<TelemetrySectionProps> = ({
     if (m === "bandwidth_mb_s") return "Bandwidth";
     if (m === "temperature_c") return "Temperature";
     return toTitle(metric);
+  };
+
+  const memoryUsedPreferenceRank = (metric: string): number => {
+    const m = String(metric || "").toLowerCase();
+    if (m.includes("memory_used") || /(^|_)used(_|$)/.test(m)) return 2;
+    if (m.includes("memory_available") || /(^|_)available(_|$)/.test(m)) return 1;
+    return 0;
   };
 
   // Filename-safe sanitiser: lower-case, collapse any non-alphanumeric run
@@ -290,11 +302,25 @@ export const TelemetrySection: FunctionComponent<TelemetrySectionProps> = ({
 
         const cards = cardsByDevice.get(device) ?? new Map<string, MetricCard>();
         if (cards.has(canonical)) {
+          // For the unified Memory Used card, prefer ``used`` signals over
+          // ``available`` when both are present in the same module.
+          if (canonical === "memory_used_mb") {
+            const existing = cards.get(canonical);
+            const existingRawMetric = String(existing?.moduleData?.rawMetric || "");
+            const shouldReplace =
+              memoryUsedPreferenceRank(metric) > memoryUsedPreferenceRank(existingRawMetric);
+            if (shouldReplace) {
+              cards.delete(canonical);
+            } else {
+              return;
+            }
+          } else {
           // Already have a card for this (device, canonical) pair; keep the
           // first one to avoid double-counting metrics that map to the same
           // bucket (e.g. ``gpu_0_pkg_c`` + ``gpu_0_vram_c`` both map to
           // ``temperature_c``). The chart renders the first metric only.
-          return;
+            return;
+          }
         }
         cardsByDevice.set(device, cards);
 
@@ -405,7 +431,19 @@ export const TelemetrySection: FunctionComponent<TelemetrySectionProps> = ({
         .filter((metric) => metricCards.has(metric))
         .map((metric) => metricCards.get(metric) as MetricCard);
 
-      return { device, modules, metricRows };
+      const filteredMetricRows = metricRows.filter((row) => {
+        // Accelerator memory metrics are currently unreliable and often
+        // reported as hard zeros; hide them for iGPU/dGPU/NPU.
+        if (
+          (row.metric === "memory_used_mb" || row.metric === "memory_utilization")
+          && isAcceleratorDevice(device)
+        ) {
+          return false;
+        }
+        return true;
+      });
+
+      return { device, modules, metricRows: filteredMetricRows };
     });
   }, [moduleEntries]);
 

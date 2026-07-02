@@ -65,8 +65,6 @@ plugins:
       version_selector: true
       css_dir: css
       javascript_dir: js
-  # - minify:
-  #     minify_html: true
 
 # Customization
 extra:
@@ -135,14 +133,29 @@ nav:
     - Quick Start: getting-started/quick-start.md
     - Test Suites:
       - getting-started/suites/index.md
-    - Background Telemetry:
+    - Telemetry:
       - getting-started/telemetry/index.md
 
   - Guides:
     - guides/index.md
     - Optimization: guides/optimization.md
     - Troubleshooting: guides/troubleshooting.md
-    - Developer: guides/developer.md
+    - Developer:
+      - Overview: guides/developer/index.md
+      - Writing Tests: guides/developer/writing-tests.md
+      - Configuration:
+        - Profile & Test Config: guides/developer/configuration.md
+        - System Requirements: guides/developer/requirements.md
+      - Framework API:
+        - Fixtures Reference: guides/developer/fixtures.md
+        - Results & Metrics: guides/developer/results-metrics.md
+        - KPI Validation: guides/developer/kpi-validation.md
+      - Features:
+        - Asset Management: guides/developer/assets.md
+        - Modular Telemetry: guides/developer/telemetry.md
+      - Advanced:
+        - Best Practices: guides/developer/advanced.md
+        - Allure Report Customization: guides/developer/allure-reports.md
   - About:
     - about/index.md
     - License: about/license.md

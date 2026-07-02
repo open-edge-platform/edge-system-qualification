@@ -73,7 +73,7 @@ suites:
           test_lp_vlm:
             params:
               - test_id: "LP-VLM-001"
-                display_name: "Loss Prevention VLM"
+                display_name: "Loss Prevention VLM - yolo11n-Qwen2.5-VL-7B-Instruct"
                 devices: [cpu]
                 timeout: 3600  # 60 minutes
                 camera_stream: "camera_to_workload_vlm.json"

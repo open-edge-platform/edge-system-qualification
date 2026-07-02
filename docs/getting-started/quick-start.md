@@ -17,7 +17,7 @@ Intel® ESQ supports a wide range of Intel® edge systems optimized for various 
 
 | **Category** | **Processors** | **Specifications** |**Storage** | **Discrete GPU Options** |
 |--------------|------------------------|------------------------|-------------|------------------|
-| **Scalable Performance Graphics Media** | **Xeon-Based**: <br>Intel® Xeon® 6 Processors,<br>5th Gen Intel® Xeon® Scalable Processors,<br>Intel® Xeon® W Processors<br><br>**Core-Based**: <br>Intel® Core Ultra Processor (Series 2),<br> Intel® Core™ (Series 2) | **Xeon-Based**: <br>**SKU**: Dual and Single Socket<br>**Minimum System Memory**: 128 GB DDR5 (Dual Channel)<br><br> **Core-Based**:<br> **Minimum System Memory**: 64GB DDR5 (Dual Channel)<br>| **Recommended**: 1TB | **Intel® Arc™ B-Series Graphics,**<br>**Intel® Arc™ Pro B-Series Graphics** |
+| **Scalable Performance Graphics Media** | **Xeon-Based**: <br>Intel® Xeon® 6 Processors,<br>5th Gen Intel® Xeon® Scalable Processors,<br>Intel® Xeon® W Processors<br><br>**Core-Based**: <br>Intel® Core Ultra Processor (Series 2),<br> Intel® Core™ Processor (Series 2) | **Xeon-Based**: <br>**SKU**: Dual and Single Socket<br>**Minimum System Memory**: 128 GB DDR5 (Dual Channel)<br><br> **Core-Based**:<br> **Minimum System Memory**: 64GB DDR5 (Dual Channel)<br>| **Recommended**: 1TB | **Intel® Arc™ B-Series Graphics,**<br>**Intel® Arc™ Pro B-Series Graphics** |
 | **Scalable Performance** | Intel® Xeon® 6 Processors,<br> 5th Gen Intel® Xeon® Scalable Processors, <br>Intel® Xeon® W Processors | **SKU**: Dual and Single Socket<br>**Minimum System Memory**: 128 GB DDR5 (Dual Channnel) <br>| **Recommended**: 1TB | N/A |
 | **Efficiency Optimized** | Intel® Core™ Ultra Processor (Series 2),<br>Intel® Core™ Ultra Processor (Series 3)  | **Graphics**: Integrated GPU with 7 Xe-Cores or more <br> **SKU**: Single Socket <br>**Minimum System Memory**: 32 GB DDR5 (Dual Channel)| **Recommended**: 512 GB | N/A |
 | **Mainstream** | Intel® Core™ (Series 2) | **Minimum System Memory**: 32 GB DDR5 (Dual Channel)| **Recommended**: 512 GB | N/A |
@@ -143,7 +143,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh && source $HOME/.local/bin/env
 Run the setup script to configure system settings required for full functionality:
 
 ```bash
-sudo bash -c "$(wget -qLO - https://raw.githubusercontent.com/open-edge-platform/edge-system-qualification/refs/heads/main/scripts/system-setup.sh)"
+sudo bash -c "$(wget -qLO - https://raw.githubusercontent.com/open-edge-platform/edge-system-qualification/refs/heads/release/2026.2/scripts/system-setup.sh)"
 ```
 
 !!! note "Feature Availability"
@@ -163,7 +163,7 @@ sudo bash -c "$(wget -qLO - https://raw.githubusercontent.com/open-edge-platform
 Install Intel® ESQ from GitHub*:
 
 ```bash
-uv tool install --force --refresh git+https://github.com/open-edge-platform/edge-system-qualification.git@main
+uv tool install --force --refresh git+https://github.com/open-edge-platform/edge-system-qualification.git@release/2026.2
 ```
 
 Verify that Intel® ESQ is working correctly:
@@ -177,7 +177,7 @@ esq --version
 Run all tests and review the generated test report:
 
 !!! tip "Upgrading Intel® ESQ"
-    Before running a new version of Intel® ESQ, clean up any previously created `esq_data` folder to prevent leftover data from interfering with the new installation:
+    before running a new version of Intel® ESQ, clean up any previously created `esq_data` folder to prevent leftover data from interfering with the new installation:
     
     ```bash
     esq clean --all

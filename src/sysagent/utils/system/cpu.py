@@ -1403,27 +1403,37 @@ def detect_cpu_generation_and_segment(
             elif codename == "Raptor Lake-HX":
                 codename = "Raptor Lake-HX Refresh"
 
-    # Override 2: Check for Core Series 2 (non-Ultra)
-    # Intel Core Series 2 (non-Ultra) uses Raptor Lake/Bartlett Lake architecture but different branding
-    # Key differentiator: "Core 7" vs "Core i7" (no "i" prefix)
-    # Examples: Core 7 251TE, Core 7 251E, Core 7 250U, Core 5 220U (not Core i7, Core i5)
-    # These share CPUID model numbers with 13th/14th Gen but need separate generation string
+    # Override 2: Check for Core Series (non-Ultra)
+    # Intel Core Series (non-Ultra) uses model number ranges to indicate series:
+    # - 2XX (200-299) = Series 2 (Raptor Lake-based, e.g., Core 7 250U, Core 5 220U)
+    # - 3XX (300-399) = Series 3 (Wildcat Lake, e.g., Core 7 360, Core 5 330, Core 3 304)
+    # - 4XX+ = Series 4+ (future platforms, forward compatibility)
+    # Key differentiator from traditional Core i: "Core 7" vs "Core i7" (no "i" prefix)
+    # These may share CPUID model numbers with older Gen but need the correct series string
     # Note: Segment will be detected by suffix (E/TE=embedded, U/P=mobile) via _detect_segment()
     if codename and "ultra" not in brand_lower:
         # Check for Core 3/5/7/9 pattern WITHOUT "i" prefix (not i3/i5/i7/i9)
         # Pattern: "core" ... whitespace ... digit (3/5/7/9) ... whitespace ... NOT "i"
-        # Matches: "Core(TM) 7 251TE" or "Core(TM) 7 250U" but NOT "Core(TM) i7-13700K"
+        # Matches: "Core(TM) 7 251TE" or "Core(TM) 5 330" but NOT "Core(TM) i7-13700K"
         is_n_series_brand = re.search(r"\bN\d{2,3}\b", brand, re.IGNORECASE) is not None
         if re.search(r"core.*?\s+[3579]\s+(?!i)", brand_lower) and not is_n_series_brand:
-            # This is Core Series 2 (new branding without "i")
+            # Derive series from the hundreds digit of the model number:
+            # 2XX -> Series 2, 3XX -> Series 3, 4XX -> Series 4, etc.
+            series_model_match = re.search(r"core.*?[3579]\s+(\d{2,3})", brand, re.IGNORECASE)
+            if series_model_match:
+                model_num = int(series_model_match.group(1))
+                series_num = model_num // 100
+                detected_series_gen = f"Core (Series {series_num})" if series_num >= 2 else "Core (Series 2)"
+            else:
+                detected_series_gen = "Core (Series 2)"
             logger.debug(
-                f"Detected Core Series 2 (non-Ultra) from brand string - overriding generation: "
-                f"original={generation} -> Core (Series 2), brand={brand}"
+                f"Detected {detected_series_gen} (non-Ultra) from brand string - overriding generation: "
+                f"original={generation} -> {detected_series_gen}, brand={brand}"
             )
-            generation = "Core (Series 2)"
+            generation = detected_series_gen
             # Segment will be determined by _detect_segment() based on suffix
-            # Keep original codename but update it to reflect "Refresh"
-            if "Raptor Lake" in codename:
+            # Update codename to reflect "Refresh" for Series 2 (Raptor Lake) only
+            if generation == "Core (Series 2)" and "Raptor Lake" in codename:
                 codename = codename.replace("Raptor Lake", "Raptor Lake Refresh")
 
     if codename:

@@ -2128,7 +2128,12 @@ export const Summary = () => {
               let slotLine = `${locator}`;
               if (dimm.size) slotLine += ` • ${dimm.size}`;
               if (dimm.type) slotLine += ` ${dimm.type}`;
-              if (dimm.speed_mts) slotLine += ` @ ${dimm.speed_mts} MT/s`;
+              if (dimm.speed_mts) {
+                slotLine += ` @ ${dimm.speed_mts} MT/s`;
+                if (dimm.configured_speed_mts && dimm.configured_speed_mts !== dimm.speed_mts) {
+                  slotLine += ` (configured: ${dimm.configured_speed_mts} MT/s)`;
+                }
+              }
               if (dimm.manufacturer) slotLine += ` • ${dimm.manufacturer.trim()}`;
               if (dimm.part_number) slotLine += ` ${dimm.part_number.trim()}`;
               memoryDetails.push(`\t${slotLine}`);

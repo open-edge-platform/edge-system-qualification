@@ -65,7 +65,6 @@ class PlatformTelemetryModule(BaseTelemetryModule):
             ("gpu.frequency_mhz", "MHz"),
             ("gpu.power_w", "W"),
             ("gpu.memory_utilization", "%"),
-            ("gpu.bandwidth_mb_s", "MB/s"),
             ("gpu.temperature_c", "°C"),
         ],
         "dGPU": [
@@ -73,7 +72,6 @@ class PlatformTelemetryModule(BaseTelemetryModule):
             ("gpu.frequency_mhz", "MHz"),
             ("gpu.power_w", "W"),
             ("gpu.memory_utilization", "%"),
-            ("gpu.bandwidth_mb_s", "MB/s"),
             ("gpu.temperature_c", "°C"),
         ],
         "NPU": [
@@ -85,7 +83,6 @@ class PlatformTelemetryModule(BaseTelemetryModule):
             # row size-explicit so the chart/CSV label cannot be confused
             # with a 0-100 % reading.
             ("npu.memory_used_mb", "MB"),
-            ("npu.bandwidth_mb_s", "MB/s"),
             ("npu.temperature_c", "°C"),
         ],
     }

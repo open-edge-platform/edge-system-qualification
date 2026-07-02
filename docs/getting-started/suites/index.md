@@ -24,6 +24,7 @@ Intel® ESQ provides a comprehensive collection of test suites to assess and qua
     - [System GPU - OpenVINO](#system-gpu---openvino)
     - [System Memory - STREAM](#system-memory---stream)
     - [Media Performance](#media-performance)
+    - [Timeseries AI](#timeseries-ai)
 
 
 ---
@@ -34,19 +35,21 @@ Quick reference of all available test suites and their profile names.
 
 | Profile Name | Category | Description | Run Command |
 |--------------|----------|-------------|-------------|
-| `profile.qualification.ai-edge-system` | Qualification | AI Edge System qualification | `esq run --profile profile.qualification.ai-edge-system` |
+| `profile.qualification.ai-edge-system` | Qualification | Intel® AI Edge Systems qualification | `esq run --profile profile.qualification.ai-edge-system` |
 | `profile.vertical.manufacturing` | Vertical | Manufacturing | `esq run --profile profile.vertical.manufacturing` |
 | `profile.vertical.metro` | Vertical | Metro proxy workloads (LPR, Smart NVR, Visual AI, VSaaS) | `esq run --profile profile.vertical.metro` |
 | `profile.vertical.retail-asc` | Vertical | Retail Automated Self-Checkout | `esq run --profile profile.vertical.retail-asc` |
 | `profile.vertical.retail-lp` | Vertical | Retail Loss Prevention | `esq run --profile profile.vertical.retail-lp` |
+| `profile.vertical.retail-lp-vlm` | Vertical | Retail Loss Prevention Visual Language Model | `esq run --profile profile.vertical.retail-lp-vlm` |
 | `profile.suite.ai.gen` | Horizontal | Gen AI profile | `esq run --profile profile.suite.ai.gen` |
+| `profile.suite.ai.timeseries-wind-turbine` | Horizontal | Timeseries AI profile - Wind Turbine Skeleton | `esq run --profile profile.suite.ai.timeseries-wind-turbine` |
 | `profile.suite.ai.vision-light` | Horizontal | DL Streamer Analysis - Multi-Stream Pipelines With Multiple AI Stages | `esq run --profile profile.suite.ai.vision-light` |
 | `profile.suite.ai.vision-ov` | Horizontal | OpenVINO™ Toolkit Benchmark - Measures raw inference performance using OpenVINO Runtime API | `esq run --profile profile.suite.ai.vision-ov` |
+| `profile.suite.ai.vision-va` | Horizontal | Multi-stage video analytics pipelines with detection, tracking, and classification | `esq run --profile profile.suite.ai.vision-va` |
 | `profile.suite.ai.vision-vrb` | Horizontal | Vision AI profile - Verified Reference Blueprints | `esq run --profile profile.suite.ai.vision-vrb` |
+| `profile.suite.media.performance-pipelines` | Horizontal | Media Performance | `esq run --profile profile.suite.media.performance-pipelines` |
 | `profile.suite.system.gpu-ov` | Horizontal | System GPU Performance using OpenVINO™ Toolkit benchmark | `esq run --profile profile.suite.system.gpu-ov` |
 | `profile.suite.system.memory-stream` | Horizontal | System Memory Performance using STREAM benchmark | `esq run --profile profile.suite.system.memory-stream` |
-| `profile.suite.media.performance-pipelines` | Horizontal | Media Performance | `esq run --profile profile.suite.media.performance-pipelines` |
-| `profile.suite.ai.vision-va` | Horizontal | Multi-stage video analytics pipelines with detection, tracking, and classification | `esq run --profile profile.suite.ai.vision-va` |
 
 **List all available profiles**:
 ```bash
@@ -67,7 +70,7 @@ esq list
 
 ## Qualifications
 
-### Intel® AI Edge System Qualification
+### Intel® AI Edge Systems Qualification
 
 **Profile**: `profile.qualification.ai-edge-system`
 
@@ -114,9 +117,22 @@ esq run --profile profile.qualification.ai-edge-system
 | MFG-PDD-001 | Pallet Defect Detection - multi-stream 480p30 H.264 gvadetect YOLOX-TINY INT8 (CPU) |
 | MFG-PDD-002 | Pallet Defect Detection - multi-stream 480p30 H.264 gvadetect YOLOX-TINY INT8 (iGPU) |
 | MFG-PDD-003 | Pallet Defect Detection - multi-stream 480p30 H.264 gvadetect YOLOX-TINY INT8 (dGPU) |
+| MFG-PDD-004 | Pallet Defect Detection - multi-stream 480p30 H.264 gvadetect YOLOX-TINY FP32 (CPU) |
+| MFG-PDD-005 | Pallet Defect Detection - multi-stream 480p30 H.264 gvadetect YOLOX-TINY FP32 (iGPU) |
+| MFG-PDD-006 | Pallet Defect Detection - multi-stream 480p30 H.264 gvadetect YOLOX-TINY FP32 (dGPU) |
+| MFG-PDD-007 | Pallet Defect Detection - multi-stream 480p30 H.264 gvadetect YOLOX-TINY FP16 (CPU) |
+| MFG-PDD-008 | Pallet Defect Detection - multi-stream 480p30 H.264 gvadetect YOLOX-TINY FP16 (iGPU) |
+| MFG-PDD-009 | Pallet Defect Detection - multi-stream 480p30 H.264 gvadetect YOLOX-TINY FP16 (dGPU) |
 | MFG-WPC-001 | Weld Porosity Classification - multi-stream 1024p30 H.264 gvaclassify EfficientNet-B0 FP16 (CPU) |
 | MFG-WPC-002 | Weld Porosity Classification - multi-stream 1024p30 H.264 gvaclassify EfficientNet-B0 FP16 (iGPU) |
 | MFG-WPC-003 | Weld Porosity Classification - multi-stream 1024p30 H.264 gvaclassify EfficientNet-B0 FP16 (dGPU) |
+| MFG-WPC-004 | Weld Porosity Classification - multi-stream 1024p30 H.264 gvaclassify EfficientNet-B0 INT8 (CPU) |
+| MFG-WPC-005 | Weld Porosity Classification - multi-stream 1024p30 H.264 gvaclassify EfficientNet-B0 INT8 (iGPU) |
+| MFG-WPC-006 | Weld Porosity Classification - multi-stream 1024p30 H.264 gvaclassify EfficientNet-B0 INT8 (dGPU) |
+| MFG-WPC-007 | Weld Porosity Classification - multi-stream 1024p30 H.264 gvaclassify EfficientNet-B0 FP32 (CPU) |
+| MFG-WPC-008 | Weld Porosity Classification - multi-stream 1024p30 H.264 gvaclassify EfficientNet-B0 FP32 (iGPU) |
+| MFG-WPC-009 | Weld Porosity Classification - multi-stream 1024p30 H.264 gvaclassify EfficientNet-B0 FP32 (dGPU) |
+
 
 
 **Run this profile**:
@@ -445,6 +461,29 @@ esq run --profile profile.suite.system.memory-stream
 **Run this profile**:
 ```bash
 esq run --profile profile.suite.media.performance-pipelines
+```
+
+### Timeseries AI
+**Profile**: `profile.suite.ai.timeseries-wind-turbine`
+
+<details markdown="1">
+<summary><b>Test Cases</b> (click to expand)</summary>
+
+| Test ID | Test Case |
+|---------|-----------| 
+| TS-WT-CONS-001 | Wind Turbine Timeseries - Combined Functional Flow |
+| TS-WT-001 | TS Wind Turbine - s40p500 CPU OPCUA |
+| TS-WT-002 | TS Wind Turbine - s40p500 GPU OPCUA |
+| TS-WT-003 | TS Wind Turbine - s40p500 CPU MQTT |
+| TS-WT-004 | TS Wind Turbine - s40p500 GPU MQTT |
+
+</details>
+
+<br>
+
+**Run this profile**:
+```bash
+esq run --profile profile.suite.ai.timeseries-wind-turbine
 ```
 
 ---

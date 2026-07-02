@@ -131,6 +131,14 @@ params:
           throughput_tokens_per_sec: 21
           first_token_latency_ms: 10306
           perf_per_watt: 1.96
+        - device_sku: "Intel Core 5 330"
+          type: "iGPU"
+          model: "Phi-4-mini-reasoning"
+          precision: "INT4"
+          batch_size: 1
+          throughput_tokens_per_sec: 21
+          first_token_latency_ms: 794
+          perf_per_watt: 1.62
         - device_sku: "Intel Xeon 6730P (32 Cores at 2.5GHz)"
           type: "CPU"
           model: "Qwen3-32B"
@@ -214,6 +222,21 @@ params:
           precision: "INT8"
           batch_size: 8
           no_of_streams: 44
+        - device_sku: "Intel Core 5 330"
+          type: "CPU"
+          precision: "INT8"
+          batch_size: 1
+          no_of_streams: 3
+        - device_sku: "Intel Core 5 330"
+          type: "iGPU"
+          precision: "INT8"
+          batch_size: 1
+          no_of_streams: 18
+        - device_sku: "Intel Core 5 330"
+          type: "NPU"
+          precision: "INT8"
+          batch_size: 1
+          no_of_streams: 18
         - device_sku: "Intel Xeon 6730P (32 Cores at 2.5GHz)"
           type: "CPU"
           precision: "INT8"

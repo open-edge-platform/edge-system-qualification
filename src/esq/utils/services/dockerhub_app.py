@@ -3,6 +3,7 @@
 
 """Docker Hub based deployment helpers for timeseries ESQ suites."""
 
+import json
 import logging
 import time
 from pathlib import Path
@@ -38,6 +39,109 @@ class DockerHubTimeseriesAppManager:
             self.project_name,
             *sub_cmd,
         ]
+
+    @staticmethod
+    def _looks_like_file_path(path_text: str) -> bool:
+        """Heuristic to classify a host path as a file bind source."""
+        name = Path(str(path_text)).name
+        # Common file-like pattern used by bind-mounted configs/scripts.
+        return "." in name and not name.startswith(".")
+
+    def precreate_bind_sources(self, env: Optional[Dict[str, str]] = None) -> None:
+        """Pre-create bind-mount sources from active compose configuration.
+
+        This protects against root-owned host paths when compose definitions drift
+        (e.g., downloaded compose differs from in-repo assumptions).
+        """
+        result = run_command(
+            self._compose_cmd(["config", "--format", "json"]),
+            cwd=self.working_dir,
+            env=env,
+            timeout=180,
+        )
+        if not result.success:
+            logger.warning("Compose config inspection failed; skipping dynamic bind pre-create: %s", result.stderr)
+            return
+
+        try:
+            config = json.loads(result.stdout or "{}")
+        except json.JSONDecodeError as decode_error:
+            logger.warning("Compose config JSON parse failed; skipping dynamic bind pre-create: %s", decode_error)
+            return
+
+        services = config.get("services", {}) if isinstance(config, dict) else {}
+        if not isinstance(services, dict):
+            return
+
+        for service_name, service_def in services.items():
+            if not isinstance(service_def, dict):
+                continue
+            volumes = service_def.get("volumes", [])
+            if not isinstance(volumes, list):
+                continue
+
+            for volume_entry in volumes:
+                source_path = None
+
+                if isinstance(volume_entry, dict):
+                    if str(volume_entry.get("type", "")).lower() != "bind":
+                        continue
+                    source_path = str(volume_entry.get("source", "")).strip()
+                elif isinstance(volume_entry, str):
+                    # Fallback for legacy string-form entries.
+                    parts = volume_entry.split(":")
+                    if len(parts) >= 2:
+                        source_path = parts[0].strip()
+
+                if not source_path:
+                    continue
+
+                source = Path(source_path)
+                if not source.is_absolute():
+                    source = (Path(self.working_dir) / source).resolve()
+
+                try:
+                    if source.exists():
+                        continue
+
+                    if self._looks_like_file_path(str(source)):
+                        source.parent.mkdir(parents=True, exist_ok=True)
+                        source.touch(exist_ok=True)
+                    else:
+                        source.mkdir(parents=True, exist_ok=True)
+                except OSError as create_error:
+                    logger.debug(
+                        "Skipping dynamic bind source pre-create for service %s path %s: %s",
+                        service_name,
+                        source,
+                        create_error,
+                    )
+
+    def _list_project_container_ids(self) -> List[str]:
+        """List container IDs for this compose project via docker labels."""
+        label = f"com.docker.compose.project={self.project_name}"
+        result = run_command(["docker", "ps", "-aq", "--filter", f"label={label}"], timeout=120)
+        if not result.success:
+            logger.warning("Docker container listing by label failed: %s", result.stderr or result.stdout)
+            return []
+        return [line.strip() for line in (result.stdout or "").splitlines() if line.strip()]
+
+    def force_remove_project_containers(self) -> None:
+        """Force-remove project containers without relying on compose parsing."""
+        container_ids = self._list_project_container_ids()
+        if not container_ids:
+            return
+
+        stop_result = run_command(["docker", "stop", *container_ids], timeout=180)
+        if not stop_result.success:
+            logger.warning("Docker stop by container IDs reported issues: %s", stop_result.stderr or stop_result.stdout)
+
+        rm_result = run_command(["docker", "rm", "-f", "-v", *container_ids], timeout=180)
+        if not rm_result.success:
+            logger.warning(
+                "Docker rm -f -v by container IDs reported issues: %s",
+                rm_result.stderr or rm_result.stdout,
+            )
 
     @staticmethod
     def _sanitize_error_text(text: str, max_chars: int = 600) -> str:
@@ -179,6 +283,64 @@ class DockerHubTimeseriesAppManager:
         )
         if not result.success:
             logger.warning("Compose down reported issues: %s", result.stderr or result.stdout)
+
+    def stop_services(
+        self,
+        env: Optional[Dict[str, str]] = None,
+        timeout_seconds: int = 30,
+    ) -> None:
+        """Stop compose services using the configured compose project."""
+        sub_cmd = ["stop", "--timeout", str(max(1, int(timeout_seconds)))]
+        result = run_command(
+            self._compose_cmd(sub_cmd),
+            cwd=self.working_dir,
+            env=env,
+            timeout=self.timeout,
+        )
+        if not result.success:
+            logger.warning("Compose stop reported issues: %s", result.stderr or result.stdout)
+
+    def remove_services(
+        self,
+        env: Optional[Dict[str, str]] = None,
+        remove_volumes: bool = True,
+        force: bool = True,
+        stop: bool = True,
+    ) -> None:
+        """Remove compose service containers for the configured project."""
+        sub_cmd = ["rm"]
+        if force:
+            sub_cmd.append("--force")
+        if stop:
+            sub_cmd.append("--stop")
+        if remove_volumes:
+            sub_cmd.append("--volumes")
+
+        result = run_command(
+            self._compose_cmd(sub_cmd),
+            cwd=self.working_dir,
+            env=env,
+            timeout=self.timeout,
+        )
+        if not result.success:
+            logger.warning("Compose rm reported issues: %s", result.stderr or result.stdout)
+
+    def interrupt_cleanup(
+        self,
+        env: Optional[Dict[str, str]] = None,
+        stop_timeout_seconds: int = 30,
+    ) -> None:
+        """Best-effort cleanup for interrupted/cancelled runs.
+
+        Uses explicit stop/rm against the active compose file and project name,
+        then issues compose down to remove any remaining resources.
+        """
+        self.stop_services(env=env, timeout_seconds=stop_timeout_seconds)
+        self.remove_services(env=env, remove_volumes=True, force=True, stop=True)
+        self.bring_down(remove_volumes=True, remove_orphans=True, env=env)
+        # Final fallback for cases where compose commands fail (for example
+        # interpolation/format drift under cancellation timing).
+        self.force_remove_project_containers()
 
     def status(self, env: Optional[Dict[str, str]] = None) -> str:
         """Return compose ps status output."""

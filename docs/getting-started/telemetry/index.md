@@ -1,4 +1,4 @@
-# Background Telemetry
+# Telemetry
 
 Intel® ESQ automatically collects system metrics as a background thread during each test run. No configuration or code changes in the test itself are needed — telemetry is controlled entirely from the profile YAML and results are visible in the Allure report.
 

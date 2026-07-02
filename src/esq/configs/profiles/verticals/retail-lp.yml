@@ -197,7 +197,7 @@ suites:
                   igpu_required: true
 
               - test_id: "RTL-LPP-004"
-                display_name: "Loss Prevention - multi-stream 1080p15 H.264 gvadetect YOLO11n INT8 gvatrack gvaclassify EfficientNet-B0 INT8 (iGPU)"
+                display_name: "Loss Prevention - multi-stream 1080p15 Multi-Product-Scans H.264 gvadetect YOLO11n INT8 gvatrack gvaclassify EfficientNet-B0 INT8 (iGPU)"
                 pipeline: |
                   filesrc location=./videos/items-in-basket-32658421-1080-15-bench.mp4
                     ! decodebin3 ! vapostproc ! "video/x-raw(memory:VAMemory)" ! gvaattachroi roi=335,900,1060,1340 

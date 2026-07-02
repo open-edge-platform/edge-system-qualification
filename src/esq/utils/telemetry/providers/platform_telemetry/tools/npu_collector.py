@@ -118,7 +118,7 @@ class NpuCollector(BaseCollector):
     absent the collector silently returns empty samples, allowing the
     dashboard to display the NPU placeholder row rather than erroring.
 
-    Delta-based metrics (utilization, power, bandwidth) require at least
+    Delta-based metrics (utilization, power) require at least
     two consecutive collect_once() calls to produce non-zero values; the
     first call always initialises the baseline and returns sentinel values.
     """
@@ -136,7 +136,6 @@ class NpuCollector(BaseCollector):
         # Delta state (updated on every collect_once call)
         self._prev_busy_us: Optional[int] = None
         self._prev_energy_j: Optional[float] = None
-        self._prev_bw: Optional[float] = None
         self._prev_ts: Optional[float] = None
 
     # ── BaseCollector interface ───────────────────────────────────────────────
@@ -171,9 +170,6 @@ class NpuCollector(BaseCollector):
 
         # ── Frequency (PMT VPU_WORKPOINT register) ────────────────────────────
         freq_mhz = self._read_freq_mhz()
-
-        # ── Bandwidth (delta of PMT VPU_MEM_BW counter) ───────────────────────
-        bandwidth_mb_s = self._compute_bandwidth(now_ts)
 
         # ── Temperature (PMT SOC_TEMPERATURES register) ───────────────────────
         temperature_c = self._read_temperature_c()
@@ -216,16 +212,6 @@ class NpuCollector(BaseCollector):
             metric_name="npu.frequency_mhz",
             value=float(freq_mhz) if freq_mhz is not None else MISSING_VALUE,
             unit="MHz",
-            tags=tags,
-        ))
-
-        samples.append(MetricSample(
-            timestamp_utc=now_utc,
-            collector=self.name,
-            device="NPU",
-            metric_name="npu.bandwidth_mb_s",
-            value=float(bandwidth_mb_s) if bandwidth_mb_s is not None else MISSING_VALUE,
-            unit="MB/s",
             tags=tags,
         ))
 
@@ -310,7 +296,6 @@ class NpuCollector(BaseCollector):
         if pmt.refresh():
             self._prev_busy_us = self._read_busy_time_us()
             self._prev_energy_j = self._read_energy_j()
-            self._prev_bw = self._read_raw_bandwidth()
             self._prev_ts = time.monotonic()
 
         return True
@@ -376,16 +361,6 @@ class NpuCollector(BaseCollector):
         # U32.18.14 fixed-point → float joules
         return (val >> 14) + ((val & ((1 << 14) - 1)) / (1 << 14))
 
-    def _read_raw_bandwidth(self) -> Optional[float]:
-        if self._pmt is None or self._pmt.buf is None:
-            return None
-        val = self._pmt.read("VPU_MEM_BW", 31, 0)
-        if val is None:
-            return None
-        # PMT exposes a monotonically increasing memory traffic counter.
-        # Convert to MB-equivalent units; rate is computed in _compute_bandwidth.
-        return val / 1e3
-
     def _read_freq_mhz(self) -> Optional[float]:
         if self._pmt is None or self._pmt.buf is None:
             return None
@@ -440,21 +415,3 @@ class NpuCollector(BaseCollector):
         power_w = (curr - self._prev_energy_j) / elapsed_s
         self._prev_energy_j = curr
         return max(0.0, power_w)
-
-    def _compute_bandwidth(self, now_ts: float) -> Optional[float]:
-        curr = self._read_raw_bandwidth()
-        if curr is None or self._prev_bw is None or self._prev_ts is None:
-            self._prev_bw = curr
-            return None
-
-        elapsed_s = now_ts - self._prev_ts
-        if elapsed_s <= 0:
-            self._prev_bw = curr
-            return None
-
-        delta = curr - self._prev_bw
-        self._prev_bw = curr
-        if delta < 0:
-            return 0.0
-
-        return max(0.0, float(delta / elapsed_s))

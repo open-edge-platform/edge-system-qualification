@@ -735,6 +735,19 @@ class SystemValidator:
                 )
             )
 
+        # KVM acceleration requirement (/dev/kvm must exist and be accessible)
+        if "kvm_required" in hw_requirements and hw_requirements["kvm_required"]:
+            kvm_accessible = os.path.exists("/dev/kvm") and os.access("/dev/kvm", os.R_OK | os.W_OK)
+            results.append(
+                {
+                    "name": "KVM acceleration required",
+                    "passed": kvm_accessible,
+                    "actual": "/dev/kvm accessible" if kvm_accessible else "/dev/kvm not found or not accessible",
+                    "required": "KVM hardware acceleration (/dev/kvm accessible)",
+                    "category": "hardware.kvm.required",
+                }
+            )
+
         return results
 
     def _validate_software(self, sw_requirements: Dict[str, Any]) -> List[Dict[str, Any]]:

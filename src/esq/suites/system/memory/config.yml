@@ -1,0 +1,25 @@
+# Copyright (C) 2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+kpi:
+  # ============================================================
+  # Memory Errors KPI (memtester)
+  # Metric: memory_errors — number of bit-pattern errors found
+  # during a memtester run.  0 means the tested region is clean;
+  # any positive value indicates faulty RAM.
+  #
+  # Disabled by default so suite runs collect data without
+  # enforcing pass/fail.  Enabled per-profile via kpi_override
+  # (see hybrid_edge_system.yml).
+  # ============================================================
+  memory_errors:
+    name: "Memory Errors"
+    type: "numeric"
+    validation:
+      operator: "eq"
+      reference: 0
+      enabled: false
+    unit: "errors"
+    severity: "normal"
+    description: "Number of bit-pattern errors detected by memtester (0 = clean, >0 = faulty)"
+    default_value: 0

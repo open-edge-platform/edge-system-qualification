@@ -23,7 +23,7 @@ from ..core.process import (
     run_command_with_output,
     run_git_command,
 )
-from . import formatter, hardware, memory, power, software
+from . import drm, formatter, hardware, memory, power, software
 from .cache import SystemInfoCache
 from .formatter import (
     format_hardware_summary,
@@ -59,6 +59,7 @@ __all__ = [
     "configure_security",
     "cleanup_processes",
     # Submodules
+    "drm",
     "hardware",
     "memory",
     "software",

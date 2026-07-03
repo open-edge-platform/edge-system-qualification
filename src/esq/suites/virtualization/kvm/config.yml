@@ -1,0 +1,29 @@
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+kpi:
+  # ============================================================
+  # Peripheral VM Capacity KPI
+  # Metric: peripheral_vm_capacity — number of VMs that can each
+  # be provisioned with a DEDICATED set of physical 1 display +
+  # 1 keyboard + 1 mouse passed through. This is NOT a generic
+  # CPU/memory VM count; it requires real connected peripherals.
+  # Input pairs are grouped by USB hub branch so devices wired
+  # through the same hub form a single station, and at least one
+  # IOMMU group is required for peripheral passthrough.
+  #
+  # Disabled by default so suite runs collect data without
+  # enforcing pass/fail. Enabled per-profile via kpi_override
+  # (see hybrid_edge_system.yml).
+  # ============================================================
+  peripheral_vm_capacity:
+    name: "Peripheral VM Capacity"
+    type: "numeric"
+    validation:
+      operator: "gte"
+      reference: 1
+      enabled: false
+    unit: "vms"
+    severity: "normal"
+    description: "Number of VMs that can each get a dedicated physical 1 display + 1 keyboard + 1 mouse passthrough"
+    default_value: 0

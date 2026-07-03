@@ -1,11 +1,19 @@
 # Copyright (C) 2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-"""
-QEMU/KVM VM reboot test.
+"""Shared QEMU/KVM VM lifecycle helpers.
 
-This suite validates VM lifecycle operations focused on reboot behavior:
-create image, start VM, validate boot, execute reboot cycles, and cleanup.
+Reusable building blocks for QEMU/KVM test entry points so the pytest files
+stay focused on orchestration. Covers host tool availability probes, guest
+image preparation (download or blank qcow2), cloud-init seeding, headless VM
+start/stop/reboot via the QEMU monitor, and guest-readiness probes (serial,
+SSH, QGA). The ``/dev/kvm`` availability check is shared from :mod:`checks` to
+avoid duplicating host-detection logic.
+
+These helpers are intentionally generic: ``run_qemu_vm_test`` drives the reboot
+scenario today, but the lower-level functions (``start_qemu_vm``,
+``stop_qemu_vm``, ``reboot_vm``, ``prepare_vm_image``, the readiness probes) can
+be composed by other QEMU/KVM tests.
 """
 
 import json
@@ -18,21 +26,13 @@ import tempfile
 import time
 import urllib.parse
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Optional
 
 import allure
-import pytest
-from sysagent.utils.config import ensure_dir_permissions
 from sysagent.utils.core import Metrics, Result, run_command
 from sysagent.utils.infrastructure import download_file
 
 logger = logging.getLogger(__name__)
-
-
-def get_scenario_key_metric(configs: Dict) -> tuple[str, str]:
-    """Return a stable scenario label for report key matrix display."""
-    use_kvm = configs.get("use_kvm", True)
-    return "scenario_mode", "kvm" if use_kvm else "tcg"
 
 
 def check_qemu_availability() -> tuple[bool, str, Optional[str]]:
@@ -48,16 +48,6 @@ def check_qemu_availability() -> tuple[bool, str, Optional[str]]:
             return True, f"QEMU available at {qemu_path}", qemu_path
         return False, f"QEMU found but not executable: {qemu_path}", None
     return False, "QEMU not found (qemu-system-x86_64 not in PATH)", None
-
-
-def check_kvm_available() -> tuple[bool, str]:
-    """Check if /dev/kvm exists and is accessible."""
-    kvm_dev = "/dev/kvm"
-    if not os.path.exists(kvm_dev):
-        return False, "/dev/kvm not found - KVM not available"
-    if not os.access(kvm_dev, os.R_OK | os.W_OK):
-        return False, "/dev/kvm not accessible - check permissions"
-    return True, "/dev/kvm available"
 
 
 def create_test_vm_image(output_dir: str, size_mb: int = 100) -> Optional[str]:
@@ -88,7 +78,7 @@ def download_guest_image(image_url: str, output_dir: str) -> Optional[str]:
     if parsed_url.scheme not in ("http", "https"):
         logger.error("Invalid URL scheme '%s'. Only http and https are allowed: %s", parsed_url.scheme, image_url)
         return None
-    
+
     local_name = _safe_image_name_from_url(image_url)
     image_path = os.path.join(output_dir, local_name)
 
@@ -196,7 +186,7 @@ def detect_image_format(image_path: str) -> str:
 
 def wait_for_serial_prompt(serial_log_path: str, timeout: int = 180, start_position: int = 0) -> tuple[bool, str]:
     """Wait for serial log to indicate guest readiness/login prompt.
-    
+
     Args:
         serial_log_path: Path to the serial log file
         timeout: Maximum time to wait in seconds
@@ -304,16 +294,8 @@ def get_guest_os_release_via_ssh(ssh_user: str, ssh_key_path: str, ssh_port: int
     return False, ""
 
 
-def should_require_ssh_for_os_check(guest_ready_probe: str, configs: Dict) -> bool:
-    """Whether OS identity check must fail when SSH is unavailable."""
-    # Default: strict only when the primary readiness probe is SSH.
-    # Serial/QGA modes can run without guest networking and should not hard-fail.
-    if "require_ssh_for_os_check" in configs:
-        return bool(configs.get("require_ssh_for_os_check"))
-    return guest_ready_probe == "ssh"
-
-
 def get_vm_pid_file(vm_id: str) -> str:
+    """Return the pid-file path for a VM id."""
     return f"/tmp/qemu-{vm_id}.pid"
 
 
@@ -324,7 +306,43 @@ def get_short_tmp_socket_path(prefix: str, vm_id: str) -> str:
     return f"/tmp/{prefix}-{suffix}.sock"
 
 
+def find_ovmf_paths() -> tuple[Optional[str], Optional[str]]:
+    """Locate OVMF firmware images (CODE and VARS) installed on the host.
+
+    Searches known installation paths for Ubuntu/Debian (``ovmf`` package) and
+    Fedora/RHEL (``edk2-ovmf`` package).  The 4M variants are preferred when
+    present because they are required for Secure Boot on newer firmware.
+
+    Returns:
+        Tuple of ``(code_path, vars_path)`` where each element is the absolute
+        path to the corresponding OVMF image or ``None`` if not found.
+        ``vars_path`` may be ``None`` even when ``code_path`` is valid (some
+        installations only ship the combined image).
+    """
+    candidates = [
+        # Ubuntu 22.04+ — 4M variants preferred (Secure Boot capable)
+        ("/usr/share/OVMF/OVMF_CODE_4M.fd", "/usr/share/OVMF/OVMF_VARS_4M.fd"),
+        # Ubuntu 20.04 / Debian — standard 2M variants
+        ("/usr/share/OVMF/OVMF_CODE.fd", "/usr/share/OVMF/OVMF_VARS.fd"),
+        # Fedora / RHEL — edk2-ovmf package
+        ("/usr/share/edk2/x64/OVMF_CODE.fd", "/usr/share/edk2/x64/OVMF_VARS.fd"),
+        # Arch Linux — edk2-ovmf package
+        ("/usr/share/edk2/x64/OVMF_CODE.fd", "/usr/share/edk2/x64/OVMF_VARS.fd"),
+        # Generic combined-image fallback (some older packages)
+        ("/usr/share/qemu/OVMF.fd", None),
+        ("/usr/share/OVMF/OVMF.fd", None),
+    ]
+    for code, vars_ in candidates:
+        if os.path.exists(code):
+            vars_path = vars_ if (vars_ and os.path.exists(vars_)) else None
+            logger.debug("Found OVMF: code=%s vars=%s", code, vars_path)
+            return code, vars_path
+    logger.warning("OVMF firmware not found. Install the 'ovmf' package: sudo apt-get install ovmf")
+    return None, None
+
+
 def read_vm_pid(vm_id: str) -> Optional[int]:
+    """Read and validate the recorded VM pid from its pid-file."""
     pid_file = get_vm_pid_file(vm_id)
     if not os.path.exists(pid_file):
         return None
@@ -338,6 +356,7 @@ def read_vm_pid(vm_id: str) -> Optional[int]:
 
 
 def is_process_running(pid: int) -> bool:
+    """Return True if a process with the given pid is alive."""
     try:
         os.kill(pid, 0)
         return True
@@ -357,9 +376,19 @@ def start_qemu_vm(
     ssh_host_port: Optional[int] = None,
     qga_socket_path: Optional[str] = None,
     seed_iso_path: Optional[str] = None,
+    ovmf_code_path: Optional[str] = None,
+    ovmf_vars_path: Optional[str] = None,
     timeout: int = 30,
 ) -> tuple[bool, str, Optional[int]]:
-    """Start a headless QEMU VM and return PID."""
+    """Start a headless QEMU VM and return PID.
+
+    When ``ovmf_code_path`` is provided the VM boots with OVMF/UEFI firmware
+    instead of the default SeaBIOS.  Pass a writable copy of ``OVMF_VARS.fd``
+    as ``ovmf_vars_path`` to give the VM a private UEFI variable store.
+
+    The full QEMU command is attached to the active Allure report as a TEXT
+    attachment so the exact invocation is always visible in the test results.
+    """
     pid_file = get_vm_pid_file(vm_id)
     qemu_args = [
         qemu_path,
@@ -385,32 +414,58 @@ def start_qemu_vm(
     else:
         qemu_args.extend(["-cpu", "qemu64"])
 
+    # OVMF/UEFI firmware — prepend pflash drives so firmware is loaded first.
+    # The CODE image is always read-only; the VARS image carries the writable
+    # UEFI variable store (a per-VM copy so boot entries don't bleed across
+    # concurrent test runs).
+    if ovmf_code_path:
+        qemu_args.extend(["-drive", f"if=pflash,format=raw,readonly=on,file={ovmf_code_path}"])
+        if ovmf_vars_path:
+            qemu_args.extend(["-drive", f"if=pflash,format=raw,file={ovmf_vars_path}"])
+
     if serial_log_path:
         qemu_args.extend(["-serial", f"file:{serial_log_path}"])
 
     if ssh_host_port:
-        qemu_args.extend([
-            "-netdev",
-            f"user,id=net0,hostfwd=tcp::{ssh_host_port}-:22",
-            "-device",
-            "virtio-net-pci,netdev=net0",
-        ])
+        qemu_args.extend(
+            [
+                "-netdev",
+                f"user,id=net0,hostfwd=tcp::{ssh_host_port}-:22",
+                "-device",
+                "virtio-net-pci,netdev=net0",
+            ]
+        )
 
     if qga_socket_path:
-        qemu_args.extend([
-            "-device",
-            "virtio-serial",
-            "-chardev",
-            f"socket,path={qga_socket_path},server=on,wait=off,id=qga0",
-            "-device",
-            "virtserialport,chardev=qga0,name=org.qemu.guest_agent.0",
-        ])
+        qemu_args.extend(
+            [
+                "-device",
+                "virtio-serial",
+                "-chardev",
+                f"socket,path={qga_socket_path},server=on,wait=off,id=qga0",
+                "-device",
+                "virtserialport,chardev=qga0,name=org.qemu.guest_agent.0",
+            ]
+        )
 
     if seed_iso_path and os.path.exists(seed_iso_path):
-        qemu_args.extend([
-            "-drive",
-            f"file={seed_iso_path},format=raw,media=cdrom,readonly=on",
-        ])
+        qemu_args.extend(
+            [
+                "-drive",
+                f"file={seed_iso_path},format=raw,media=cdrom,readonly=on",
+            ]
+        )
+
+    # Attach the full QEMU command as an Allure text attachment so the exact
+    # invocation is always visible inside the execution step of the test report.
+    try:
+        allure.attach(
+            " ".join(qemu_args),
+            name=f"QEMU Launch Command ({vm_id})",
+            attachment_type=allure.attachment_type.TEXT,
+        )
+    except Exception:
+        pass  # non-test context (unit tests, direct invocation) — silently skip
 
     result = run_command(qemu_args, timeout=timeout)
     if not result or result.returncode != 0:
@@ -505,9 +560,7 @@ def reboot_vm(
     readiness_ok = False
     readiness_msg = ""
     if guest_ready_probe == "ssh" and ssh_user and ssh_key_path and ssh_port:
-        readiness_ok, readiness_msg = wait_for_ssh_ready(
-            ssh_user, ssh_key_path, ssh_port, timeout=guest_ready_timeout
-        )
+        readiness_ok, readiness_msg = wait_for_ssh_ready(ssh_user, ssh_key_path, ssh_port, timeout=guest_ready_timeout)
     elif guest_ready_probe == "qga" and qga_socket_path:
         readiness_ok, readiness_msg = wait_for_qga_ready(qga_socket_path, timeout=guest_ready_timeout)
     elif guest_ready_probe == "serial" and serial_log_path:
@@ -594,14 +647,72 @@ def run_qemu_vm_test(
     enable_cloud_init_seed: bool,
     images_dir: Path,
     test_results_dir: Path,
-    scenario_metric_name: str,
-    scenario_metric_value: str,
-    scenario_reboot_plan: str,
     qemu_available: bool,
     kvm_available: bool,
+    vm_start_timeout: int = 60,
+    vm_boot_timeout: int = 120,
+    reboot_timeout: int = 120,
+    vm_stop_timeout: int = 30,
+    firmware: str = "seabios",
 ) -> Result:
-    """Execute the QEMU VM reboot test and return results."""
+    """Execute the QEMU VM reboot test and return a populated ``Result``.
+
+    Flow:
+      1. Prepare the guest disk image (download cloud image or blank qcow2).
+      2. For cloud images, seed SSH login via a cloud-init ISO.
+      3. Launch the headless VM and time how long the process took to start.
+      4. Wait for the QEMU monitor to report a running machine.
+      5. Wait for the guest OS to become ready (serial / SSH / QGA probe).
+      6. Optionally confirm the guest OS identity over SSH.
+      7. Reboot the VM ``reboot_count`` times, timing each cycle.
+    The VM is always stopped and its scratch resources cleaned up afterwards,
+    then per-reboot timings are aggregated into metrics.
+
+    The per-phase timeouts (``vm_start_timeout``, ``vm_boot_timeout``,
+    ``reboot_timeout``, ``vm_stop_timeout``, ``guest_ready_timeout``) are passed
+    explicitly so the caller can size each lifecycle phase independently instead
+    of relying on a single oversized generic timeout.
+
+    ``firmware`` selects the VM firmware:
+      * ``"seabios"`` (default) — QEMU's built-in SeaBIOS; no extra host files
+        needed.
+      * ``"ovmf"`` — OVMF/UEFI firmware via pflash; requires the ``ovmf``
+        package (``sudo apt-get install ovmf``).  The CODE image is
+        opened read-only; a per-VM copy of the VARS image is created in
+        ``test_results_dir`` as a writable UEFI variable store and removed
+        after the test.  If OVMF files cannot be located the test falls back
+        to SeaBIOS with a warning.
+    """
     vm_id = f"{test_id}-{int(time.time())}"
+    firmware_normalized = str(firmware).strip().lower()
+
+    # Resolve OVMF paths when UEFI firmware is requested.
+    ovmf_code_path: Optional[str] = None
+    ovmf_vars_copy_path: Optional[str] = None  # per-VM writable VARS copy
+    if firmware_normalized == "ovmf":
+        _code, _vars = find_ovmf_paths()
+        if _code:
+            ovmf_code_path = _code
+            if _vars:
+                # Create a per-VM writable copy so UEFI variable changes from
+                # one run don't bleed into the next and concurrent runs don't
+                # share a single mutable file.
+                ovmf_vars_copy_path = str(test_results_dir / f"{vm_id}_OVMF_VARS.fd")
+                try:
+                    shutil.copy2(_vars, ovmf_vars_copy_path)
+                    logger.info("Created OVMF VARS copy: %s", ovmf_vars_copy_path)
+                except (IOError, OSError) as _copy_err:
+                    logger.warning("Could not copy OVMF VARS (%s): %s; using read-only", _vars, _copy_err)
+                    ovmf_vars_copy_path = None
+        else:
+            logger.warning("OVMF requested but not found; falling back to SeaBIOS")
+            firmware_normalized = "seabios"
+
+    logger.info(
+        "run_qemu_vm_test: firmware=%s ovmf_code=%s",
+        firmware_normalized,
+        ovmf_code_path or "N/A (SeaBIOS)",
+    )
     vm_result = {
         "vm_id": vm_id,
         "created": False,
@@ -616,127 +727,152 @@ def run_qemu_vm_test(
 
     vm_launch_time_seconds = -1.0
     readiness_duration_seconds = -1.0
+    # Tracks Phase 1+2 duration (image download/creation + cloud-init seeding).
+    # Stored separately so it never contaminates the reboot-cycle baseline metrics.
+    image_prepare_time_seconds = -1.0
     ssh_ready_for_os_check = False
     qga_probe_ready = False
     serial_probe_ready = False
 
     image_path = None
-    image_format = "qcow2"
     vm_pid = None
     seed_iso_path = str(test_results_dir / f"{vm_id}-seed.iso")
     serial_log_path = str(test_results_dir / f"{vm_id}-serial.log")
     qga_socket_path = get_short_tmp_socket_path("qga", vm_id) if enable_qga else None
     ssh_key_path = str(images_dir / "qemu_guest_ssh_key")
-    ssh_pubkey_path = ""
-    cloud_init_attached = False
 
-    try:
+    def _bring_up_and_reboot_vm() -> None:
+        """Drive the VM through its lifecycle as flat, sequential phases.
+
+        Each phase records any failure in ``vm_result["errors"]`` and returns
+        early, so the happy path reads top-to-bottom without deep nesting.
+        Outer-scope values needed by the ``finally`` cleanup (``image_path``,
+        ``vm_pid``) and by the metrics block (the timing and per-probe readiness
+        flags) are written via ``nonlocal``.
+        """
+        nonlocal image_path, vm_pid
+        nonlocal vm_launch_time_seconds, readiness_duration_seconds
+        nonlocal image_prepare_time_seconds
+        nonlocal ssh_ready_for_os_check, qga_probe_ready, serial_probe_ready
+
+        # Phase 1+2: prepare the guest image and cloud-init seed ISO.
+        # Time this stage explicitly so callers can see that image download and
+        # cloud-init setup are completely excluded from the reboot-cycle metrics.
+        _image_prep_start = time.time()
+
+        # Phase 1: prepare the guest disk (download cloud image or blank qcow2).
         image_path = prepare_vm_image(str(images_dir), vm_disk_mb, guest_image_url)
         if not image_path:
             vm_result["errors"].append("Failed to create VM image")
-        else:
-            vm_result["created"] = True
-            image_format = detect_image_format(image_path)
+            return
+        vm_result["created"] = True
+        image_format = detect_image_format(image_path)
 
-            if guest_image_url and enable_cloud_init_seed:
-                key_ready, ssh_pubkey_path = ensure_ssh_keypair(ssh_key_path)
-                if key_ready:
-                    cloud_init_attached = create_cloud_init_seed(seed_iso_path, vm_id, guest_ssh_user, ssh_pubkey_path)
-                    if not cloud_init_attached:
-                        vm_result["errors"].append("Failed to generate cloud-init seed ISO (cloud-localds required)")
-                else:
-                    vm_result["errors"].append("Failed to create SSH keypair for cloud-init seed")
-
-            startup_start = time.time()
-            started, start_msg, vm_pid = start_qemu_vm(
-                qemu_path,
-                image_path,
-                vm_id,
-                use_kvm=use_kvm,
-                memory_mb=vm_memory_mb,
-                cpu_count=vm_cpu_count,
-                image_format=image_format,
-                serial_log_path=serial_log_path,
-                ssh_host_port=guest_ssh_host_port,
-                qga_socket_path=qga_socket_path,
-                seed_iso_path=seed_iso_path if cloud_init_attached else None,
-                timeout=30,
-            )
-            vm_launch_time_seconds = time.time() - startup_start
-            if not started or vm_pid is None:
-                vm_result["errors"].append(f"Failed to start VM: {start_msg}")
+        # Phase 2: for cloud images, seed SSH login via a cloud-init ISO.
+        cloud_init_attached = False
+        if guest_image_url and enable_cloud_init_seed:
+            key_ready, ssh_pubkey_path = ensure_ssh_keypair(ssh_key_path)
+            if not key_ready:
+                vm_result["errors"].append("Failed to create SSH keypair for cloud-init seed")
             else:
-                vm_result["started"] = True
-                booted, boot_msg = check_vm_booted(vm_id, vm_pid, timeout=60)
-                if not booted:
-                    vm_result["errors"].append(f"VM boot verification failed: {boot_msg}")
-                else:
-                    readiness_start = time.time()
-                    readiness_ok = False
-                    readiness_msg = ""
-                    if guest_ready_probe == "ssh":
-                        readiness_ok, readiness_msg = wait_for_ssh_ready(
-                            guest_ssh_user, ssh_key_path, guest_ssh_host_port, timeout=guest_ready_timeout
-                        )
-                        ssh_ready_for_os_check = readiness_ok
-                    elif guest_ready_probe == "qga":
-                        if qga_socket_path:
-                            readiness_ok, readiness_msg = wait_for_qga_ready(qga_socket_path, timeout=guest_ready_timeout)
-                            qga_probe_ready = readiness_ok
-                        else:
-                            readiness_ok, readiness_msg = False, "QGA probe requested but qga socket is disabled"
-                    else:
-                        readiness_ok, readiness_msg = wait_for_serial_prompt(serial_log_path, timeout=guest_ready_timeout)
-                        serial_probe_ready = readiness_ok
-                    readiness_duration_seconds = time.time() - readiness_start
+                cloud_init_attached = create_cloud_init_seed(seed_iso_path, vm_id, guest_ssh_user, ssh_pubkey_path)
+                if not cloud_init_attached:
+                    vm_result["errors"].append("Failed to generate cloud-init seed ISO (cloud-localds required)")
 
-                    vm_result["ready"] = readiness_ok
-                    if not readiness_ok:
-                        vm_result["errors"].append(f"Guest readiness probe failed: {readiness_msg}")
-                    else:
-                        if verify_guest_os:
-                            ssh_timeout_for_os = 90 if guest_ready_probe != "ssh" else 30
-                            os_ok, _ = wait_for_ssh_ready(
-                                guest_ssh_user, ssh_key_path, guest_ssh_host_port, timeout=ssh_timeout_for_os
-                            )
-                            ssh_ready_for_os_check = os_ok
-                            if os_ok:
-                                os_info_ok, guest_os = get_guest_os_release_via_ssh(
-                                    guest_ssh_user, ssh_key_path, guest_ssh_host_port
-                                )
-                                if os_info_ok:
-                                    vm_result["guest_os_pretty_name"] = guest_os
-                                    if expected_guest_os_contains and expected_guest_os_contains.lower() not in guest_os.lower():
-                                        vm_result["errors"].append(
-                                            f"Guest OS mismatch: expected contains '{expected_guest_os_contains}', got '{guest_os}'"
-                                        )
-                                else:
-                                    vm_result["errors"].append("Failed to read /etc/os-release from guest via SSH")
-                            else:
-                                vm_result["errors"].append("Guest OS identity check requires SSH readiness")
+        image_prepare_time_seconds = time.time() - _image_prep_start
 
-                    if not vm_result["errors"]:
-                        for index in range(reboot_count):
-                            reboot_ok, reboot_msg, reboot_time = reboot_vm(
-                                vm_pid,
-                                vm_id,
-                                timeout=30,
-                                guest_ready_probe=guest_ready_probe,
-                                serial_log_path=serial_log_path,
-                                ssh_user=guest_ssh_user,
-                                ssh_key_path=ssh_key_path,
-                                ssh_port=guest_ssh_host_port,
-                                qga_socket_path=qga_socket_path,
-                                guest_ready_timeout=guest_ready_timeout,
-                            )
-                            if reboot_ok:
-                                vm_result["reboot_times"].append(reboot_time)
-                            else:
-                                vm_result["errors"].append(f"Reboot {index + 1} failed: {reboot_msg}")
-                                break
+        # Phase 3: launch the headless VM and time how long the process took.
+        startup_start = time.time()
+        started, start_msg, vm_pid = start_qemu_vm(
+            qemu_path,
+            image_path,
+            vm_id,
+            use_kvm=use_kvm,
+            memory_mb=vm_memory_mb,
+            cpu_count=vm_cpu_count,
+            image_format=image_format,
+            serial_log_path=serial_log_path,
+            ssh_host_port=guest_ssh_host_port,
+            qga_socket_path=qga_socket_path,
+            seed_iso_path=seed_iso_path if cloud_init_attached else None,
+            ovmf_code_path=ovmf_code_path,
+            ovmf_vars_path=ovmf_vars_copy_path,
+            timeout=vm_start_timeout,
+        )
+        vm_launch_time_seconds = time.time() - startup_start
+        if not started or vm_pid is None:
+            vm_result["errors"].append(f"Failed to start VM: {start_msg}")
+            return
+        vm_result["started"] = True
 
-                    if len(vm_result["reboot_times"]) == reboot_count:
-                        vm_result["rebooted"] = True
+        # Phase 4: wait for the QEMU monitor to report a running machine.
+        booted, boot_msg = check_vm_booted(vm_id, vm_pid, timeout=vm_boot_timeout)
+        if not booted:
+            vm_result["errors"].append(f"VM boot verification failed: {boot_msg}")
+            return
+
+        # Phase 5: wait for the guest OS to be ready via the selected probe.
+        readiness_start = time.time()
+        if guest_ready_probe == "ssh":
+            readiness_ok, readiness_msg = wait_for_ssh_ready(
+                guest_ssh_user, ssh_key_path, guest_ssh_host_port, timeout=guest_ready_timeout
+            )
+            ssh_ready_for_os_check = readiness_ok
+        elif guest_ready_probe == "qga" and qga_socket_path:
+            readiness_ok, readiness_msg = wait_for_qga_ready(qga_socket_path, timeout=guest_ready_timeout)
+            qga_probe_ready = readiness_ok
+        elif guest_ready_probe == "qga":
+            readiness_ok, readiness_msg = False, "QGA probe requested but qga socket is disabled"
+        else:
+            readiness_ok, readiness_msg = wait_for_serial_prompt(serial_log_path, timeout=guest_ready_timeout)
+            serial_probe_ready = readiness_ok
+        readiness_duration_seconds = time.time() - readiness_start
+        vm_result["ready"] = readiness_ok
+        if not readiness_ok:
+            vm_result["errors"].append(f"Guest readiness probe failed: {readiness_msg}")
+            return
+
+        # Phase 6: optionally confirm the guest OS identity over SSH.
+        if verify_guest_os:
+            ssh_timeout_for_os = 30 if guest_ready_probe == "ssh" else 90
+            os_ok, _ = wait_for_ssh_ready(guest_ssh_user, ssh_key_path, guest_ssh_host_port, timeout=ssh_timeout_for_os)
+            ssh_ready_for_os_check = os_ok
+            if not os_ok:
+                vm_result["errors"].append("Guest OS identity check requires SSH readiness")
+                return
+            os_info_ok, guest_os = get_guest_os_release_via_ssh(guest_ssh_user, ssh_key_path, guest_ssh_host_port)
+            if not os_info_ok:
+                vm_result["errors"].append("Failed to read /etc/os-release from guest via SSH")
+                return
+            vm_result["guest_os_pretty_name"] = guest_os
+            if expected_guest_os_contains and expected_guest_os_contains.lower() not in guest_os.lower():
+                vm_result["errors"].append(
+                    f"Guest OS mismatch: expected contains '{expected_guest_os_contains}', got '{guest_os}'"
+                )
+                return
+
+        # Phase 7: reboot the VM the requested number of times, timing each cycle.
+        for index in range(reboot_count):
+            reboot_ok, reboot_msg, reboot_time = reboot_vm(
+                vm_pid,
+                vm_id,
+                timeout=reboot_timeout,
+                guest_ready_probe=guest_ready_probe,
+                serial_log_path=serial_log_path,
+                ssh_user=guest_ssh_user,
+                ssh_key_path=ssh_key_path,
+                ssh_port=guest_ssh_host_port,
+                qga_socket_path=qga_socket_path,
+                guest_ready_timeout=guest_ready_timeout,
+            )
+            if not reboot_ok:
+                vm_result["errors"].append(f"Reboot {index + 1} failed: {reboot_msg}")
+                return
+            vm_result["reboot_times"].append(reboot_time)
+        vm_result["rebooted"] = True
+
+    try:
+        _bring_up_and_reboot_vm()
     finally:
         if os.path.exists(serial_log_path):
             try:
@@ -750,7 +886,7 @@ def run_qemu_vm_test(
             except (IOError, OSError) as exc:
                 logger.warning("Failed to attach serial log to allure: %s", exc)
         if vm_pid is not None:
-            stop_qemu_vm(vm_pid, vm_id, timeout=10)
+            stop_qemu_vm(vm_pid, vm_id, timeout=vm_stop_timeout)
         cleanup_vm_resources(vm_id, image_path, remove_image=not bool(guest_image_url))
         if os.path.exists(seed_iso_path):
             try:
@@ -762,6 +898,13 @@ def run_qemu_vm_test(
                 os.remove(qga_socket_path)
             except (IOError, OSError):
                 pass
+        # Remove the per-VM OVMF VARS copy (writable UEFI variable store).
+        if ovmf_vars_copy_path and os.path.exists(ovmf_vars_copy_path):
+            try:
+                os.remove(ovmf_vars_copy_path)
+                logger.debug("Removed OVMF VARS copy: %s", ovmf_vars_copy_path)
+            except (IOError, OSError) as exc:
+                logger.warning("Failed to remove OVMF VARS copy %s: %s", ovmf_vars_copy_path, exc)
 
     vms_total = 1
     vms_created = 1 if vm_result["created"] else 0
@@ -786,14 +929,24 @@ def run_qemu_vm_test(
         metrics["min_reboot_time"] = Metrics(unit="seconds", value=-1, is_key_metric=False)
         metrics["max_reboot_time"] = Metrics(unit="seconds", value=-1, is_key_metric=False)
 
+    # image_prepare_time captures Phase 1+2 (image download/creation + cloud-init
+    # seeding).  It is intentionally NOT a key metric — it reflects one-time setup
+    # overhead (often dominated by a network download) rather than VM performance,
+    # and it is excluded from all reboot-cycle metrics so the avg_reboot_time
+    # baseline is consistent whether the image was freshly downloaded or cached.
+    metrics["image_prepare_time"] = Metrics(
+        unit="seconds", value=round(image_prepare_time_seconds, 2), is_key_metric=False
+    )
     metrics["vm_launch_time"] = Metrics(unit="seconds", value=round(vm_launch_time_seconds, 2), is_key_metric=False)
-    metrics["initial_boot_readiness_time"] = Metrics(unit="seconds", value=round(readiness_duration_seconds, 2), is_key_metric=False)
+    metrics["initial_boot_readiness_time"] = Metrics(
+        unit="seconds", value=round(readiness_duration_seconds, 2), is_key_metric=False
+    )
     metrics["ssh_ready_for_os_check"] = Metrics(value=ssh_ready_for_os_check, is_key_metric=False)
     metrics["qga_probe_ready"] = Metrics(value=qga_probe_ready, is_key_metric=False)
     metrics["serial_probe_ready"] = Metrics(value=serial_probe_ready, is_key_metric=False)
 
     guest_os_value = vm_result["guest_os_pretty_name"] or "Unknown (SSH not available)"
-    metrics["guest_os_pretty_name"] = Metrics(value=guest_os_value, is_key_metric=True)
+    metrics["guest_os_pretty_name"] = Metrics(value=guest_os_value, is_key_metric=False)
 
     test_passed = vm_result["created"] and vm_result["started"] and vm_result["ready"] and vm_result["rebooted"]
     test_message = f"VM reboot test: {vms_rebooted}/{vms_total} VM(s) passed."
@@ -813,8 +966,6 @@ def run_qemu_vm_test(
         metrics=metrics,
         extended_metadata={
             "execution_context": {
-                "scenario_reboot_plan": scenario_reboot_plan,
-                scenario_metric_name: scenario_metric_value,
                 "target_reboot_count": reboot_count,
                 "qemu_available": qemu_available,
                 "kvm_available": kvm_available,
@@ -832,16 +983,21 @@ def run_qemu_vm_test(
                 "memory_mb": vm_memory_mb,
                 "disk_mb": vm_disk_mb,
                 "use_kvm": use_kvm,
+                "firmware": firmware_normalized,
+                "ovmf_code_path": ovmf_code_path,
                 "guest_image_url": guest_image_url,
                 "guest_ready_probe": guest_ready_probe,
                 "guest_ready_timeout": guest_ready_timeout,
                 "guest_ssh_user": guest_ssh_user,
                 "guest_ssh_host_port": guest_ssh_host_port,
                 "verify_guest_os": verify_guest_os,
-                "require_ssh_for_os_check": True,
                 "expected_guest_os_contains": expected_guest_os_contains,
                 "enable_qga": enable_qga,
                 "enable_cloud_init_seed": enable_cloud_init_seed,
+                "vm_start_timeout": vm_start_timeout,
+                "vm_boot_timeout": vm_boot_timeout,
+                "reboot_timeout": reboot_timeout,
+                "vm_stop_timeout": vm_stop_timeout,
             },
             "paths": {
                 "suite_data_dir": str(images_dir.parent.parent.parent),
@@ -853,137 +1009,3 @@ def run_qemu_vm_test(
             "vm_result": vm_result,
         },
     )
-
-
-def test_kvm_qemu(
-    request,
-    configs,
-    cached_result,
-    cache_result,
-    get_kpi_config,
-    validate_test_results,
-    summarize_test_results,
-    validate_system_requirements_from_configs,
-    execute_test_with_cache,
-    prepare_test,
-):
-    """Validate reboot behavior for a single QEMU/KVM VM instance."""
-    test_name = request.node.name.split("[")[0]
-    test_id = configs.get("test_id", test_name)
-    test_display_name = configs.get("display_name", test_name)
-
-    use_kvm = configs.get("use_kvm", True)
-    vm_memory_mb = configs.get("vm_memory_mb", 4096)
-    vm_disk_mb = configs.get("vm_disk_mb", 16384)
-    vm_cpu_count = configs.get("vm_cpu_count", 2)
-    reboot_count = configs.get("reboot_count", 1)
-    guest_image_url = configs.get("guest_image_url")
-    guest_ready_probe = configs.get("guest_ready_probe", "serial")
-    guest_ready_timeout = int(configs.get("guest_ready_timeout", 300))
-    guest_ssh_user = configs.get("guest_ssh_user", "ubuntu")
-    guest_ssh_host_port = int(configs.get("guest_ssh_host_port", 2222))
-    verify_guest_os = bool(configs.get("verify_guest_os", True))
-    expected_guest_os_contains = configs.get("expected_guest_os_contains")
-    enable_qga = bool(configs.get("enable_qga", True))
-    enable_cloud_init_seed = bool(configs.get("enable_cloud_init_seed", True))
-
-    validate_system_requirements_from_configs(configs)
-
-    core_data_dir = os.environ.get("CORE_DATA_DIR", os.path.join(os.getcwd(), "esq_data"))
-    expected_base = Path(os.getcwd()).resolve()
-    resolved_core_data = Path(core_data_dir).resolve()
-    if not resolved_core_data.is_relative_to(expected_base):
-        resolved_core_data = expected_base / "esq_data"
-
-    suite_data_dir = resolved_core_data / "data" / "suites" / "virtualization" / "kvm" / "qemu"
-    images_dir = suite_data_dir / "images"
-    test_results_dir = suite_data_dir / "results" / test_id
-
-    try:
-        os.makedirs(images_dir, mode=0o770, exist_ok=True)
-        os.makedirs(test_results_dir, mode=0o770, exist_ok=True)
-        ensure_dir_permissions(str(images_dir), uid=os.getuid(), gid=os.getgid(), mode=0o770)
-        ensure_dir_permissions(str(test_results_dir), uid=os.getuid(), gid=os.getgid(), mode=0o770)
-    except (IOError, OSError, PermissionError) as exc:
-        logger.warning("Primary data directory unavailable (%s): %s", suite_data_dir, exc)
-        fallback_images_dir = Path(tempfile.gettempdir()) / "esq_qemu_images"
-        fallback_dir = Path(tempfile.gettempdir()) / "esq_qemu_results" / test_id
-        os.makedirs(fallback_images_dir, mode=0o770, exist_ok=True)
-        os.makedirs(fallback_dir, mode=0o770, exist_ok=True)
-        images_dir = fallback_images_dir
-        test_results_dir = fallback_dir
-
-    qemu_available, qemu_msg, qemu_path = check_qemu_availability()
-    kvm_available, kvm_msg = check_kvm_available()
-
-    scenario_metric_name, scenario_metric_value = get_scenario_key_metric(configs)
-    scenario_reboot_plan = f"{scenario_metric_value}_reboot_x{reboot_count}"
-
-    if not qemu_available:
-        metrics = {
-            "avg_reboot_time": Metrics(unit="seconds", value=-1, is_key_metric=True),
-            "total_reboot_time": Metrics(unit="seconds", value=-1, is_key_metric=False),
-        }
-        test_message = f"QEMU not available: {qemu_msg}"
-        result = Result(name=test_display_name, metadata={"status": False, "message": test_message}, metrics=metrics)
-        validate_test_results(test_name=test_name, results=result, configs=configs, get_kpi_config=get_kpi_config)
-        summarize_test_results(results=result, test_name=test_name, configs=configs, get_kpi_config=get_kpi_config)
-        cache_result(result)
-        pytest.fail(test_message)
-
-    if use_kvm and not kvm_available:
-        logger.warning("KVM requested but not available: %s. Falling back to TCG mode.", kvm_msg)
-        use_kvm = False
-
-    # Cache configuration for deduplication
-    cache_configs = {
-        "use_kvm": use_kvm,
-        "vm_memory_mb": vm_memory_mb,
-        "vm_cpu_count": vm_cpu_count,
-        "reboot_count": reboot_count,
-        "guest_image_url": guest_image_url,
-        "guest_ready_probe": guest_ready_probe,
-    }
-
-    # Execute test with cache
-    result = execute_test_with_cache(
-        cached_result=cached_result,
-        cache_result=cache_result,
-        test_name=test_name,
-        configs=configs,
-        cache_configs=cache_configs,
-        run_test_func=lambda: run_qemu_vm_test(
-            test_display_name=test_display_name,
-            test_id=test_id,
-            qemu_path=qemu_path,
-            use_kvm=use_kvm,
-            vm_memory_mb=vm_memory_mb,
-            vm_disk_mb=vm_disk_mb,
-            vm_cpu_count=vm_cpu_count,
-            reboot_count=reboot_count,
-            guest_image_url=guest_image_url,
-            guest_ready_probe=guest_ready_probe,
-            guest_ready_timeout=guest_ready_timeout,
-            guest_ssh_user=guest_ssh_user,
-            guest_ssh_host_port=guest_ssh_host_port,
-            verify_guest_os=verify_guest_os,
-            expected_guest_os_contains=expected_guest_os_contains,
-            enable_qga=enable_qga,
-            enable_cloud_init_seed=enable_cloud_init_seed,
-            images_dir=images_dir,
-            test_results_dir=test_results_dir,
-            scenario_metric_name=scenario_metric_name,
-            scenario_metric_value=scenario_metric_value,
-            scenario_reboot_plan=scenario_reboot_plan,
-            qemu_available=qemu_available,
-            kvm_available=kvm_available,
-        ),
-    )
-
-    # Validate and summarize results
-    validate_test_results(test_name=test_name, results=result, configs=configs, get_kpi_config=get_kpi_config)
-    summarize_test_results(results=result, test_name=test_name, configs=configs, get_kpi_config=get_kpi_config)
-
-    logger.info("QEMU VM reboot test completed: %s - %s", test_display_name, result.metadata.get("message", ""))
-    if not result.metadata.get("status", False):
-        pytest.fail(result.metadata.get("message", "Test failed"))

@@ -216,6 +216,25 @@ class TestResultCache:
                 metadata = result_dict.get("metadata", {})
                 extended_metadata = result_dict.get("extended_metadata", {})
                 kpis = result_dict.get("kpis", {})
+
+                # Defense-in-depth: refuse to return cached results that have
+                # status=False.  These represent tests that did not complete
+                # (interrupted, allocation failure, unexpected error) and were
+                # incorrectly stored before the guarded cache_result fix was
+                # applied.  Returning them would cause subsequent runs to appear
+                # as "passed" without re-executing the test.
+                if metadata.get("status") is False:
+                    logger.warning(
+                        f"Cached result for {test_name} [{cache_key}] has status=False "
+                        "(likely from an interrupted or failed run); discarding stale cache entry."
+                    )
+                    try:
+                        os.remove(cache_path)
+                        logger.debug(f"Removed stale cache entry: {cache_path}")
+                    except OSError as _rm_err:
+                        logger.debug(f"Could not remove stale cache file {cache_path}: {_rm_err}")
+                    return None
+
                 return Result(
                     parameters=parameters,
                     metrics=metrics,

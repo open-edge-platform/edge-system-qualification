@@ -43,6 +43,7 @@ import re
 from typing import Any, List
 
 import allure
+import pytest
 from sysagent.utils.core import Metrics, Result
 from sysagent.utils.system import SystemInfoCache
 from sysagent.utils.system.cpu import is_generation_supported
@@ -178,6 +179,9 @@ def _is_exact_match(cpu_info: dict, exact_list: List[Any]) -> bool:
 def test_cpu(
     request,
     configs,
+    cached_result,
+    cache_result,
+    execute_test_with_cache,
     get_kpi_config,
     validate_test_results,
     summarize_test_results,
@@ -234,154 +238,213 @@ def test_cpu(
     test_id = configs.get("test_id", test_name)
     test_display_name = configs.get("display_name", test_name)
 
+    description = configs.get("description")
+    if description:
+        allure.dynamic.description(description)
+
     logger.info(f"Starting CPU test: {test_display_name}")
 
     # Step 1: Validate system requirements
     validate_system_requirements_from_configs(configs)
 
-    # Step 2: Collect CPU data
-    cpu_info = _get_cpu_info()
-    generation_info = cpu_info.get("generation_info", {})
+    is_qualification = configs.get("labels", {}).get("type") == "qualification"
+    result = None
+    test_interrupted = False
+    test_failed = False
+    failure_message = ""
 
-    cpu_brand = cpu_info.get("brand", "Unknown")
-    architecture = cpu_info.get("architecture", "Unknown")
-    cpu_generation = generation_info.get("generation", "Unknown")
-    codename = generation_info.get("codename", "Unknown")
-    product_collection = generation_info.get("product_collection", "Unknown")
-    segment = generation_info.get("segment", "Unknown")
-    processor_number = _extract_processor_number(cpu_brand)
+    def _collect_cpu_data():
+        """Collect CPU data and build the result object."""
+        # Step 2: Collect CPU data
+        cpu_info = _get_cpu_info()
+        generation_info = cpu_info.get("generation_info", {})
 
-    physical_cores = int(cpu_info.get("count", 0) or 0)
-    logical_cores = int(cpu_info.get("logical_count", 0) or 0)
-    sockets = int(cpu_info.get("sockets", 1) or 1)
+        cpu_brand = cpu_info.get("brand", "Unknown")
+        architecture = cpu_info.get("architecture", "Unknown")
+        cpu_generation = generation_info.get("generation", "Unknown")
+        codename = generation_info.get("codename", "Unknown")
+        product_collection = generation_info.get("product_collection", "Unknown")
+        segment = generation_info.get("segment", "Unknown")
+        processor_number = _extract_processor_number(cpu_brand)
 
-    frequency = cpu_info.get("frequency", {}) or {}
-    max_frequency_mhz = float(frequency.get("max") or 0.0)
-    min_frequency_mhz = float(frequency.get("min") or 0.0)
+        physical_cores = int(cpu_info.get("count", 0) or 0)
+        logical_cores = int(cpu_info.get("logical_count", 0) or 0)
+        sockets = int(cpu_info.get("sockets", 1) or 1)
 
-    logger.info(f"CPU: {cpu_brand} | Processor number: {processor_number}")
-    logger.info(f"Generation: {cpu_generation} | Codename: {codename} | Segment: {segment}")
-    logger.info(
-        f"Cores: {physical_cores}P / {logical_cores}L ({sockets} socket(s)) | "
-        f"Freq: max={max_frequency_mhz:.0f} MHz, min={min_frequency_mhz:.0f} MHz"
-    )
+        frequency = cpu_info.get("frequency", {}) or {}
+        max_frequency_mhz = float(frequency.get("max") or 0.0)
+        min_frequency_mhz = float(frequency.get("min") or 0.0)
 
-    # Step 3: CPU compatibility check.
-    #
-    # Allowlists (processor_numbers, exact_generations, supported_generations) are
-    # OR-combined: a CPU passes when it satisfies ANY one of the configured lists.
-    # This allows a profile to accept, for example, an entire generation of mobile
-    # CPUs plus a handful of specific desktop processor numbers in one test entry.
-    #
-    # The denylist (unsupported_generations) is mutually exclusive with allowlists
-    # because its semantics ("not in list") cannot be meaningfully OR'd with them.
-    pn_list = configs.get("processor_numbers", [])
-    exact_generations = _normalize_generation_list(configs.get("exact_generations", []))
-    supported_generations = _normalize_generation_list(configs.get("supported_generations", []))
-    unsupported_generations = _normalize_generation_list(configs.get("unsupported_generations", []))
+        logger.info(f"CPU: {cpu_brand} | Processor number: {processor_number}")
+        logger.info(f"Generation: {cpu_generation} | Codename: {codename} | Segment: {segment}")
+        logger.info(
+            f"Cores: {physical_cores}P / {logical_cores}L ({sockets} socket(s)) | "
+            f"Freq: max={max_frequency_mhz:.0f} MHz, min={min_frequency_mhz:.0f} MHz"
+        )
 
-    allowlist_results = []
-    active_modes = []
+        # Step 3: CPU compatibility check.
+        #
+        # Allowlists (processor_numbers, exact_generations, supported_generations) are
+        # OR-combined: a CPU passes when it satisfies ANY one of the configured lists.
+        # This allows a profile to accept, for example, an entire generation of mobile
+        # CPUs plus a handful of specific desktop processor numbers in one test entry.
+        #
+        # The denylist (unsupported_generations) is mutually exclusive with allowlists
+        # because its semantics ("not in list") cannot be meaningfully OR'd with them.
+        pn_list = configs.get("processor_numbers", [])
+        exact_generations = _normalize_generation_list(configs.get("exact_generations", []))
+        supported_generations = _normalize_generation_list(configs.get("supported_generations", []))
+        unsupported_generations = _normalize_generation_list(configs.get("unsupported_generations", []))
 
-    if pn_list:
-        allowlist_results.append(_is_processor_number_match(cpu_brand, pn_list))
-        active_modes.append("processor_numbers")
+        allowlist_results = []
+        active_modes = []
 
-    if exact_generations:
-        allowlist_results.append(_is_exact_match(cpu_info, exact_generations))
-        active_modes.append("exact_generations")
+        if pn_list:
+            allowlist_results.append(_is_processor_number_match(cpu_brand, pn_list))
+            active_modes.append("processor_numbers")
 
-    if supported_generations:
-        allowlist_results.append(
-            is_generation_supported(
+        if exact_generations:
+            allowlist_results.append(_is_exact_match(cpu_info, exact_generations))
+            active_modes.append("exact_generations")
+
+        if supported_generations:
+            allowlist_results.append(
+                is_generation_supported(
+                    cpu_generation=cpu_generation,
+                    supported_generations=supported_generations,
+                    product_collection=product_collection,
+                    segment=segment,
+                    codename=codename,
+                )
+            )
+            active_modes.append("supported_generations")
+
+        if allowlist_results:
+            # OR: pass when any allowlist criterion is satisfied.
+            is_supported = any(allowlist_results)
+            check_mode = "+".join(active_modes)
+        elif unsupported_generations:
+            is_supported = is_generation_supported(
                 cpu_generation=cpu_generation,
-                supported_generations=supported_generations,
+                unsupported_generations=unsupported_generations,
                 product_collection=product_collection,
                 segment=segment,
                 codename=codename,
             )
+            check_mode = "unsupported_generations"
+        else:
+            is_supported = True
+            check_mode = "audit"
+
+        cpu_compatibility_value = 1 if is_supported else 0
+        logger.info(
+            f"CPU compatibility check [{check_mode}]: {'PASS' if is_supported else 'FAIL'} "
+            f"(cpu_compatibility={cpu_compatibility_value})"
         )
-        active_modes.append("supported_generations")
 
-    if allowlist_results:
-        # OR: pass when any allowlist criterion is satisfied.
-        is_supported = any(allowlist_results)
-        check_mode = "+".join(active_modes)
-    elif unsupported_generations:
-        is_supported = is_generation_supported(
-            cpu_generation=cpu_generation,
-            unsupported_generations=unsupported_generations,
-            product_collection=product_collection,
-            segment=segment,
-            codename=codename,
+        # Step 4: Determine which metrics are key for this test run.
+        # Priority: kpi_refs (qualification profiles) > key_metrics (suite profiles).
+        # Only the explicitly requested metrics are included in the result; all others
+        # are omitted to keep reports concise when multiple CPU tests run together.
+        kpi_refs_set = set(configs.get("kpi_refs", []))
+        key_metrics_set = set(configs.get("key_metrics", []))
+        active_key_metrics = kpi_refs_set | key_metrics_set
+
+        # Full pool — only entries whose name is in active_key_metrics are kept.
+        _all_metrics = {
+            "cpu_compatibility": Metrics(unit=None, value=cpu_compatibility_value, is_key_metric=True),
+            "physical_cores": Metrics(unit="cores", value=physical_cores, is_key_metric=True),
+            "logical_cores": Metrics(unit="cores", value=logical_cores, is_key_metric=True),
+            "sockets": Metrics(unit="sockets", value=sockets, is_key_metric=True),
+            "max_frequency_mhz": Metrics(unit="MHz", value=max_frequency_mhz, is_key_metric=True),
+            "min_frequency_mhz": Metrics(unit="MHz", value=min_frequency_mhz, is_key_metric=True),
+        }
+        filtered_metrics = {k: v for k, v in _all_metrics.items() if k in active_key_metrics}
+
+        # Step 5: Build result
+        return Result(
+            name=f"{test_id} - {test_display_name}",
+            parameters={
+                "Test ID": test_id,
+                "CPU Brand": cpu_brand,
+                "Processor Number": processor_number,
+                "Architecture": architecture,
+                "Generation": cpu_generation,
+                "Codename": codename,
+                "Product Collection": product_collection,
+                "Segment": segment,
+                "Sockets": sockets,
+                "Check Mode": check_mode,
+            },
+            metrics=filtered_metrics,
+            metadata={
+                "processor_number": processor_number,
+                "cpu_generation": cpu_generation,
+                "codename": codename,
+                "product_collection": product_collection,
+                "segment": segment,
+            },
         )
-        check_mode = "unsupported_generations"
-    else:
-        is_supported = True
-        check_mode = "audit"
 
-    cpu_compatibility_value = 1 if is_supported else 0
-    logger.info(
-        f"CPU compatibility check [{check_mode}]: {'PASS' if is_supported else 'FAIL'} "
-        f"(cpu_compatibility={cpu_compatibility_value})"
-    )
+    try:
+        result = execute_test_with_cache(
+            cached_result=cached_result,
+            cache_result=cache_result,
+            run_test_func=_collect_cpu_data,
+            test_name=test_name,
+            configs=configs,
+        )
+    except KeyboardInterrupt:
+        failure_message = "Interrupt detected during CPU test execution"
+        test_interrupted = True
+        logger.error(failure_message)
+    except Exception as e:
+        test_failed = True
+        failure_message = f"Unexpected error during CPU test execution: {str(e)}"
+        logger.error(failure_message, exc_info=True)
 
-    # Step 4: Determine which metrics are key for this test run.
-    # Priority: kpi_refs (qualification profiles) > key_metrics (suite profiles).
-    # Only the explicitly requested metrics are included in the result; all others
-    # are omitted to keep reports concise when multiple CPU tests run together.
-    kpi_refs_set = set(configs.get("kpi_refs", []))
-    key_metrics_set = set(configs.get("key_metrics", []))
-    active_key_metrics = kpi_refs_set | key_metrics_set
-
-    # Full pool — only entries whose name is in active_key_metrics are kept.
-    _all_metrics = {
-        "cpu_compatibility": Metrics(unit=None, value=cpu_compatibility_value, is_key_metric=True),
-        "physical_cores": Metrics(unit="cores", value=physical_cores, is_key_metric=True),
-        "logical_cores": Metrics(unit="cores", value=logical_cores, is_key_metric=True),
-        "sockets": Metrics(unit="sockets", value=sockets, is_key_metric=True),
-        "max_frequency_mhz": Metrics(unit="MHz", value=max_frequency_mhz, is_key_metric=True),
-        "min_frequency_mhz": Metrics(unit="MHz", value=min_frequency_mhz, is_key_metric=True),
-    }
-    filtered_metrics = {k: v for k, v in _all_metrics.items() if k in active_key_metrics}
-
-    # Step 5: Build result
-    results = Result(
-        name=test_name,
-        parameters={
-            "Test ID": test_id,
-            "CPU Brand": cpu_brand,
-            "Processor Number": processor_number,
-            "Architecture": architecture,
-            "Generation": cpu_generation,
-            "Codename": codename,
-            "Product Collection": product_collection,
-            "Segment": segment,
-            "Sockets": sockets,
-            "Check Mode": check_mode,
-        },
-        metrics=filtered_metrics,
-        metadata={
-            "processor_number": processor_number,
-            "cpu_generation": cpu_generation,
-            "codename": codename,
-            "product_collection": product_collection,
-            "segment": segment,
-        },
-    )
+    # Ensure a result always exists so validate/summarize can record the outcome
+    # even when interrupted before data collection completed.
+    if result is None:
+        result = Result(
+            name=f"{test_id} - {test_display_name}",
+            metadata={"status": False},
+            extended_metadata={"message": failure_message or "CPU test did not complete"},
+            metrics={},
+        )
 
     # Step 6: KPI validation (only active when kpi_refs is set in profile)
-    validate_test_results(
-        results=results,
-        configs=configs,
-        get_kpi_config=get_kpi_config,
-        test_name=test_name,
-    )
+    try:
+        validate_test_results(
+            test_name=test_name,
+            results=result,
+            configs=configs,
+            get_kpi_config=get_kpi_config,
+        )
+    except Exception as validation_error:
+        logger.error(f"Validation failed: {validation_error}")
 
     # Step 7: Summarise
-    summarize_test_results(
-        results=results,
-        configs=configs,
-        get_kpi_config=get_kpi_config,
-        test_name=test_name,
-    )
+    try:
+        summarize_test_results(
+            results=result,
+            test_name=test_name,
+            configs=configs,
+            get_kpi_config=get_kpi_config,
+        )
+    except Exception as summary_error:
+        logger.error(f"Test result summarization failed: {summary_error}", exc_info=True)
+
+    cache_result(result)
+
+    logger.info(f"CPU test completed: {test_display_name}")
+
+    # Terminate cleanly: surface interrupts/errors as a proper test outcome
+    # instead of leaving a broken/errored status behind.
+    if test_interrupted:
+        if is_qualification:
+            pytest.fail(failure_message)
+        else:
+            raise RuntimeError(failure_message)
+    if test_failed:
+        pytest.fail(failure_message)

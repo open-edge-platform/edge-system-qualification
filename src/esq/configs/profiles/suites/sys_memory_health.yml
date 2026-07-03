@@ -1,0 +1,72 @@
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+name: "profile.suite.system.memory-health"
+description: "System memory health — detects and helps identify faulty RAM modules at runtime"
+version: "1.0.0"
+params:
+  labels:
+    profile_display_name: "System Memory"
+    group: "system.memory"
+    type: "suite"
+    display_status: false
+  requirements:
+    # Hardware requirements
+    cpu_min_cores: 1
+    memory_min_gib: 2.0
+    storage_min_gib: 2.0
+    # Software requirements
+    os_type:
+      - "linux"
+    docker_required: false
+  # Telemetry configuration — sample host memory/CPU while the active memtester
+  # workload runs so pressure during the pattern test is visible in Allure.
+  telemetry:
+    enabled: true
+    interval: 2  # seconds between samples
+    scope: execution    # execution = workload-only sampling; test = full pytest lifecycle
+    prerun:
+      enabled: true
+      duration_s: 10   # idle baseline window before the test
+      interval_s: 2    # sample cadence during the idle window
+    modules:
+      - name: memory_usage
+        enabled: true
+      - name: cpu_usage
+        enabled: true
+      - name: cpu_temp
+        enabled: true
+
+suites:
+  - name: "system"
+    sub_suites:
+      - name: "memory"
+        tests:
+          test_memory_health:
+            params:
+              - test_id: "MEM-HLT-001"
+                display_name: "Memory ECC Error Scan (EDAC)"
+                description: |
+                  Passively scans EDAC/RAS ECC error counters from sysfs per
+                  memory controller and DIMM. Reports hardware-detected
+                  correctable (CE) and uncorrectable (UE) errors accumulated
+                  since last reset; uncorrectable_errors is the key metric.
+                  Does not actively test memory cells.
+                check_type: "edac"
+                timeout: 60
+
+              - test_id: "MEM-HLT-002"
+                display_name: "Memory Bit-Pattern Test (memtester, 512 MB, 1 iter)"
+                description: |
+                  Runs memtester — an in-OS userspace memory tester — over a
+                  fixed 512 MB region. memtester writes and reads back bit
+                  patterns to detect cell faults in the allocated pages.
+                  Unlike memtest86+ (which runs pre-OS via GRUB and covers all
+                  physical RAM), memtester is limited to pages the kernel makes
+                  available to userspace. Reports memory_errors as the key
+                  metric; 0 errors means the tested region is clean.
+                check_type: "memtester"
+                memtester_size_mb: 512
+                memtester_iterations: 1
+                timeout: 600
+

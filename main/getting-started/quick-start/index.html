@@ -2177,47 +2177,87 @@
 <p>For detailed <code>uv</code> installation instructions, see the official <a href="https://docs.astral.sh/uv/getting-started/installation/">uv Installation</a> documentation.</p>
 </div>
 <h3 id="5-system-setup">5. System Setup<a class="headerlink" href="#5-system-setup" title="Permanent link">&para;</a></h3>
-<p>Run the setup script to configure system settings required for full functionality:</p>
+<p>Run the setup scripts to configure system settings:</p>
+<table>
+<thead>
+<tr>
+<th>Script</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>system-setup.sh</code></td>
+<td>Installs packages and configures file read permissions (run once after OS installation)</td>
+</tr>
+<tr>
+<td><code>system-setup-advanced.sh</code></td>
+<td>Optional. Applies runtime resource limit settings — current session only, re-run after each reboot. Required for full test coverage</td>
+</tr>
+</tbody>
+</table>
+<p>Run <code>system-setup.sh</code> once after OS installation:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>sudo<span class="w"> </span>bash<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>wget<span class="w"> </span>-qLO<span class="w"> </span>-<span class="w"> </span>https://raw.githubusercontent.com/open-edge-platform/edge-system-qualification/refs/heads/main/scripts/system-setup.sh<span class="k">)</span><span class="s2">&quot;</span>
 </span></code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Feature Availability</p>
 <p>Some features configured by this script are optional. Intel® ESQ will still run if skipped, but certain metrics and capabilities may be unavailable.</p>
 </div>
-<div class="admonition note">
-<p class="admonition-title">Security &amp; Persistence</p>
-<p>Each module applies the minimum permissions required and documents its persistence behavior. Re-run this script after system or package updates that may reset configured settings.</p>
+<p>Run the advanced setup script to enable full test coverage:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>sudo<span class="w"> </span>bash<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>wget<span class="w"> </span>-qLO<span class="w"> </span>-<span class="w"> </span>https://raw.githubusercontent.com/open-edge-platform/edge-system-qualification/refs/heads/main/scripts/system-setup-advanced.sh<span class="k">)</span><span class="s2">&quot;</span>
+</span></code></pre></div>
+<div class="admonition warning">
+<p class="admonition-title">Re-run after reboot</p>
+<p>All changes applied by <code>system-setup-advanced.sh</code> are <strong>current session only</strong> and reset automatically after reboot. Re-run the script after each reboot before executing tests that depend on it.</p>
 </div>
+<p>Each module prompts for confirmation. Use <code>--force</code> to accept all automatically (for example, in automated provisioning workflows):</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>sudo<span class="w"> </span>bash<span class="w"> </span>system-setup-advanced.sh<span class="w"> </span>--force
+</span></code></pre></div>
+<p><strong>Advanced setup modules:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Module</th>
+<th>What it changes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Locked Memory Limit</strong></td>
+<td>Sets <code>RLIMIT_MEMLOCK</code> to unlimited for the current session so memtester can lock all available RAM pages. Without this, memory-related tests will be limited or fail</td>
+</tr>
+</tbody>
+</table>
 <h3 id="6-intel-esq">6. Intel® ESQ<a class="headerlink" href="#6-intel-esq" title="Permanent link">&para;</a></h3>
 <div class="admonition info">
 <p class="admonition-title">Development Version</p>
 <p>To access the latest features that may not be available in the current release, you can install the development version from the main branch:
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>uv<span class="w"> </span>tool<span class="w"> </span>install<span class="w"> </span>--force<span class="w"> </span>--refresh<span class="w"> </span>git+https://github.com/open-edge-platform/edge-system-qualification.git@main
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>uv<span class="w"> </span>tool<span class="w"> </span>install<span class="w"> </span>--force<span class="w"> </span>--refresh<span class="w"> </span>git+https://github.com/open-edge-platform/edge-system-qualification.git@main
 </span></code></pre></div></p>
 </div>
 <p>Install Intel® ESQ from GitHub*:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>uv<span class="w"> </span>tool<span class="w"> </span>install<span class="w"> </span>--force<span class="w"> </span>--refresh<span class="w"> </span>git+https://github.com/open-edge-platform/edge-system-qualification.git@main
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>uv<span class="w"> </span>tool<span class="w"> </span>install<span class="w"> </span>--force<span class="w"> </span>--refresh<span class="w"> </span>git+https://github.com/open-edge-platform/edge-system-qualification.git@main
 </span></code></pre></div>
 <p>Verify that Intel® ESQ is working correctly:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>esq<span class="w"> </span>--version
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>esq<span class="w"> </span>--version
 </span></code></pre></div>
 <h2 id="quick-start_1">Quick Start<a class="headerlink" href="#quick-start_1" title="Permanent link">&para;</a></h2>
 <p>Run all tests and review the generated test report:</p>
 <div class="admonition tip">
 <p class="admonition-title">Upgrading Intel® ESQ</p>
 <p>before running a new version of Intel® ESQ, clean up any previously created <code>esq_data</code> folder to prevent leftover data from interfering with the new installation:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>esq<span class="w"> </span>clean<span class="w"> </span>--all
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>esq<span class="w"> </span>clean<span class="w"> </span>--all
 </span></code></pre></div>
 </div>
 <div class="admonition info">
 <p class="admonition-title">Download Source</p>
 <p>Intel® ESQ uses HuggingFace* as the default download source. For ModelScope*, you can configure it with:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">PREFER_MODELSCOPE</span><span class="o">=</span><span class="m">1</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">PREFER_MODELSCOPE</span><span class="o">=</span><span class="m">1</span>
 </span></code></pre></div>
 </div>
 <h3 id="1-run-intel-esq">1. Run Intel® ESQ<a class="headerlink" href="#1-run-intel-esq" title="Permanent link">&para;</a></h3>
 <p>Run qualification and vertical (recommended) test profiles to generate a test report:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>esq<span class="w"> </span>run
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>esq<span class="w"> </span>run
 </span></code></pre></div>
 <p>By default, this command will:</p>
 <ol>
@@ -2228,18 +2268,18 @@
 <div class="admonition tip">
 <p class="admonition-title">Verbose Output and Profile Types</p>
 <p>Use <code>--verbose</code> to show detailed execution logs. Add <code>--all</code> to include all profile types (qualification, vertical, and suite).</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="c1"># Verbose output with default profile selection</span>
-</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>esq<span class="w"> </span>--verbose<span class="w"> </span>run
-</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>
-</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="c1"># Verbose output with all profile types</span>
-</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>esq<span class="w"> </span>--verbose<span class="w"> </span>run<span class="w"> </span>--all
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="c1"># Verbose output with default profile selection</span>
+</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>esq<span class="w"> </span>--verbose<span class="w"> </span>run
+</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>
+</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="c1"># Verbose output with all profile types</span>
+</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>esq<span class="w"> </span>--verbose<span class="w"> </span>run<span class="w"> </span>--all
 </span></code></pre></div>
 </div>
 <div class="admonition info">
 <p class="admonition-title">Driver Requirements and Hardware Changes</p>
 <p>Intel® GPU and NPU tests require specific drivers. Ensure you have the latest Intel® drivers installed for your hardware configuration.</p>
 <p>If you run tests on different hardware or swap system components (such as different CPUs), clean up the cache before rerunning tests:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>esq<span class="w"> </span>--verbose<span class="w"> </span>clean<span class="w"> </span>--cache-only
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>esq<span class="w"> </span>--verbose<span class="w"> </span>clean<span class="w"> </span>--cache-only
 </span></code></pre></div>
 </div>
 <div class="admonition note">
@@ -2249,10 +2289,10 @@
 <hr />
 <h2 id="uninstall">Uninstall<a class="headerlink" href="#uninstall" title="Permanent link">&para;</a></h2>
 <p>Before uninstalling, clean up all data created by Intel® ESQ, including Docker images built during test execution:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>esq<span class="w"> </span>clean<span class="w"> </span>--all
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>esq<span class="w"> </span>clean<span class="w"> </span>--all
 </span></code></pre></div>
 <p>Then remove Intel® ESQ:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>uv<span class="w"> </span>tool<span class="w"> </span>uninstall<span class="w"> </span>esq
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>uv<span class="w"> </span>tool<span class="w"> </span>uninstall<span class="w"> </span>esq
 </span></code></pre></div>
 <hr />
 <p>Ready to explore all test suites? Continue to the <a href="../suites/">Test Suites</a> →</p>

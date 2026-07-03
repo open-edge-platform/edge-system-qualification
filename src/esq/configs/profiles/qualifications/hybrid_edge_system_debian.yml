@@ -1,0 +1,210 @@
+# Copyright (C) 2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+name: "profile.qualification.hybrid-edge-system-debian"
+description: "Hybrid Edge Computing (HEC) system qualification - Debian"
+version: "1.0.0"
+params:
+  labels:
+    profile_display_name: "Hybrid Edge Computing - Debian"
+    group: "hybrid-edge-system-debian"
+    type: "qualification"
+    display_reference: false
+    kpi_enabled: true
+    default_run: false
+  depends_on:
+    - "profile.suite.system.cpu-sku"
+    - "profile.suite.system.display"
+    - "profile.suite.system.memory-health"
+    - "profile.suite.system.network"
+    - "profile.suite.system.peripheral"
+    - "profile.suite.system.stress"
+    - "profile.suite.virtualization.kvm"
+    - "profile.suite.virtualization.kvm-qemu"
+  requirements:
+    # Hardware requirements
+    cpu_min_cores: 4
+    memory_min_gib: 8.0
+    # Software requirements
+    os_type:
+      - "linux"
+    docker_required: false
+  telemetry:
+    enabled: true
+    interval: 2  # seconds between samples
+    prerun:
+      enabled: true
+      duration_s: 10   # idle baseline window before the test
+      interval_s: 1    # sample cadence during the idle window
+    modules:
+      - name: cpu_usage
+        enabled: true
+      - name: cpu_freq
+        enabled: true
+      - name: cpu_temp
+        enabled: true
+      - name: package_power
+        enabled: true
+      - name: memory_usage
+        enabled: true
+      - name: gpu_freq
+        enabled: true
+      - name: gpu_power
+        enabled: true
+      - name: gpu_temp
+        enabled: true
+      - name: gpu_usage
+        enabled: true
+
+suites:
+  - name: "system"
+    sub_suites:
+      - name: "cpu"
+        tests:
+          # -------------------------------------------------------------------
+          # HEC-CPU-001 — CPU Compatibility check.
+          #
+          # Verifies that the system CPU matches one of the allowed platform
+          # configurations.  Allowlist modes can be used individually or
+          # combined — a CPU passes when it satisfies ANY configured list.
+          #
+          #   processor_numbers  — exact SKU allowlist matched against the CPU
+          #     brand string (word-boundary, case-insensitive).  Use this when
+          #     qualifying by specific processor number (e.g. 155H, 285K).
+          #     Example:
+          #       processor_numbers: ["155H", "165H", "285K"]
+          #
+          #   exact_generations  — allowlist matched on generation + optional
+          #     segment/codename/product_collection fields.  No age-forward
+          #     inference; every specified field must match directly.
+          #     Example: see current config below.
+          #
+          #   supported_generations — minimum-and-above allowlist within the
+          #     same product family (age-forward comparison).
+          #     Example:
+          #       supported_generations: ["Core Ultra (Series 2)"]
+          #
+          # Combined-mode example — accept an entire generation AND specific
+          # processor numbers from other generations in one test:
+          #
+          #   exact_generations:
+          #     - generation: "Core Ultra (Series 1)"
+          #       segment: "mobile"
+          #   processor_numbers: ["285K", "265K"]  # specific desktop SKUs
+          #
+          # -------------------------------------------------------------------
+          test_cpu:
+            params:
+              - test_id: "HEC-CPU-001"
+                display_name: "CPU Compatibility"
+                description: |
+                  Verifies the CPU matches a qualified platform
+                timeout: 60
+                # Accepted platforms:
+                #   - Core Ultra (Series 1)  +  mobile  → Meteor Lake H (MTL-H)
+                #   - Core Ultra (Series 2)  +  mobile  → Arrow Lake H (ARL-H)
+                exact_generations:
+                  - generation: "Core Ultra (Series 1)"
+                    segment: "mobile"
+                  - generation: "Core Ultra (Series 2)"
+                    segment: "mobile"
+                kpi_refs:
+                  - cpu_compatibility
+                kpi_override:
+                  cpu_compatibility:
+                    validation:
+                      reference: 1
+                      enabled: true
+
+      - name: "stress"
+        tests:
+          test_stress_ng:
+            params:
+              - test_id: "HEC-STR-001"
+                display_name: "CPU 100% (stress-ng)"
+                description: |
+                  CPU-only stress at 100% CPU load for 15 minutes.
+                  Override duration via SUITE_STRESS_DURATION_SECONDS.
+                stress_duration_seconds: 900
+                enable_cpu_stress: true
+                stress_cpu_workers: 0
+                stress_cpu_load: 100
+                enable_memory_stress: false
+                stress_vm_workers: 0
+                stress_vm_bytes: "0M"
+                enable_gpu_stress: false
+                stress_gpu_workers: 0
+                key_metric_name: "cpu_bogo_ops_per_real_time"
+                timeout: 1200
+
+      - name: "memory"
+        tests:
+          test_memory_health:
+            params:
+              - test_id: "HEC-MEM-001"
+                display_name: "Memory Bit-Pattern Test (memtester, dynamic, 1 iter)"
+                description: |
+                  Runs memtester — an in-OS userspace memory tester — over all
+                  available RAM minus a safety reserve. memtester writes and
+                  reads back bit patterns to detect cell faults in the allocated
+                  pages; unlike memtest86+ (which runs pre-OS via GRUB), it
+                  covers userspace-allocatable memory while the OS is live.
+                  Region size is read from MemAvailable in /proc/meminfo with a
+                  512 MB or 10% reserve (whichever is larger) to avoid OOM.
+                  memory_errors is the key metric; 0 means the tested region is
+                  clean.
+                check_type: "memtester"
+                memtester_size_mb: "auto"              # dynamic: scales with machine's free RAM
+                memtester_dynamic_reserve_mb: 512      # fixed floor reservation (MB)
+                memtester_dynamic_reserve_percent: 10  # proportional reservation (%)
+                memtester_iterations: 1
+                timeout: 28800  # 8 hours — accommodates systems with up to ~200 GB RAM
+                kpi_refs:
+                  - memory_errors
+                kpi_override:
+                  memory_errors:
+                    validation:
+                      operator: eq
+                      reference: 0
+                      enabled: true
+
+  - name: "virtualization"
+    sub_suites:
+      - name: "kvm"
+        tests:
+          test_kvm_vm_capacity:
+            params:
+              - test_id: "HEC-KVM-001"
+                display_name: "Peripheral VM Capacity"
+                description: |
+                  Verifies the available VM capacity with dedicated 1 display,
+                  1 keyboard, and 1 mouse passthrough.
+                timeout: 120
+                kpi_refs:
+                  - peripheral_vm_capacity
+                kpi_override:
+                  peripheral_vm_capacity:
+                    validation:
+                      operator: gte
+                      reference: 1
+                      enabled: true
+
+          test_kvm_qemu_reboot:
+            params:
+              - test_id: "HEC-QEMU-001"
+                display_name: "QEMU VM Reboot Test (KVM, OVMF/UEFI, 5x)"
+                description: |
+                  KVM VM reboot lifecycle (5 cycles) with OVMF/UEFI firmware.
+                  Guest readiness after each reboot is verified via serial
+                  console probe and Ubuntu OS boot completion.
+                firmware: "ovmf"
+                vm_cpu_count: 4
+                vm_memory_mb: 8192
+                vm_disk_mb: 61440
+                reboot_count: 5
+                guest_image_url: "https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img"
+                expected_guest_os_contains: "Ubuntu"
+                guest_ready_timeout: 300
+                requirements:
+                  kvm_required: true
+                timeout: 3000

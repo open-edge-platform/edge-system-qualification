@@ -1,13 +1,13 @@
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-name: "profile.qualification.hybrid-edge-system"
-description: "Hybrid Edge Computing (HEC) system qualification"
+name: "profile.qualification.hybrid-edge-system-emt"
+description: "Hybrid Edge Computing (HEC) system qualification - Edge Microvisor Toolkit (EMT)"
 version: "1.0.0"
 params:
   labels:
-    profile_display_name: "Hybrid Edge Computing"
-    group: "hybrid-edge-system"
+    profile_display_name: "Hybrid Edge Computing - EMT"
+    group: "hybrid-edge-system-emt"
     type: "qualification"
     display_reference: false
     kpi_enabled: true
@@ -92,9 +92,6 @@ suites:
           #       segment: "mobile"
           #   processor_numbers: ["285K", "265K"]  # specific desktop SKUs
           #
-          # The current configuration uses exact_generations to accept only
-          # Meteor Lake mobile (Core Ultra Series 1, mobile) and Alder Lake
-          # desktop (12th Gen Core, desktop).
           # -------------------------------------------------------------------
           test_cpu:
             params:
@@ -103,22 +100,16 @@ suites:
                 description: |
                   Verifies the CPU matches a qualified platform
                 timeout: 60
-                # Strict allowlist — only these two specific platform variants
-                # qualify.  Each entry matches both the Intel generation string
-                # AND the market segment, so adjacent segments in the same
-                # generation (e.g. Core Ultra (Series 1) server or embedded)
-                # are NOT implicitly accepted.
-                #
-                # Alternative: use processor_numbers to qualify by SKU instead
-                # of generation, e.g. processor_numbers: ["155H", "165H", "285K"]
-                #
                 # Accepted platforms:
-                #   - Core Ultra (Series 1)  +  mobile  → Meteor Lake (MTL-H / MTL-U)
-                #   - 12th Gen Core          +  desktop → Alder Lake-S (ADL-S)
+                #   - 12th Gen Core          +  desktop → Alder Lake S (ADL-S)
+                #   - Core Ultra (Series 2)  +  mobile  → Arrow Lake H (ARL-H)
+                #   - Core Ultra (Series 2)  +  desktop → Arrow Lake S (ARL-S)
                 exact_generations:
-                  - generation: "Core Ultra (Series 1)"
-                    segment: "mobile"
                   - generation: "12th Gen Core"
+                    segment: "desktop"
+                  - generation: "Core Ultra (Series 2)"
+                    segment: "mobile"
+                  - generation: "Core Ultra (Series 2)"
                     segment: "desktop"
                 kpi_refs:
                   - cpu_compatibility
@@ -220,4 +211,3 @@ suites:
                 requirements:
                   kvm_required: true
                 timeout: 3000
-

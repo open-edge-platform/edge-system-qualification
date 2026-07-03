@@ -165,12 +165,6 @@ sudo bash -c "$(wget -qLO - https://raw.githubusercontent.com/open-edge-platform
 !!! warning "Re-run after reboot"
     All changes applied by `system-setup-advanced.sh` are **current session only** and reset automatically after reboot. Re-run the script after each reboot before executing tests that depend on it.
 
-Each module prompts for confirmation. Use `--force` to accept all automatically (for example, in automated provisioning workflows):
-
-```bash
-sudo bash system-setup-advanced.sh --force
-```
-
 **Advanced setup modules:**
 
 | Module | What it changes |

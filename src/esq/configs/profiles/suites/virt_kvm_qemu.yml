@@ -15,53 +15,74 @@ params:
     cpu_min_cores: 2
     memory_min_gib: 4.0
     storage_min_gib: 5.0
+    kvm_required: true
     # Software requirements
     os_type:
       - "linux"
     docker_required: false
+  telemetry:
+    enabled: true
+    interval: 2  # seconds between samples
+    prerun:
+      enabled: true
+      duration_s: 10   # idle baseline window before the test
+      interval_s: 1    # sample cadence during the idle window
+    modules:
+      - name: cpu_usage
+        enabled: true
+      - name: cpu_freq
+        enabled: true
+      - name: cpu_temp
+        enabled: true
+      - name: package_power
+        enabled: true
+      - name: memory_usage
+        enabled: true
+      - name: gpu_freq
+        enabled: true
+      - name: gpu_power
+        enabled: true
+      - name: gpu_temp
+        enabled: true
+      - name: gpu_usage
+        enabled: true
 
 suites:
   - name: "virtualization"
     sub_suites:
       - name: "kvm"
         tests:
-          test_kvm_qemu:
+          test_kvm_qemu_reboot:
             params:
-              # ---------------------------------------------------------------
-              # VIRT-QEMU-001 — QEMU VM Reboot Stress (KVM, 10x)
-              #
-              # Stress reboot test. Creates a VM using
-              # hardware-accelerated KVM, performs 10 reboot cycles, and
-              # validates the VM reaches running state after each reboot.
-              #
-              # Key metric : avg_reboot_time (seconds)
-              # Pass/fail  : based on successful VM lifecycle (create → boot →
-              #              reboot x10 → cleanup). Fails if QEMU or KVM is
-              #              unavailable.
-              # ---------------------------------------------------------------
-              - test_id: "VIRT-QEMU-001"
-                display_name: "QEMU VM Reboot Stress (KVM, 10x)"
-                use_case: "kvm_reboot_stress_10"
+              - test_id: "KVM-RBT-001"
+                display_name: "QEMU VM Reboot Test (KVM, OVMF/UEFI, 2x)"
                 description: |
-                  KVM reboot stress validation.
-                  Reboot cycles: 10.
-                  Creates a VM using KVM and validates VM lifecycle operations
-                  (create, start, reboot, cleanup) while ensuring the VM is
-                  running after every reboot.
-                  Reports avg_reboot_time as the primary key metric.
-                use_kvm: true
+                  KVM VM reboot lifecycle (2 cycles) with OVMF/UEFI firmware.
+                  Boots via pflash OVMF_CODE.fd; guest readiness verified via
+                  serial console probe and Ubuntu OS boot completion.
+                firmware: "ovmf"
                 vm_cpu_count: 4
-                vm_memory_mb: 12288
+                vm_memory_mb: 8192
                 vm_disk_mb: 61440
-                reboot_count: 10
+                reboot_count: 2
                 guest_image_url: "https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img"
-                guest_ready_probe: "serial"
-                guest_ready_timeout: 300
-                guest_ssh_user: "ubuntu"
-                guest_ssh_host_port: 2222
-                verify_guest_os: true
-                require_ssh_for_os_check: false
                 expected_guest_os_contains: "Ubuntu"
-                enable_qga: true
-                enable_cloud_init_seed: true
-                timeout: 7200
+                # UEFI POST takes longer than SeaBIOS; allow extra headroom.
+                guest_ready_timeout: 300
+                # Overall test timeout: image download + UEFI boot + 2 reboots.
+                timeout: 2400
+
+              - test_id: "KVM-RBT-002"
+                display_name: "QEMU VM Reboot Test (KVM, SeaBIOS, 2x)"
+                description: |
+                  KVM VM reboot lifecycle (2 cycles) with default SeaBIOS
+                  firmware. Guest readiness verified via serial console probe
+                  and Ubuntu OS boot completion.
+                firmware: "seabios"
+                vm_cpu_count: 4
+                vm_memory_mb: 8192
+                vm_disk_mb: 61440
+                reboot_count: 2
+                guest_image_url: "https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img"
+                expected_guest_os_contains: "Ubuntu"
+                timeout: 1800

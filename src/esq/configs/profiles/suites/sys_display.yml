@@ -28,26 +28,21 @@ suites:
           test_display_connectivity:
             params:
               - test_id: "SYS-DISP-001"
-                display_name: "Display - All Ports"
+                display_name: "All Display Ports"
                 description: |
-                  Checks all display ports (HDMI, DisplayPort, etc.) and their connection status.
-                  Reports the number of ports that have monitors connected.
-                  Uses the DRM subsystem to detect display hardware.
+                  Reports connected monitor count across all display ports
+                  (HDMI, DisplayPort, etc.) via the DRM subsystem.
                 check_all: true
                 timeout: 120
 
               - test_id: "SYS-DISP-002"
-                display_name: "Display - HDMI Ports"
-                description: |
-                  Checks HDMI display ports and their connection status.
-                  Reports the number of HDMI ports with monitors connected.
+                display_name: "HDMI Ports"
+                description: Reports the number of HDMI ports with connected monitors.
                 check_hdmi: true
                 timeout: 120
 
               - test_id: "SYS-DISP-003"
-                display_name: "Display - DisplayPort"
-                description: |
-                  Checks DisplayPort connectors and their connection status.
-                  Reports the number of DisplayPort connectors with monitors connected.
+                display_name: "DisplayPort"
+                description: Reports the number of DisplayPort connectors with connected monitors.
                 check_displayport: true
                 timeout: 120

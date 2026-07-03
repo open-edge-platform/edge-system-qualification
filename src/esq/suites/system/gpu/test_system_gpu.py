@@ -232,15 +232,14 @@ def test_system_gpu(
             # Check if testing dGPU (discrete GPU)
             if device_id and device_id.upper().startswith("GPU"):
                 from sysagent.utils.system.hardware import collect_hardware_info
+
                 hardware_info = collect_hardware_info()
                 gpu_info = hardware_info.get("gpu", {})
-                is_discrete = any(
-                    gpu.get("is_discrete", False) for gpu in gpu_info.get("devices", [])
-                )
+                is_discrete = any(gpu.get("is_discrete", False) for gpu in gpu_info.get("devices", []))
                 if is_discrete:
                     fw_custom_base_image = fw_container_config.get(
                         "dgpu_analyzer_image",
-                        fw_container_config.get("analyzer_image", "intel/dlstreamer:2025.2.0-ubuntu24")
+                        fw_container_config.get("analyzer_image", "intel/dlstreamer:2025.2.0-ubuntu24"),
                     )
                     logger.info("Detected discrete GPU, using dGPU custom image")
 
@@ -248,9 +247,7 @@ def test_system_gpu(
 
             docker_nocache = configs.get("docker_nocache", False)
             logger.info(f"Docker build cache setting: nocache={docker_nocache}")
-            logger.info(
-                f"Build 2: Building test suite image '{docker_image_tag}' on top of FW custom image..."
-            )
+            logger.info(f"Build 2: Building test suite image '{docker_image_tag}' on top of FW custom image...")
 
             # Download models and assets outside container
             logger.info("Downloading OpenVINO models for GPU benchmarking...")
@@ -604,7 +601,11 @@ def test_system_gpu(
                                 devices=devices,
                                 environment=environment,
                                 group_add=group_add,
-                                cap_add=["PERFMON", "SYS_ADMIN", "DAC_READ_SEARCH"],  # PERFMON/SYS_ADMIN for intel_gpu_top, DAC_READ_SEARCH for RAPL power reading
+                                cap_add=[
+                                    "PERFMON",
+                                    "SYS_ADMIN",
+                                    "DAC_READ_SEARCH",
+                                ],  # PERFMON/SYS_ADMIN for intel_gpu_top, DAC_READ_SEARCH for RAPL power reading
                                 network_mode="host",  # Align with proxy/video analytics execution model
                                 ipc_mode="host",  # Required for shared memory access consistency
                                 working_dir="/home/dlstreamer",
@@ -703,7 +704,7 @@ def test_system_gpu(
                                     metric_obj.unit = None
                                     logger.debug(f"  -> Converted 0 to -1 for {kpi_name} (data not available)")
                                 else:
-                                    metric_obj.value = val
+                                    metric_obj.value = round(float(val), 2)
                                     # Set appropriate unit based on metric type
                                     if "frequency" in kpi_name:
                                         metric_obj.unit = "GHz"

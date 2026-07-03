@@ -5,7 +5,7 @@ name: "profile.suite.system.stress"
 description: "Host machine stress-ng suite with CPU, memory, iGPU, and mixed stress scenarios"
 version: "1.0.0"
 params:
-  stress_duration_seconds_default: &stress_duration_seconds_default 120
+  stress_duration_seconds_default: &stress_duration_seconds_default 60
   labels:
     profile_display_name: "System Stress"
     group: "system.stress"
@@ -20,42 +20,30 @@ params:
     os_type:
       - "linux"
     docker_required: false
-  # Telemetry configuration
   telemetry:
     enabled: true
     interval: 2  # seconds between samples
-    scope: execution    # execution = workload-only sampling; test = full pytest lifecycle
     prerun:
       enabled: true
       duration_s: 10   # idle baseline window before the test
       interval_s: 1    # sample cadence during the idle window
     modules:
-      # Use framework/core modules for stress visibility without invoking
-      # platform_telemetry runtime dependencies (qmmd/PMT).
       - name: cpu_usage
         enabled: true
-
       - name: cpu_freq
         enabled: true
-
       - name: cpu_temp
         enabled: true
-
       - name: package_power
         enabled: true
-
       - name: memory_usage
         enabled: true
-
       - name: gpu_freq
         enabled: true
-
       - name: gpu_power
         enabled: true
-
       - name: gpu_temp
         enabled: true
-
       - name: gpu_usage
         enabled: true
 
@@ -64,12 +52,13 @@ suites:
     sub_suites:
       - name: "stress"
         tests:
-          test_stress_cpu_gpu:
+          test_stress_ng:
             params:
               - test_id: "SNG-CPU-001"
-                display_name: "CPU 100% 120s"
+                display_name: "CPU 100% (stress-ng)"
                 description: |
-                  CPU-only stress case at 100% CPU load for 120 seconds.
+                  CPU-only stress at 100% CPU load. Duration defaults to the
+                  profile value and can be overridden via SUITE_STRESS_DURATION_SECONDS.
                 stress_duration_seconds: *stress_duration_seconds_default
                 enable_cpu_stress: true
                 stress_cpu_workers: 0
@@ -83,13 +72,14 @@ suites:
                 timeout: 300
 
               - test_id: "SNG-CPU-002"
-                display_name: "CPU 70% 120s"
+                display_name: "CPU 50% (stress-ng)"
                 description: |
-                  CPU-only stress case at 70% CPU load for 120 seconds.
+                  CPU-only stress at 50% CPU load. Duration defaults to the
+                  profile value and can be overridden via SUITE_STRESS_DURATION_SECONDS.
                 stress_duration_seconds: *stress_duration_seconds_default
                 enable_cpu_stress: true
                 stress_cpu_workers: 0
-                stress_cpu_load: 70
+                stress_cpu_load: 50
                 enable_memory_stress: false
                 stress_vm_workers: 0
                 stress_vm_bytes: "0M"
@@ -99,41 +89,46 @@ suites:
                 timeout: 300
 
               - test_id: "SNG-MEM-001"
-                display_name: "Memory 2048M 120s"
+                display_name: "Memory 100% (stress-ng)"
                 description: |
-                  Memory stress case using VM stressor with 2048M for 120 seconds.
+                  Memory stress sized to 100% of physical RAM (percentage of
+                  physical memory, kept resident to avoid swap). Duration defaults
+                  to the profile value and can be overridden via SUITE_STRESS_DURATION_SECONDS.
                 stress_duration_seconds: *stress_duration_seconds_default
                 enable_cpu_stress: false
                 stress_cpu_workers: 0
                 stress_cpu_load: 0
                 enable_memory_stress: true
                 stress_vm_workers: 1
-                stress_vm_bytes: "2048M"
+                stress_vm_bytes: "100%"
                 enable_gpu_stress: false
                 stress_gpu_workers: 0
                 key_metric_name: "vm_bogo_ops_per_real_time"
                 timeout: 300
 
               - test_id: "SNG-MEM-002"
-                display_name: "Memory 512M 120s"
+                display_name: "Memory 50% (stress-ng)"
                 description: |
-                  Memory stress case using VM stressor with 512M for 120 seconds.
+                  Memory stress sized to 50% of physical RAM (percentage of
+                  physical memory, kept resident to avoid swap). Duration defaults
+                  to the profile value and can be overridden via SUITE_STRESS_DURATION_SECONDS.
                 stress_duration_seconds: *stress_duration_seconds_default
                 enable_cpu_stress: false
                 stress_cpu_workers: 0
                 stress_cpu_load: 0
                 enable_memory_stress: true
                 stress_vm_workers: 1
-                stress_vm_bytes: "512M"
+                stress_vm_bytes: "50%"
                 enable_gpu_stress: false
                 stress_gpu_workers: 0
                 key_metric_name: "vm_bogo_ops_per_real_time"
                 timeout: 300
 
               - test_id: "SNG-IGP-001"
-                display_name: "iGPU Rendering 120s"
+                display_name: "iGPU Rendering (stress-ng)"
                 description: |
-                  iGPU rendering stress case for 120 seconds.
+                  iGPU rendering stress. Duration defaults to the profile value
+                  and can be overridden via SUITE_STRESS_DURATION_SECONDS.
                 stress_duration_seconds: *stress_duration_seconds_default
                 enable_cpu_stress: false
                 stress_cpu_workers: 0
@@ -157,9 +152,10 @@ suites:
                 timeout: 300
 
               - test_id: "SNG-MIX-001"
-                display_name: "CPU 100% + iGPU Rendering 120s"
+                display_name: "CPU 100% + iGPU Rendering (stress-ng)"
                 description: |
-                  Mixed stress case with CPU at 100% and iGPU rendering for 120 seconds.
+                  Mixed stress with CPU at 100% and iGPU rendering. Duration defaults
+                  to the profile value and can be overridden via SUITE_STRESS_DURATION_SECONDS.
                 stress_duration_seconds: *stress_duration_seconds_default
                 enable_cpu_stress: true
                 stress_cpu_workers: 0
@@ -183,13 +179,14 @@ suites:
                 timeout: 300
 
               - test_id: "SNG-MIX-002"
-                display_name: "CPU 70% + iGPU Rendering 120s"
+                display_name: "CPU 50% + iGPU Rendering (stress-ng)"
                 description: |
-                  Mixed stress case with CPU at 70% and iGPU rendering for 120 seconds.
+                  Mixed stress with CPU at 50% and iGPU rendering. Duration defaults
+                  to the profile value and can be overridden via SUITE_STRESS_DURATION_SECONDS.
                 stress_duration_seconds: *stress_duration_seconds_default
                 enable_cpu_stress: true
                 stress_cpu_workers: 0
-                stress_cpu_load: 70
+                stress_cpu_load: 50
                 enable_memory_stress: false
                 stress_vm_workers: 0
                 stress_vm_bytes: "0M"

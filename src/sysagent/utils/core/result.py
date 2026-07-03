@@ -24,6 +24,10 @@ class Metrics:
     value: Any = None
     is_key_metric: bool = False
 
+    def __post_init__(self):
+        if isinstance(self.value, float):
+            self.value = round(self.value, 2)
+
 
 @dataclass
 class Result:

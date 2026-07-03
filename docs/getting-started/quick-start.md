@@ -140,7 +140,14 @@ curl -LsSf https://astral.sh/uv/install.sh | sh && source $HOME/.local/bin/env
 
 ### 5. System Setup
 
-Run the setup script to configure system settings required for full functionality:
+Run the setup scripts to configure system settings:
+
+| Script | Purpose |
+|--------|----------|
+| `system-setup.sh` | Installs packages and configures file read permissions (run once after OS installation) |
+| `system-setup-advanced.sh` | Optional. Applies runtime resource limit settings — current session only, re-run after each reboot. Required for full test coverage |
+
+Run `system-setup.sh` once after OS installation:
 
 ```bash
 sudo bash -c "$(wget -qLO - https://raw.githubusercontent.com/open-edge-platform/edge-system-qualification/refs/heads/main/scripts/system-setup.sh)"
@@ -149,8 +156,26 @@ sudo bash -c "$(wget -qLO - https://raw.githubusercontent.com/open-edge-platform
 !!! note "Feature Availability"
     Some features configured by this script are optional. Intel® ESQ will still run if skipped, but certain metrics and capabilities may be unavailable.
 
-!!! note "Security & Persistence"
-    Each module applies the minimum permissions required and documents its persistence behavior. Re-run this script after system or package updates that may reset configured settings.
+Run the advanced setup script to enable full test coverage:
+
+```bash
+sudo bash -c "$(wget -qLO - https://raw.githubusercontent.com/open-edge-platform/edge-system-qualification/refs/heads/main/scripts/system-setup-advanced.sh)"
+```
+
+!!! warning "Re-run after reboot"
+    All changes applied by `system-setup-advanced.sh` are **current session only** and reset automatically after reboot. Re-run the script after each reboot before executing tests that depend on it.
+
+Each module prompts for confirmation. Use `--force` to accept all automatically (for example, in automated provisioning workflows):
+
+```bash
+sudo bash system-setup-advanced.sh --force
+```
+
+**Advanced setup modules:**
+
+| Module | What it changes |
+|--------|----------------|
+| **Locked Memory Limit** | Sets `RLIMIT_MEMLOCK` to unlimited for the current session so memtester can lock all available RAM pages. Without this, memory-related tests will be limited or fail |
 
 
 ### 6. Intel® ESQ

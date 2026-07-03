@@ -20,6 +20,7 @@ of direct subprocess calls to ensure consistency and security.
 import logging
 import os
 import shlex
+import shutil
 import subprocess  # nosec B404 # For secure process execution API
 import threading
 import time
@@ -559,15 +560,18 @@ def check_command_available(command: str, timeout: float = 5.0) -> bool:
     Returns:
         bool: True if command is available
     """
+    # shutil.which() is a reliable PATH lookup with no exit-code ambiguity.
+    # Running the command with --version is not reliable — many tools (e.g.
+    # memtester) exit non-zero for --version even when correctly installed.
+    if shutil.which(command) is not None:
+        return True
+    # Fallback: subprocess which covers edge cases where Python's PATH differs
+    # from the shell's runtime PATH (e.g. /usr/sbin not in os.environ PATH).
     try:
-        result = run_command([command, "--version"], timeout=timeout, capture_output=True)
+        result = run_command(["which", command], timeout=timeout, capture_output=True)
         return result.success
     except Exception:
-        try:
-            result = run_command(["which", command], timeout=timeout, capture_output=True)
-            return result.success
-        except Exception:
-            return False
+        return False
 
 
 def run_git_command(

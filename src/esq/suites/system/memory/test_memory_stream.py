@@ -9,6 +9,7 @@ import logging
 import os
 from dataclasses import is_dataclass
 from pathlib import Path
+
 import allure
 import pandas as pd
 import pytest
@@ -20,6 +21,7 @@ from sysagent.utils.infrastructure import DockerClient
 logger = logging.getLogger(__name__)
 
 test_container_path = "src/containers/memory_bcmk/"
+
 
 def _create_mem_metrics(value: str = "N/A", unit: str = None) -> dict:
     """
@@ -38,6 +40,7 @@ def _create_mem_metrics(value: str = "N/A", unit: str = None) -> dict:
         "min_time": Metrics(unit=unit, value=value, is_key_metric=False),
         "max_time": Metrics(unit=unit, value=value, is_key_metric=False),
     }
+
 
 @allure.title("System Memory Performance Test (STREAM)")
 def test_memory_stream(
@@ -86,7 +89,7 @@ def test_memory_stream(
     # Use esq_data folder for results (consistent with other suites)
     core_data_dir_tainted = os.environ.get("CORE_DATA_DIR", os.path.join(os.getcwd(), "esq_data"))
     core_data_dir = "".join(c for c in core_data_dir_tainted)
-    data_dir = os.path.join(core_data_dir, "data", "system", "memory")
+    data_dir = os.path.join(core_data_dir, "data", "suites", "system", "memory")
     mem_results = os.path.join(data_dir, "results", test_id)
     os.makedirs(mem_results, exist_ok=True)
 
@@ -139,9 +142,7 @@ def test_memory_stream(
 
             docker_nocache = configs.get("docker_nocache", False)
             logger.info(f"Docker build cache setting: nocache={docker_nocache}")
-            logger.info(
-                f"Build 2: Building test suite image '{docker_image_tag}' on top of FW custom image..."
-            )
+            logger.info(f"Build 2: Building test suite image '{docker_image_tag}' on top of FW custom image...")
 
             build_args = {
                 "COMMON_BASE_IMAGE": fw_custom_base_image,  # FW custom image
@@ -377,6 +378,8 @@ def test_memory_stream(
                                 # Convert np.float64 or np.int64 to native Python types
                                 if hasattr(new_val, "item"):
                                     new_val = new_val.item()
+                                if isinstance(new_val, float):
+                                    new_val = round(new_val, 2)
                                 if is_dataclass(val):
                                     # Safely update the value field
                                     setattr(val, "value", new_val)

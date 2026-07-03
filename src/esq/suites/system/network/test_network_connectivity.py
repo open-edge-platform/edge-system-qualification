@@ -187,7 +187,7 @@ def test_network_connectivity(
         # If path is outside current directory, use safe default
         core_data_dir = os.path.join(os.getcwd(), "esq_data")
 
-    data_dir = os.path.join(core_data_dir, "data", "system", "network")
+    data_dir = os.path.join(core_data_dir, "data", "suites", "system", "network")
     network_results = os.path.join(data_dir, "results", test_id)
 
     # Sanitize final path before directory creation

@@ -8,6 +8,15 @@
 system_packages:
   - docker-ce
   - ffmpeg
+  - dmidecode
+  # Memory health
+  - memtester
+  # Virtualization
+  - qemu-system-x86
+  - qemu-utils
+  - cloud-image-utils
+  # System stress
+  - stress-ng
 
 python_packages:
   - openvino

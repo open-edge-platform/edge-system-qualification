@@ -17,19 +17,73 @@ _MODULE_FAIL=()
 
 _is_root() { [ "$EUID" -eq 0 ]; }
 
+# Require root for the caller's module.  Logs the skip message and appends to
+# _MODULE_SKIP when not root, then returns 1 so the caller can do:
+#   _require_root "$MODULE" || return 0
+_require_root() {
+    if _is_root; then
+        return 0
+    fi
+    echo "  [SKIP] Root required. Re-run with sudo to configure this module."
+    _MODULE_SKIP+=("$1")
+    return 1
+}
+
 # ---------------------------------------------------------------------------
-# Module 1: Platform Power Monitoring
+# Module 1: System APT Packages
+# ---------------------------------------------------------------------------
+# Installs system-level utilities required by other setup modules and test
+# suites.
+setup_system_packages() {
+    local MODULE="System APT Packages"
+    echo ""
+    echo "--- $MODULE ---"
+
+    _require_root "$MODULE" || return 0
+
+    if ! command -v apt-get > /dev/null 2>&1; then
+        echo "  [SKIP] apt-get not found (non-Debian host); install equivalents manually."
+        _MODULE_SKIP+=("$MODULE (no apt-get)")
+        return 0
+    fi
+
+    local pkgs=(
+        # Capabilities tooling — required by Module 3 (Memory DIMM Information)
+        libcap2-bin
+
+        # Memory health tests
+        memtester
+
+        # Virtualization tests (QEMU/KVM VM lifecycle)
+        qemu-system-x86
+        qemu-utils
+        cloud-image-utils
+        ovmf
+
+        # System stress tests
+        stress-ng
+    )
+
+    DEBIAN_FRONTEND=noninteractive apt-get update -qq || true
+    if DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "${pkgs[@]}"; then
+        echo "  [OK] Installed system APT packages (${#pkgs[@]} packages)"
+        _MODULE_PASS+=("$MODULE")
+    else
+        echo "  [ERROR] apt-get install failed for one or more system packages"
+        _MODULE_FAIL+=("$MODULE")
+        return 1
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Module 2: Platform Power Monitoring
 # ---------------------------------------------------------------------------
 setup_powercap() {
     local MODULE="Platform Power Monitoring"
     echo ""
     echo "--- $MODULE ---"
 
-    if ! _is_root; then
-        echo "  [SKIP] Root required. Re-run with sudo to configure this module."
-        _MODULE_SKIP+=("$MODULE")
-        return 0
-    fi
+    _require_root "$MODULE" || return 0
 
     # Check if RAPL is available on this system
     local has_rapl=false
@@ -119,29 +173,19 @@ UDEV_EOF
 
 
 # ---------------------------------------------------------------------------
-# Module 2: Memory DIMM Information
+# Module 3: Memory DIMM Information
 # ---------------------------------------------------------------------------
 setup_memory_dimm() {
     local MODULE="Memory DIMM Information"
     echo ""
     echo "--- $MODULE ---"
 
-    if ! _is_root; then
-        echo "  [SKIP] Root required. Re-run with sudo to configure this module."
-        _MODULE_SKIP+=("$MODULE")
-        return 0
-    fi
+    _require_root "$MODULE" || return 0
 
-    # Verify required tools
-    local tool MISSING_TOOLS=false
-    for tool in setcap getcap; do
-        if ! command -v "$tool" > /dev/null 2>&1; then
-            echo "  [ERROR] '$tool' not found. Install: sudo apt-get install libcap2-bin"
-            MISSING_TOOLS=true
-        fi
-    done
-    if [ "$MISSING_TOOLS" = true ]; then
-        _MODULE_FAIL+=("$MODULE (install libcap2-bin and dmidecode, then re-run)")
+    # Verify setcap/getcap (libcap2-bin, installed by Module 1)
+    if ! command -v setcap > /dev/null 2>&1 || ! command -v getcap > /dev/null 2>&1; then
+        echo "  [ERROR] setcap/getcap not found; install the libcap2-bin package first."
+        _MODULE_FAIL+=("$MODULE (libcap2-bin missing)")
         return 1
     fi
 
@@ -155,8 +199,8 @@ setup_memory_dimm() {
     done
     [ -z "$DMIDECODE_PATH" ] && DMIDECODE_PATH=$(command -v dmidecode 2>/dev/null || true)
     if [ -z "$DMIDECODE_PATH" ]; then
-        echo "  [ERROR] dmidecode not found. Install: sudo apt-get install dmidecode"
-        _MODULE_FAIL+=("$MODULE (install dmidecode, then re-run)")
+        echo "  [ERROR] dmidecode not found; install the dmidecode package first."
+        _MODULE_FAIL+=("$MODULE (dmidecode not installed)")
         return 1
     fi
     echo "  [OK] Found dmidecode at: $DMIDECODE_PATH"
@@ -195,18 +239,14 @@ setup_memory_dimm() {
 }
 
 # ---------------------------------------------------------------------------
-# Module 3: GPU Engine Performance Metrics (perf_event_paranoid)
+# Module 4: GPU Engine Performance Metrics (perf_event_paranoid)
 # ---------------------------------------------------------------------------
 setup_gpu_perf_events() {
     local MODULE="GPU Engine Performance Metrics"
     echo ""
     echo "--- $MODULE ---"
 
-    if ! _is_root; then
-        echo "  [SKIP] Root required. Re-run with sudo to configure this module."
-        _MODULE_SKIP+=("$MODULE")
-        return 0
-    fi
+    _require_root "$MODULE" || return 0
 
     # perf_event_paranoid controls which users can open Linux perf events.
     # The xe and i915 GPU drivers expose per-engine utilisation counters
@@ -331,7 +371,7 @@ SYSCTL_EOF
 }
 
 # ---------------------------------------------------------------------------
-# Module 4: Telemetry APT Packages (fw_sys_telemetry build/runtime deps)
+# Module 5: Telemetry APT Packages (fw_sys_telemetry build/runtime deps)
 # ---------------------------------------------------------------------------
 # Build deps for cargo/qmmd, runtime fetchers, GPU tools, and perf for qmmd.
 # Packages installed by apt persist across reboots naturally.
@@ -340,11 +380,7 @@ setup_telemetry_apt_packages() {
     echo ""
     echo "--- $MODULE ---"
 
-    if ! _is_root; then
-        echo "  [SKIP] Root required. Re-run with sudo to configure this module."
-        _MODULE_SKIP+=("$MODULE")
-        return 0
-    fi
+    _require_root "$MODULE" || return 0
 
     if ! command -v apt-get > /dev/null 2>&1; then
         echo "  [SKIP] apt-get not found (non-Debian host); install equivalents manually."
@@ -363,10 +399,6 @@ setup_telemetry_apt_packages() {
         intel-gpu-tools
         "linux-tools-$(uname -r)"
         linux-tools-generic
-        qemu-system-x86
-        qemu-utils
-        cloud-image-utils
-        stress-ng
     )
 
     DEBIAN_FRONTEND=noninteractive apt-get update -qq || true
@@ -381,7 +413,7 @@ setup_telemetry_apt_packages() {
 }
 
 # ---------------------------------------------------------------------------
-# Module 5: Telemetry Kernel Modules
+# Module 6: Telemetry Kernel Modules
 # ---------------------------------------------------------------------------
 # Loads kernel modules used by CPU / NPU / GPU telemetry collectors and
 # persists them via /etc/modules-load.d/ so they auto-load every boot.
@@ -390,11 +422,7 @@ setup_telemetry_kernel_modules() {
     echo ""
     echo "--- $MODULE ---"
 
-    if ! _is_root; then
-        echo "  [SKIP] Root required. Re-run with sudo to configure this module."
-        _MODULE_SKIP+=("$MODULE")
-        return 0
-    fi
+    _require_root "$MODULE" || return 0
 
     local mods=(coretemp intel_rapl_common intel_rapl_msr intel_pmt_telemetry intel_vpu)
     local m load_failed=()
@@ -428,7 +456,7 @@ setup_telemetry_kernel_modules() {
 }
 
 # ---------------------------------------------------------------------------
-# Module 6: debugfs Mount (required by npu-monitor-tool)
+# Module 7: debugfs Mount (required by npu-monitor-tool)
 # ---------------------------------------------------------------------------
 # Mounts debugfs immediately and adds an /etc/fstab entry so the mount
 # survives reboot. (Most distros mount debugfs by default, but several
@@ -438,11 +466,7 @@ setup_debugfs() {
     echo ""
     echo "--- $MODULE ---"
 
-    if ! _is_root; then
-        echo "  [SKIP] Root required. Re-run with sudo to configure this module."
-        _MODULE_SKIP+=("$MODULE")
-        return 0
-    fi
+    _require_root "$MODULE" || return 0
 
     if mountpoint -q /sys/kernel/debug; then
         echo "  [OK] /sys/kernel/debug already mounted"
@@ -485,7 +509,7 @@ setup_debugfs() {
 }
 
 # ---------------------------------------------------------------------------
-# Module 7: Rust Toolchain (per-user, for qmmd build)
+# Module 8: Rust Toolchain (per-user, for qmmd build)
 # ---------------------------------------------------------------------------
 # Bootstraps rustup for the calling (non-root) user. Installs to ~/.cargo
 # which persists across reboots without any system-wide modification.
@@ -510,7 +534,7 @@ setup_rust_toolchain() {
     fi
 
     if ! command -v curl > /dev/null 2>&1; then
-        echo "  [ERROR] curl not available; ensure Module 4 (Telemetry APT Packages) ran first."
+        echo "  [ERROR] curl not available; ensure Module 5 (Telemetry APT Packages) ran first."
         _MODULE_FAIL+=("$MODULE (curl missing)")
         return 1
     fi
@@ -529,7 +553,7 @@ setup_rust_toolchain() {
 }
 
 # ---------------------------------------------------------------------------
-# Module 8: xpu-smi (Intel Data Center GPU tooling, dGPU power/bandwidth)
+# Module 9: xpu-smi (Intel Data Center GPU tooling, dGPU power/bandwidth)
 # ---------------------------------------------------------------------------
 # Best-effort apt install; xpu-smi is important for dGPU utilisation and
 # power telemetry but is not in the default Ubuntu repos on every image.
@@ -546,11 +570,7 @@ setup_xpu_smi() {
         return 0
     fi
 
-    if ! _is_root; then
-        echo "  [SKIP] Root required. Re-run with sudo to configure this module."
-        _MODULE_SKIP+=("$MODULE")
-        return 0
-    fi
+    _require_root "$MODULE" || return 0
 
     if ! command -v apt-get > /dev/null 2>&1; then
         echo "  [SKIP] apt-get not found; install xpu-smi per Intel Data Center GPU docs."
@@ -570,7 +590,7 @@ setup_xpu_smi() {
 }
 
 # ---------------------------------------------------------------------------
-# Module 9: NPU PMT Telemetry Read Access
+# Module 10: NPU PMT Telemetry Read Access
 # ---------------------------------------------------------------------------
 # Grants world-read on /sys/class/intel_pmt/telem*/telem (default
 # 0440 root:root) via a persistent udev rule + immediate chmod, so
@@ -580,11 +600,7 @@ setup_pmt_telemetry() {
     echo ""
     echo "--- $MODULE ---"
 
-    if ! _is_root; then
-        echo "  [SKIP] Root required. Re-run with sudo to configure this module."
-        _MODULE_SKIP+=("$MODULE")
-        return 0
-    fi
+    _require_root "$MODULE" || return 0
 
     if [ ! -d /sys/class/intel_pmt ]; then
         echo "  [INFO] /sys/class/intel_pmt not present (intel_pmt_telemetry driver"
@@ -650,6 +666,7 @@ main() {
     echo "=== System Setup ==="
     echo "Running as: $CURRENT_USER"
 
+    setup_system_packages
     setup_powercap
     setup_memory_dimm
     setup_gpu_perf_events

@@ -1,0 +1,5 @@
+Summarize the main argument in the provided context in 3 concise bullets.
+Identify two limitations or ambiguities in the context and explain why they matter.
+Extract any timeline, sequencing, or dependency clues from the context.
+If a decision maker had 60 seconds, what are the top two recommendations from the context?
+List key entities (people, tools, systems, or datasets) and describe each role briefly.

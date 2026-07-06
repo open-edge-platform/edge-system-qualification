@@ -234,7 +234,9 @@ esq run --profile profile.vertical.retail-lp-vlm
 
 ### Generative AI
 
-**Profile**: `profile.suite.ai.gen`
+#### LLM Serving Benchmark
+
+**Profile**: `profile.suite.ai.gen-llm`
 
 <details markdown="1">
 <summary><b>Test Cases</b> (click to expand)</summary>
@@ -278,7 +280,50 @@ esq run --profile profile.vertical.retail-lp-vlm
 
 **Run this profile**:
 ```bash
-esq run --profile profile.suite.ai.gen
+esq run --profile profile.suite.ai.gen-llm
+```
+
+---
+
+#### Chat Question and Answer Core
+
+**Profile**: `profile.suite.ai.gen-chatqna-core`
+
+Benchmarks the Intel® Edge AI Chat Question and Answer Core sample application. Tests document ingestion, query latency (P50/P95), time to first token (TTFT), and estimated output throughput across OpenVINO* CPU, OpenVINO* GPU, and Ollama* CPU backends.
+
+!!! note "Suite-specific notes"
+    - GEN-CHAT-002 requires an Intel® GPU driver to be installed and visible to Docker*.
+    - The first run downloads and converts the LLM model (~30–45 minutes for OpenVINO* CPU). Subsequent runs reuse the cached model and start faster.
+    - A Hugging Face* token (`HUGGINGFACEHUB_API_TOKEN`) is only needed if you use gated or private model assets.
+
+**Test Cases**:
+
+| Test ID | Test Case | Backend |
+|---------|-----------|----------|
+| GEN-CHAT-001 | Chat Q&A Core - OpenVINO* CPU | OpenVINO* CPU |
+| GEN-CHAT-002 | Chat Q&A Core - OpenVINO* GPU | OpenVINO* GPU (Intel® iGPU) |
+| GEN-CHAT-003 | Chat Q&A Core - Ollama* CPU | Ollama* CPU |
+
+**Metrics collected**:
+
+| Metric | Description |
+|--------|-------------|
+| `service_startup_seconds` | Time from container start to service ready |
+| `document_ingestion_seconds` | Time to ingest benchmark corpus |
+| `p50_query_latency_ms` | Median end-to-end query latency |
+| `p95_query_latency_ms` | 95th percentile query latency |
+| `ttft_ms` | Time to first token (streaming) |
+| `estimated_output_tokens_per_second` | Output throughput estimate |
+| `query_success_rate` | Fraction of queries that succeeded |
+
+**Run this profile**:
+```bash
+esq run --profile profile.suite.ai.gen-chatqna-core
+```
+
+**Run a specific test case**:
+```bash
+esq -d run --profile profile.suite.ai.gen-chatqna-core --filter test_id=GEN-CHAT-001
 ```
 
 ---

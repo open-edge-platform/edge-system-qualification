@@ -1,8 +1,8 @@
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-name: "profile.suite.ai.gen"
-description: "Gen AI suite profile"
+name: "profile.suite.ai.gen-llm"
+description: "Gen AI LLM serving benchmark suite profile"
 version: "1.0.0"
 params:
   labels:

@@ -98,3 +98,67 @@ tests:
         devices: [cpu]
         model_precision: "int4"
         # model_precision specified - quantizes original model on-demand
+
+  test_chatqna_core:
+    params:
+      - display_name: "Chat Q&A Core - OpenVINO CPU"
+        backend_runtime: "openvino"
+        compose_profile: "OPENVINO"
+        backend_service: "chatqna-core-ov-cpu"
+        compute_device: "cpu"
+        include_ui: false
+        pull_images: true
+        compose_project_name: "esq-chatqna-core"
+        timeout: 1800
+        startup_timeout_seconds: 300
+        startup_poll_interval_seconds: 5
+        request_timeout_seconds: 180
+        health_url: "http://127.0.0.1:8888/health"
+        api_base_url: "http://127.0.0.1:8888"
+        reference_app_src_path: ""
+        compose_file: ""
+        assets_repo_ref: "main"
+        assets: []
+        model_cache_path: ""
+        model_config_path: ""
+        corpus_dir: ""
+        prompt_file: ""
+        prompt_limit: 5
+        warmup_query: "Summarize the main topics in the uploaded documents."
+        keep_documents_after_run: false
+        preserve_environment: false
+        registry: "intel/"
+        backend_tag: "core_2026.1.0"
+        ui_tag: "2026.1.0"
+        hf_access_token_env_var: "HUGGINGFACEHUB_API_TOKEN"
+
+      - display_name: "Chat Q&A Core - OpenVINO GPU"
+        backend_runtime: "openvino"
+        compose_profile: "OPENVINO-GPU"
+        backend_service: "chatqna-core-ov-gpu"
+        compute_device: "gpu"
+        include_ui: false
+        pull_images: true
+        compose_project_name: "esq-chatqna-core"
+        timeout: 1800
+        startup_timeout_seconds: 300
+        startup_poll_interval_seconds: 5
+        request_timeout_seconds: 180
+        health_url: "http://127.0.0.1:8888/health"
+        api_base_url: "http://127.0.0.1:8888"
+        reference_app_src_path: ""
+        compose_file: ""
+        assets_repo_ref: "main"
+        assets: []
+        model_cache_path: ""
+        model_config_path: ""
+        corpus_dir: ""
+        prompt_file: ""
+        prompt_limit: 5
+        warmup_query: "Summarize the main topics in the uploaded documents."
+        keep_documents_after_run: false
+        preserve_environment: false
+        registry: "intel/"
+        backend_tag: "core_gpu_2026.1.0"
+        ui_tag: "2026.1.0"
+        hf_access_token_env_var: "HUGGINGFACEHUB_API_TOKEN"

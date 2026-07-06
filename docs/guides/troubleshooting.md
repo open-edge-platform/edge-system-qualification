@@ -126,7 +126,7 @@ Using a shortened or incorrect profile name (for example, `ai_vision`) causes a 
 esq list
 ```
 
-Profile names follow the format `profile.suite.ai.vision`, `profile.suite.ai.gen`, and so on.
+Profile names follow the format `profile.suite.ai.vision`, `profile.suite.ai.gen-llm`, and so on.
 
 ---
 

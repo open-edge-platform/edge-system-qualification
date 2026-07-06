@@ -1,0 +1,146 @@
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+name: "profile.suite.ai.gen-chatqna-core"
+description: "Gen AI Chat Q&A Core suite profile"
+version: "1.0.0"
+params:
+  labels:
+    profile_display_name: "Gen AI"
+    group: "ai.gen"
+    type: "suite"
+    display_status: false
+  requirements:
+    cpu_min_cores: 4
+    memory_min_gb: 16.0
+    storage_total_min_gb: 64.0
+    storage_min_gb: 20.0
+    os_type:
+      - "linux"
+    docker_required: true
+  assets_repo_ref: "release-2026.1.0"  # Pinned edge-ai-libraries release branch
+  assets:
+    - id: "chatqna_compose"
+      type: "file"
+      path: "./docker/compose.yaml"
+      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-libraries/release-2026.1.0/sample-applications/chat-question-and-answer-core/docker/compose.yaml"
+    - id: "chatqna_nginx_template"
+      type: "file"
+      path: "./nginx_config/nginx.conf.template"
+      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-libraries/release-2026.1.0/sample-applications/chat-question-and-answer-core/nginx_config/nginx.conf.template"
+    - id: "chatqna_openvino_template"
+      type: "file"
+      path: "./model_config/sample/openvino_template.yaml"
+      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-libraries/release-2026.1.0/sample-applications/chat-question-and-answer-core/model_config/sample/openvino_template.yaml"
+    - id: "chatqna_ollama_template"
+      type: "file"
+      path: "./model_config/sample/ollama_template.yaml"
+      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-libraries/release-2026.1.0/sample-applications/chat-question-and-answer-core/model_config/sample/ollama_template.yaml"
+    - id: "chatqna_phi35_config"
+      type: "file"
+      path: "./model_config/openvino/microsoft-phi-3.5-config.yaml"
+      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-libraries/release-2026.1.0/sample-applications/chat-question-and-answer-core/model_config/openvino/microsoft-phi-3.5-config.yaml"
+    - id: "chatqna_sizing_core_config"
+      type: "file"
+      path: "./tools/genai-applications-sizing/profiles/chatqna-core-config.yaml"
+      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-libraries/release-2026.1.0/tools/genai-applications-sizing/profiles/chatqna-core-config.yaml"
+    - id: "chatqna_sizing_profiles"
+      type: "file"
+      path: "./tools/genai-applications-sizing/profiles/profiles.yaml"
+      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-libraries/release-2026.1.0/tools/genai-applications-sizing/profiles/profiles.yaml"
+    - id: "chatqna_sizing_sample_doc"
+      type: "file"
+      path: "./tools/genai-applications-sizing/data/file.txt"
+      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-libraries/release-2026.1.0/tools/genai-applications-sizing/data/file.txt"
+  # ChatQnA Core defaults applied to all test params in this profile.
+  include_ui: false
+  registry: "intel/"
+  ui_tag: "2026.1.0"
+  reference_app_src_path: ""
+  model_config_path: ""
+  corpus_dir: ""
+  prompt_file: ""
+  prompt_limit: 5
+  keep_documents_after_run: false
+  ref_p50_query_latency_ms: -1.0
+  ref_p95_query_latency_ms: -1.0
+  ref_ttft_ms: -1.0
+  startup_poll_interval_seconds: 15
+  backend_runtime: "openvino"
+  compose_profile: "OPENVINO"
+  backend_service: "chatqna-core-ov-cpu"
+  compute_device: "cpu"
+  backend_tag: "core_2026.1.0"
+  startup_timeout_seconds: 300
+  startup_attempts: 1
+  timeout: 1800
+
+suites:
+  - name: "ai"
+    sub_suites:
+      - name: "gen"
+
+        tests:
+          test_chatqna_core:
+            params:
+              - test_id: "GEN-CHAT-CONS-001"
+                display_name: "Chat Q&A Core - Consolidated Functional Flow"
+                scenario_matrix:
+                  - test_id: "GEN-CHAT-001"
+                    display_name: "Chat Q&A Core - OpenVINO CPU"
+                  - test_id: "GEN-CHAT-002"
+                    display_name: "Chat Q&A Core - OpenVINO GPU"
+                    compose_profile: "OPENVINO-GPU"
+                    backend_service: "chatqna-core-ov-gpu"
+                    compute_device: "gpu"
+                    backend_tag: "core_gpu_2026.1.0"
+                    requirements:
+                      igpu_required: true
+                  - test_id: "GEN-CHAT-003"
+                    display_name: "Chat Q&A Core - Ollama CPU"
+                    backend_runtime: "ollama"
+                    compose_profile: "OLLAMA"
+                    backend_service: "chatqna-core-ollama"
+                    backend_tag: "core_ollama_2026.1.0"
+                    startup_timeout_seconds: 1800
+                    timeout: 2700
+                  - test_id: "GEN-CHAT-004"
+                    display_name: "Chat Q&A Core - Ollama CPU (5 prompts)"
+                    backend_runtime: "ollama"
+                    compose_profile: "OLLAMA"
+                    backend_service: "chatqna-core-ollama"
+                    backend_tag: "core_ollama_2026.1.0"
+                    startup_timeout_seconds: 1800
+                    timeout: 2700
+                    prompt_file: "src/esq/suites/ai/gen/src/chatqna_core/prompts/chatqna_multi_prompts_5.txt"
+
+              - test_id: "GEN-CHAT-001"
+                display_name: "Chat Q&A Core - OpenVINO CPU"
+
+              - test_id: "GEN-CHAT-002"
+                display_name: "Chat Q&A Core - OpenVINO GPU"
+                compose_profile: "OPENVINO-GPU"
+                backend_service: "chatqna-core-ov-gpu"
+                compute_device: "gpu"
+                backend_tag: "core_gpu_2026.1.0"
+                requirements:
+                  igpu_required: true
+
+              - test_id: "GEN-CHAT-003"
+                display_name: "Chat Q&A Core - Ollama CPU"
+                backend_runtime: "ollama"
+                compose_profile: "OLLAMA"
+                backend_service: "chatqna-core-ollama"
+                backend_tag: "core_ollama_2026.1.0"
+                startup_timeout_seconds: 1800
+                timeout: 2700
+
+              - test_id: "GEN-CHAT-004"
+                display_name: "Chat Q&A Core - Ollama CPU (5 prompts)"
+                backend_runtime: "ollama"
+                compose_profile: "OLLAMA"
+                backend_service: "chatqna-core-ollama"
+                backend_tag: "core_ollama_2026.1.0"
+                startup_timeout_seconds: 1800
+                timeout: 2700
+                prompt_file: "src/esq/suites/ai/gen/src/chatqna_core/prompts/chatqna_multi_prompts_5.txt"

@@ -1771,6 +1771,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Generative AI">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#llm-serving-benchmark" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LLM Serving Benchmark
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#chat-question-and-answer-core" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Chat Question and Answer Core
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
           <li class="md-nav__item">
@@ -2416,7 +2444,8 @@ Total execution time depends on your hardware capabilities and available acceler
 <hr />
 <h2 id="horizontal">Horizontal<a class="headerlink" href="#horizontal" title="Permanent link">&para;</a></h2>
 <h3 id="generative-ai">Generative AI<a class="headerlink" href="#generative-ai" title="Permanent link">&para;</a></h3>
-<p><strong>Profile</strong>: <code>profile.suite.ai.gen</code></p>
+<h4 id="llm-serving-benchmark">LLM Serving Benchmark<a class="headerlink" href="#llm-serving-benchmark" title="Permanent link">&para;</a></h4>
+<p><strong>Profile</strong>: <code>profile.suite.ai.gen-llm</code></p>
 <details>
 <summary><b>Test Cases</b> (click to expand)</summary>
 <table>
@@ -2552,7 +2581,91 @@ Total execution time depends on your hardware capabilities and available acceler
 </details>
 <p><br></p>
 <p><strong>Run this profile</strong>:
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>esq<span class="w"> </span>run<span class="w"> </span>--profile<span class="w"> </span>profile.suite.ai.gen
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>esq<span class="w"> </span>run<span class="w"> </span>--profile<span class="w"> </span>profile.suite.ai.gen-llm
+</span></code></pre></div></p>
+<hr />
+<h4 id="chat-question-and-answer-core">Chat Question and Answer Core<a class="headerlink" href="#chat-question-and-answer-core" title="Permanent link">&para;</a></h4>
+<p><strong>Profile</strong>: <code>profile.suite.ai.gen-chatqna-core</code></p>
+<p>Benchmarks the Intel® Edge AI Chat Question and Answer Core sample application. Tests document ingestion, query latency (P50/P95), time to first token (TTFT), and estimated output throughput across OpenVINO* CPU, OpenVINO* GPU, and Ollama* CPU backends.</p>
+<div class="admonition note">
+<p class="admonition-title">Suite-specific notes</p>
+<ul>
+<li>GEN-CHAT-002 requires an Intel® GPU driver to be installed and visible to Docker*.</li>
+<li>The first run downloads and converts the LLM model (~30–45 minutes for OpenVINO* CPU). Subsequent runs reuse the cached model and start faster.</li>
+<li>A Hugging Face* token (<code>HUGGINGFACEHUB_API_TOKEN</code>) is only needed if you use gated or private model assets.</li>
+</ul>
+</div>
+<p><strong>Test Cases</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Test ID</th>
+<th>Test Case</th>
+<th>Backend</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GEN-CHAT-001</td>
+<td>Chat Q&amp;A Core - OpenVINO* CPU</td>
+<td>OpenVINO* CPU</td>
+</tr>
+<tr>
+<td>GEN-CHAT-002</td>
+<td>Chat Q&amp;A Core - OpenVINO* GPU</td>
+<td>OpenVINO* GPU (Intel® iGPU)</td>
+</tr>
+<tr>
+<td>GEN-CHAT-003</td>
+<td>Chat Q&amp;A Core - Ollama* CPU</td>
+<td>Ollama* CPU</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Metrics collected</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>service_startup_seconds</code></td>
+<td>Time from container start to service ready</td>
+</tr>
+<tr>
+<td><code>document_ingestion_seconds</code></td>
+<td>Time to ingest benchmark corpus</td>
+</tr>
+<tr>
+<td><code>p50_query_latency_ms</code></td>
+<td>Median end-to-end query latency</td>
+</tr>
+<tr>
+<td><code>p95_query_latency_ms</code></td>
+<td>95<sup>th</sup> percentile query latency</td>
+</tr>
+<tr>
+<td><code>ttft_ms</code></td>
+<td>Time to first token (streaming)</td>
+</tr>
+<tr>
+<td><code>estimated_output_tokens_per_second</code></td>
+<td>Output throughput estimate</td>
+</tr>
+<tr>
+<td><code>query_success_rate</code></td>
+<td>Fraction of queries that succeeded</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Run this profile</strong>:
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>esq<span class="w"> </span>run<span class="w"> </span>--profile<span class="w"> </span>profile.suite.ai.gen-chatqna-core
+</span></code></pre></div></p>
+<p><strong>Run a specific test case</strong>:
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>esq<span class="w"> </span>-d<span class="w"> </span>run<span class="w"> </span>--profile<span class="w"> </span>profile.suite.ai.gen-chatqna-core<span class="w"> </span>--filter<span class="w"> </span><span class="nv">test_id</span><span class="o">=</span>GEN-CHAT-001
 </span></code></pre></div></p>
 <hr />
 <h3 id="vision-ai">Vision AI<a class="headerlink" href="#vision-ai" title="Permanent link">&para;</a></h3>
@@ -2590,7 +2703,7 @@ Total execution time depends on your hardware capabilities and available acceler
 </tbody>
 </table>
 <p><strong>Run this profile</strong>:
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>esq<span class="w"> </span>run<span class="w"> </span>--profile<span class="w"> </span>profile.suite.ai.vision-light
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>esq<span class="w"> </span>run<span class="w"> </span>--profile<span class="w"> </span>profile.suite.ai.vision-light
 </span></code></pre></div></p>
 <hr />
 <h4 id="verified-reference-blueprints">Verified Reference Blueprints<a class="headerlink" href="#verified-reference-blueprints" title="Permanent link">&para;</a></h4>
@@ -2627,7 +2740,7 @@ Total execution time depends on your hardware capabilities and available acceler
 </tbody>
 </table>
 <p><strong>Run this profile</strong>:
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>esq<span class="w"> </span>run<span class="w"> </span>--profile<span class="w"> </span>profile.suite.ai.vision-vrb
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>esq<span class="w"> </span>run<span class="w"> </span>--profile<span class="w"> </span>profile.suite.ai.vision-vrb
 </span></code></pre></div></p>
 <hr />
 <h4 id="openvino">OpenVINO<a class="headerlink" href="#openvino" title="Permanent link">&para;</a></h4>
@@ -2723,7 +2836,7 @@ Total execution time depends on your hardware capabilities and available acceler
 </details>
 <p><br></p>
 <p><strong>Run this profile</strong>:
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>esq<span class="w"> </span>run<span class="w"> </span>--profile<span class="w"> </span>profile.suite.ai.vision-ov
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>esq<span class="w"> </span>run<span class="w"> </span>--profile<span class="w"> </span>profile.suite.ai.vision-ov
 </span></code></pre></div></p>
 <hr />
 <h4 id="video-analytics">Video Analytics<a class="headerlink" href="#video-analytics" title="Permanent link">&para;</a></h4>
@@ -2752,7 +2865,7 @@ Total execution time depends on your hardware capabilities and available acceler
 </tbody>
 </table>
 <p><strong>Run this profile</strong>:
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>esq<span class="w"> </span>run<span class="w"> </span>--profile<span class="w"> </span>profile.suite.ai.vision-va
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>esq<span class="w"> </span>run<span class="w"> </span>--profile<span class="w"> </span>profile.suite.ai.vision-va
 </span></code></pre></div></p>
 <hr />
 <h3 id="system-gpu-openvinotm-toolkit">System GPU - OpenVINO™ Toolkit<a class="headerlink" href="#system-gpu-openvinotm-toolkit" title="Permanent link">&para;</a></h3>
@@ -2777,7 +2890,7 @@ Total execution time depends on your hardware capabilities and available acceler
 </tbody>
 </table>
 <p><strong>Run this profile</strong>:
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>esq<span class="w"> </span>run<span class="w"> </span>--profile<span class="w"> </span>profile.suite.system.gpu-ov
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>esq<span class="w"> </span>run<span class="w"> </span>--profile<span class="w"> </span>profile.suite.system.gpu-ov
 </span></code></pre></div></p>
 <hr />
 <h3 id="system-memory-stream">System Memory - STREAM<a class="headerlink" href="#system-memory-stream" title="Permanent link">&para;</a></h3>
@@ -2810,7 +2923,7 @@ Total execution time depends on your hardware capabilities and available acceler
 </tbody>
 </table>
 <p><strong>Run this profile</strong>:
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>esq<span class="w"> </span>run<span class="w"> </span>--profile<span class="w"> </span>profile.suite.system.memory-stream
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>esq<span class="w"> </span>run<span class="w"> </span>--profile<span class="w"> </span>profile.suite.system.memory-stream
 </span></code></pre></div></p>
 <h3 id="media-performance">Media Performance<a class="headerlink" href="#media-performance" title="Permanent link">&para;</a></h3>
 <p><strong>Profile</strong>: <code>profile.suite.media.performance-pipelines</code></p>
@@ -2925,7 +3038,7 @@ Total execution time depends on your hardware capabilities and available acceler
 </details>
 <p><br></p>
 <p><strong>Run this profile</strong>:
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>esq<span class="w"> </span>run<span class="w"> </span>--profile<span class="w"> </span>profile.suite.media.performance-pipelines
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>esq<span class="w"> </span>run<span class="w"> </span>--profile<span class="w"> </span>profile.suite.media.performance-pipelines
 </span></code></pre></div></p>
 <h3 id="timeseries-ai">Timeseries AI<a class="headerlink" href="#timeseries-ai" title="Permanent link">&para;</a></h3>
 <p><strong>Profile</strong>: <code>profile.suite.ai.timeseries-wind-turbine</code></p>
@@ -2964,7 +3077,7 @@ Total execution time depends on your hardware capabilities and available acceler
 </details>
 <p><br></p>
 <p><strong>Run this profile</strong>:
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>esq<span class="w"> </span>run<span class="w"> </span>--profile<span class="w"> </span>profile.suite.ai.timeseries-wind-turbine
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>esq<span class="w"> </span>run<span class="w"> </span>--profile<span class="w"> </span>profile.suite.ai.timeseries-wind-turbine
 </span></code></pre></div></p>
 <hr />
 

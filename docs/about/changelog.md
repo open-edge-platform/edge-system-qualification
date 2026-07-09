@@ -42,6 +42,7 @@ Intel® ESQ changelog and version history.
 - Redundant file detection in the Metro Media test case due to file copy during test/build
 - Pexels* video download intermittently fails from the PRC network
 - Memory is not released after Vision AI test cases complete on Panther Lake (PTL) systems
+- Intel® Core™ Ultra Processor (Series 3) may report lower performance due to Balanced power mode default on Ubuntu* 24.04
 - Gen-AI qualification tests may sometimes fail on systems with dual B60 GPUs
 - Vision-AI qualification tests may sometimes fail on systems with dual B60 GPUs
 - Qmassa Collector fallback logic incorrectly references a sysfs metric source

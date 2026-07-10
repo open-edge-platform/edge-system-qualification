@@ -102,11 +102,14 @@ suites:
                 timeout: 60
                 # Accepted platforms:
                 #   - 12th Gen Core          +  desktop → Alder Lake S (ADL-S)
+                #   - Core Ultra (Series 1)  +  mobile  → Meteor Lake H (MTL-H)
                 #   - Core Ultra (Series 2)  +  mobile  → Arrow Lake H (ARL-H)
                 #   - Core Ultra (Series 2)  +  desktop → Arrow Lake S (ARL-S)
                 exact_generations:
                   - generation: "12th Gen Core"
                     segment: "desktop"
+                  - generation: "Core Ultra (Series 1)"
+                    segment: "mobile"
                   - generation: "Core Ultra (Series 2)"
                     segment: "mobile"
                   - generation: "Core Ultra (Series 2)"

@@ -16,6 +16,7 @@ from .container import run_dlstreamer_analyzer_container
 from .pipeline import (
     build_multi_pipeline_with_devices,
     get_fpscounter_config,
+    get_pre_fpscounter_elements_config,
     get_sink_element_config,
     resolve_pipeline_placeholders,
 )
@@ -144,12 +145,14 @@ def run_benchmark_container(
     if num_streams is not None:
         sink_element = get_sink_element_config(pipeline_params, device_id, device_dict)
         fpscounter_config = get_fpscounter_config(pipeline_params, device_id, device_dict)
+        pre_fpscounter_elements = get_pre_fpscounter_elements_config(pipeline_params, device_id, device_dict)
         multi_pipeline, result_pipeline = build_multi_pipeline_with_devices(
             pipeline=resolved_pipeline,
             device_id=device_id,
             num_streams=num_streams,
             sink_element=sink_element,
             fpscounter_elements=fpscounter_config,
+            pre_fpscounter_elements=pre_fpscounter_elements,
         )
     else:
         multi_pipeline = ""

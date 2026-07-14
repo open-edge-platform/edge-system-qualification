@@ -152,6 +152,8 @@ params:
       default: "fakesink sync=false async=false"
     FPSCOUNTER_PROPS:
       default: ""
+    PRE_FPSCOUNTER_ELEMENTS:
+      default: ""
 
 suites:
   - name: "ai"

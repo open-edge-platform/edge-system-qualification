@@ -95,7 +95,7 @@ def test_dlstreamer(
     data_dir = os.path.join(core_data_dir, "data", "suites", "ai", "vision")
     models_dir = os.path.join(data_dir, "models")
     videos_dir = os.path.join(data_dir, "videos")
-    results_dir = os.path.join(data_dir, "results")
+    results_dir = os.path.join(data_dir, "results", "analysis")
 
     container_mnt_dir = "/mnt"
 

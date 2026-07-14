@@ -368,8 +368,17 @@ class SecureProcessExecutor:
         with self._process_lock:
             self._active_processes[process.pid] = process
 
+        # Use poll() instead of select() to support file descriptors > 1023.
+        # select() has a hard FD_SETSIZE=1024 limit on Linux and raises
+        # "filedescriptor out of range in select()" when fd numbers are exhausted
+        # after many tests open Docker connections, log streams, etc.
+        # poll() has no such restriction.
+        poller = select.poll()
+        if process.stdout:
+            poller.register(process.stdout, select.POLLIN)
+
         try:
-            # Read output in real-time using select for non-blocking I/O
+            # Read output in real-time using poll for non-blocking I/O
             while True:
                 # Check if process has finished
                 if process.poll() is not None:
@@ -398,11 +407,11 @@ class SecureProcessExecutor:
                 if current_time - last_timeout_check >= 5.0:
                     last_timeout_check = current_time
 
-                # Use select to check if data is available (non-blocking with 0.1s timeout)
-                # This allows us to check the timeout more frequently
+                # Use poll to check if data is available (100ms timeout in milliseconds)
+                # poll() works with any fd value, unlike select() which fails above fd 1023
                 if process.stdout:
-                    ready, _, _ = select.select([process.stdout], [], [], 0.1)
-                    if ready:
+                    events = poller.poll(100)
+                    if events:
                         line = process.stdout.readline()
                         if line:
                             line_stripped = line.rstrip()
@@ -421,6 +430,11 @@ class SecureProcessExecutor:
                 stderr_lines.extend(stderr.splitlines())
 
         finally:
+            if process.stdout:
+                try:
+                    poller.unregister(process.stdout)
+                except Exception:
+                    pass
             with self._process_lock:
                 self._active_processes.pop(process.pid, None)
 

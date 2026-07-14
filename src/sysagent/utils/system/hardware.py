@@ -744,28 +744,59 @@ def collect_npu_info(pci_devices, openvino_npu=None) -> dict:
         if "DEVICE_ARCHITECTURE" in all_props:
             normalized_device["device_architecture"] = all_props["DEVICE_ARCHITECTURE"]
 
+        # Extract PCI slot from DEVICE_PCI_INFO for reliable PCI device matching.
+        # This is especially important on newer platforms where the PCI device_id may not
+        # yet be in the local PCI database (device_name = "Unknown device").
+        # Format: "{domain: 0 bus: 0 device: 0xb function: 0}"
+        if "DEVICE_PCI_INFO" in all_props:
+            import re as _re
+
+            pci_info_str = str(all_props["DEVICE_PCI_INFO"])
+            _domain_m = _re.search(r"domain:\s*(0x[0-9a-fA-F]+|\d+)", pci_info_str)
+            _bus_m = _re.search(r"bus:\s*(0x[0-9a-fA-F]+|\d+)", pci_info_str)
+            _device_m = _re.search(r"device:\s*(0x[0-9a-fA-F]+|\d+)", pci_info_str)
+            _func_m = _re.search(r"function:\s*(0x[0-9a-fA-F]+|\d+)", pci_info_str)
+            if _bus_m and _device_m and _func_m:
+                _domain = int(_domain_m.group(1), 0) if _domain_m else 0
+                _bus = int(_bus_m.group(1), 0)
+                _dev = int(_device_m.group(1), 0)
+                _func = int(_func_m.group(1), 0)
+                normalized_device["pci_slot"] = f"{_domain:04x}:{_bus:02x}:{_dev:02x}.{_func}"
+
         return normalized_device
 
     npu_info = {"devices": [], "count": 0}
 
     # Get NPU devices from PCI (Processing accelerators)
     pci_npus = []
+    # Known Intel NPU kernel drivers. On newer platforms the PCI device_id may not yet
+    # be in the local PCI database, causing device_name to be "Unknown device". In that
+    # case the driver name is a reliable indicator that the device is an Intel NPU.
+    _INTEL_NPU_DRIVERS = {"intel_vpu", "intel_npu"}
     for dev in pci_devices:
         class_name = dev.get("class_name", "").lower()
         device_name = dev.get("device_name", "").lower()
         vendor_id = dev.get("vendor_id", "").lower()
+        driver = dev.get("driver", "") or ""
 
-        # NPU devices must meet ALL criteria:
-        # 1. PCI class is "Processing accelerators" (class_id 12)
-        # 2. Device name contains "npu" keyword
-        # 3. Vendor is Intel (8086)
-        if "processing accelerator" in class_name and "npu" in device_name and vendor_id == "8086":
+        # NPU devices must be Intel (8086) Processing accelerators AND
+        # either have "npu" in the device name (known devices in PCI DB) OR
+        # use a recognised Intel NPU kernel driver (new/unknown PCI IDs).
+        is_intel_npu = (
+            "processing accelerator" in class_name
+            and vendor_id == "8086"
+            and ("npu" in device_name or driver in _INTEL_NPU_DRIVERS)
+        )
+
+        if is_intel_npu:
             pci_npus.append(normalize_pci_device(dev))
-            logger.debug(f"Found NPU device: {device_name} (vendor: {vendor_id}, slot: {dev.get('pci_slot')})")
+            logger.debug(
+                f"Found NPU device: {device_name} (vendor: {vendor_id}, driver: {driver}, slot: {dev.get('pci_slot')})"
+            )
         elif "processing accelerator" in class_name:
             logger.debug(
                 f"Skipping non-NPU processing accelerator: {device_name} "
-                f"(vendor: {vendor_id}, npu_in_name: {'npu' in device_name}, slot: {dev.get('pci_slot')})"
+                f"(vendor: {vendor_id}, driver: {driver}, slot: {dev.get('pci_slot')})"
             )
 
     # Get NPU devices from OpenVINO
@@ -808,71 +839,95 @@ def collect_npu_info(pci_devices, openvino_npu=None) -> dict:
     elif len(pci_npus) > 1 or len(openvino_npus) > 1:
 
         def normalize_pci_device_for_matching(dev):
-            """Normalize PCI device for UUID matching."""
-            vendor_id = dev.get("vendor_id", "").lower().zfill(4)
-            device_id = dev.get("device_id", "").lower().zfill(4)
-            pci_address = dev.get("pci_address", "")
-            bus = dev.get("bus")
-            dev_num = dev.get("dev")
-
-            if not (bus and dev_num) and pci_address:
-                try:
-                    # pci_address format: "domain:bus:device.function"
-                    if pci_address.count(":") >= 2:
-                        parts = pci_address.split(":")
-                        bus = parts[1].zfill(2)
-                        device_func = parts[2].split(".")
-                        dev_num = device_func[0].zfill(2)
-                    elif pci_address.count(":") == 1:
-                        parts = pci_address.split(":")
-                        bus = parts[0].zfill(2)
-                        device_func = parts[1].split(".")
-                        dev_num = device_func[0].zfill(2)
-                except Exception:
-                    bus = dev_num = None
-
-            if not (bus and dev_num):
+            """Normalize PCI device by PCI slot for matching."""
+            pci_slot = dev.get("pci_slot", "")
+            if not pci_slot or pci_slot == "Unknown":
                 return None
-            return f"{vendor_id}{device_id}{bus}{dev_num}"
+            # Normalize "domain:bus:device.function" → "domain:bus:device"
+            try:
+                parts = pci_slot.replace(".", ":").split(":")
+                if len(parts) >= 3:
+                    return f"{parts[0].lower()}:{parts[1].lower()}:{parts[2].lower()}"
+            except Exception:
+                pass
+            return None
 
         def normalize_openvino_device_for_matching(ovdev):
-            """Normalize OpenVINO device for UUID matching."""
+            """Normalize OpenVINO device for PCI slot matching.
+
+            Uses pci_slot (parsed from DEVICE_PCI_INFO) as the primary key because
+            it is reliable even when the PCI device_id is not yet in the PCI database.
+            Falls back to UUID byte decoding for devices without DEVICE_PCI_INFO.
+            """
+            # Primary: PCI slot from DEVICE_PCI_INFO (added by normalize_openvino_device)
+            pci_slot = ovdev.get("pci_slot")
+            if pci_slot:
+                try:
+                    parts = pci_slot.replace(".", ":").split(":")
+                    if len(parts) >= 3:
+                        return f"{parts[0].lower()}:{parts[1].lower()}:{parts[2].lower()}"
+                except Exception:
+                    pass
+
+            # Fallback: GPU-style UUID byte decoding
             uuid = ovdev.get("device_uuid")
             if not uuid or len(uuid) < 20:
                 return None
-            # vendor_id: bytes 0-1 (little endian)
             vendor_id = uuid[2:4] + uuid[0:2]
-            # device_id: bytes 4-5 (little endian)
             device_id = uuid[6:8] + uuid[4:6]
-            # bus: byte 16-17 (8th byte, 2 chars)
             bus = uuid[16:18]
-            # dev: byte 18-19 (9th byte, 2 chars)
             dev_num = uuid[18:20]
-            return f"{vendor_id}{device_id}{bus}{dev_num}".lower()
+            return f"uuid:{vendor_id}{device_id}{bus}{dev_num}".lower()
 
-        # Try UUID-based matching for multiple NPUs
+        def normalize_pci_device_for_uuid_matching(dev):
+            """Normalize PCI device by vendor+device+bus+device for UUID fallback."""
+            vendor_id = dev.get("vendor_id", "").lower().zfill(4)
+            device_id = dev.get("device_id", "").lower().zfill(4)
+            pci_slot = dev.get("pci_slot", "")
+            if not pci_slot or pci_slot == "Unknown":
+                return None
+            try:
+                parts = pci_slot.replace(".", ":").split(":")
+                if len(parts) >= 3:
+                    bus = parts[1].lower().zfill(2)
+                    dev_num = parts[2].lower().zfill(2)
+                    return f"uuid:{vendor_id}{device_id}{bus}{dev_num}"
+            except Exception:
+                pass
+            return None
+
+        # Build matching maps: slot-based (primary) and UUID-based (fallback)
         pci_norm_map = {}
+        pci_uuid_map = {}
         for device in pci_npus:
-            norm = normalize_pci_device_for_matching(device)
-            if norm:
-                pci_norm_map[norm] = device
+            slot_norm = normalize_pci_device_for_matching(device)
+            if slot_norm:
+                pci_norm_map[slot_norm] = device
+            uuid_norm = normalize_pci_device_for_uuid_matching(device)
+            if uuid_norm:
+                pci_uuid_map[uuid_norm] = device
 
         matched_npus = []
         remaining_openvino = openvino_npus.copy()
 
         for ov_npu in openvino_npus:
             norm = normalize_openvino_device_for_matching(ov_npu)
+            pci_device = None
 
-            if norm and norm in pci_norm_map:
-                # UUID match found
-                pci_device = pci_norm_map[norm]
+            if norm:
+                if norm in pci_norm_map:
+                    pci_device = pci_norm_map[norm]
+                elif norm in pci_uuid_map:
+                    pci_device = pci_uuid_map[norm]
+
+            if pci_device:
                 npu_device = normalize_pci_device(pci_device)
                 npu_device["source"] = "pci"
                 npu_device["openvino"] = ov_npu
                 matched_npus.append(npu_device)
                 remaining_openvino.remove(ov_npu)
                 logger.debug(
-                    f"✅ NPU match: PCI {pci_device.get('pci_address', 'Unknown')} <-> "
+                    f"NPU match: PCI {pci_device.get('pci_slot', 'Unknown')} <-> "
                     f"OpenVINO {ov_npu.get('device_name', 'Unknown')}"
                 )
 
@@ -880,17 +935,16 @@ def collect_npu_info(pci_devices, openvino_npu=None) -> dict:
         openvino_npus = remaining_openvino
 
         # Remove matched PCI devices
-        for matched_npu in matched_npus:
-            pci_address = matched_npu.get("pci_address")
-            pci_npus = [dev for dev in pci_npus if dev.get("pci_address") != pci_address]
+        matched_slots = {npu.get("pci_slot") for npu in matched_npus}
+        pci_npus = [dev for dev in pci_npus if dev.get("pci_slot") not in matched_slots]
 
     # Add remaining PCI devices (no OpenVINO match)
     for pci_npu in pci_npus:
-        if not any(existing.get("pci_address") == pci_npu.get("pci_address") for existing in all_npus):
+        if not any(existing.get("pci_slot") == pci_npu.get("pci_slot") for existing in all_npus):
             npu_device = normalize_pci_device(pci_npu)
             npu_device["source"] = "pci"
             all_npus.append(npu_device)
-            logger.debug(f"ℹ️ Added PCI-only NPU device: {pci_npu.get('pci_address', 'Unknown')}")
+            logger.debug(f"Added PCI-only NPU device: {pci_npu.get('pci_slot', 'Unknown')}")
 
     # Add remaining OpenVINO devices (no PCI match)
     for ov_npu in openvino_npus:
@@ -901,7 +955,7 @@ def collect_npu_info(pci_devices, openvino_npu=None) -> dict:
             "openvino": ov_npu,
         }
         all_npus.append(npu_device)
-        logger.debug(f"ℹ️ Added OpenVINO-only NPU device: {ov_npu.get('device_name', 'Unknown')}")
+        logger.debug(f"Added OpenVINO-only NPU device: {ov_npu.get('device_name', 'Unknown')}")
 
     npu_info["devices"] = all_npus
     npu_info["count"] = len(all_npus)

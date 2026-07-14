@@ -293,6 +293,76 @@ tests:
             # npu: "ximagesink display=:0"
           #
           # =============================================================================
+          # FPSCOUNTER_PROPS: Additional properties for the gvafpscounter element
+          # =============================================================================
+          # Configures a GStreamer property string passed directly to gvafpscounter
+          # in the multi-stream pipeline.
+          #
+          # Common use — starting-frame=<N>:
+          #   Skip the first N frames before FPS measurement begins. Useful to
+          #   exclude warm-up latency from decoder and inference initialisation.
+          #   Typical value: 2000 (skips ~133 s at 15 fps, ~67 s at 30 fps).
+          #
+          # Leave empty (default) to measure from the very first frame.
+          #
+          # Example:
+          #   FPSCOUNTER_PROPS:
+          #     default: "starting-frame=2000"  # Same threshold for all devices
+          #     cpu: "starting-frame=1000"       # Different value per device type
+          # =============================================================================
+          FPSCOUNTER_PROPS:
+            default: ""
+          #
+          # =============================================================================
+          # PRE_FPSCOUNTER_ELEMENTS: Memory conversion elements for GPU visualization
+          # =============================================================================
+          # GPU (iGPU/dGPU) hardware-accelerated pipelines decode and run inference with
+          # frames residing in VA memory (video/x-raw(memory:VAMemory)). Software elements
+          # that follow gvafpscounter — such as gvawatermark, videoconvert, and display
+          # sinks (ximagesink, autovideosink) — cannot consume VA memory frames and require
+          # standard system memory (video/x-raw).
+          #
+          # Inserting "vapostproc ! capsfilter caps='video/x-raw'" before gvafpscounter
+          # copies the frame from the GPU VA surface into a system memory buffer, enabling
+          # all downstream software elements to process it correctly.
+          #
+          # CPU and NPU pipelines output frames in system memory by default, so no
+          # conversion is needed and these entries are empty.
+          #
+          # This parameter is only active for multi-stream pipelines. Baseline pipelines
+          # always terminate with fakesink and are not affected.
+          #
+          # Usage Examples:
+          # ---------------
+          # 1. Default — no visualization (fakesink), no conversion needed:
+          #      PRE_FPSCOUNTER_ELEMENTS:
+          #        default: ""   # or omit the parameter entirely
+          #
+          # 2. Enable visualization on GPU devices — BOTH parameters must be set together:
+          #    Step 1: Switch SINK_ELEMENT to a visualization sink:
+          #      SINK_ELEMENT:
+          #        default: "fakesink sync=true"               # CPU / NPU unchanged
+          #        igpu: "gvawatermark ! videoconvert ! ximagesink display=:0"
+          #        dgpu: "gvawatermark ! videoconvert ! ximagesink display=:0"
+          #    Step 2: Add PRE_FPSCOUNTER_ELEMENTS for GPU memory conversion:
+          #      PRE_FPSCOUNTER_ELEMENTS:
+          #        default: ""   # CPU / NPU: system memory already, no conversion
+          #        igpu: "vapostproc ! capsfilter caps='video/x-raw'"
+          #        dgpu: "vapostproc ! capsfilter caps='video/x-raw'"
+          #
+          #    NOTE: xhost +local:root must be run on the host before starting the test
+          #          to grant the Docker container access to the X11 display.
+          #
+          # Resulting pipeline fragment for iGPU/dGPU with visualization:
+          #   ! queue
+          #   ! vapostproc ! capsfilter caps='video/x-raw'           ← PRE_FPSCOUNTER_ELEMENTS
+          #   ! gvafpscounter write-pipe=/tmp/<id>
+          #   ! gvawatermark ! videoconvert ! ximagesink display=:0  ← SINK_ELEMENT
+          # =============================================================================
+          # PRE_FPSCOUNTER_ELEMENTS:
+          #   default: ""   # No conversion needed when SINK_ELEMENT is fakesink
+          #   igpu: "vapostproc ! capsfilter caps='video/x-raw'"   # Uncomment for visualization
+          #   dgpu: "vapostproc ! capsfilter caps='video/x-raw'"   # Uncomment for visualization
         # devices: [cpu, igpu, dgpu, npu] # options: [cpu, igpu, dgpu, npu]
         devices: [igpu] # options: [cpu, igpu, dgpu, npu]
         # Optional: Set to true to keep original videos in debug/ subfolder for debugging

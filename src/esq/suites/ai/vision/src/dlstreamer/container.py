@@ -134,10 +134,14 @@ def run_dlstreamer_analyzer_container(
     if os.path.exists("/dev/accel"):
         container_devices.append("/dev/accel:/dev/accel")
 
-    # Ensure results directory exists and has correct permissions
+    # Ensure results directory and subdirectories exist with correct permissions
     results_dir = os.path.join(data_dir, "results")
     os.makedirs(results_dir, exist_ok=True)
     os.chmod(results_dir, 0o770)
+    for subdir in ("baseline", "analysis"):
+        subdir_path = os.path.join(results_dir, subdir)
+        os.makedirs(subdir_path, exist_ok=True)
+        os.chmod(subdir_path, 0o770)
 
     # Ensure logs directory exists and has correct permissions
     logs_dir = os.path.join(data_dir, "logs")

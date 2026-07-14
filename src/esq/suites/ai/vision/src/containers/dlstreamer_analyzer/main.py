@@ -42,6 +42,8 @@ logger = logging.getLogger(__name__)
 MNT_DIR = "/mnt"
 VIDEOS_DIR = os.path.join(MNT_DIR, "videos")
 RESULTS_DIR = os.path.join(MNT_DIR, "results")
+BASELINE_RESULTS_DIR = os.path.join(MNT_DIR, "results", "baseline")
+ANALYSIS_RESULTS_DIR = os.path.join(MNT_DIR, "results", "analysis")
 LOGS_DIR = os.path.join(MNT_DIR, "logs")
 
 
@@ -55,7 +57,10 @@ def validate_pipeline_command(pipeline_cmd: str) -> str:
     if len(pipeline_cmd.strip()) == 0:
         raise ValueError("Pipeline command cannot be empty")
 
-    max_length = 60000  # Set a reasonable maximum length for pipeline commands
+    max_length = 500000  # Set a reasonable maximum length for pipeline commands
+    # Note: High-end GPUs can sustain 100+ concurrent streams; at ~1000 chars/stream
+    # a 62-stream pipeline already exceeds 60000 chars, so the limit is set high
+    # enough to accommodate future hardware with even larger stream counts.
     if len(pipeline_cmd) > max_length:
         raise ValueError(
             f"Pipeline command length exceeds maximum allowed length ({max_length} characters): {len(pipeline_cmd)}"
@@ -293,14 +298,14 @@ def cleanup_previous_analysis_files(device_id=None, analysis_type="all"):
             if device_id:
                 files_to_remove.extend(
                     [
-                        os.path.join(RESULTS_DIR, f"stdout-baseline-pipeline_{str(device_id).lower()}.txt"),
-                        os.path.join(RESULTS_DIR, f"stdout-baseline-result_{str(device_id).lower()}.txt"),
+                        os.path.join(BASELINE_RESULTS_DIR, f"stdout-baseline-pipeline_{str(device_id).lower()}.txt"),
+                        os.path.join(BASELINE_RESULTS_DIR, f"stdout-baseline-result_{str(device_id).lower()}.txt"),
                         os.path.join(LOGS_DIR, f"gst_debug_baseline_pipeline_{str(device_id).lower()}.log"),
                         os.path.join(LOGS_DIR, f"gst_debug_baseline_result_{str(device_id).lower()}.log"),
                     ]
                 )
                 baseline_result_file = os.path.join(
-                    RESULTS_DIR, f"baseline_streams_result_{str(device_id).replace('.', '_').lower()}.json"
+                    BASELINE_RESULTS_DIR, f"baseline_streams_result_{str(device_id).replace('.', '_').lower()}.json"
                 )
                 files_to_remove.append(baseline_result_file)
             else:
@@ -311,10 +316,10 @@ def cleanup_previous_analysis_files(device_id=None, analysis_type="all"):
             if device_id:
                 # Stdout files with run_id pattern (pattern matching for multi-socket)
                 stdout_pipeline_pattern = os.path.join(
-                    RESULTS_DIR, f"stdout-streams-pipeline_*_{str(device_id).lower()}.txt"
+                    ANALYSIS_RESULTS_DIR, f"stdout-streams-pipeline_*_{str(device_id).lower()}.txt"
                 )
                 stdout_result_pattern = os.path.join(
-                    RESULTS_DIR, f"stdout-streams-result_*_{str(device_id).lower()}.txt"
+                    ANALYSIS_RESULTS_DIR, f"stdout-streams-result_*_{str(device_id).lower()}.txt"
                 )
                 gst_debug_pipeline_pattern = os.path.join(
                     LOGS_DIR, f"gst_debug_streams_pipeline_*_{str(device_id).lower()}.log"
@@ -329,7 +334,7 @@ def cleanup_previous_analysis_files(device_id=None, analysis_type="all"):
                 files_to_remove.extend(glob.glob(gst_debug_result_pattern))
 
                 # Total streams result files (pattern matching for different run_ids)
-                result_pattern = os.path.join(RESULTS_DIR, f"total_streams_result_*_{device_id}.json")
+                result_pattern = os.path.join(ANALYSIS_RESULTS_DIR, f"total_streams_result_*_{device_id}.json")
                 files_to_remove.extend(glob.glob(result_pattern))
             else:
                 logger.debug("Device ID not provided, skipping total streams analysis file cleanup.")
@@ -561,8 +566,11 @@ def get_baseline_stream_analysis(baseline_pipeline=None, result_pipeline=None, p
             "status": "error",
         }
 
-    baseline_pipeline_path = os.path.join(RESULTS_DIR, f"stdout-baseline-pipeline_{str(device_id).lower()}.txt")
-    baseline_result_path = os.path.join(RESULTS_DIR, f"stdout-baseline-result_{str(device_id).lower()}.txt")
+    os.makedirs(BASELINE_RESULTS_DIR, exist_ok=True)
+    baseline_pipeline_path = os.path.join(
+        BASELINE_RESULTS_DIR, f"stdout-baseline-pipeline_{str(device_id).lower()}.txt"
+    )
+    baseline_result_path = os.path.join(BASELINE_RESULTS_DIR, f"stdout-baseline-result_{str(device_id).lower()}.txt")
     gst_debug_pipeline_path = os.path.join(LOGS_DIR, f"gst_debug_baseline_pipeline_{str(device_id).lower()}.log")
     gst_debug_result_path = os.path.join(LOGS_DIR, f"gst_debug_baseline_result_{str(device_id).lower()}.log")
 
@@ -611,7 +619,12 @@ def get_baseline_stream_analysis(baseline_pipeline=None, result_pipeline=None, p
         pipeline_process = subprocess.Popen(
             result_pipeline_cmd,
             stdout=fp_result,
-            stderr=subprocess.PIPE,
+            # Redirect stderr to DEVNULL: newer DLStreamer images emit many non-fatal
+            # GStreamer-CRITICAL 'gst_buffer_get_meta: assertion buffer != NULL' messages
+            # on the result (FPS aggregator) pipeline. With stderr=PIPE these fill the
+            # pipe buffer and can deadlock the process. Failures are still detected via
+            # exit code; the main pipeline retains stderr=PIPE for crash-pattern analysis.
+            stderr=subprocess.DEVNULL,
             env=env_result,
             start_new_session=True,  # Enable process group termination
         )
@@ -640,9 +653,11 @@ def get_baseline_stream_analysis(baseline_pipeline=None, result_pipeline=None, p
         # Capture result process information
         result_info["result_process_exit_code"] = pipeline_process.returncode
         if pipeline_process.returncode != 0:
-            stderr_output = pipeline_process.stderr.read().decode() if pipeline_process.stderr else "No stderr"
+            # stderr was redirected to DEVNULL to suppress non-fatal GStreamer buffer warnings;
+            # failure is identified by exit code alone.
             logger.error(
-                f"Baseline result pipeline failed with exit code {pipeline_process.returncode}: {stderr_output}"
+                f"Baseline result pipeline failed with exit code {pipeline_process.returncode} "
+                f"(stderr suppressed — see GST_DEBUG logs for details)"
             )
 
             # Use robust termination for main process
@@ -782,8 +797,13 @@ def get_n_stream_analysis_per_device(
     os.environ["LIBVA_MESSAGING_LEVEL"] = "1"
 
     # Use device-specific file names with run_id to prevent conflicts during concurrent multi-socket analysis
-    streams_pipeline_path = os.path.join(RESULTS_DIR, f"stdout-streams-pipeline_{run_id}_{str(device_id).lower()}.txt")
-    streams_result_path = os.path.join(RESULTS_DIR, f"stdout-streams-result_{run_id}_{str(device_id).lower()}.txt")
+    os.makedirs(ANALYSIS_RESULTS_DIR, exist_ok=True)
+    streams_pipeline_path = os.path.join(
+        ANALYSIS_RESULTS_DIR, f"stdout-streams-pipeline_{run_id}_{str(device_id).lower()}.txt"
+    )
+    streams_result_path = os.path.join(
+        ANALYSIS_RESULTS_DIR, f"stdout-streams-result_{run_id}_{str(device_id).lower()}.txt"
+    )
     # streams_pipeline_path = (Path(pipeline_stdout_path)).resolve()
     # streams_result_path = (Path(result_stdout_path)).resolve()
 
@@ -841,7 +861,12 @@ def get_n_stream_analysis_per_device(
         pipeline_process = subprocess.Popen(
             result_pipeline_cmd,
             stdout=fp_result,
-            stderr=subprocess.PIPE,
+            # Redirect stderr to DEVNULL: newer DLStreamer images emit many non-fatal
+            # GStreamer-CRITICAL 'gst_buffer_get_meta: assertion buffer != NULL' messages
+            # on the result (FPS aggregator) pipeline. With stderr=PIPE these fill the
+            # pipe buffer and can deadlock the process. Failures are still detected via
+            # exit code; the main pipeline retains stderr=PIPE for crash-pattern analysis.
+            stderr=subprocess.DEVNULL,
             env=env_result,
             start_new_session=True,  # Enable process group termination
         )
@@ -872,8 +897,12 @@ def get_n_stream_analysis_per_device(
         if not timeout_occurred:
             result_info["result_process_exit_code"] = pipeline_process.returncode
             if pipeline_process.returncode != 0:
-                stderr_output = pipeline_process.stderr.read().decode() if pipeline_process.stderr else "No stderr"
-                logger.error(f"Result pipeline failed with exit code {pipeline_process.returncode}: {stderr_output}")
+                # stderr was redirected to DEVNULL to suppress non-fatal GStreamer buffer warnings;
+                # failure is identified by exit code alone.
+                logger.error(
+                    f"Result pipeline failed with exit code {pipeline_process.returncode} "
+                    f"(stderr suppressed — see GST_DEBUG logs for details)"
+                )
 
                 # Use robust termination for main process
                 main_terminated = terminate_process_safely(main_process, "multi-stream main pipeline", timeout=3)
@@ -1065,7 +1094,8 @@ def baseline_streams_analysis(
 
     # Define the baseline result path. replace all dot with underscore of device id value and normalize as lowercase
     device_id_safe = str(device_id).replace(".", "_").lower()
-    baseline_streams_result_path = f"{RESULTS_DIR}/baseline_streams_result_{device_id_safe}.json"
+    os.makedirs(BASELINE_RESULTS_DIR, exist_ok=True)
+    baseline_streams_result_path = os.path.join(BASELINE_RESULTS_DIR, f"baseline_streams_result_{device_id_safe}.json")
     baseline_num_streams = {}
 
     try:
@@ -1164,7 +1194,8 @@ def total_streams_analysis(
     analysis_start_time = time.time()
 
     filename = f"total_streams_result_{run_id}_{device_id}.json"
-    result_path = (Path(RESULTS_DIR) / filename).resolve()
+    os.makedirs(ANALYSIS_RESULTS_DIR, exist_ok=True)
+    result_path = (Path(ANALYSIS_RESULTS_DIR) / filename).resolve()
 
     if not os.path.exists(result_path):
         with open(result_path, "w") as wfile:

@@ -594,7 +594,7 @@ def prepare_estimate_num_streams_for_device(
             str(pipeline_timeout),
         ]
 
-        result = run_dlstreamer_analyzer_container(
+        batch_result = run_dlstreamer_analyzer_container(
             docker_client=docker_client,
             docker_image_tag=docker_image_tag_analyzer,
             command=command,
@@ -603,16 +603,20 @@ def prepare_estimate_num_streams_for_device(
             container_mnt_dir=container_mnt_dir,
             render_gid=grp.getgrnam("render").gr_gid,
             user_gid=os.getuid(),
+            # Use batch mode so container logs are collected synchronously within the
+            # current Allure step for this device. Server mode uses async log streaming
+            # which causes logs to be attached to whichever Allure step is active when
+            # the streaming thread fires, mis-grouping them under a different device.
             mode="batch",
             result_file=f"baseline_streams_result_{str(device_id).replace('.', '_').lower()}.json",
-            container_result_file_dir=f"{container_mnt_dir}/results",
+            container_result_file_dir=f"{container_mnt_dir}/results/baseline",
         )
 
-        # Extract and process results
-        if result["result_json"]:
-            baseline_streams = result["result_json"]
-        else:
-            raise RuntimeError("Could not extract test results from container.")
+        # Batch mode mounts a temp dir at container_result_file_dir to capture the
+        # result file, so the JSON is returned directly in batch_result["result_json"].
+        if not batch_result.get("result_json"):
+            raise RuntimeError("Could not extract baseline test results from container.")
+        baseline_streams = batch_result["result_json"]
 
         device_info = baseline_streams.get(device_id, {})
         # Check for valid baseline results

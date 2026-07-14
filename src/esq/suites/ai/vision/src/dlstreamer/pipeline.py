@@ -48,7 +48,9 @@ def get_device_type_key(device_id: str, device_dict=None):
         return device_type_key
 
 
-def build_multi_pipeline_with_devices(pipeline, device_id, num_streams, sink_element=None, fpscounter_elements=None):
+def build_multi_pipeline_with_devices(
+    pipeline, device_id, num_streams, sink_element=None, fpscounter_elements=None, pre_fpscounter_elements=None
+):
     """
     Build a multi-stream pipeline for a specific device with FPS measurement aggregation.
 
@@ -72,6 +74,14 @@ def build_multi_pipeline_with_devices(pipeline, device_id, num_streams, sink_ele
                      Both sync and async properties (if present) are extracted and applied to result pipeline.
                      If None, defaults to "fakesink sync=true"
         fpscounter_elements: Additional properties for gvafpscounter element (e.g., "starting-frame=2000")
+        pre_fpscounter_elements: GStreamer elements to insert before gvafpscounter (e.g.,
+                     "vapostproc ! capsfilter caps='video/x-raw'" for GPU devices).
+                     GPU hardware-accelerated pipelines produce frames in VA memory
+                     (video/x-raw(memory:VAMemory)). Software elements such as gvafpscounter,
+                     gvawatermark, and videoconvert require standard system memory (video/x-raw).
+                     This conversion step is only needed when visualization or other software
+                     elements follow gvafpscounter. CPU and NPU pipelines output system memory
+                     directly so no conversion is required. If None or empty, skipped.
 
     Returns:
         Tuple of (multi_pipeline, result_pipeline)
@@ -113,7 +123,8 @@ def build_multi_pipeline_with_devices(pipeline, device_id, num_streams, sink_ele
         # Replace ${PIPELINE_ID} placeholder in the pipeline string
         current_pipeline = pipeline.replace("${PIPELINE_ID}", placeholder_pipeline_id)
 
-        additional_elements = f"! gvafpscounter{fpscounter_props} write-pipe=/tmp/{pipe_id} ! {sink_element}"
+        pre_fc = f"! {pre_fpscounter_elements} " if pre_fpscounter_elements else ""
+        additional_elements = f"{pre_fc}! gvafpscounter{fpscounter_props} write-pipe=/tmp/{pipe_id} ! {sink_element}"
         inputs.append(f"{current_pipeline} {additional_elements}")
 
     pipeline_branches = " ".join(inputs)
@@ -241,6 +252,45 @@ def get_fpscounter_config(pipeline_params, device_id, device_dict=None):
     return fpscounter_value
 
 
+def get_pre_fpscounter_elements_config(pipeline_params, device_id, device_dict=None):
+    """
+    Get pre-fpscounter GStreamer elements configuration from pipeline_params.
+
+    GPU hardware-accelerated pipelines (iGPU/dGPU) decode and run inference with frames
+    residing in VA memory (video/x-raw(memory:VAMemory)). Software elements that come after
+    gvafpscounter in the pipeline — such as gvawatermark, videoconvert, and display sinks
+    (ximagesink, autovideosink) — cannot operate on VA memory and require standard system
+    memory (video/x-raw). Inserting ``vapostproc ! capsfilter caps='video/x-raw'`` before
+    gvafpscounter performs the GPU-to-system memory copy, unblocking all downstream software
+    elements.
+
+    CPU and NPU pipelines output frames directly in system memory, so no conversion is
+    needed and this parameter should be empty (or omitted) for those devices.
+
+    This conversion is only relevant for multi-stream pipelines where a configurable
+    SINK_ELEMENT (e.g. visualization) follows gvafpscounter. Baseline pipelines always
+    use ``fakesink`` and are unaffected.
+
+    Args:
+        pipeline_params: Dictionary of pipeline parameters
+        device_id: Device ID to use for parameter lookup
+        device_dict: Dictionary containing device information (optional)
+
+    Returns:
+        String with pre-fpscounter GStreamer elements, or empty string if none needed.
+        Example for GPU: ``"vapostproc ! capsfilter caps='video/x-raw'"``
+    """
+    if not pipeline_params:
+        return ""
+
+    type_key = get_device_type_key(device_id, device_dict)
+    pre_fc_params = pipeline_params.get("PRE_FPSCOUNTER_ELEMENTS", {})
+
+    value = pre_fc_params.get(type_key, pre_fc_params.get("default", ""))
+    logger.debug(f"Pre-fpscounter elements for {device_id} (type_key={type_key}): '{value}'")
+    return value
+
+
 def get_pipeline_info(
     device_id: str,
     pipeline: str,
@@ -279,12 +329,14 @@ def get_pipeline_info(
         else:
             fpscounter_config = get_fpscounter_config(pipeline_params, device_id, device_dict)
             sink_element = get_sink_element_config(pipeline_params, device_id, device_dict)
+            pre_fpscounter_elements = get_pre_fpscounter_elements_config(pipeline_params, device_id, device_dict)
             multi, result = build_multi_pipeline_with_devices(
                 pipeline=resolved_pipeline,
                 device_id=device_id,
                 num_streams=num_streams,
                 sink_element=sink_element,
                 fpscounter_elements=fpscounter_config,
+                pre_fpscounter_elements=pre_fpscounter_elements,
             )
             if len(multi) > 1500:
                 truncated = f"{multi[:1000]} ... \n[middle content truncated] ... {multi[-500:]}"

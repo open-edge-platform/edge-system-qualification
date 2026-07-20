@@ -1008,7 +1008,12 @@ class SystemValidator:
         if re.search(r"atom.*\bx[67]\d{3}[a-z]*\b", brand_lower):
             return True
 
-        # Pattern 4: Historical Pentium and Celeron
+        # Pattern 4: Bare Intel N-series without "Core" or "Processor" qualifier
+        # e.g., "Intel(R) N150", "Intel N97", "Intel N100", "Intel N200"
+        if re.search(r"\bn\d{2,4}\b", brand_lower) and "intel" in brand_lower and "core" not in brand_lower:
+            return True
+
+        # Pattern 5: Historical Pentium and Celeron
         if "pentium" in brand_lower or "celeron" in brand_lower:
             return True
 

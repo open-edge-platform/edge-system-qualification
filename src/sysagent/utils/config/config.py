@@ -697,7 +697,7 @@ def get_active_profile_configs() -> Optional[Dict[str, Any]]:
             logger.debug(f"Applying tier filtering for active profile: {active_profile}, tier: {highest_tier}")
             profile_configs = filter_profile_by_tier(profile_configs, highest_tier)
         elif profile_has_tiers:
-            logger.debug(f"Profile {active_profile} has tiers but no highest tier determined - using all tiers")
+            logger.warning(f"Profile {active_profile} has tiers but no highest tier was determined")
         else:
             logger.debug(f"Profile {active_profile} has no tiers - using merged parameters as-is")
 

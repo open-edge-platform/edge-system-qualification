@@ -377,13 +377,19 @@ def _run_single_profile(
             return 1, False
 
     # Get the profile tier and filter configuration
-    from sysagent.utils.testing.tier_validator import get_highest_matching_tier
+    from sysagent.utils.testing.tier_validator import get_highest_matching_tier, validate_profile_tiers
 
     profile_highest_tier = get_highest_matching_tier(profile_configs)
     if profile_highest_tier:
         logger.info(f"Highest passed tier for profile '{profile_name}': {profile_highest_tier}")
         os.environ["ACTIVE_PROFILE_HIGHEST_TIER"] = profile_highest_tier
         profile_configs = filter_profile_by_tier(profile_configs, profile_highest_tier)
+    else:
+        profile_has_tiers = bool(profile_configs.get("params", {}).get("tiers"))
+        if profile_has_tiers:
+            tier_results = validate_profile_tiers(profile_configs)
+            _log_no_tier_match(profile_name, tier_results)
+            return TIER_SKIP_EXIT, False
 
     # Verify that the profile has valid suites section after filtering
     profile_suites = profile_configs.get("suites", [])
@@ -724,6 +730,16 @@ def _validate_all_profiles(all_profile_items, skip_system_check: bool):
     return valid_profiles, failed_profiles
 
 
+# Sentinel exit code returned when a profile is skipped because no system tier matched.
+# Distinct from 1 (test failure) so callers can distinguish skipped vs failed.
+TIER_SKIP_EXIT = 2
+
+
+def _log_no_tier_match(profile_name: str, tier_results: dict) -> None:
+    """Log a concise error when no system tier matches the profile's requirements."""
+    logger.error(f"No system tier matched for profile '{profile_name}' - skipping")
+
+
 def _run_single_profile_in_batch(profile, data_dir: str, verbose: bool, debug: bool) -> int:
     """Run a single profile in batch mode with proper cleanup."""
     profile_configs = profile.get("configs")
@@ -753,6 +769,14 @@ def _run_single_profile_in_batch(profile, data_dir: str, verbose: bool, debug: b
         logger.info(f"Highest passed tier for profile '{profile_name}': {profile_highest_tier}")
         os.environ["ACTIVE_PROFILE_HIGHEST_TIER"] = profile_highest_tier
         profile_configs = filter_profile_by_tier(profile_configs, profile_highest_tier)
+    else:
+        profile_has_tiers = bool(profile_configs.get("params", {}).get("tiers"))
+        if profile_has_tiers:
+            from sysagent.utils.testing.tier_validator import validate_profile_tiers
+
+            tier_results = validate_profile_tiers(profile_configs)
+            _log_no_tier_match(profile_name, tier_results)
+            return TIER_SKIP_EXIT
 
     # Verify suites exist after filtering
     profile_suites = profile_configs.get("suites", [])

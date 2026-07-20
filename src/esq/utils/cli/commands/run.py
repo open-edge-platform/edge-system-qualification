@@ -17,6 +17,7 @@ from typing import Any, Dict, List
 
 # Import sysagent's low-level execution functions (generic, reusable)
 from sysagent.utils.cli.commands.run import (
+    TIER_SKIP_EXIT,
     _determine_final_exit_code,
     _generate_test_reports,
     _run_single_profile,
@@ -566,9 +567,20 @@ def run_tests(
         if interrupt_occurred or shared_state.INTERRUPT_OCCURRED:
             logger.warning("Test execution was interrupted by user")
 
-        if tests_ran:
+        # TIER_SKIP_EXIT is the specific sentinel for "no tier matched" - distinct from
+        # validation failure (exit 1) or other early aborts.
+        all_skipped = result_code == TIER_SKIP_EXIT
+
+        # Generate reports when tests ran, OR when tier-skip (so system hardware info is
+        # available for review). Do NOT generate for other failures (e.g. profile validation).
+        if tests_ran or all_skipped:
             _generate_test_reports(data_dir, verbose, debug)
             result_code = _determine_final_exit_code(data_dir, result_code)
+
+        if all_skipped:
+            logger.error("No qualification tests ran - all profile(s) were skipped: no system tier matched")
+            logger.error("Check system hardware compatibility: run 'esq info' or review the report above")
+            result_code = 1
 
     return result_code
 
@@ -904,6 +916,7 @@ def _run_all_profiles_esq(
     logger.info(f"Running tests for {len(valid_profiles)} valid profiles in dependency order")
     result = 0
     executed_profiles = set()
+    tests_actually_ran = False
 
     for profile_name in execution_order:
         # Only run if profile is valid
@@ -913,8 +926,18 @@ def _run_all_profiles_esq(
                 continue
 
             profile_type, profile = valid_profiles_map[profile_name]
-            result = _run_single_profile_in_batch(profile, data_dir, verbose, debug)
+            profile_result = _run_single_profile_in_batch(profile, data_dir, verbose, debug)
             executed_profiles.add(profile_name)
+            if profile_result != TIER_SKIP_EXIT:
+                tests_actually_ran = True
+                result = profile_result
+            elif result == 0:
+                # Only record tier-skip as error if no other result yet
+                result = 1
 
     logger.info(f"All profiles processed. Results: {result}")
-    return result, True
+    # Signal tier-skip-all with the sentinel so run_tests can distinguish it from
+    # validation failures (which return 1, not TIER_SKIP_EXIT)
+    if not tests_actually_ran and result != 0:
+        return TIER_SKIP_EXIT, False
+    return result, tests_actually_ran

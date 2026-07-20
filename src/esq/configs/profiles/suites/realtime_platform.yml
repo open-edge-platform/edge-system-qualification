@@ -1,0 +1,98 @@
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+name: "profile.suite.realtime.platform"
+description: "Real-time platform capability detection — PREEMPT-RT, TSN and TCC"
+version: "1.0.0"
+params:
+  labels:
+    profile_display_name: "Real-Time"
+    group: "realtime.platform"
+    type: "suite"
+    display_status: false
+  requirements:
+    # Hardware requirements
+    cpu_min_cores: 2
+    memory_min_gib: 2.0
+    # Software requirements
+    os_type:
+      - "linux"
+    docker_required: false  # Runs natively for kernel/hardware capability detection
+
+suites:
+  - name: "realtime"
+    sub_suites:
+      - name: "platform"
+        tests:
+          # -----------------------------------------------------------------
+          test_preempt_rt:
+            params:
+              - test_id: "RT-KRN-001"
+                display_name: "PREEMPT-RT Kernel Check"
+                description: |
+                  Verifies the running Linux kernel provides full real-time
+                  preemption (PREEMPT_RT), required for deterministic
+                  low-latency workloads. Detected via
+                  CONFIG_PREEMPT_RT=y in /boot/config-<release>.
+                timeout: 60
+                key_metrics:
+                  - preempt_rt_enabled
+
+          test_tsn:
+            params:
+              - test_id: "RT-TSN-001"
+                display_name: "TSN Detection"
+                description: |
+                  Detects Time-Sensitive Networking capabilities: Ethernet
+                  interfaces using the Intel igc driver with PTP hardware
+                  clock association via PCI sysfs paths.
+                timeout: 120
+                key_metrics:
+                  - tsn_capable_interfaces
+
+          test_tcc:
+            params:
+              - test_id: "RT-TCC-001"
+                display_name: "TCC Detection"
+                description: |
+                  Detects TCC capability via invariant TSC CPU flags
+                  (constant_tsc + nonstop_tsc).
+                timeout: 60
+                key_metrics:
+                  - tcc_capable
+
+          test_tsc_clocksource:
+            params:
+              - test_id: "RT-TSC-001"
+                display_name: "TSC Active Clocksource"
+                description: |
+                  Verifies TSC is the active kernel clocksource, indicating
+                  the platform is configured for deterministic timing.
+                timeout: 30
+                key_metrics:
+                  - tsc_clocksource_active
+
+          test_epb:
+            params:
+              - test_id: "RT-EPB-001"
+                display_name: "Energy Performance Bias"
+                description: |
+                  Reads CPU energy/performance preference (0=performance,
+                  15=power-saving, -1=unavailable). Probes legacy EPB sysfs
+                  then EPP sysfs as fallback.
+                timeout: 30
+                key_metrics:
+                  - energy_perf_bias
+
+          test_pci_multi_vc:
+            params:
+              - test_id: "RT-PCI-001"
+                display_name: "PCI Multi-VC Detection"
+                description: |
+                  Counts PCIe devices with VC extended capability and Extended
+                  VC Count >= 1. On Intel TCC platforms with Multi Virtual
+                  Channel enabled, additional VCs provide a dedicated real-time
+                  traffic queue for deterministic memory-access latency.
+                timeout: 30
+                key_metrics:
+                  - pci_multi_vc

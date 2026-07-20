@@ -397,19 +397,33 @@ setup_telemetry_apt_packages() {
         curl
         ca-certificates
         intel-gpu-tools
-        "linux-tools-$(uname -r)"
         linux-tools-generic
     )
 
     DEBIAN_FRONTEND=noninteractive apt-get update -qq || true
     if DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "${pkgs[@]}"; then
         echo "  [OK] Installed telemetry APT packages (${#pkgs[@]} packages)"
-        _MODULE_PASS+=("$MODULE")
     else
         echo "  [ERROR] apt-get install failed for one or more telemetry packages"
         _MODULE_FAIL+=("$MODULE")
         return 1
     fi
+
+    # Attempt to install the kernel-version-specific linux-tools package.
+    # This is best-effort: custom and vendor kernels (e.g. RT, OEM)
+    # often have no matching package in the configured apt repos, so a
+    # failure here is non-fatal — linux-tools-generic covers most use cases.
+    local KERNEL_TOOLS_PKG
+    KERNEL_TOOLS_PKG="linux-tools-$(uname -r)"
+    if DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            "$KERNEL_TOOLS_PKG" > /dev/null 2>&1; then
+        echo "  [OK] Installed $KERNEL_TOOLS_PKG"
+    else
+        echo "  [INFO] $KERNEL_TOOLS_PKG not available in apt repos (custom/vendor kernel detected)"
+        echo "         linux-tools-generic installed as fallback; perf may not match running kernel exactly"
+    fi
+
+    _MODULE_PASS+=("$MODULE")
 }
 
 # ---------------------------------------------------------------------------
@@ -660,6 +674,99 @@ UDEV_EOF
 }
 
 # ---------------------------------------------------------------------------
+# Module 11: PCI Device Info Dump
+# ---------------------------------------------------------------------------
+# Captures full PCI device information (lspci -vvvnn) as root and saves it
+# to ~/.esq/pci/lspci_verbose.txt in the calling user's home directory.
+# Running lspci as root gives full 4096-byte PCIe extended config space
+# access via sysfs, including extended capabilities (Virtual Channel, etc.)
+# that are not visible to unprivileged processes.
+#
+# The dump is:
+#   - Stored under the calling user's home directory (~/.esq/pci/).
+#   - Protected with user-only permissions (0700 dir, 0600 file).
+#   - Overwritten on each re-run to reflect the current hardware state.
+#   - Reusable by all ESQ tests that need PCI device information.
+#
+# Re-run this script after hardware changes to refresh the dump.
+setup_pci_device_info() {
+    local MODULE="PCI Device Info Dump"
+    echo ""
+    echo "--- $MODULE ---"
+
+    _require_root "$MODULE" || return 0
+
+    # lspci is provided by pciutils, installed by Module 1.
+    if ! command -v lspci > /dev/null 2>&1; then
+        echo "  [ERROR] lspci not found. Install pciutils:"
+        echo "          sudo apt-get install pciutils"
+        _MODULE_FAIL+=("$MODULE")
+        return 1
+    fi
+
+    # Determine the calling user's home directory.
+    # When the script is invoked via sudo, SUDO_USER holds the original user.
+    local CALLING_USER="${SUDO_USER:-}"
+    if [ -z "$CALLING_USER" ]; then
+        echo "  [WARN] Cannot determine calling user. Run via sudo to write to user home."
+        _MODULE_SKIP+=("$MODULE (run via sudo to enable)")
+        return 0
+    fi
+
+    local USER_HOME
+    USER_HOME=$(getent passwd "$CALLING_USER" | cut -d: -f6 2>/dev/null || echo "")
+    if [ -z "$USER_HOME" ] || [ ! -d "$USER_HOME" ]; then
+        echo "  [ERROR] Could not determine home directory for '$CALLING_USER'"
+        _MODULE_FAIL+=("$MODULE")
+        return 1
+    fi
+
+    local ESQ_CACHE_DIR="$USER_HOME/.esq/pci"
+    local LSPCI_DUMP="$ESQ_CACHE_DIR/lspci_verbose.txt"
+
+    # Create ~/.esq/pci/ with user-only permissions.
+    # chmod 0700 ensures the directory (and its contents) are not world-readable.
+    mkdir -p "$ESQ_CACHE_DIR"
+    chown -R "$CALLING_USER:" "$USER_HOME/.esq"
+    chmod 0700 "$USER_HOME/.esq"
+    chmod 0700 "$ESQ_CACHE_DIR"
+
+    # Capture full PCI device information as root.
+    # -vvv: maximum verbosity (all capabilities including extended at >0x100).
+    # -nn:  numeric vendor/device/class IDs alongside human-readable names.
+    # As root, lspci reads the full 4096-byte PCIe config space via sysfs.
+    echo "  [INFO] Capturing full PCI device information (lspci -vvvnn)..."
+    if lspci -vvvnn > "$LSPCI_DUMP" 2>/dev/null; then
+        local device_count
+        device_count=$(grep -c '^[0-9a-f]' "$LSPCI_DUMP" 2>/dev/null || echo 0)
+        echo "  [OK] Captured $device_count PCI device(s) to $LSPCI_DUMP"
+    else
+        echo "  [ERROR] lspci failed to capture PCI device information"
+        rm -f "$LSPCI_DUMP"
+        _MODULE_FAIL+=("$MODULE")
+        return 1
+    fi
+
+    # User-only file permissions (not world-readable).
+    chown "$CALLING_USER:" "$LSPCI_DUMP"
+    chmod 0600 "$LSPCI_DUMP"
+    echo "  [OK] Saved: $LSPCI_DUMP (owner: $CALLING_USER, mode: 0600)"
+    echo "  [INFO] Re-run this script after hardware changes to refresh."
+    echo "  [INFO] Used by ESQ tests for PCI capability detection (VC, etc.)."
+
+    # Verify that the calling user can read the file.
+    if sudo -u "$CALLING_USER" test -r "$LSPCI_DUMP" 2>/dev/null; then
+        local line_count
+        line_count=$(sudo -u "$CALLING_USER" cat "$LSPCI_DUMP" 2>/dev/null | wc -l || echo 0)
+        echo "  [OK] Verified: '$CALLING_USER' can read dump ($line_count lines)"
+    else
+        echo "  [WARN] Could not verify read access for '$CALLING_USER'"
+    fi
+
+    _MODULE_PASS+=("$MODULE")
+}
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 main() {
@@ -676,8 +783,7 @@ main() {
     setup_rust_toolchain
     setup_xpu_smi
     setup_pmt_telemetry
-
-    echo ""
+    setup_pci_device_info
     echo "=== Summary ==="
     local m
     if [ ${#_MODULE_PASS[@]} -gt 0 ]; then

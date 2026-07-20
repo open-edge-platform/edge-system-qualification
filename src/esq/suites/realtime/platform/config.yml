@@ -1,0 +1,158 @@
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+# KPI definitions for the realtime platform capability tests.
+#
+# All KPIs are disabled by default so the data-collection suite
+# (profile.suite.realtime.platform) records capability metrics without
+# enforcing pass/fail. Qualification profiles (e.g. the Robotics
+# qualification) enable enforcement per test via kpi_refs + kpi_override.
+
+kpi:
+  # ============================================================
+  # PREEMPT-RT Kernel Check
+  # Metric: preempt_rt_enabled (1 = PREEMPT_RT detected, 0 = not)
+  # ============================================================
+  preempt_rt_enabled:
+    name: "PREEMPT-RT Kernel"
+    type: "numeric"
+    validation:
+      operator: "eq"
+      reference: 1
+      enabled: false
+    unit: null
+    severity: "critical"
+    description: "Kernel provides full real-time preemption (1=PREEMPT_RT, 0=not)"
+    default_value: 0
+
+  # ============================================================
+  # TSN Detection
+  # Metric: tsn_capable_interfaces (count of igc-driver Ethernet interfaces)
+  # ============================================================
+  tsn_capable_interfaces:
+    name: "TSN Capable Interfaces"
+    type: "numeric"
+    validation:
+      operator: "gte"
+      reference: 1
+      enabled: false
+    unit: "interfaces"
+    severity: "normal"
+    description: "Count of Ethernet interfaces using the igc driver (TSN-capable NICs)"
+    default_value: 0
+
+  ptp_clocks:
+    name: "PTP Hardware Clocks"
+    type: "numeric"
+    validation:
+      operator: "gte"
+      reference: 1
+      enabled: false
+    unit: "clocks"
+    severity: "normal"
+    description: "Number of PTP hardware clock devices"
+    default_value: 0
+
+  # ============================================================
+  # TCC Detection
+  # Metric: tcc_capable (1 = PTCT/RTCT ACPI table present, 0 = not)
+  # ============================================================
+  tcc_capable:
+    name: "TCC Capable"
+    type: "numeric"
+    validation:
+      operator: "eq"
+      reference: 1
+      enabled: false
+    unit: null
+    severity: "normal"
+    description: "Platform publishes the PTCT/RTCT TCC ACPI table — TCC supported and enabled in BIOS (1=yes, 0=no)"
+    default_value: 0
+
+  constant_tsc:
+    name: "Constant TSC"
+    type: "numeric"
+    validation:
+      operator: "eq"
+      reference: 1
+      enabled: false
+    unit: null
+    severity: "normal"
+    description: "CPU exposes the constant_tsc flag (1=yes, 0=no)"
+    default_value: 0
+
+  nonstop_tsc:
+    name: "Nonstop TSC"
+    type: "numeric"
+    validation:
+      operator: "eq"
+      reference: 1
+      enabled: false
+    unit: null
+    severity: "normal"
+    description: "CPU exposes the nonstop_tsc flag (1=yes, 0=no)"
+    default_value: 0
+
+  # ============================================================
+  # TSC Active Clocksource
+  # Metric: tsc_clocksource_active (1 = TSC is the active clocksource, 0 = not)
+  # ============================================================
+  tsc_clocksource_active:
+    name: "TSC Active Clocksource"
+    type: "numeric"
+    validation:
+      operator: "eq"
+      reference: 1
+      enabled: false
+    unit: null
+    severity: "normal"
+    description: "TSC is the active kernel clocksource (1=yes, 0=no)"
+    default_value: 0
+
+  # ============================================================
+  # MSR Write Access
+  # Metric: msr_write_capable (1=L3 CAT writable, 0=not writable, -1=indeterminate)
+  # ============================================================
+  msr_write_capable:
+    name: "MSR Write Capable"
+    type: "numeric"
+    validation:
+      operator: "eq"
+      reference: 1
+      enabled: false
+    unit: null
+    severity: "normal"
+    description: "L3 CAT MSR registers are writable (1=yes, 0=no, -1=permission denied)"
+    default_value: 0
+
+  # ============================================================
+  # Energy Performance Bias
+  # Metric: energy_perf_bias (0=performance, 15=power-saving, -1=unavailable)
+  # ============================================================
+  energy_perf_bias:
+    name: "Energy Performance Bias"
+    type: "numeric"
+    validation:
+      operator: "lte"
+      reference: 6
+      enabled: false
+    unit: null
+    severity: "normal"
+    description: "CPU energy/performance preference (0=performance, 15=power-saving, -1=unavailable)"
+    default_value: -1
+
+  # ============================================================
+  # PCI Multi-VC
+  # Metric: pci_multi_vc (count of PCIe devices with Multi-VC active)
+  # ============================================================
+  pci_multi_vc:
+    name: "PCI Multi-VC Devices"
+    type: "numeric"
+    validation:
+      operator: "gte"
+      reference: 1
+      enabled: false
+    unit: "devices"
+    severity: "normal"
+    description: "Count of PCIe devices with VC extended capability and Extended VC Count >= 1"
+    default_value: 0

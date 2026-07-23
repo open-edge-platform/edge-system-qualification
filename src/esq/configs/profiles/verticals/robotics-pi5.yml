@@ -14,7 +14,7 @@ params:
   requirements:
     # Hardware requirements
     memory_min_gib: 8.0
-    storage_min_gib: 5.0  # Free storage for container build and benchmark output
+    storage_min_gib: 12.6  # Free storage for container build and benchmark output
     # Software requirements
     os_type:
       - "linux"

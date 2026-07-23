@@ -84,7 +84,9 @@ def test_robotics_pi_rtc(
     execute_test_with_cache,
     prepare_test,
 ):
-    # Step 1: Extract parameters from configs
+    # ================================================================
+    # STEP 1: Extract Parameters
+    # ================================================================
     test_name = request.node.name.split("[")[0]
     test_id = configs.get("test_id", test_name)
     test_display_name = configs.get("display_name", test_name)
@@ -97,9 +99,15 @@ def test_robotics_pi_rtc(
     docker_image_tag = f"{container_image}:{image_tag}"
     container_name = f"{container_image}_{operation.lower()}"
 
-    logger.info(f"Robotics - Starting test: {test_display_name}")
+    # Qualification tests fail the run on interrupt; data-collection tests
+    # surface it as a runtime error instead. This flag drives that decision.
+    is_qualification = configs.get("labels", {}).get("type") == "qualification"
 
-    # Step 2: Validate system requirements
+    logger.info(f"Starting test: {test_display_name}")
+
+    # ================================================================
+    # STEP 2: Validate System Requirements
+    # ================================================================
     validate_system_requirements_from_configs(configs)
 
     # Setup
@@ -119,12 +127,21 @@ def test_robotics_pi_rtc(
     docker_client = DockerClient()
 
     # Initialize variables for error handling
-    test_failed = False
-    failure_message = ""
     results = None
+    test_failed = False
+    test_interrupted = False
+    failure_message = ""
+
+    def cleanup():
+        try:
+            docker_client.stop_container(container_name)
+        except Exception as cleanup_error:
+            logger.warning(f"Could not stop container '{container_name}' during cleanup: {cleanup_error}")
 
     try:
-        # Step 3: Prepare assets/dependencies
+        # ============================================================
+        # STEP 3: Prepare Assets/Dependencies
+        # ============================================================
         def prepare_assets():
             # Access outer scope variables
             nonlocal docker_image_tag, dockerfile_name, docker_dir, timeout
@@ -166,80 +183,28 @@ def test_robotics_pi_rtc(
 
             return result
 
-    except KeyboardInterrupt:
-        failure_message = (
-            f"User interrupt (Ctrl+C) detected during {test_display_name} test preparation. "
-            f"Test: {test_display_name}, Operation: {operation}. "
-            f"Partial setup may be incomplete."
-        )
-        logger.error(failure_message)
-        raise
+        try:
+            prepare_test(
+                test_name=test_name,
+                prepare_func=prepare_assets,
+                configs=configs,
+                name=f"{test_display_name}_Assets",
+            )
+        except Exception as prep_error:
+            # Handle docker build or other preparation failures
+            test_failed = True
+            failure_message = (
+                f"Test preparation failed during asset setup: {type(prep_error).__name__}: {str(prep_error)}. "
+                f"Possible causes: Docker build failure, network issues, or dependency problems. "
+                f"Docker image: {docker_image_tag}. "
+                f"Check logs for detailed error and verify Docker daemon is running."
+            )
+            logger.error(failure_message, exc_info=True)
+            logger.debug(f"Preparation failed - Docker dir: {docker_dir}, Timeout: {timeout}s")
 
-    except Exception as e:
-        test_failed = True
-        failure_message = (
-            f"Unexpected error during {test_display_name} test preparation: {type(e).__name__}: {str(e)}. "
-            f"Test: {test_display_name}, Operation: {operation}, Docker image: {docker_image_tag}. "
-            f"Check logs for full stack trace and error details."
-        )
-        logger.error(failure_message, exc_info=True)
-        logger.debug(f"Preparation context - Docker dir: {docker_dir}")
-        # Don't raise yet - create N/A result below
-
-    try:
-        prepare_test(
-            test_name=test_name, prepare_func=prepare_assets, configs=configs, name=f"{test_display_name}_Assets"
-        )
-    except Exception as prep_error:
-        # Handle docker build or other preparation failures
-        test_failed = True
-        failure_message = (
-            f"Test preparation failed during asset setup: {type(prep_error).__name__}: {str(prep_error)}. "
-            f"Possible causes: Docker build failure, network issues, or dependency problems. "
-            f"Docker image: {docker_image_tag}. "
-            f"Check logs for detailed error and verify Docker daemon is running."
-        )
-        logger.error(failure_message, exc_info=True)
-        logger.debug(f"Preparation failed - Docker dir: {docker_dir}, Timeout: {timeout}s")
-
-    # If preparation failed, return N/A metrics immediately
-    if test_failed:
-        metrics = _create_metrics(value="N/A", unit=None)  # type: ignore
-
-        results = Result.from_test_config(
-            configs=configs,
-            parameters={
-                "timeout(s)": timeout,
-                "display_name": test_display_name,
-                "operation": operation,
-            },
-            metrics=metrics,
-            metadata={
-                "status": "N/A",
-                "failure_reason": failure_message,
-            },
-        )
-
-        # Summarize with N/A status and exit
-        summarize_test_results(
-            results=results,
-            test_name=test_name,
-            configs=configs,
-            get_kpi_config=get_kpi_config,
-        )
-        pytest.fail(failure_message)
-
-    # Initialize results template using from_test_config for automatic metadata application
-    results = Result.from_test_config(
-        configs=configs,
-        parameters={
-            "timeout(s)": timeout,
-            "display_name": test_display_name,
-        },
-    )
-
-    try:
-        # Step 4: Execute test logic (with caching)
+        # ============================================================
+        # STEP 4: Execute Test Logic (with caching)
+        # ============================================================
         def execute_logic():
             # Access outer scope variables
             nonlocal docker_client, test_results, docker_image_tag, container_name, timeout, operation, device
@@ -249,15 +214,15 @@ def test_robotics_pi_rtc(
 
             # Initialize result template using from_test_config for automatic metadata application
             result = Result.from_test_config(
+                name=f"{test_id} - {test_display_name}",
                 configs=configs,
                 parameters={
-                    "test_id": test_id,
+                    "device": device,
                     "operation_type": operation,
-                    "display_name": test_display_name,
                 },
                 metrics=metrics,
                 metadata={
-                    "status": "N/A",
+                    "status": False,
                 },
             )
 
@@ -346,7 +311,7 @@ def test_robotics_pi_rtc(
                     logger.error(error_msg, exc_info=True)
 
                     result.metadata["failure_reason"] = error_msg
-                    result.metadata["status"] = "N/A"
+                    result.metadata["status"] = False
                     return result
 
                 if results_file_path.exists():
@@ -366,7 +331,7 @@ def test_robotics_pi_rtc(
                     )
                     logger.debug(f"Results directory contents: {results_dir_contents}")
                     result.metadata["failure_reason"] = "Results file not generated by test container"
-                    result.metadata["status"] = "N/A"
+                    result.metadata["status"] = False
                     return result
 
                 # Check if we collected valid metrics
@@ -381,12 +346,13 @@ def test_robotics_pi_rtc(
                     logger.error(error_msg)
                     logger.debug(f"Results file location: {results_file_path}")
                     result.metadata["failure_reason"] = error_msg
-                    result.metadata["status"] = "N/A"
+                    result.metadata["status"] = False
                     return result
 
                 # If successfully processed and collected valid metrics, mark as success
-                result.metadata["status"] = True
                 result.metadata.pop("failure_reason", None)  # Remove failure_reason if test succeeded
+                result.metadata["status"] = True
+                result.update_timestamps()
 
             except Exception as exec_error:
                 # Handle any execution errors (shell script failures, results file parsing, etc.)
@@ -398,50 +364,109 @@ def test_robotics_pi_rtc(
                 logger.error(error_msg, exc_info=True)
                 logger.debug(f"Execution context - Container: {container_name}, Results dir: {test_results}")
                 result.metadata["failure_reason"] = error_msg
-                # Metrics remain as N/A
+                result.metadata["status"] = False
                 return result
 
             return result
+
+        if not test_failed:
+            results = execute_test_with_cache(
+                cached_result=cached_result,
+                cache_result=cache_result,
+                run_test_func=execute_logic,
+                test_name=test_name,
+                configs=configs,
+            )
+
+        # Mark the test failed when the execution reported a non-passing status.
+        if not results.metadata.get("status", False):
+            test_failed = True
+            failure_message = results.metadata.get("failure_reason", f"{test_display_name} failed")
+
     except KeyboardInterrupt:
-        failure_message = f"Interrupt detected during {test_display_name} Test"
+        # Ctrl+C or run cancellation — record it and re-surface after cleanup.
+        test_interrupted = True
+        failure_message = "Interrupt detected during test execution"
         logger.error(failure_message)
 
-    except Exception as e:
+    except Exception as error:
         test_failed = True
-        failure_message = f"Unexpected error during {test_display_name} Test: {str(e)}"
+        # Any unexpected error — capture the message and continue to reporting.
+        failure_message = f"Unexpected error during {test_display_name} Test: {str(error)}"
         logger.error(failure_message, exc_info=True)
 
-    # Execute the test with shared fixture
-    results = execute_test_with_cache(
-        cached_result=cached_result,
-        cache_result=cache_result,
-        run_test_func=execute_logic,
-        test_name=test_name,
-        configs=configs,
-    )
+    finally:
+        # Always release resources, even on failure or interrupt.
+        cleanup()
 
-    # Handle N/A status (test failures)
-    if results.metadata.get("status") == "N/A" and "failure_reason" in results.metadata:
-        failure_msg = results.metadata["failure_reason"]
-        logger.error(f"Test failed with N/A status: {failure_msg}")
-        logger.info(f"Test summary - ID: {test_id}, Operation: {operation}")
+    # ================================================================
+    # Ensure a result object always exists so validation and
+    # summarization can record the outcome — even when execution was
+    # interrupted before producing results.
+    # ================================================================
+    if results is None:
+        metrics = _create_metrics(value="N/A", unit=None)  # type: ignore
 
+        results = Result.from_test_config(
+            name=f"{test_id} - {test_display_name}",
+            configs=configs,
+            parameters={
+                "device": device,
+                "operation_type": operation,
+            },
+            metrics=metrics,
+            metadata={
+                "status": False,
+            },
+            extended_metadata={
+                "message": failure_message or "Test did not complete"
+            },
+        )
+
+    # ================================================================
+    # STEP 5: Validate Results Against KPIs (optional)
+    # Only enforced when kpi_refs are configured for the test. Wrapped so a
+    # validation error never masks the underlying test outcome.
+    # ================================================================
+    try:
+        validate_test_results(
+            results=results,
+            configs=configs,
+            get_kpi_config=get_kpi_config,
+            test_name=test_name,
+        )
+    except Exception as validation_error:
+        logger.error(f"Validation failed: {validation_error}")
+
+    # ================================================================
+    # STEP 6: Generate Summary (always runs)
+    # ================================================================
+    try:
         summarize_test_results(
             results=results,
             test_name=test_name,
             configs=configs,
             get_kpi_config=get_kpi_config,
         )
+    except Exception as summary_error:
+        logger.error(f"Summarization failed: {summary_error}", exc_info=True)
 
-        pytest.fail(f"Robotics test '{test_name}' failed - {failure_msg}")
+    cache_result(results)
 
-    # Step 5: Validate results (if qualification profile)
-    validate_test_results(results=results, configs=configs, get_kpi_config=get_kpi_config, test_name=test_name)
-
-    # Step 6: Generate summary
-    summarize_test_results(results=results, test_name=test_name, configs=configs, get_kpi_config=get_kpi_config)
+    # ================================================================
+    # STEP 7: Surface the outcome
+    # Report interrupts and failures as proper pytest results instead of
+    # leaving a broken/errored status behind.
+    # ================================================================
+    if test_interrupted:
+        if is_qualification:
+            pytest.fail(failure_message)
+        else:
+            raise RuntimeError(failure_message)
 
     if test_failed:
-        pytest.fail(failure_message)
+        logger.error(f"Test failed with status: {failure_message}")
+        logger.info(f"Test summary - ID: {test_id}, Operation: {operation}")
+        pytest.fail(f"Robotics test '{test_name}' failed - {failure_message}")
 
     logger.info(f"Robotics test '{test_name}' completed successfully")

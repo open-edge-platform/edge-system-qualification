@@ -138,6 +138,26 @@ suites:
                 timeout: 600
                 requirements:
                   igpu_required: true
+          test_act:
+            params:
+              - test_id: "ROB-ACT-001"
+                test: "test_robotics_act"
+                name: "act_gpu"
+                display_name: "ACT Benchmark (GPU)"
+                description: "ACT robotics inference benchmark running in a Docker container on GPU"
+                operation: "act"
+                device: "GPU"
+                dockerfile_name: "Dockerfile"
+                container_image: "robotics_act_benchmark"
+                image_tag: "1.0"
+                docker_base_image: "ubuntu:24.04"
+                docker_nocache: false
+                timeout: 600
+                requirements:
+                  memory_min_gib: 8.0
+                  storage_min_gib: 1.7
+                  docker_required: true
+                  igpu_required: true
           test_fastmapping:
             params:
               - test_id: "ROB-FMP-001"

@@ -1,0 +1,89 @@
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+name: "profile.vertical.robotics-act"
+display_name: "Robotics"
+description: "Robotics Suites"
+version: "1.0.0"
+params:
+  labels:
+    profile_display_name: "Robotics"
+    group: "robotics"
+    type: "vertical"
+    display_status: false
+  requirements:
+    # Hardware requirements
+    memory_min_gib: 8.0
+    storage_min_gib: 1.7 # Free storage for container build and benchmark output
+    # Software requirements
+    os_type:
+    - "linux"
+    docker_required: true
+  # Modular telemetry configuration
+  # Telemetry runs as a lightweight background thread during test execution.
+  # Set enabled: false (or remove this block) to disable entirely.
+  telemetry:
+    enabled: true
+    interval: 10 # seconds between samples
+    modules:
+    # Title, scales, thresholds and axes are defined as defaults within each module.
+    # Only specify these here to override the module defaults.
+    # --- sysagent core modules ---
+    - name: cpu_usage
+      enabled: true
+
+    - name: cpu_freq
+      enabled: true
+
+    - name: cpu_temp
+      enabled: true
+
+    - name: memory_usage
+      enabled: true
+
+    # --- ESQ package modules ---
+    - name: package_power
+      enabled: true
+
+    - name: gpu_temp
+      enabled: true
+
+    - name: gpu_freq
+      enabled: true
+
+    - name: gpu_power
+      enabled: true
+
+    - name: gpu_usage
+      enabled: true
+
+    - name: npu_usage
+      enabled: true
+
+    - name: npu_freq
+      enabled: true
+
+suites:
+- name: "vertical"
+  sub_suites:
+  - name: "robotics"
+    tests:
+      # Key matches the test file (test_act.py) for CLI discovery;
+      # the per-param `test` field routes to the test function (test_robotics_act).
+      test_act:
+        params:
+        - test_id: "ROB-ACT-001"
+          test: "test_robotics_act"
+          name: "act_gpu"
+          display_name: "ACT Benchmark (GPU)"
+          description: "ACT robotics inference benchmark running in a Docker container on GPU"
+          operation: "act"
+          device: "GPU"
+          dockerfile_name: "Dockerfile"
+          container_image: "robotics_act_benchmark"
+          image_tag: "1.0"
+          docker_base_image: "ubuntu:24.04"
+          docker_nocache: false
+          timeout: 600
+          requirements:
+            igpu_required: true

@@ -137,6 +137,10 @@ suites:
                 docker_nocache: false
                 timeout: 600
                 requirements:
+                requirements:
+                  memory_min_gib: 8.0
+                  storage_min_gib: 12.6
+                  docker_required: true
                   igpu_required: true
           test_act:
             params:

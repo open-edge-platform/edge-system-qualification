@@ -24,8 +24,9 @@ RUN apt-get update -y && \
 # Update CA certificates to ensure the latest trusted root certificates are available
 RUN update-ca-certificates --fresh
 
-COPY setup.sh .
-RUN chmod +x setup.sh && bash setup.sh
+# Setup OpenVINO optimized PI0.5
+COPY setup_openvino.sh .
+RUN chmod +x setup_openvino.sh && bash setup_openvino.sh
 
 # Staged build
 FROM ${COMMON_BASE_IMAGE}

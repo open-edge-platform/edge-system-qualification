@@ -70,7 +70,7 @@ def validate_profile_requirements(
 
     # Perform validation with profile-specific context
     context = f"profile: {profile_name}" if profile_name else "system validator"
-    results = validator.validate_requirements(system_requirements, log_suggestions=True, context=context)
+    results = validator.validate_requirements(system_requirements, log_failures=True, context=context)
 
     # Add profile name to results for later reference
     if profile_name:
@@ -113,8 +113,8 @@ def validate_filtered_profile_requirements(
     profile_requirements = profile_params.get("requirements", {})
     profile_system_requirements = _convert_profile_requirements_to_system_format(profile_requirements)
 
-    # Don't log suggestions here - will be consolidated below
-    profile_results = validator.validate_requirements(profile_system_requirements, log_suggestions=False)
+    # Don't log failures here - will be consolidated below
+    profile_results = validator.validate_requirements(profile_system_requirements, log_failures=False)
 
     # Get consolidated test parameters that would actually run based on filters
     try:
@@ -149,7 +149,7 @@ def validate_filtered_profile_requirements(
     test_results = {"passed": True, "checks": []}
     if all_test_requirements:
         test_system_requirements = _convert_profile_requirements_to_system_format(all_test_requirements)
-        test_results = validator.validate_requirements(test_system_requirements, log_suggestions=False)
+        test_results = validator.validate_requirements(test_system_requirements, log_failures=False)
 
         # Add context to test requirement checks
         for check in test_results.get("checks", []):
@@ -178,11 +178,11 @@ def validate_filtered_profile_requirements(
     if not overall_passed:
         failed_checks = [check for check in all_checks if not check.get("passed", False)]
 
-        # Provide consolidated fix suggestions without duplicates, with profile context
-        from sysagent.utils.testing.validation_suggestions import log_validation_fix_suggestions
+        # Report failed requirements without duplicates, with profile context
+        from sysagent.utils.testing.validation_reporting import log_failed_requirements
 
         context = f"profile: {profile_name}" if profile_name else "system validator"
-        log_validation_fix_suggestions(failed_checks, context=context, deduplicate_by_category=True)
+        log_failed_requirements(failed_checks, context=context, deduplicate_by_category=True)
 
     # Add profile name to results for later reference
     if profile_name:

@@ -37,14 +37,14 @@ class SystemValidator:
         logger.debug("SystemValidator initialized with system info")
 
     def validate_requirements(
-        self, requirements: Dict[str, Any], log_suggestions: bool = True, context: str = "system validator"
+        self, requirements: Dict[str, Any], log_failures: bool = True, context: str = "system validator"
     ) -> Dict[str, Any]:
         """
         Validate system requirements against system info.
 
         Args:
             requirements: Dictionary of requirements to check
-            log_suggestions: Whether to log fix suggestions for failed checks
+            log_failures: Whether to log failed requirements with required vs actual values
             context: Context string for validation messages (e.g., "profile: my-profile")
 
         Returns:
@@ -74,9 +74,9 @@ class SystemValidator:
         # Summary logging
         failed_checks = [check for check in results["checks"] if not check["passed"]]
 
-        # Provide user-friendly suggestions (only if requested)
-        if not results["passed"] and log_suggestions:
-            self._log_fix_suggestions(failed_checks, context)
+        # Log failed requirements (only if requested)
+        if not results["passed"] and log_failures:
+            self._log_failed_requirements(failed_checks, context)
 
         return results
 
@@ -1027,11 +1027,11 @@ class SystemValidator:
         except (FileNotFoundError, OSError):
             return False
 
-    def _log_fix_suggestions(self, failed_checks: List[Dict[str, Any]], context: str = "system validator") -> None:
-        """Log user-friendly suggestions for fixing failed system requirements."""
-        from sysagent.utils.testing.validation_suggestions import log_validation_fix_suggestions
+    def _log_failed_requirements(self, failed_checks: List[Dict[str, Any]], context: str = "system validator") -> None:
+        """Log failed requirements showing required vs actual values."""
+        from sysagent.utils.testing.validation_reporting import log_failed_requirements
 
-        log_validation_fix_suggestions(failed_checks, context=context)
+        log_failed_requirements(failed_checks, context=context)
 
 
 def validate_system_requirements(requirements: Dict[str, Any], cache_dir: Optional[str] = None) -> Dict[str, Any]:

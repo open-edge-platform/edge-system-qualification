@@ -80,8 +80,8 @@ def _validate_tiers(
             )
             continue
         merged_req = _merge_requirements(tier_obj, profile_reqs, test_reqs, use_profile_reqs)
-        # Don't log suggestions for tier validation - tier mismatches are expected and handled internally
-        result = validator.validate_requirements({"hardware": merged_req, "software": {}}, log_suggestions=False)
+        # Don't log failures for tier validation - tier mismatches are expected and handled internally
+        result = validator.validate_requirements({"hardware": merged_req, "software": {}}, log_failures=False)
         results.append(
             {
                 "tier": tier_name,

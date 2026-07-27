@@ -111,16 +111,15 @@ This will:
 
 1. Check all specified requirements against system capabilities.
 2. Skip the test if any requirement is not met (via `pytest.skip`).
-3. Provide detailed error messages for failed requirements.
-4. Log fix suggestions for common issues.
+3. Log failed requirements showing required vs actual values.
 
 **Example validation output:**
 
 ```
 ╭─ Validation Failed: my-profile
 │  Missing requirements (2):
-│  • CPU cores >= 8: Upgrade to a CPU with more cores
-│  • Environment variable 'HF_TOKEN' required: Set the environment variable before running: export HF_TOKEN=<value>
+│  • Required: At least 8 CPU cores | Actual: 4 cores
+│  • Environment variable 'HF_TOKEN' required
 ╰─
 ```
 

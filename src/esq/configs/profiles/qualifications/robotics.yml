@@ -176,9 +176,29 @@ suites:
                 image_tag: "1.0"
                 docker_base_image: "amd64/ros:jazzy-ros-base"
                 docker_nocache: false
-                timeout: 600
+                timeout: 900
                 requirements:
                   memory_min_gib: 8.0
                   storage_min_gib: 9.0
+                  docker_required: true
+                  igpu_required: false
+          test_adbscan:
+            params:
+              - test_id: "ROB-ADB-001"
+                test: "test_robotics_adbscan"
+                name: "adbscan_cpu"
+                display_name: "ADBScan Benchmark (CPU)"
+                description: "ADBScan robotics benchmark running in a Docker container on CPU"
+                operation: "adbscan"
+                device: "CPU"
+                dockerfile_name: "Dockerfile"
+                container_image: "robotics_adbscan_benchmark"
+                image_tag: "1.0"
+                docker_base_image: "amd64/ros:jazzy-ros-base"
+                docker_nocache: false
+                timeout: 900
+                requirements:
+                  memory_min_gib: 8.0
+                  storage_min_gib: 4.0
                   docker_required: true
                   igpu_required: false

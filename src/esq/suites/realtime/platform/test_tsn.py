@@ -46,7 +46,6 @@ import io
 import logging
 import re
 from pathlib import Path
-from typing import Dict, List
 
 import allure
 import pytest
@@ -55,9 +54,9 @@ from sysagent.utils.core import Metrics, Result, run_command
 logger = logging.getLogger(__name__)
 
 
-def _get_all_interfaces() -> List[str]:
+def _get_all_interfaces() -> list[str]:
     """Return all non-loopback network interface names."""
-    interfaces: List[str] = []
+    interfaces: list[str] = []
     result = run_command(["ip", "-brief", "link"], timeout=10)
     if result and result.returncode == 0 and result.stdout:
         for line in result.stdout.strip().split("\n"):
@@ -89,7 +88,7 @@ def _is_virtual_interface(iface: str) -> bool:
     return any(iface.startswith(p) for p in ("docker", "veth", "br-", "virbr", "cni"))
 
 
-def _get_interface_driver_info(iface: str) -> Dict[str, str]:
+def _get_interface_driver_info(iface: str) -> dict[str, str]:
     """
     Return driver and PCI identity information for a network interface.
 
@@ -101,7 +100,7 @@ def _get_interface_driver_info(iface: str) -> Dict[str, str]:
     Returns a dict with ``driver``, ``bus_info``, ``pci_vendor_id``, and
     ``pci_device_id``. All values default to ``"unknown"`` when unavailable.
     """
-    info: Dict[str, str] = {
+    info: dict[str, str] = {
         "driver": "unknown",
         "bus_info": "unknown",
         "pci_vendor_id": "unknown",
@@ -123,13 +122,54 @@ def _get_interface_driver_info(iface: str) -> Dict[str, str]:
             value = Path(f"/sys/class/net/{iface}/device/{sysfs_name}").read_text(encoding="utf-8").strip()
             if value:
                 info[field] = value
-        except (OSError, IOError):
+        except OSError:
             pass
 
     return info
 
 
-def _get_ptp_clocks() -> Dict[str, str]:
+def _attach_network_interfaces_csv(result: "Result") -> None:
+    """Attach a CSV summary of network interfaces to the current Allure step.
+
+    Reads ``interface_details`` and ``tsn_capable_interfaces`` from
+    ``result.extended_metadata`` so the attachment is generated correctly for
+    both fresh runs and cache-hit reruns.  Does nothing when
+    ``interface_details`` is absent (e.g. a failure result).
+    """
+    iface_details = result.extended_metadata.get("interface_details", {})
+    igc_interfaces = result.extended_metadata.get("tsn_capable_interfaces", [])
+    if not iface_details:
+        return
+    csv_buf = io.StringIO()
+    writer = csv.DictWriter(
+        csv_buf,
+        fieldnames=[
+            "interface",
+            "driver",
+            "bus_info",
+            "pci_vendor_id",
+            "pci_device_id",
+            "ptp_clock",
+            "tsn_capable",
+        ],
+    )
+    writer.writeheader()
+    for iface, details in iface_details.items():
+        writer.writerow(
+            {
+                "interface": iface,
+                "driver": details["driver"],
+                "bus_info": details["bus_info"],
+                "pci_vendor_id": details["pci_vendor_id"],
+                "pci_device_id": details["pci_device_id"],
+                "ptp_clock": details["ptp_clock"],
+                "tsn_capable": "yes" if iface in igc_interfaces else "no",
+            }
+        )
+    allure.attach(csv_buf.getvalue(), name="network_interfaces.csv", attachment_type=allure.attachment_type.CSV)
+
+
+def _get_ptp_clocks() -> dict[str, str]:
     """Return PTP clock names mapped to their PCI bus address.
 
     Resolves each ``/sys/class/ptp/ptpX`` symlink to extract the PCI device
@@ -142,7 +182,7 @@ def _get_ptp_clocks() -> Dict[str, str]:
     ``{"ptp0": "0000:84:00.0"}``. The address is ``"unknown"`` when the sysfs
     path does not contain a recognisable PCI address.
     """
-    clocks: Dict[str, str] = {}
+    clocks: dict[str, str] = {}
     _pci_re = re.compile(r"\b[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-9a-f]\b")
     try:
         ptp_sys = Path("/sys/class/ptp")
@@ -158,10 +198,10 @@ def _get_ptp_clocks() -> Dict[str, str]:
                         matches = _pci_re.findall(resolved[:ptp_idx])
                         if matches:
                             pci_addr = matches[-1]
-                except (OSError, IOError):
+                except OSError:
                     pass
                 clocks[p.name] = pci_addr
-    except (OSError, IOError) as e:
+    except OSError as e:
         logger.debug(f"Could not enumerate /sys/class/ptp: {e}")
     return clocks
 
@@ -208,7 +248,7 @@ def test_tsn(
     def _run_detection():
         all_interfaces = _get_all_interfaces()
         # Exclude software-only virtual/container interfaces from detail collection.
-        iface_details: Dict[str, Dict[str, str]] = {
+        iface_details: dict[str, dict[str, str]] = {
             iface: _get_interface_driver_info(iface) for iface in all_interfaces if not _is_virtual_interface(iface)
         }
 
@@ -216,14 +256,14 @@ def test_tsn(
         ptp_clock_map = _get_ptp_clocks()
 
         # Reverse map: PCI address → clock name for per-interface annotation.
-        pci_to_ptp: Dict[str, str] = {pci: clk for clk, pci in ptp_clock_map.items() if pci != "unknown"}
+        pci_to_ptp: dict[str, str] = {pci: clk for clk, pci in ptp_clock_map.items() if pci != "unknown"}
 
         # Annotate every interface with its associated PTP clock (if any).
         for details in iface_details.values():
             details["ptp_clock"] = pci_to_ptp.get(details["bus_info"], "none")
 
         # TSN-capable = Ethernet interfaces using the igc driver.
-        igc_interfaces: List[str] = [
+        igc_interfaces: list[str] = [
             iface
             for iface in iface_details
             if _is_ethernet_interface(iface) and iface_details[iface]["driver"] == "igc"
@@ -237,35 +277,6 @@ def test_tsn(
             f"TSN detection: {'CAPABLE' if is_tsn_capable else 'NOT CAPABLE'} "
             f"(tsn_ifaces={tsn_iface_count}, ptp_clocks={ptp_count})"
         )
-
-        # CSV attachment: one row per interface for easy PTP-to-interface correlation.
-        csv_buf = io.StringIO()
-        writer = csv.DictWriter(
-            csv_buf,
-            fieldnames=[
-                "interface",
-                "driver",
-                "bus_info",
-                "pci_vendor_id",
-                "pci_device_id",
-                "ptp_clock",
-                "tsn_capable",
-            ],
-        )
-        writer.writeheader()
-        for iface, details in iface_details.items():
-            writer.writerow(
-                {
-                    "interface": iface,
-                    "driver": details["driver"],
-                    "bus_info": details["bus_info"],
-                    "pci_vendor_id": details["pci_vendor_id"],
-                    "pci_device_id": details["pci_device_id"],
-                    "ptp_clock": details["ptp_clock"],
-                    "tsn_capable": "yes" if iface in igc_interfaces else "no",
-                }
-            )
-        allure.attach(csv_buf.getvalue(), name="network_interfaces.csv", attachment_type=allure.attachment_type.CSV)
 
         return Result(
             name=f"{test_id} - {test_display_name}",
@@ -308,6 +319,14 @@ def test_tsn(
             extended_metadata={"message": failure_message or "TSN detection did not complete"},
             metrics={},
         )
+
+    # CSV attachment: generated from result data so it is present for both
+    # fresh runs and cache-hit reruns (execute_test_with_cache skips
+    # _run_detection on a cache hit, so attachments must be created here).
+    try:
+        _attach_network_interfaces_csv(result)
+    except Exception as csv_error:
+        logger.debug(f"CSV attachment generation failed: {csv_error}")
 
     # Step 2: KPI validation (only active when kpi_refs is set in profile)
     try:

@@ -9,12 +9,12 @@ and summaries for display and debugging purposes.
 """
 
 import logging
-from typing import Any, Dict
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-def format_system_summary(hardware_info: Dict[str, Any], software_info: Dict[str, Any]) -> str:
+def format_system_summary(hardware_info: dict[str, Any], software_info: dict[str, Any]) -> str:
     """
     Format consolidated system summary for both info command and test summaries.
 
@@ -311,7 +311,7 @@ def format_system_summary(hardware_info: Dict[str, Any], software_info: Dict[str
     return "\n".join(lines)
 
 
-def build_display_summary(hardware: Dict[str, Any], software: Dict[str, Any]) -> tuple:
+def build_display_summary(hardware: dict[str, Any], software: dict[str, Any]) -> tuple:
     """
     Convert raw hardware/software dicts from SystemInfoCache into display-ready
     summary dicts for use with format_system_summary().
@@ -419,23 +419,14 @@ def build_display_summary(hardware: Dict[str, Any], software: Dict[str, Any]) ->
     if "network" in hardware:
         summary_hardware["network"] = hardware["network"]
 
-    # Convert OS info
+    # Pass OS info through as-is to keep the same structure as system_info_software.json
     if "os" in software:
-        os_info = software["os"]
-        dist = os_info.get("distribution", {})
-        os_summary = {
-            "name": dist.get("name", "Unknown") if isinstance(dist, dict) else str(dist),
-            "version": dist.get("version_id", "") if isinstance(dist, dict) else "",
-            "release": os_info.get("release", ""),
-        }
-        if isinstance(dist, dict) and dist.get("pretty_name"):
-            os_summary["pretty_name"] = dist["pretty_name"]
-        summary_software["os"] = os_summary
+        summary_software["os"] = software["os"]
 
     return summary_hardware, summary_software
 
 
-def generate_simple_report(system_info: Dict[str, Any]) -> str:
+def generate_simple_report(system_info: dict[str, Any]) -> str:
     """
     Generate a simple text report of system information.
 
@@ -490,7 +481,7 @@ def generate_simple_report(system_info: Dict[str, Any]) -> str:
     return "\n".join(report_lines)
 
 
-def format_hardware_summary(hardware_info: Dict[str, Any]) -> str:
+def format_hardware_summary(hardware_info: dict[str, Any]) -> str:
     """
     Format hardware information into a concise summary.
 
@@ -525,7 +516,7 @@ def format_hardware_summary(hardware_info: Dict[str, Any]) -> str:
     return " | ".join(summary_parts) if summary_parts else "Hardware information unavailable"
 
 
-def format_software_summary(software_info: Dict[str, Any]) -> str:
+def format_software_summary(software_info: dict[str, Any]) -> str:
     """
     Format software information into a concise summary.
 

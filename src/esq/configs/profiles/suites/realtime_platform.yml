@@ -36,7 +36,7 @@ suites:
                   CONFIG_PREEMPT_RT=y in /boot/config-<release>.
                 timeout: 60
                 key_metrics:
-                  - preempt_rt_enabled
+                  - preempt_rt
 
           test_tsn:
             params:

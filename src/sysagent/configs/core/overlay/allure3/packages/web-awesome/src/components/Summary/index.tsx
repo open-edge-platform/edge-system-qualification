@@ -30,7 +30,7 @@ interface SortableTableProps {
 // System Information table component (for Hardware and Software info)
 interface SystemInfoTableProps {
   title: string;
-  data: { component: string; details: string[]; packageData?: { [key: string]: string }; expandable?: boolean }[];
+  data: { component: string; details: string[]; packageData?: { [key: string]: string }; expandable?: boolean; singleColumn?: boolean }[];
   expandedPackageDetails?: Set<string>;
   onTogglePackageDetails?: (packageType: string) => void;
 }
@@ -740,73 +740,59 @@ const SystemInfoTable = ({ title, data, expandedPackageDetails, onTogglePackageD
                 
                 {/* Expanded package list */}
                 {row.expandable && row.packageData && expandedPackageDetails?.has(row.component) && (
-                  <div style={{ 
-                    marginTop: '12px', 
-                    backgroundColor: 'white', 
-                    borderRadius: '4px'
-                  }}>
-                    <table style={{
-                      width: '100%',
-                      borderCollapse: 'collapse',
-                      fontSize: '12px',
-                      border: '1px solid #e0e0e0'
-                    }}>
+                  <div style={{ marginTop: '12px', borderRadius: '4px' }}>
+                    <table className={styles["metadata-table"]}>
                       <thead>
                         <tr>
-                          <th style={{ 
-                            backgroundColor: '#f8f9fa', 
-                            color: '#333', 
-                            textAlign: 'left', 
-                            fontWeight: '500', 
-                            padding: '8px 12px', 
-                            border: '1px solid #e0e0e0',
-                            width: '60%'
-                          }}>
-                            Package
+                          <th className={styles["metadata-table-header"]} style={{ width: '40px', textAlign: 'center' }}>
+                            #
                           </th>
-                          <th style={{ 
-                            backgroundColor: '#f8f9fa', 
-                            color: '#333', 
-                            textAlign: 'left', 
-                            fontWeight: '500', 
-                            padding: '8px 12px', 
-                            border: '1px solid #e0e0e0'
-                          }}>
-                            Version
-                          </th>
+                          {row.singleColumn ? (
+                            <th className={styles["metadata-table-header"]} style={{ width: '100%' }}>
+                              Parameter
+                            </th>
+                          ) : (
+                            <>
+                              <th className={styles["metadata-table-header"]} style={{ width: '60%' }}>
+                                Package
+                              </th>
+                              <th className={styles["metadata-table-header"]}>
+                                Version
+                              </th>
+                            </>
+                          )}
                         </tr>
                       </thead>
                       <tbody>
-                        {Object.entries(row.packageData)
-                          .sort(([a], [b]) => a.toLowerCase().localeCompare(b.toLowerCase()))
-                          .map(([name, version]) => (
-                            <tr key={name}>
-                              <td style={{
-                                padding: '8px 12px',
-                                border: '1px solid #e0e0e0',
-                                backgroundColor: 'white',
-                                fontWeight: '500',
-                                color: '#555',
-                                verticalAlign: 'top',
-                                fontFamily: 'monospace',
-                                wordBreak: 'break-word',
-                                fontSize: '12px'
-                              }}>
-                                {name}
-                              </td>
-                              <td style={{
-                                padding: '8px 12px',
-                                border: '1px solid #e0e0e0',
-                                backgroundColor: 'white',
-                                color: '#333',
-                                verticalAlign: 'top',
-                                fontFamily: 'monospace',
-                                fontSize: '11px'
-                              }}>
-                                {version || 'unknown'}
-                              </td>
-                            </tr>
-                          ))}
+                        {row.singleColumn ? (
+                          Object.entries(row.packageData)
+                            .map(([key, value], entryIdx) => (
+                              <tr key={key}>
+                                <td className={styles["metadata-table-cell"]} style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '11px', userSelect: 'none', whiteSpace: 'nowrap' }}>
+                                  {entryIdx + 1}
+                                </td>
+                                <td className={styles["metadata-table-cell"]} style={{ fontFamily: 'monospace', wordBreak: 'break-all', fontSize: '12px' }}>
+                                  {value ? `${key}=${value}` : key}
+                                </td>
+                              </tr>
+                            ))
+                        ) : (
+                          Object.entries(row.packageData)
+                            .sort(([a], [b]) => a.toLowerCase().localeCompare(b.toLowerCase()))
+                            .map(([name, version], entryIdx) => (
+                              <tr key={name}>
+                                <td className={styles["metadata-table-cell"]} style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '11px', userSelect: 'none', whiteSpace: 'nowrap' }}>
+                                  {entryIdx + 1}
+                                </td>
+                                <td className={styles["metadata-table-cell"]} style={{ fontFamily: 'monospace', wordBreak: 'break-word', fontWeight: '500', fontSize: '12px' }}>
+                                  {name}
+                                </td>
+                                <td className={styles["metadata-table-cell"]} style={{ fontFamily: 'monospace', fontSize: '11px' }}>
+                                  {version || 'unknown'}
+                                </td>
+                              </tr>
+                            ))
+                        )}
                       </tbody>
                     </table>
                   </div>
@@ -2230,7 +2216,7 @@ export const Summary = () => {
   }
 
   // Software Information data preparation from attachment
-  const softwareInfoData: { component: string; details: string[]; packageData?: { [key: string]: string }; expandable?: boolean }[] = [];
+  const softwareInfoData: { component: string; details: string[]; packageData?: { [key: string]: string }; expandable?: boolean; singleColumn?: boolean }[] = [];
   
   if (systemInfo?.software) {
     const software = systemInfo.software;
@@ -2313,6 +2299,34 @@ export const Summary = () => {
           details: packageDetails,
           packageData: pythonPackages.packages || {},
           expandable: true
+        });
+      }
+    }
+
+    // Kernel Boot Parameters from /proc/cmdline
+    if (software.os?.kernel?.cmdline) {
+      const cmdline: string = software.os.kernel.cmdline;
+      const bootParams: { [key: string]: string } = {};
+
+      cmdline.split(/\s+/).forEach((param: string) => {
+        if (param) {
+          const eqIdx = param.indexOf('=');
+          if (eqIdx !== -1) {
+            bootParams[param.substring(0, eqIdx)] = param.substring(eqIdx + 1);
+          } else {
+            bootParams[param] = '';
+          }
+        }
+      });
+
+      const paramCount = Object.keys(bootParams).length;
+      if (paramCount > 0) {
+        softwareInfoData.push({
+          component: "Kernel Boot Parameters",
+          details: [`${paramCount} parameters`],
+          packageData: bootParams,
+          expandable: true,
+          singleColumn: true
         });
       }
     }

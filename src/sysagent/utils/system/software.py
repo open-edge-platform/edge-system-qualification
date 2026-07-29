@@ -12,7 +12,7 @@ import logging
 import os
 import platform
 import sys
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import yaml
 
@@ -22,7 +22,7 @@ from ..core.process import run_command
 logger = logging.getLogger(__name__)
 
 
-def _load_software_config() -> Dict[str, List[str]]:
+def _load_software_config() -> dict[str, list[str]]:
     """
     Load software configuration from available config files.
 
@@ -39,9 +39,7 @@ def _load_software_config() -> Dict[str, List[str]]:
         config_paths = discover_entrypoint_paths("configs")
 
         for config_path in config_paths:
-            software_config_path = os.path.join(
-                config_path, "system", "info", "software.yml"
-            )
+            software_config_path = os.path.join(config_path, "system", "info", "software.yml")
             if os.path.exists(software_config_path):
                 logger.debug(f"Loading software config from: {software_config_path}")
 
@@ -64,20 +62,11 @@ def _load_software_config() -> Dict[str, List[str]]:
                         )
 
                 except Exception as e:
-                    logger.warning(
-                        (
-                            f"Failed to load software config from "
-                            f"{software_config_path}: {e}"
-                        )
-                    )
+                    logger.warning(f"Failed to load software config from {software_config_path}: {e}")
 
         # Remove duplicates while preserving order
-        consolidated_config["python_packages"] = list(
-            dict.fromkeys(consolidated_config["python_packages"])
-        )
-        consolidated_config["system_packages"] = list(
-            dict.fromkeys(consolidated_config["system_packages"])
-        )
+        consolidated_config["python_packages"] = list(dict.fromkeys(consolidated_config["python_packages"]))
+        consolidated_config["system_packages"] = list(dict.fromkeys(consolidated_config["system_packages"]))
 
         logger.debug(
             "Consolidated software config: %d Python packages, %d system packages",
@@ -91,7 +80,7 @@ def _load_software_config() -> Dict[str, List[str]]:
     return consolidated_config
 
 
-def collect_software_info() -> Dict[str, Any]:
+def collect_software_info() -> dict[str, Any]:
     """
     Collect comprehensive software information.
 
@@ -111,7 +100,7 @@ def collect_software_info() -> Dict[str, Any]:
     return software_info
 
 
-def collect_os_info() -> Dict[str, Any]:
+def collect_os_info() -> dict[str, Any]:
     """
     Collect operating system information.
 
@@ -147,7 +136,7 @@ def collect_os_info() -> Dict[str, Any]:
         return {"error": str(e)}
 
 
-def collect_python_info() -> Dict[str, Any]:
+def collect_python_info() -> dict[str, Any]:
     """
     Collect Python interpreter and environment information.
 
@@ -187,7 +176,7 @@ def collect_python_info() -> Dict[str, Any]:
         return {"error": str(e)}
 
 
-def collect_python_package_info() -> Dict[str, Any]:
+def collect_python_package_info() -> dict[str, Any]:
     """
     Collect information about installed Python packages.
 
@@ -218,7 +207,7 @@ def collect_python_package_info() -> Dict[str, Any]:
         return {"error": str(e)}
 
 
-def collect_system_package_info() -> Dict[str, Any]:
+def collect_system_package_info() -> dict[str, Any]:
     """
     Collect information about installed system packages.
 
@@ -252,7 +241,7 @@ def collect_system_package_info() -> Dict[str, Any]:
         return {"error": str(e)}
 
 
-def collect_environment_info() -> Dict[str, Any]:
+def collect_environment_info() -> dict[str, Any]:
     """
     Collect environment variables and system configuration.
 
@@ -301,7 +290,7 @@ def collect_environment_info() -> Dict[str, Any]:
         return {"error": str(e)}
 
 
-def _collect_linux_info() -> Dict[str, Any]:
+def _collect_linux_info() -> dict[str, Any]:
     """
     Collect Linux-specific information.
 
@@ -347,6 +336,13 @@ def _collect_linux_info() -> Dict[str, Any]:
         except Exception:
             pass
 
+        # Capture the kernel boot command line
+        try:
+            with open("/proc/cmdline", "r") as f:
+                linux_info["kernel"]["cmdline"] = f.read().strip()
+        except Exception:
+            pass
+
     except Exception:
         linux_info["kernel"] = {"error": "Could not get kernel information"}
 
@@ -361,7 +357,7 @@ def _collect_linux_info() -> Dict[str, Any]:
     return linux_info
 
 
-def _collect_windows_info() -> Dict[str, Any]:
+def _collect_windows_info() -> dict[str, Any]:
     """
     Collect Windows-specific information.
 
@@ -374,11 +370,7 @@ def _collect_windows_info() -> Dict[str, Any]:
         # Get Windows version information
         import platform
 
-        windows_info["edition"] = (
-            platform.win32_edition()
-            if hasattr(platform, "win32_edition")
-            else "Unknown"
-        )
+        windows_info["edition"] = platform.win32_edition() if hasattr(platform, "win32_edition") else "Unknown"
         windows_info["version"] = platform.win32_ver()
 
         # Try to get more detailed Windows information using wmic
@@ -418,7 +410,7 @@ def _is_in_virtualenv() -> bool:
     )
 
 
-def _collect_virtualenv_info() -> Dict[str, Any]:
+def _collect_virtualenv_info() -> dict[str, Any]:
     """
     Collect virtual environment information.
 
@@ -450,7 +442,7 @@ def _collect_virtualenv_info() -> Dict[str, Any]:
     return venv_info
 
 
-def _get_pip_version() -> Optional[str]:
+def _get_pip_version() -> str | None:
     """
     Get pip version.
 
@@ -475,7 +467,7 @@ def _get_pip_version() -> Optional[str]:
     return None
 
 
-def _get_package_version(package_name: str) -> Optional[str]:
+def _get_package_version(package_name: str) -> str | None:
     """
     Get version of an installed package.
 
@@ -549,7 +541,7 @@ def _get_temp_directory() -> str:
     return tempfile.gettempdir()
 
 
-def _get_system_package_version(package_name: str) -> Optional[str]:
+def _get_system_package_version(package_name: str) -> str | None:
     """
     Get version of an installed system package.
 
@@ -580,9 +572,7 @@ def _get_system_package_version(package_name: str) -> Optional[str]:
                 if result.success:
                     version = parser(result.stdout.strip())
                     if version:
-                        logger.debug(
-                            f"Found {package_name} version {version} via {cmd[0]}"
-                        )
+                        logger.debug(f"Found {package_name} version {version} via {cmd[0]}")
                         return version
             except (FileNotFoundError, OSError):
                 continue
@@ -613,7 +603,7 @@ def _detect_package_manager() -> str:
     return "unknown"
 
 
-def _parse_dpkg_version(output: str, package_name: str) -> Optional[str]:
+def _parse_dpkg_version(output: str, package_name: str) -> str | None:
     """Parse version from dpkg output."""
     lines = output.split("\n")
     for line in lines:
@@ -624,7 +614,7 @@ def _parse_dpkg_version(output: str, package_name: str) -> Optional[str]:
     return None
 
 
-def _parse_snap_version(output: str) -> Optional[str]:
+def _parse_snap_version(output: str) -> str | None:
     """Parse version from snap output."""
     lines = output.split("\n")
     if len(lines) > 1:  # Skip header

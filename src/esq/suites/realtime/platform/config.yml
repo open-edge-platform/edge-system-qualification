@@ -10,11 +10,12 @@
 
 kpi:
   # ============================================================
-  # PREEMPT-RT Kernel Check
-  # Metric: preempt_rt_enabled (1 = PREEMPT_RT detected, 0 = not)
+  # PREEMPT-RT Kernel Check — primary (key) metric
+  # Metric: preempt_rt (1 = PREEMPT-RT kernel confirmed and boot params
+  # compliant when configured, 0 = one or more checks failed)
   # ============================================================
-  preempt_rt_enabled:
-    name: "PREEMPT-RT Kernel"
+  preempt_rt:
+    name: "PREEMPT-RT"
     type: "numeric"
     validation:
       operator: "eq"
@@ -22,7 +23,7 @@ kpi:
       enabled: false
     unit: null
     severity: "critical"
-    description: "Kernel provides full real-time preemption (1=PREEMPT_RT, 0=not)"
+    description: "PREEMPT_RT kernel confirmed and (when configured) all required boot parameters present (1=ready, 0=not ready)"
     default_value: 0
 
   # ============================================================

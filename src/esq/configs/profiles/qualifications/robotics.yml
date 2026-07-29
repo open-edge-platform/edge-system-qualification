@@ -64,13 +64,32 @@ suites:
                 display_name: "PREEMPT-RT Kernel Check"
                 description: >
                   Verifies the running kernel provides full real-time preemption
-                  (PREEMPT_RT). Detected via CONFIG_PREEMPT_RT=y in
-                  /boot/config-<release>.
+                  (PREEMPT_RT) via CONFIG_PREEMPT_RT=y in /boot/config-<release>.
+                  Also checks that required real-time kernel boot parameters are
+                  configured in /proc/cmdline for deterministic low-latency
+                  operation.
                 timeout: 60
+                kernel_boot_params:
+                  - "hpet=disable"
+                  - "clocksource=tsc"
+                  - "tsc=reliable"
+                  - "intel_pstate=disable"
+                  - "intel_idle.max_cstate=0"
+                  - "intel.max_cstate=0"
+                  - "processor.max_cstate=0"
+                  - "processor_idle.max_cstate=0"
+                  - "rcupdate.rcu_cpu_stall_suppress=1"
+                  - "mce=off"
+                  - "nmi_watchdog=0"
+                  - "nosoftlockup"
+                  - "noht"
+                  - "numa_balancing=disable"
+                  - "hugepages=1024"
+                  - "rcu_nocb_poll"
                 kpi_refs:
-                  - preempt_rt_enabled
+                  - preempt_rt
                 kpi_override:
-                  preempt_rt_enabled:
+                  preempt_rt:
                     validation:
                       operator: "eq"
                       reference: 1

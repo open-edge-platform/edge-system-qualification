@@ -1,0 +1,132 @@
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+name: "profile.vertical.robotics-funasr"
+display_name: "Robotics"
+description: "Robotics Suites"
+version: "1.0.0"
+params:
+  labels:
+    profile_display_name: "Robotics"
+    group: "robotics"
+    type: "vertical"
+    display_status: false
+  requirements:
+    # Hardware requirements
+    memory_min_gib: 8.0
+    storage_min_gib: 20.0 # Free storage for the from-source model conversion + benchmark output
+    # Software requirements
+    os_type:
+    - "linux"
+    docker_required: true
+  # Modular telemetry configuration
+  # Telemetry runs as a lightweight background thread during test execution.
+  # Set enabled: false (or remove this block) to disable entirely.
+  telemetry:
+    enabled: true
+    interval: 10 # seconds between samples
+    modules:
+    # Title, scales, thresholds and axes are defined as defaults within each module.
+    # Only specify these here to override the module defaults.
+    # --- sysagent core modules ---
+    - name: cpu_usage
+      enabled: true
+
+    - name: cpu_freq
+      enabled: true
+
+    - name: cpu_temp
+      enabled: true
+
+    - name: memory_usage
+      enabled: true
+
+    # --- ESQ package modules ---
+    - name: package_power
+      enabled: true
+
+    - name: gpu_temp
+      enabled: true
+
+    - name: gpu_freq
+      enabled: true
+
+    - name: gpu_power
+      enabled: true
+
+    - name: gpu_usage
+      enabled: true
+
+    - name: npu_usage
+      enabled: true
+
+    - name: npu_freq
+      enabled: true
+
+suites:
+- name: "vertical"
+  sub_suites:
+  - name: "robotics"
+    tests:
+      # Key matches the test file (test_funasr.py) for CLI discovery;
+      # the per-param `test` field routes to the test function (test_robotics_funasr).
+      # FunASR (Paraformer) has no published OpenVINO IR, so it is converted from
+      # source at container build time. The portable contextual embedder
+      # (model: eb) is benchmarked so the same test runs across CPU / GPU / NPU;
+      # the backbone (model: bb) is CPU-only in the current conversion.
+      test_funasr:
+        params:
+        - test_id: "ROB-ASR-001"
+          test: "test_robotics_funasr"
+          name: "funasr_cpu"
+          display_name: "FunASR ASR Benchmark (CPU)"
+          description: "FunASR speech-recognition inference benchmark running in a Docker container on CPU"
+          operation: "funasr"
+          device: "CPU"
+          model: "eb"
+          dockerfile_name: "Dockerfile"
+          container_image: "robotics_funasr_benchmark"
+          image_tag: "1.0"
+          docker_base_image: "ubuntu:24.04"
+          # The shared multi-stage image is built once per run (see
+          # test_funasr.py: _BUILT_IMAGE_TAGS) and reused for GPU/NPU, since the
+          # device is a runtime env var, not a build arg. Use --no-cache to force
+          # a full rebuild.
+          docker_nocache: false
+          timeout: 1800
+          requirements:
+            storage_min_gib: 20.0
+        - test_id: "ROB-ASR-002"
+          test: "test_robotics_funasr"
+          name: "funasr_gpu"
+          display_name: "FunASR ASR Benchmark (GPU)"
+          description: "FunASR speech-recognition inference benchmark running in a Docker container on GPU"
+          operation: "funasr"
+          device: "GPU"
+          model: "eb"
+          dockerfile_name: "Dockerfile"
+          container_image: "robotics_funasr_benchmark"
+          image_tag: "1.0"
+          docker_base_image: "ubuntu:24.04"
+          docker_nocache: false
+          timeout: 1800
+          requirements:
+            storage_min_gib: 20.0
+            igpu_required: true
+        - test_id: "ROB-ASR-003"
+          test: "test_robotics_funasr"
+          name: "funasr_npu"
+          display_name: "FunASR ASR Benchmark (NPU)"
+          description: "FunASR speech-recognition inference benchmark running in a Docker container on NPU"
+          operation: "funasr"
+          device: "NPU"
+          model: "eb"
+          dockerfile_name: "Dockerfile"
+          container_image: "robotics_funasr_benchmark"
+          image_tag: "1.0"
+          docker_base_image: "ubuntu:24.04"
+          docker_nocache: false
+          timeout: 1800
+          requirements:
+            storage_min_gib: 20.0
+            npu_required: true

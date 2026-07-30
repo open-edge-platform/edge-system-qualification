@@ -221,3 +221,69 @@ suites:
                   storage_min_gib: 4.0
                   docker_required: true
                   igpu_required: false
+          # FunASR (Paraformer) ASR benchmark. The IR is converted from source
+          # at container build time (no published IR). The portable contextual
+          # embedder (model: eb) is benchmarked so the same test runs on
+          # CPU / GPU / NPU. The backbone (model: bb) is CPU-only currently.
+          test_funasr:
+            params:
+              - test_id: "ROB-ASR-001"
+                test: "test_robotics_funasr"
+                name: "funasr_cpu"
+                display_name: "FunASR ASR Benchmark (CPU)"
+                description: "FunASR speech-recognition inference benchmark running in a Docker container on CPU"
+                operation: "funasr"
+                device: "CPU"
+                model: "eb"
+                dockerfile_name: "Dockerfile"
+                container_image: "robotics_funasr_benchmark"
+                image_tag: "1.0"
+                docker_base_image: "ubuntu:24.04"
+                # The shared multi-stage image is built once per run (see
+                # test_funasr.py: _BUILT_IMAGE_TAGS) and reused for GPU/NPU,
+                # since the device is a runtime env var, not a build arg. Use
+                # --no-cache to force a full rebuild.
+                docker_nocache: false
+                timeout: 1800
+                requirements:
+                  memory_min_gib: 8.0
+                  storage_min_gib: 20.0
+                  docker_required: true
+              - test_id: "ROB-ASR-002"
+                test: "test_robotics_funasr"
+                name: "funasr_gpu"
+                display_name: "FunASR ASR Benchmark (GPU)"
+                description: "FunASR speech-recognition inference benchmark running in a Docker container on GPU"
+                operation: "funasr"
+                device: "GPU"
+                model: "eb"
+                dockerfile_name: "Dockerfile"
+                container_image: "robotics_funasr_benchmark"
+                image_tag: "1.0"
+                docker_base_image: "ubuntu:24.04"
+                docker_nocache: false
+                timeout: 1800
+                requirements:
+                  memory_min_gib: 8.0
+                  storage_min_gib: 20.0
+                  docker_required: true
+                  igpu_required: true
+              - test_id: "ROB-ASR-003"
+                test: "test_robotics_funasr"
+                name: "funasr_npu"
+                display_name: "FunASR ASR Benchmark (NPU)"
+                description: "FunASR speech-recognition inference benchmark running in a Docker container on NPU"
+                operation: "funasr"
+                device: "NPU"
+                model: "eb"
+                dockerfile_name: "Dockerfile"
+                container_image: "robotics_funasr_benchmark"
+                image_tag: "1.0"
+                docker_base_image: "ubuntu:24.04"
+                docker_nocache: false
+                timeout: 1800
+                requirements:
+                  memory_min_gib: 8.0
+                  storage_min_gib: 20.0
+                  docker_required: true
+                  npu_required: true

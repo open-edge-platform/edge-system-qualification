@@ -1,0 +1,187 @@
+From 647b91eaa221f9107550505ea2b0323b4aa0793c Mon Sep 17 00:00:00 2001
+From: Jayabalaji <jayabalaji.sathiyamoorthi@intel.com>
+Date: Thu, 30 Jul 2026 11:27:27 +0200
+Subject: [PATCH] OpenVINO enable convert FunASR model
+
+---
+ .../models/bicif_paraformer/cif_predictor.py  | 31 ++++++-------
+ funasr/models/seaco_paraformer/export_meta.py | 45 ++++++++++++++++---
+ ov_convert_FunASR.py                          | 20 +++++++++
+ 3 files changed, 73 insertions(+), 23 deletions(-)
+ create mode 100644 ov_convert_FunASR.py
+
+diff --git a/funasr/models/bicif_paraformer/cif_predictor.py b/funasr/models/bicif_paraformer/cif_predictor.py
+index 95c100f7..e93a02aa 100644
+--- a/funasr/models/bicif_paraformer/cif_predictor.py
++++ b/funasr/models/bicif_paraformer/cif_predictor.py
+@@ -581,37 +581,32 @@ def cif_export(hidden, alphas, threshold: float):
+     # loop varss
+     integrate = torch.zeros([batch_size], dtype=alphas.dtype, device=hidden.device)
+     frame = torch.zeros([batch_size, hidden_size], dtype=hidden.dtype, device=hidden.device)
+-    # intermediate vars along time
+-    list_fires = []
+-    list_frames = []
+ 
+-    for t in range(len_time):
++    fires = torch.zeros([batch_size, len_time], dtype=alphas.dtype, device=hidden.device)
++    frames = torch.zeros_like(hidden)
++    for t in range(hidden.shape[1]):
+         alpha = alphas[:, t]
+-        distribution_completion = (
+-            torch.ones([batch_size], dtype=alphas.dtype, device=hidden.device) - integrate
+-        )
+-
++        distribution_completion = torch.ones([batch_size], dtype=alphas.dtype, device=hidden.device) - integrate
+         integrate += alpha
+-        list_fires.append(integrate)
+-
++        fires[:, t] = integrate
+         fire_place = integrate >= threshold
++
+         integrate = torch.where(
+-            fire_place,
+-            integrate - torch.ones([batch_size], dtype=alphas.dtype, device=hidden.device),
+-            integrate,
++            fire_place, integrate - torch.ones([batch_size], dtype=alphas.dtype, device=hidden.device), integrate
+         )
++
+         cur = torch.where(fire_place, distribution_completion, alpha)
+         remainds = alpha - cur
+ 
+         frame += cur[:, None] * hidden[:, t, :]
+-        list_frames.append(frame)
++        frames[:, t] = frame
++
+         frame = torch.where(
+-            fire_place[:, None].repeat(1, hidden_size), remainds[:, None] * hidden[:, t, :], frame
++            fire_place[:, None].repeat(1, hidden_size),
++            remainds[:, None] * hidden[:, t, :],
++            frame,
+         )
+ 
+-    fires = torch.stack(list_fires, 1)
+-    frames = torch.stack(list_frames, 1)
+-
+     fire_idxs = fires >= threshold
+     frame_fires = torch.zeros_like(hidden)
+     max_label_len = frames[0, fire_idxs[0]].size(0)
+diff --git a/funasr/models/seaco_paraformer/export_meta.py b/funasr/models/seaco_paraformer/export_meta.py
+index 980e062a..5eeb9d6f 100644
+--- a/funasr/models/seaco_paraformer/export_meta.py
++++ b/funasr/models/seaco_paraformer/export_meta.py
+@@ -4,6 +4,9 @@
+ #  MIT License  (https://opensource.org/licenses/MIT)
+ 
+ import torch
++import numpy as np
++import openvino as ov
++from openvino import save_model
+ 
+ from funasr.register import tables
+ 
+@@ -96,6 +99,7 @@ def export_rebuild_model(model, **kwargs):
+ 
+     # before decoder convert into export class
+     embedder_class = ContextualEmbedderExport
++    tmp_eb_model = embedder_class(model)
+     embedder_model = embedder_class(model, onnx=is_onnx)
+ 
+     decoder_class = tables.decoder_classes.get(kwargs["decoder"] + "Export")
+@@ -137,6 +141,36 @@ def export_rebuild_model(model, **kwargs):
+     embedder_model.export_name = "model_eb"
+     backbone_model.export_name = "model"
+ 
++    print("-------------convert to IR model-----------------------------------")
++
++    feats_dim=560
++    speech = torch.randn(1, 30, feats_dim)
++    speech_lengths = torch.tensor([30], dtype=torch.int32)
++    bias_embed = torch.randn(1, 2, 512)
++    bb_input = {"speech": speech,
++                "speech_lengths": speech_lengths,
++                "bias_embed": bias_embed,
++                }
++    ov_model = ov.convert_model(backbone_model, example_input=bb_input)
++    save_model(ov_model, 'model_bb.xml', compress_to_fp16=False)
++    print("== export bb_model IR success ==")
++
++    hotword = torch.tensor(
++            [
++                [10, 11, 12, 13, 14, 10, 11, 12, 13, 14],
++                [100, 101, 0, 0, 0, 0, 0, 0, 0, 0],
++                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
++                [10, 11, 12, 13, 14, 10, 11, 12, 13, 14],
++                [100, 101, 0, 0, 0, 0, 0, 0, 0, 0],
++                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
++            ],
++            dtype=torch.int32,
++        )
++
++    ov_eb_model = ov.convert_model(embedder_model, example_input=(hotword))
++    save_model(ov_eb_model, 'model_eb.xml', compress_to_fp16=False)
++    print("== export eb_model IR success ==")
++
+     return backbone_model, embedder_model
+ 
+ 
+@@ -199,8 +233,8 @@ def export_backbone_forward(
+ 
+     # get predicted timestamps
+     us_alphas, us_cif_peak = self.predictor.get_upsample_timestmap(enc, mask, pre_token_length)
+-    
+-    return decoder_out, pre_token_length, us_alphas, us_cif_peak
++    # return decoder_out, pre_token_length, us_alphas, us_cif_peak
++    return decoder_out, pre_token_length, alphas
+ 
+ 
+ def export_backbone_dummy_inputs(self):
+@@ -218,7 +252,8 @@ def export_backbone_input_names(self):
+ 
+ def export_backbone_output_names(self):
+     """Export backbone output names."""
+-    return ["logits", "token_num", "us_alphas", "us_cif_peak"]
++    # return ["logits", "token_num", "us_alphas", "us_cif_peak"]
++    return ["logits", "token_num", "alphas"]
+ 
+ 
+ def export_backbone_dynamic_axes(self):
+@@ -231,7 +266,7 @@ def export_backbone_dynamic_axes(self):
+         "bias_embed": {0: "batch_size", 1: "num_hotwords"},
+         "logits": {0: "batch_size", 1: "logits_length"},
+         "pre_acoustic_embeds": {1: "feats_length1"},
+-        "us_alphas": {0: "batch_size", 1: "alphas_length"},
+-        "us_cif_peak": {0: "batch_size", 1: "alphas_length"},
++        # "us_alphas": {0: "batch_size", 1: "alphas_length"},
++        # "us_cif_peak": {0: "batch_size", 1: "alphas_length"},
+     }
+ 
+diff --git a/ov_convert_FunASR.py b/ov_convert_FunASR.py
+new file mode 100644
+index 00000000..999d13ed
+--- /dev/null
++++ b/ov_convert_FunASR.py
+@@ -0,0 +1,20 @@
++from funasr import AutoModel
++# paraformer-zh is a multi-functional asr model
++# use vad, punc, spk or not as you need
++hotwords = ''
++# hotwords = '你的热词 魔搭 脊背发凉 chatGPT 天马流星拳 劈里啪啦 PaLM GPT4 文心一言 一枪 Midjourney'
++model = AutoModel(model="paraformer-zh", model_revision="v2.0.4",
++                  vad_model="fsmn-vad", vad_model_revision="v2.0.4",
++                  punc_model="ct-punc-c", punc_model_revision="v2.0.4",
++                  spk_model="cam++", spk_model_revision="v2.0.2",
++                  )
++
++# res = model.generate(input=f"{model.model_path}/example/asr_example.wav",
++# res = model.generate(input="BAC009S0764W0133.wav",
++res = model.generate(input="BAC009S0764W0262.wav",
++            batch_size_s=300,
++            hotword=hotwords)
++print(res)
++
++model.export()
++print("==== export onnx model success =====")
+\ No newline at end of file
+-- 
+2.43.0
+

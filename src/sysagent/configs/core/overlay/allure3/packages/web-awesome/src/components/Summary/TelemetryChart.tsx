@@ -127,6 +127,67 @@ function resolveSeriesColor(metricKey: string, index: number): string {
   return SERIES_COLORS[index % SERIES_COLORS.length];
 }
 
+/**
+ * Parse modular telemetry device metrics (gpu_N_*, npu_N_*) and generate
+ * human-readable device labels that clearly identify which physical device
+ * the metric represents.
+ *
+ * For metrics like "gpu_0_gt0_mhz" or "npu_1_busy_pct", extracts the device
+ * index and metric type to produce labels like "GPU 0 - Frequency" or
+ * "NPU 1 - Utilization".
+ *
+ * Metrics without device prefixes are returned unchanged (not modular telemetry).
+ */
+function parseDeviceMetricLabel(rawKey: string): string {
+  const key = String(rawKey || "").toLowerCase();
+  
+  // ─── GPU metrics: gpu_N_* ────────────────────────────────────────────────
+  const gpuMatch = key.match(/^gpu_(\d+)_(.+)/);
+  if (gpuMatch) {
+    const deviceIdx = gpuMatch[1];
+    const metricPart = gpuMatch[2];
+    
+    let metricType = "";
+    if (metricPart.includes("mhz") || metricPart.includes("freq")) metricType = "Frequency";
+    else if (metricPart.includes("pct") || metricPart.includes("percent") || metricPart.includes("busy") || metricPart.includes("usage")) metricType = "Utilization";
+    else if (metricPart.includes("_c") || metricPart.includes("temp")) metricType = "Temperature";
+    else if (metricPart.includes("_w") || metricPart.includes("power")) metricType = "Power";
+    else if (metricPart.includes("mem")) metricType = "Memory";
+    else metricType = metricPart
+      .replace(/_gt\d+/, "") // remove GT suffix for clarity
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, c => c.toUpperCase());
+    
+    // Include GT identifier if present (for multi-GT GPUs)
+    const gtMatch = metricPart.match(/gt(\d+)/);
+    const gtSuffix = gtMatch ? ` GT${gtMatch[1]}` : "";
+    
+    return `GPU ${deviceIdx}${gtSuffix} - ${metricType}`;
+  }
+  
+  // ─── NPU metrics: npu_N_* ────────────────────────────────────────────────
+  const npuMatch = key.match(/^npu_(\d+)_(.+)/);
+  if (npuMatch) {
+    const deviceIdx = npuMatch[1];
+    const metricPart = npuMatch[2];
+    
+    let metricType = "";
+    if (metricPart.includes("mhz") || metricPart.includes("freq")) metricType = "Frequency";
+    else if (metricPart.includes("pct") || metricPart.includes("percent") || metricPart.includes("busy")) metricType = "Utilization";
+    else if (metricPart.includes("_c") || metricPart.includes("temp")) metricType = "Temperature";
+    else if (metricPart.includes("_w") || metricPart.includes("power")) metricType = "Power";
+    else if (metricPart.includes("mem")) metricType = "Memory";
+    else metricType = metricPart
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, c => c.toUpperCase());
+    
+    return `NPU ${deviceIdx} - ${metricType}`;
+  }
+  
+  // Not a device-indexed metric; return unchanged so fallback logic below applies
+  return rawKey;
+}
+
 function exportFullPng(
   svgEl: SVGSVGElement,
   w: number,
@@ -262,7 +323,9 @@ function exportFullPng(
 
   metricKeys.forEach((key, i) => {
     const color      = resolveSeriesColor(key, i);
-    const label      = configScales?.[key]?.label ?? key.replace(/_/g, " ");
+    // Use explicit configScales label if provided; otherwise attempt device-aware parsing
+    const parsedLabel = parseDeviceMetricLabel(key);
+    const label      = configScales?.[key]?.label ?? (parsedLabel !== key ? parsedLabel : key.replace(/_/g, " "));
     const unit       = configScales?.[key]?.unit;
     const avg        = averages?.[key];
     const mm         = minMax?.[key];
@@ -694,13 +757,18 @@ export const TelemetryChart: FunctionComponent<TelemetryChartProps> = ({
     return {
       svgX: cursorX, cX: cursorX, cY: mouseY,
       time: new Date(s.timestamp * 1000).toLocaleTimeString(),
-      entries: metricKeys.map((k, i) => ({
-        key:   k,
-        label: configScales?.[k]?.label ?? k.replace(/_/g, " "),
-        value: isMissing(s.values[k]) ? null : (s.values[k] as number),
-        unit:  configScales?.[k]?.unit ?? "",
+      entries: metricKeys.map((k, i) => {
+        // Use explicit configScales label if provided; otherwise attempt device-aware parsing
+        const parsedLabel = parseDeviceMetricLabel(k);
+        const label = configScales?.[k]?.label ?? (parsedLabel !== k ? parsedLabel : k.replace(/_/g, " "));
+        return {
+          key:   k,
+          label: label,
+          value: isMissing(s.values[k]) ? null : (s.values[k] as number),
+          unit:  configScales?.[k]?.unit ?? "",
           color: resolveSeriesColor(k, i),
-      })),
+        };
+      }),
     };
   };
 
@@ -729,7 +797,10 @@ export const TelemetryChart: FunctionComponent<TelemetryChartProps> = ({
     <div className={styles.legend}>
       {metricKeys.map((key, i) => {
         const color      = resolveSeriesColor(key, i);
-        const label      = configScales?.[key]?.label ?? key.replace(/_/g, " ");
+        // Use explicit configScales label if provided; otherwise attempt device-aware parsing
+        // for modular telemetry (gpu_N_*, npu_N_*) metrics; fall back to underscore-to-space
+        const parsedLabel = parseDeviceMetricLabel(key);
+        const label      = configScales?.[key]?.label ?? (parsedLabel !== key ? parsedLabel : key.replace(/_/g, " "));
         const unit       = configScales?.[key]?.unit;
         const avg        = averages?.[key];
         const mm         = minMax?.[key];

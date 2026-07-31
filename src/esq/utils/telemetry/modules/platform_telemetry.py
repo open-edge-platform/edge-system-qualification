@@ -588,13 +588,14 @@ class PlatformTelemetryModule(BaseTelemetryModule):
             if not metrics_for_token:
                 continue
 
-            if has_igpu_slot and not has_igpu:
-                target_group = "iGPU"
-                has_igpu = True
-            else:
-                target_group = _dgpu_label(dgpu_index)
-                dgpu_index += 1
-                has_dgpu = True
+            # Assign each GPU_TOKEN to a dGPU slot sequentially.
+            # Note: iGPU metrics (if present) come from non-token sources
+            # (already categorized correctly in _categorize_metric).
+            # We must not assume the first GPU_TOKEN is iGPU just because
+            # the platform supports iGPU; it could be a multi-dGPU platform
+            # with no iGPU metrics from the provider.
+            target_group = _dgpu_label(dgpu_index)
+            dgpu_index += 1
 
             grouped_metrics.setdefault(target_group, {}).update(metrics_for_token)
 

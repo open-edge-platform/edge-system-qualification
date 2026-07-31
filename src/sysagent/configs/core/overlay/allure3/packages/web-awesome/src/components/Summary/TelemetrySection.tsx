@@ -80,13 +80,21 @@ export const TelemetrySection: FunctionComponent<TelemetrySectionProps> = ({
     //    Sysfs gpu modules populate ``configs.scales[metric].label`` with a
     //    human-readable hint produced by ``_drm.get_gpu_label_map()``
     //    (e.g. "iGPU Pkg", "Arc A770 Pkg"); use it to disambiguate iGPU vs dGPU.
-    if (/^gpu_\d+_/.test(metric)) {
+    const gpuMetricMatch = metric.match(/^gpu_(\d+)_/);
+    if (gpuMetricMatch) {
+      const idx = Number.parseInt(gpuMetricMatch[1], 10);
       const label = String(moduleData?.configs?.scales?.[metricKey ?? ""]?.label || "").toLowerCase();
       if (label.includes("igpu")) return "iGPU";
-      if (label.includes("dgpu") || label.includes("arc") || label.includes("data center")) return "dGPU";
-      return "GPU";
+      if (label.includes("dgpu") || label.includes("arc") || label.includes("data center")) {
+        return Number.isFinite(idx) ? `dGPU[${idx}]` : "dGPU";
+      }
+      return Number.isFinite(idx) ? `GPU[${idx}]` : "GPU";
     }
-    if (/^npu_\d+_/.test(metric)) return "NPU";
+    const npuMetricMatch = metric.match(/^npu_(\d+)_/);
+    if (npuMetricMatch) {
+      const idx = Number.parseInt(npuMetricMatch[1], 10);
+      return Number.isFinite(idx) ? `NPU[${idx}]` : "NPU";
+    }
 
     // 3. Module-name fallback (no per-metric hint).
     if (name.includes("dgpu")) return "dGPU";
@@ -110,6 +118,15 @@ export const TelemetrySection: FunctionComponent<TelemetrySectionProps> = ({
       return [3, Number.isFinite(idx) ? idx + 1 : 99, device];
     }
     if (device === "NPU") return [4, 0, device];
+    if (device.startsWith("NPU[") && device.endsWith("]")) {
+      const idx = Number.parseInt(device.slice(4, -1), 10);
+      return [4, Number.isFinite(idx) ? idx + 1 : 99, device];
+    }
+    if (device === "GPU") return [5, 0, device];
+    if (device.startsWith("GPU[") && device.endsWith("]")) {
+      const idx = Number.parseInt(device.slice(4, -1), 10);
+      return [5, Number.isFinite(idx) ? idx + 1 : 99, device];
+    }
     const base = DEVICE_ORDER.indexOf(device);
     return [base === -1 ? 99 : base, 0, device];
   };
@@ -329,26 +346,26 @@ export const TelemetrySection: FunctionComponent<TelemetrySectionProps> = ({
         modulesByDevice.set(device, mods);
 
         const minMax = mod?.min_max?.[metric] ?? {};
-        // "No data" = no finite non-zero reading, and -1 (MISSING_VALUE)
-        // is treated as missing too. Such metrics render the
-        // "No telemetry data collected" placeholder instead of a flat
-        // line or a -1 spike.
-        let sawNonZero = false;
+        // "No data" means every sample is missing/unreadable (-1/NaN/null).
+        // Valid 0.0 readings are legitimate telemetry for idle devices and
+        // must still render so multi-device charts don't hide non-offloaded
+        // accelerators.
+        let sawFiniteSample = false;
         for (const s of samples) {
           const v = s?.values?.[metric];
-          if (v != null && Number.isFinite(v) && v !== 0 && v !== MISSING_VALUE) {
-            sawNonZero = true;
+          if (v != null && Number.isFinite(v) && v !== MISSING_VALUE) {
+            sawFiniteSample = true;
             break;
           }
         }
         const avgVal = mod?.averages?.[metric];
         const minVal = minMax?.min;
         const maxVal = minMax?.max;
-        const isValidAggregate = (v: unknown): boolean =>
-          typeof v === "number" && Number.isFinite(v) && v !== 0 && v !== MISSING_VALUE;
-        const summaryHasNonZero =
-          isValidAggregate(avgVal) || isValidAggregate(minVal) || isValidAggregate(maxVal);
-        const hasData = sawNonZero || summaryHasNonZero;
+        const isFiniteAggregate = (v: unknown): boolean =>
+          typeof v === "number" && Number.isFinite(v) && v !== MISSING_VALUE;
+        const summaryHasFinite =
+          isFiniteAggregate(avgVal) || isFiniteAggregate(minVal) || isFiniteAggregate(maxVal);
+        const hasData = sawFiniteSample || summaryHasFinite;
         // Map -1 (MISSING_VALUE) aggregates to undefined so the UI shows
         // "--" instead of "-1.00".
         const sanitizeAggregate = (v: unknown): number | undefined =>

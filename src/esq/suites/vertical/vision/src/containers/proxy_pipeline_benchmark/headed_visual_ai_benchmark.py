@@ -48,12 +48,19 @@ class HeadedVisualAIBenchmark(BaseProxyPipelineBenchmark):
         device_type = self.device.split(".")[0] if "." in self.device else self.device
 
         if device_type == "iGPU":
-            if self.VDBOX == 1:
+            # iGPU config tiers:
+            #   * Legacy single-VDBox (non-is_MTL): light 1080p workload, low caps.
+            #   * Single-VDBox NPU-class (is_MTL & VDBOX == 1, e.g. PTL/LNL): one media
+            #     engine can't sustain the 4K@16Mbps composite, so use a light 1080p@4Mbps
+            #     composite but keep the full model set and ARL-sized grid (inference runs
+            #     on the 1080p source, so it stays comparable to the 4K tier).
+            #   * Multi-VDBox NPU-class (is_MTL & VDBOX >= 2, e.g. MTL/ARL): full 4K config.
+            if self.VDBOX == 1 and not self.is_MTL:
                 self.config = {
                     "compose_size": 3,
-                    "ref_stream_list": [12,6,2],
-                    "ref_gpu_freq_list": [1041.3,1335.19,1359.42],
-                    "ref_pkg_power_list": [29.29,36,86,30.95],
+                    "ref_stream_list": [12, 6, 2],
+                    "ref_gpu_freq_list": [1041.3, 1335.19, 1359.42],
+                    "ref_pkg_power_list": [29.29, 36, 86, 30.95],
                     "ref_platform": "i5-13600 (32G Mem)",
                     "output_width": 1920,
                     "output_height": 1080,
@@ -63,18 +70,34 @@ class HeadedVisualAIBenchmark(BaseProxyPipelineBenchmark):
                 }
             else:
                 if self.is_MTL:
-                    self.config = {
-                        "compose_size": 4,
-                        "ref_stream_list": [14, 9, 3],
-                        "ref_gpu_freq_list": [1062.86, 1070.77, 781.55],
-                        "ref_pkg_power_list": [29.08, 28.00, 27.96],
-                        "ref_platform": "MTL 165H (32G Mem)",
-                        "output_width": 3840,
-                        "output_height": 2160,
-                        "models": ["yolov5s-416", "yolov5m-416", "yolov5m-416+efficientnet-b0"],
-                        "enc_flag": "rate-control=cbr bitrate=16000 target-usage=7",
-                        "preproc_backend": "pre-process-backend=vaapi-surface-sharing scale-method=fast",
-                    }
+                    if self.VDBOX == 1:
+                        # PTL/LNL: light 1080p@4Mbps composite, full models, ARL-sized grid.
+                        # NOTE: ref_* values pending ARL-base standardization.
+                        self.config = {
+                            "compose_size": 4,
+                            "ref_stream_list": [14, 9, 3],
+                            "ref_gpu_freq_list": [1062.86, 1070.77, 781.55],
+                            "ref_pkg_power_list": [29.08, 28.00, 27.96],
+                            "ref_platform": "MTL 165H (32G Mem)",
+                            "output_width": 1920,
+                            "output_height": 1080,
+                            "models": ["yolov5s-416", "yolov5m-416", "yolov5m-416+efficientnet-b0"],
+                            "enc_flag": "rate-control=cbr bitrate=4000 target-usage=7",
+                            "preproc_backend": "pre-process-backend=vaapi-surface-sharing scale-method=fast",
+                        }
+                    else:
+                        self.config = {
+                            "compose_size": 4,
+                            "ref_stream_list": [14, 9, 3],
+                            "ref_gpu_freq_list": [1062.86, 1070.77, 781.55],
+                            "ref_pkg_power_list": [29.08, 28.00, 27.96],
+                            "ref_platform": "MTL 165H (32G Mem)",
+                            "output_width": 3840,
+                            "output_height": 2160,
+                            "models": ["yolov5s-416", "yolov5m-416", "yolov5m-416+efficientnet-b0"],
+                            "enc_flag": "rate-control=cbr bitrate=16000 target-usage=7",
+                            "preproc_backend": "pre-process-backend=vaapi-surface-sharing scale-method=fast",
+                        }
                 else:
                     self.config = {
                         "compose_size": 4,
@@ -184,9 +207,9 @@ class HeadedVisualAIBenchmark(BaseProxyPipelineBenchmark):
                     stderr=subprocess.DEVNULL,
                     stdin=subprocess.DEVNULL,  # Detach from TTY
                     timeout=2,
-                    check=False  # We check returncode manually
+                    check=False,  # We check returncode manually
                 )
-                x11_available = (result.returncode == 0)
+                x11_available = result.returncode == 0
             except FileNotFoundError:
                 x11_socket_available = os.path.exists("/tmp/.X11-unix")
                 xauth_path = os.environ.get("XAUTHORITY", "/tmp/.docker.xauth")

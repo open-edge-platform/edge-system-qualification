@@ -167,7 +167,11 @@ class LPRBenchmark(BaseProxyPipelineBenchmark):
         device_type = self.device.split(".")[0] if "." in self.device else self.device
 
         if device_type == "iGPU":
-            if self.VDBOX == 1:
+            # Modern NPU-class platforms (MTL/ARL/LNL/PTL) report is_MTL=True. Some of
+            # them (e.g. Panther Lake, Lunar Lake) ship a single VDBox, so VDBox count
+            # must NOT downgrade them to the legacy low-end config. Only genuine legacy
+            # single-VDBox parts (non-is_MTL) use the reduced workload.
+            if self.VDBOX == 1 and not self.is_MTL:
                 self.config = {
                     "ref_stream_list": [4, 7],
                     "ref_platform": "i5-13600 (32G Mem)",

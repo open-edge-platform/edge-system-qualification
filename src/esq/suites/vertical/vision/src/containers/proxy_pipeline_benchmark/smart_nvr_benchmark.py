@@ -48,12 +48,19 @@ class SmartNVRBenchmark(BaseProxyPipelineBenchmark):
         device_type = self.device.split(".")[0] if "." in self.device else self.device
 
         if device_type == "iGPU":
-            if self.VDBOX == 1:
+            # iGPU config tiers:
+            #   * Legacy single-VDBox (non-is_MTL): light 1080p workload, low caps.
+            #   * Single-VDBox NPU-class (is_MTL & VDBOX == 1, e.g. PTL/LNL): one media
+            #     engine can't sustain the 4K@16Mbps composite, so use a light 1080p@4Mbps
+            #     composite but keep the full model set and ARL-sized grid (inference runs
+            #     on the 1080p source, so it stays comparable to the 4K tier).
+            #   * Multi-VDBox NPU-class (is_MTL & VDBOX >= 2, e.g. MTL/ARL): full 4K config.
+            if self.VDBOX == 1 and not self.is_MTL:
                 self.config = {
                     "compose_size": 4,
-                    "ref_stream_list": [12,5,2],
-                    "ref_gpu_freq_list": [1039.58,1327.17,1312.96],
-                    "ref_pkg_power_list": [27.4,37.52,26.68],
+                    "ref_stream_list": [12, 5, 2],
+                    "ref_gpu_freq_list": [1039.58, 1327.17, 1312.96],
+                    "ref_pkg_power_list": [27.4, 37.52, 26.68],
                     "ref_platform": "i5-13600 (32G Mem)",
                     "output_width": 1920,
                     "output_height": 1080,
@@ -63,18 +70,38 @@ class SmartNVRBenchmark(BaseProxyPipelineBenchmark):
                 }
             else:
                 if self.is_MTL:
-                    self.config = {
-                        "compose_size": 5,
-                        "ref_stream_list": [13, 7, 2],
-                        "ref_gpu_freq_list": [1034.29, 1285.81, 957.05],
-                        "ref_pkg_power_list": [25.85, 26.98, 24.99],
-                        "ref_platform": "MTL 165H (32G Mem)",
-                        "output_width": 3840,
-                        "output_height": 2160,
-                        "models": ["yolov5s-416", "yolov5m-416", "yolov5m-416+efficientnet-b0"],
-                        "enc_flag": "rate-control=cbr bitrate=16000 target-usage=7",
-                        "preproc_backend": "pre-process-backend=vaapi-surface-sharing scale-method=fast",
-                    }
+                    if self.VDBOX == 1:
+                        # PTL/LNL: single VDBox. The proxy always decodes the full
+                        # compose_size**2 grid (non-AI cells decode too), so a 5x5 (25)
+                        # wall saturates the lone VDBox and caps AI streams ~5. Keep a 4x4
+                        # (16) wall -- the size that already scales well here for Headed
+                        # Visual -- plus light 1080p@4Mbps composite and full models.
+                        # NOTE: ref_* values pending ARL-base standardization.
+                        self.config = {
+                            "compose_size": 4,
+                            "ref_stream_list": [13, 7, 2],
+                            "ref_gpu_freq_list": [1034.29, 1285.81, 957.05],
+                            "ref_pkg_power_list": [25.85, 26.98, 24.99],
+                            "ref_platform": "MTL 165H (32G Mem)",
+                            "output_width": 1920,
+                            "output_height": 1080,
+                            "models": ["yolov5s-416", "yolov5m-416", "yolov5m-416+efficientnet-b0"],
+                            "enc_flag": "rate-control=cbr bitrate=4000 target-usage=7",
+                            "preproc_backend": "pre-process-backend=vaapi-surface-sharing scale-method=fast",
+                        }
+                    else:
+                        self.config = {
+                            "compose_size": 5,
+                            "ref_stream_list": [13, 7, 2],
+                            "ref_gpu_freq_list": [1034.29, 1285.81, 957.05],
+                            "ref_pkg_power_list": [25.85, 26.98, 24.99],
+                            "ref_platform": "MTL 165H (32G Mem)",
+                            "output_width": 3840,
+                            "output_height": 2160,
+                            "models": ["yolov5s-416", "yolov5m-416", "yolov5m-416+efficientnet-b0"],
+                            "enc_flag": "rate-control=cbr bitrate=16000 target-usage=7",
+                            "preproc_backend": "pre-process-backend=vaapi-surface-sharing scale-method=fast",
+                        }
                 else:
                     self.config = {
                         "compose_size": 5,
@@ -185,9 +212,9 @@ class SmartNVRBenchmark(BaseProxyPipelineBenchmark):
                     stderr=subprocess.DEVNULL,
                     stdin=subprocess.DEVNULL,  # Detach from TTY
                     timeout=2,
-                    check=False  # We check returncode manually
+                    check=False,  # We check returncode manually
                 )
-                x11_available = (result.returncode == 0)
+                x11_available = result.returncode == 0
             except FileNotFoundError:
                 x11_socket_available = os.path.exists("/tmp/.X11-unix")
                 xauth_path = os.environ.get("XAUTHORITY", "/tmp/.docker.xauth")

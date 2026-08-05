@@ -48,12 +48,16 @@ class AIVSaaSBenchmark(BaseProxyPipelineBenchmark):
         device_type = self.device.split(".")[0] if "." in self.device else self.device
 
         if device_type == "iGPU":
-            if self.VDBOX == 1:
+            # Modern NPU-class platforms (MTL/ARL/LNL/PTL) report is_MTL=True. Some of
+            # them (e.g. Panther Lake, Lunar Lake) ship a single VDBox, so VDBox count
+            # must NOT downgrade them to the legacy low-end config. Only genuine legacy
+            # single-VDBox parts (non-is_MTL) use the reduced workload.
+            if self.VDBOX == 1 and not self.is_MTL:
                 # Reference values from i5-12400 benchmarking (1 VDBox)
                 self.config = {
-                    "ref_stream_list": [63,6,2],
-                    "ref_gpu_freq_list": [1251.51,1361.6,1437.98],
-                    "ref_pkg_power_list": [32.1,34.65,29.14],
+                    "ref_stream_list": [63, 6, 2],
+                    "ref_gpu_freq_list": [1251.51, 1361.6, 1437.98],
+                    "ref_pkg_power_list": [32.1, 34.65, 29.14],
                     "ref_platform": "i5-13600 (32G Mem)",
                     "models": ["yolov5s-416", "yolov5m-416"],
                     "enc_flag": "rate-control=cbr bitrate=2000 target-usage=7",
@@ -162,7 +166,9 @@ class AIVSaaSBenchmark(BaseProxyPipelineBenchmark):
                 # For iGPU: vapostproc (renderD128)
                 # For dGPU: varenderD129postproc (renderD129)
                 # Using generic vapostproc on dGPU would cross VA device contexts → blank frames.
-                display_sink = f"{self.post_proc_ele} ! video/x-raw ! xvimagesink display={display_env} async=false sync=false"
+                display_sink = (
+                    f"{self.post_proc_ele} ! video/x-raw ! xvimagesink display={display_env} async=false sync=false"
+                )
                 self.logger.info(f"Display output enabled: {self.post_proc_ele} → xvimagesink using {display_env}")
             else:
                 self.logger.warning(

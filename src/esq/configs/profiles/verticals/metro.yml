@@ -30,7 +30,7 @@ params:
   # Telemetry configuration
   telemetry:
     enabled: true
-    interval: 2  # seconds between samples
+    interval: 10  # seconds between samples
     scope: execution    # execution = workload-only sampling; test = full pytest lifecycle
     prerun:
       enabled: true

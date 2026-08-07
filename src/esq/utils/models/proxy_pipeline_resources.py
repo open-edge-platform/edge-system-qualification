@@ -12,7 +12,7 @@ import logging
 import tarfile
 from pathlib import Path
 
-from esq.utils.genutils import download_file_from_url
+from sysagent.utils.infrastructure import download_file
 
 logger = logging.getLogger(__name__)
 
@@ -54,9 +54,11 @@ def download_proxy_pipeline_resources(models_dir: str, videos_dir: str) -> bool:
     if all_models_exist:
         logger.info("All required models already exist, skipping download")
     else:
-        # Download tar.gz with retry support
-        if not download_file_from_url(pipeline_zoo_url, pipeline_zoo_tar, max_retries=3):
-            logger.error("Failed to download pipeline-zoo-models")
+        # Download tar.gz
+        try:
+            download_file(url=pipeline_zoo_url, target_path=str(pipeline_zoo_tar))
+        except RuntimeError as e:
+            logger.error(f"Failed to download pipeline-zoo-models: {e}")
             success = False
         else:
             # Extract tar.gz
@@ -126,9 +128,10 @@ def download_proxy_pipeline_resources(models_dir: str, videos_dir: str) -> bool:
             continue
 
         logger.info(f"Downloading {video_name} from {video_url}")
-        # Use 3 retries for video downloads to handle network glitches
-        if not download_file_from_url(video_url, dest_video, max_retries=3):
-            logger.error(f"Failed to download video: {video_name}")
+        try:
+            download_file(url=video_url, target_path=str(dest_video))
+        except RuntimeError as e:
+            logger.error(f"Failed to download video {video_name}: {e}")
             success = False
         else:
             logger.info(f"Successfully downloaded: {video_name}")

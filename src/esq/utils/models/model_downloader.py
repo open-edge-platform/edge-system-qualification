@@ -101,7 +101,7 @@ def download_model_by_id(
     else:
         models_dir = Path(models_dir)
 
-    logger.info(f"Downloading model: {model_id} ({precision})")
+    logger.debug(f"Downloading model: {model_id} ({precision})")
 
     try:
         if model_type == "omz":
@@ -121,7 +121,7 @@ def download_model_by_id(
             # Check if already exported
             model_path = models_dir / model_id / precision.upper() / f"{model_id}.xml"
             if not force_download and model_path.exists():
-                logger.info(f"✓ Model {model_id} ({precision}) already exists: {model_path}")
+                logger.debug(f"Model {model_id} ({precision}) already exists: {model_path}")
                 return model_path
 
             # Download weights

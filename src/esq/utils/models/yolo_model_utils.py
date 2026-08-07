@@ -14,9 +14,13 @@ Functions:
     - download_test_image: Download test images for inference
 """
 
+import contextlib
+import io
 import logging
 import os
+import signal
 import shutil
+import threading
 from pathlib import Path
 from typing import Optional, Union
 
@@ -27,6 +31,30 @@ import requests
 from .common import save_openvino_model
 
 logger = logging.getLogger(__name__)
+
+
+@contextlib.contextmanager
+def _time_limit(seconds: int):
+    """Best-effort timeout guard for blocking calls on Unix main thread."""
+    if seconds <= 0 or not hasattr(signal, "SIGALRM"):
+        yield
+        return
+
+    if threading.current_thread() is not threading.main_thread():
+        yield
+        return
+
+    def _timeout_handler(signum, frame):
+        raise TimeoutError(f"Operation timed out after {seconds}s")
+
+    previous_handler = signal.getsignal(signal.SIGALRM)
+    signal.signal(signal.SIGALRM, _timeout_handler)
+    signal.alarm(seconds)
+    try:
+        yield
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, previous_handler)
 
 # OpenVINO storage for test assets
 OPENVINO_STORAGE_BASE = "https://storage.openvinotoolkit.org"
@@ -82,10 +110,7 @@ def download_yolo_model(model_id: str, models_dir: Optional[str] = None) -> Opti
     """
     if model_id not in YOLO_MODELS:
         logger.error(f"Invalid model name '{model_id}'.")
-        logger.debug(f"Available models: {', '.join(YOLO_MODELS.keys())}")
         return None
-
-    logger.info(f"Downloading YOLO weights for: {model_id}")
 
     # Normalize model ID - Ultralytics doesn't recognize dash variants
     # yolo-v5s → yolov5s, yolo-v8s → yolov8s
@@ -96,56 +121,63 @@ def download_yolo_model(model_id: str, models_dir: Optional[str] = None) -> Opti
     if ultralytics_model_id.startswith("yolov11"):
         ultralytics_model_id = ultralytics_model_id.replace("yolov11", "yolo11")
 
-    logger.debug(f"Normalized model ID for Ultralytics: {model_id} → {ultralytics_model_id}")
-
     # Use CORE_DATA_DIR structure: esq_data/data/vertical/metro/temp for Ultralytics downloads
     core_data_dir_tainted = os.environ.get("CORE_DATA_DIR", os.path.join(os.getcwd(), "esq_data"))
     core_data_dir = "".join(c for c in core_data_dir_tainted)
     temp_dir = Path(core_data_dir) / "data" / "vertical" / "metro" / "temp"
     temp_dir.mkdir(parents=True, exist_ok=True)
     original_cwd = Path.cwd()
+    cache_dir = Path.home() / ".cache" / "ultralytics"
 
     try:
         from ultralytics import YOLO
 
         # Change to temp directory to avoid polluting workspace
         os.chdir(temp_dir)
-        logger.debug(f"Using temp directory for downloads: {temp_dir}")
 
         # Download model (Ultralytics manages cache automatically)
         # Use normalized name (without dashes) for Ultralytics
         model_name = f"{ultralytics_model_id}.pt"
-        logger.debug(f"Initializing YOLO model: {model_name}")
-        model = YOLO(model_name)
-        model.info()
+        # Redirect Ultralytics stdout/stderr to avoid conflicts with pytest
+        # capture buffers in CI environments, which can be closed mid-test
+        # and cause "I/O operation on closed file" log errors.
+        _sink = io.StringIO()
+        ultralytics_logger = logging.getLogger("ultralytics")
+        download_timeout = int(os.environ.get("ESQ_YOLO_DOWNLOAD_TIMEOUT", "900"))
+        previous_level = ultralytics_logger.level
+        try:
+            ultralytics_logger.setLevel(logging.ERROR)
+            with contextlib.redirect_stdout(_sink), contextlib.redirect_stderr(_sink):
+                with _time_limit(download_timeout):
+                    _ = YOLO(model_name)
+        except TimeoutError as e:
+            logger.error(f"YOLO model download timed out for {model_id}: {e}")
+            return None
+        finally:
+            ultralytics_logger.setLevel(previous_level)
 
         weights_path = None
         # Check temp directory first using normalized name
         temp_weights = temp_dir / f"{ultralytics_model_id}.pt"
         if temp_weights.exists():
             weights_path = temp_weights
-            logger.debug(f"Found weights in temp directory: {temp_weights}")
         else:
             # Try with suffix in temp dir
             matching_temp = list(temp_dir.glob(f"{ultralytics_model_id}*.pt"))
             if matching_temp:
                 weights_path = matching_temp[0]
-                logger.debug(f"Found weights with suffix in temp: {weights_path.name}")
 
         # If not in temp, check cache directory
         if not weights_path:
-            cache_dir = Path.home() / ".cache" / "ultralytics"
             if cache_dir.exists():
                 cache_weights = cache_dir / f"{ultralytics_model_id}.pt"
                 if cache_weights.exists():
                     weights_path = cache_weights
-                    logger.debug(f"Found weights in cache: {cache_weights}")
                 else:
                     # Try with suffix in cache
                     matching_cache = list(cache_dir.glob(f"{ultralytics_model_id}*.pt"))
                     if matching_cache:
                         weights_path = matching_cache[0]
-                        logger.debug(f"Found weights with suffix in cache: {weights_path.name}")
 
         # If still not found, report error
         if not weights_path:
@@ -156,14 +188,14 @@ def download_yolo_model(model_id: str, models_dir: Optional[str] = None) -> Opti
             # List what's in both locations
             temp_files = list(temp_dir.glob("*.pt"))
             if temp_files:
-                logger.debug(f"Files in temp: {[f.name for f in temp_files]}")
+                logger.error(f"Files in temp: {[f.name for f in temp_files]}")
             if cache_dir.exists():
                 cache_files = list(cache_dir.glob("*.pt"))
                 if cache_files:
-                    logger.debug(f"Files in cache: {[f.name for f in cache_files]}")
+                    logger.error(f"Files in cache: {[f.name for f in cache_files]}")
             return None
 
-        logger.info(f"✓ YOLO model weights ready at: {weights_path}")
+        logger.debug(f"YOLO model weights ready at: {weights_path}")
         return weights_path
 
     except Exception as e:
@@ -311,7 +343,13 @@ def export_yolo_model(
 
         # Convert to OpenVINO IR with custom export arguments
         model = YOLO(str(weights_path), task="detect")
-        converted_path = Path(model.export(**export_kwargs)).resolve()
+        export_timeout = int(os.environ.get("ESQ_YOLO_EXPORT_TIMEOUT", "1800"))
+        try:
+            with _time_limit(export_timeout):
+                converted_path = Path(model.export(**export_kwargs)).resolve()
+        except TimeoutError as e:
+            logger.error(f"YOLO model export timed out for {model_id}: {e}")
+            return None
 
         # Find the actual exported .xml file (Ultralytics may add suffix like 'u')
         # Note: Ultralytics may create nested subdirectories (e.g., /INT8/int8/)

@@ -23,14 +23,71 @@ VA Pipeline: Multi-stage video analytics pipeline with:
 """
 
 import logging
+import os
 from pathlib import Path
 from typing import Dict
 
-from esq.utils.genutils import download_file_from_url
+from sysagent.utils.infrastructure import download_file
 from esq.utils.models.openvino_model_utils import download_openvino_model
 from esq.utils.models.yolo_model_utils import download_yolo_model, export_yolo_model
 
 logger = logging.getLogger(__name__)
+
+# In-process cache to avoid repeated path probing/download calls in the same run.
+_YOLO_PT_PATH_CACHE: Dict[str, Path] = {}
+
+
+def _normalize_ultralytics_model_id(model_id: str) -> str:
+    """Normalize ESQ YOLO model id to Ultralytics weight naming format."""
+    normalized = model_id.replace("-", "")
+    if normalized.startswith("yolov11"):
+        normalized = normalized.replace("yolov11", "yolo11")
+    return normalized
+
+
+def _resolve_existing_yolo_weights(model_id: str) -> Path | None:
+    """Resolve existing YOLO .pt path from runtime temp/cache locations."""
+    cached = _YOLO_PT_PATH_CACHE.get(model_id)
+    if cached and cached.exists():
+        return cached
+
+    normalized = _normalize_ultralytics_model_id(model_id)
+
+    core_data_dir_tainted = os.environ.get("CORE_DATA_DIR", os.path.join(os.getcwd(), "esq_data"))
+    core_data_dir = "".join(c for c in core_data_dir_tainted)
+    temp_dir = Path(core_data_dir) / "data" / "vertical" / "metro" / "temp"
+    cache_dir = Path.home() / ".cache" / "ultralytics"
+
+    for base in (temp_dir, cache_dir):
+        if not base.exists():
+            continue
+
+        exact = base / f"{normalized}.pt"
+        if exact.exists():
+            _YOLO_PT_PATH_CACHE[model_id] = exact
+            return exact
+
+        matches = list(base.glob(f"{normalized}*.pt"))
+        if matches:
+            _YOLO_PT_PATH_CACHE[model_id] = matches[0]
+            return matches[0]
+
+    return None
+
+
+def _get_or_download_yolo_weights(model_id: str, models_dir_hint: str) -> Path:
+    """Get existing YOLO weights path or download once at runtime when missing."""
+    existing = _resolve_existing_yolo_weights(model_id)
+    if existing:
+        logger.debug(f"Reusing existing YOLO weights for {model_id}: {existing}")
+        return existing
+
+    pt_path = download_yolo_model(model_id, models_dir_hint)
+    if not pt_path:
+        raise FileNotFoundError(f"Failed to resolve YOLO weights for {model_id}")
+
+    _YOLO_PT_PATH_CACHE[model_id] = pt_path
+    return pt_path
 
 # VA Light pipeline video URL - H.265 encoded bears video
 VIDEO_LIGHT_URL = "https://videos.pexels.com/video-files/18856748/18856748-uhd_3840_2160_60fps.mp4"
@@ -77,9 +134,8 @@ def download_va_resources(models_dir: str, videos_dir: str) -> Dict[str, Path]:
         results["detection_bin"] = yolo_xml_expected.with_suffix(".bin")
     else:
         try:
-            logger.info("Downloading YOLOv11n detection model...")
-            # Download .pt weights
-            pt_path = download_yolo_model("yolov11n", str(models_path.parent.parent))
+            logger.debug("Resolving YOLOv11n detection weights...")
+            pt_path = _get_or_download_yolo_weights("yolov11n", str(models_path.parent.parent))
 
             logger.info("Exporting YOLOv11n to OpenVINO INT8 format with dynamic batch support...")
             # Export to OpenVINO with INT8 precision and dynamic batch
@@ -105,7 +161,7 @@ def download_va_resources(models_dir: str, videos_dir: str) -> Dict[str, Path]:
             results["detection_xml"] = yolo_xml
             results["detection_bin"] = yolo_xml.with_suffix(".bin")
 
-        except Exception as e:
+        except RuntimeError as e:
             logger.error(f"Failed to download YOLOv11n model: {e}", exc_info=True)
             raise
 
@@ -143,8 +199,10 @@ def download_va_resources(models_dir: str, videos_dir: str) -> Dict[str, Path]:
         logger.info(f"Video already exists: {video_path}")
     else:
         logger.info(f"Downloading VA Light video: {VIDEO_LIGHT_URL}")
-        # download_file_from_url expects a Path object, not a string
-        if not download_file_from_url(VIDEO_LIGHT_URL, video_path):
+        try:
+            download_file(url=VIDEO_LIGHT_URL, target_path=str(video_path))
+        except RuntimeError as e:
+            logger.error(f"Failed to download VA Light video: {e}")
             raise RuntimeError(f"Failed to download video from {VIDEO_LIGHT_URL}")
         logger.info(f"Video downloaded: {video_path}")
 
@@ -197,9 +255,8 @@ def download_va_medium_resources(models_dir: str, videos_dir: str) -> Dict[str, 
         results["detection_bin"] = yolo_xml_expected.with_suffix(".bin")
     else:
         try:
-            logger.info("Downloading YOLOv5m detection model...")
-            # Download .pt weights
-            pt_path = download_yolo_model("yolov5m", str(models_path.parent.parent))
+            logger.debug("Resolving YOLOv5m detection weights...")
+            pt_path = _get_or_download_yolo_weights("yolov5m", str(models_path.parent.parent))
 
             logger.info("Exporting YOLOv5m to OpenVINO INT8 format with dynamic batch support...")
             # Export to OpenVINO with INT8 precision and dynamic batch
@@ -223,7 +280,7 @@ def download_va_medium_resources(models_dir: str, videos_dir: str) -> Dict[str, 
             results["detection_xml"] = yolo_xml
             results["detection_bin"] = yolo_xml.with_suffix(".bin")
 
-        except Exception as e:
+        except RuntimeError as e:
             logger.error(f"Failed to download YOLOv5m model: {e}", exc_info=True)
             raise
 
@@ -283,7 +340,10 @@ def download_va_medium_resources(models_dir: str, videos_dir: str) -> Dict[str, 
         logger.info(f"Video already exists: {video_path}")
     else:
         logger.info(f"Downloading VA Medium video: {VIDEO_MEDIUM_URL}")
-        if not download_file_from_url(VIDEO_MEDIUM_URL, video_path):
+        try:
+            download_file(url=VIDEO_MEDIUM_URL, target_path=str(video_path))
+        except Exception as e:
+            logger.error(f"Failed to download VA Medium video: {e}")
             raise RuntimeError(f"Failed to download video from {VIDEO_MEDIUM_URL}")
         logger.info(f"Video downloaded: {video_path}")
 
@@ -341,9 +401,8 @@ def download_va_heavy_resources(models_dir: str, videos_dir: str) -> Dict[str, P
         results["detection_bin"] = yolo_xml_expected.with_suffix(".bin")
     else:
         try:
-            logger.info("Downloading YOLO11m detection model...")
-            # Download .pt weights using "yolo11m" identifier (Ultralytics naming without 'v')
-            pt_path = download_yolo_model("yolo11m", str(models_path.parent.parent))
+            logger.debug("Resolving YOLO11m detection weights...")
+            pt_path = _get_or_download_yolo_weights("yolo11m", str(models_path.parent.parent))
 
             logger.info("Exporting YOLO11m to OpenVINO INT8 format with dynamic batch support...")
             # Export to OpenVINO with INT8 precision and dynamic batch
@@ -429,7 +488,10 @@ def download_va_heavy_resources(models_dir: str, videos_dir: str) -> Dict[str, P
         logger.info(f"Video already exists: {video_path}")
     else:
         logger.info(f"Downloading VA Heavy video: {VIDEO_HEAVY_URL}")
-        if not download_file_from_url(VIDEO_HEAVY_URL, video_path):
+        try:
+            download_file(url=VIDEO_HEAVY_URL, target_path=str(video_path))
+        except Exception as e:
+            logger.error(f"Failed to download VA Heavy video: {e}")
             raise RuntimeError(f"Failed to download video from {VIDEO_HEAVY_URL}")
         logger.info(f"Video downloaded: {video_path}")
 

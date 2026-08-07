@@ -11,7 +11,9 @@ proxy pipeline benchmarks.
 import logging
 from pathlib import Path
 
-from esq.utils.genutils import download_file_from_url, extract_zip_archive
+from sysagent.utils.infrastructure import download_file
+
+from esq.utils.genutils import extract_zip_archive
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +64,10 @@ def download_lpr_resources(models_dir: str, videos_dir: str) -> bool:
 
             # Download zip file
             zip_path = dest.parent / f"{resource_name}.zip"
-            if not download_file_from_url(url, zip_path):
+            try:
+                download_file(url=url, target_path=str(zip_path))
+            except RuntimeError as e:
+                logger.error(f"Failed to download {resource_name}: {e}")
                 success = False
                 continue
 
@@ -76,12 +81,15 @@ def download_lpr_resources(models_dir: str, videos_dir: str) -> bool:
             zip_path.unlink(missing_ok=True)
 
         else:
-            # Direct file download with retry support
+            # Direct file download
             if dest.exists():
                 logger.info(f"File already exists: {dest}")
                 continue
 
-            if not download_file_from_url(url, dest, max_retries=3):
+            try:
+                download_file(url=url, target_path=str(dest))
+            except RuntimeError as e:
+                logger.error(f"Failed to download {resource_name}: {e}")
                 success = False
                 continue
 

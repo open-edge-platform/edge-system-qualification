@@ -394,7 +394,7 @@ def download_openvino_model(
         logger.info(f"✓ Model {model_id} ({precision}) already exists: {xml_file}")
         return xml_file
 
-    logger.info(f"Converting {model_id} to OpenVINO IR ({precision})...")
+    logger.debug(f"Converting {model_id} to OpenVINO IR ({precision})...")
 
     try:
         use_ultralytics = model_info.get("use_ultralytics", False)
@@ -408,7 +408,7 @@ def download_openvino_model(
                 logger.error(f"YOLO model {model_id} missing model_variant in configuration")
                 return None
 
-            logger.info(f"Using YOLO utilities for {model_id} ({model_variant})...")
+            logger.debug(f"Using YOLO utilities for {model_id} ({model_variant})...")
 
             # Step 1: Download YOLO weights
             weights_path = download_yolo_model(model_id=model_variant, models_dir=None)
@@ -438,7 +438,7 @@ def download_openvino_model(
                 logger.error(f"Failed to export YOLO model {model_variant} to OpenVINO")
                 return None
 
-            logger.info(f"✓ Successfully exported {model_id} ({precision}): {exported_path}")
+            logger.debug(f"Successfully exported {model_id} ({precision}): {exported_path}")
 
             # Verify the file exists and return
             if not exported_path.exists():

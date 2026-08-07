@@ -8,12 +8,13 @@ from pathlib import Path
 
 import allure
 import pytest
-from esq.utils.genutils import extract_csv_values, plot_grouped_bar_chart
-from esq.utils.media import get_platform_identifier, get_vdbox_count_for_device, match_platform
 from sysagent.utils.config import ensure_dir_permissions
 from sysagent.utils.core import Metrics, Result
 from sysagent.utils.infrastructure import DockerClient
 from sysagent.utils.system.ov_helper import get_available_devices_by_category
+
+from esq.utils.genutils import extract_csv_values, plot_grouped_bar_chart
+from esq.utils.media import get_platform_identifier, get_vdbox_count_for_device, match_platform
 
 logger = logging.getLogger(__name__)
 
@@ -98,6 +99,26 @@ def _create_ov_metrics(value: str = "N/A", unit: str = None) -> dict:
         "package_power": Metrics(unit=unit, value=value, is_key_metric=False),
         "duration": Metrics(unit=unit, value=value, is_key_metric=False),
     }
+
+
+def _ov_device_variant(device_categories) -> str:
+    """Map configured device categories to the device-specific image variant suffix.
+
+    The benchmark runner image is built on top of a device-specific FW base image
+    (standard/igpu, dgpu, or npu). Mirrors the FW base-image selection logic so each
+    device variant gets its own image tag and they do not collide on a shared tag.
+    """
+    if isinstance(device_categories, str):
+        categories = [device_categories]
+    else:
+        categories = list(device_categories or [])
+    lowered = [str(c).lower() for c in categories]
+    if any("npu" in c for c in lowered):
+        return "npu"
+    if any("dgpu" in c for c in lowered):
+        return "dgpu"
+    return "igpu"
+
 
 # Mapping between Python metric names (lowercase) and CSV column names
 # Note: Container CSV only provides: Throughput, Latency, Dev Freq, Pkg Power, Duration(s)
@@ -419,11 +440,19 @@ def test_ov_benchmark(
     test_id = configs.get("test_id", test_name)
     duration_secs = float(configs.get("duration_secs", 0.15))
     dockerfile_name = configs.get("dockerfile_name", "Dockerfile")
-    docker_image_tag = f"{configs.get('container_image', 'openvino_bm_runner')}:{configs.get('image_tag', '1.0')}"
     timeout = int(configs.get("timeout", 300))
     devices = configs.get("devices", "igpu")
     model = configs.get("model", "resnet-50-tf")
     precision = configs.get("precision", "INT8")
+
+    # Build a device-specific runner image tag. The runner image is built on top of a
+    # device-specific FW base image, so a single shared tag would collide across the
+    # igpu/dgpu/npu variants (causing repeated rebuilds and incorrect image reuse).
+    device_image_variant = _ov_device_variant(devices)
+    docker_image_tag = (
+        f"{configs.get('container_image', 'openvino_bm_runner')}:"
+        f"{configs.get('image_tag', '1.0')}-{device_image_variant}"
+    )
 
     # Setup
     test_dir = os.path.dirname(os.path.abspath(__file__))
@@ -747,8 +776,9 @@ def test_ov_benchmark(
             # Log detailed device information and execute test
             # Initialize variables for exception handler scope
             container_image = configs.get("container_image", "openvino_bm_runner")
-            container_tag = configs.get("image_tag", "1.0")
-            container_full_tag = f"{container_image}:{container_tag}"
+            # Reuse the device-specific tag built during preparation so the container
+            # runs the exact image that was built/cached for this device variant.
+            container_full_tag = docker_image_tag
 
             try:
                 logger.info(f"Processing {len(device_dict)} device(s): {list(device_dict.keys())}")
@@ -952,6 +982,7 @@ def test_ov_benchmark(
                 # CSV file exists - process it
                 try:
                     import math
+
                     import pandas as pd
 
                     def _to_float(metric_key, raw_value):
@@ -1055,7 +1086,9 @@ def test_ov_benchmark(
                                 act_freq_total = 0.0
                                 sample_count = 0
                                 try:
-                                    with open(telemetry_file, "r", encoding="utf-8", errors="ignore") as telemetry_handle:
+                                    with open(
+                                        telemetry_file, "r", encoding="utf-8", errors="ignore"
+                                    ) as telemetry_handle:
                                         for line in telemetry_handle:
                                             parts = line.strip().split()
                                             if len(parts) < 2:
@@ -1091,8 +1124,7 @@ def test_ov_benchmark(
                                             return avg_dgpu_power
                                 except Exception as dgpu_power_err:
                                     logger.debug(
-                                        f"Failed reading dGPU power fallback file {dgpu_power_file}: "
-                                        f"{dgpu_power_err}"
+                                        f"Failed reading dGPU power fallback file {dgpu_power_file}: {dgpu_power_err}"
                                     )
 
                         return None
@@ -1160,8 +1192,7 @@ def test_ov_benchmark(
                     best_throughput = device_throughputs[best_device]
                     logger.info(f"Best device: {best_device} with throughput={best_throughput:.2f} FPS")
                     logger.info(
-                        f"All device throughputs: "
-                        f"{[(dev, round(tput, 2)) for dev, tput in device_throughputs.items()]}"
+                        f"All device throughputs: {[(dev, round(tput, 2)) for dev, tput in device_throughputs.items()]}"
                     )
 
                     # Step 2: Extract ALL metrics from the best device
@@ -1310,8 +1341,7 @@ def test_ov_benchmark(
                 if not valid_metrics:
                     metric_names = list(result.metrics.keys())
                     logger.warning(
-                        f"No valid metrics collected from CSV. All metrics are 'N/A'. "
-                        f"Metrics checked: {metric_names}"
+                        f"No valid metrics collected from CSV. All metrics are 'N/A'. Metrics checked: {metric_names}"
                     )
 
                 # If successfully processed all devices and collected valid metrics, mark as success

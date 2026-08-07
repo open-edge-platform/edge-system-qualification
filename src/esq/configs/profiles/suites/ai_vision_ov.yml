@@ -59,7 +59,7 @@ suites:
                 model: "resnet-50-tf" 
                 precision: "INT8"
                 duration_secs: 120
-                timeout: "200"
+                timeout: "300"
                 requirements:
                   igpu_required: true
                 kpi_refs:
@@ -71,7 +71,7 @@ suites:
                 model: "resnet-50-tf" 
                 precision: "INT8"
                 duration_secs: 120
-                timeout: "200"
+                timeout: "300"
                 requirements:
                   dgpu_required: true
                 kpi_refs:
@@ -83,7 +83,7 @@ suites:
                 model: "resnet-50-tf" 
                 precision: "INT8"
                 duration_secs: 120
-                timeout: "200"
+                timeout: "300"
                 requirements:
                   npu_required: true
                 kpi_refs:
@@ -95,7 +95,7 @@ suites:
                 model: "efficientnet-b0" 
                 precision: "INT8"
                 duration_secs: 120
-                timeout: "200"
+                timeout: "300"
                 requirements:
                   igpu_required: true
                 kpi_refs:
@@ -107,7 +107,7 @@ suites:
                 model: "efficientnet-b0" 
                 precision: "INT8"
                 duration_secs: 120
-                timeout: "200"
+                timeout: "300"
                 requirements:
                   dgpu_required: true
                 kpi_refs:
@@ -119,7 +119,7 @@ suites:
                 model: "efficientnet-b0" 
                 precision: "INT8"
                 duration_secs: 120
-                timeout: "200"
+                timeout: "300"
                 requirements:
                   npu_required: true
                 kpi_refs:
@@ -131,7 +131,7 @@ suites:
                 model: "ssdlite_mobilenet_v2" 
                 precision: "INT8"
                 duration_secs: 120
-                timeout: "200"
+                timeout: "300"
                 requirements:
                   igpu_required: true
                 kpi_refs:
@@ -143,7 +143,7 @@ suites:
                 model: "ssdlite_mobilenet_v2" 
                 precision: "INT8"
                 duration_secs: 120
-                timeout: "200"
+                timeout: "300"
                 requirements:
                   dgpu_required: true
                 kpi_refs:
@@ -155,7 +155,7 @@ suites:
                 model: "ssdlite_mobilenet_v2" 
                 precision: "INT8"
                 duration_secs: 120
-                timeout: "200"
+                timeout: "300"
                 requirements:
                   npu_required: true
                 kpi_refs:
@@ -167,7 +167,7 @@ suites:
                 model: "mobilenet-v2-pytorch" 
                 precision: "INT8"
                 duration_secs: 120
-                timeout: "200"
+                timeout: "300"
                 requirements:
                   igpu_required: true
                 kpi_refs:
@@ -179,7 +179,7 @@ suites:
                 model: "mobilenet-v2-pytorch" 
                 precision: "INT8"
                 duration_secs: 120
-                timeout: "200"
+                timeout: "300"
                 requirements:
                   dgpu_required: true
                 kpi_refs:
@@ -191,7 +191,7 @@ suites:
                 model: "mobilenet-v2-pytorch" 
                 precision: "INT8"
                 duration_secs: 120
-                timeout: "200"
+                timeout: "300"
                 requirements:
                   npu_required: true
                 kpi_refs:
@@ -203,7 +203,7 @@ suites:
                 model: "yolo-v5s" 
                 precision: "INT8"
                 duration_secs: 120
-                timeout: "200"
+                timeout: "300"
                 requirements:
                   igpu_required: true
                 kpi_refs:
@@ -215,7 +215,7 @@ suites:
                 model: "yolo-v5s" 
                 precision: "INT8"
                 duration_secs: 120
-                timeout: "200"
+                timeout: "300"
                 requirements:
                   dgpu_required: true
                 kpi_refs:
@@ -227,7 +227,7 @@ suites:
                 model: "yolo-v5s" 
                 precision: "INT8"
                 duration_secs: 120
-                timeout: "200"
+                timeout: "300"
                 requirements:
                   npu_required: true
                 kpi_refs:
@@ -239,7 +239,7 @@ suites:
                 model: "yolo-v8s" 
                 precision: "INT8"
                 duration_secs: 120
-                timeout: "200"
+                timeout: "300"
                 requirements:
                   igpu_required: true
                 kpi_refs:
@@ -251,7 +251,7 @@ suites:
                 model: "yolo-v8s" 
                 precision: "INT8"
                 duration_secs: 120
-                timeout: "200"
+                timeout: "300"
                 requirements:
                   dgpu_required: true
                 kpi_refs:
@@ -263,7 +263,7 @@ suites:
                 model: "clip-vit-base-patch16" 
                 precision: "INT8"
                 duration_secs: 120
-                timeout: "200"
+                timeout: "300"
                 requirements:
                   igpu_required: true
                 kpi_refs:
@@ -275,7 +275,7 @@ suites:
                 model: "clip-vit-base-patch16" 
                 precision: "INT8"
                 duration_secs: 120
-                timeout: "200"
+                timeout: "300"
                 requirements:
                   dgpu_required: true
                 kpi_refs:

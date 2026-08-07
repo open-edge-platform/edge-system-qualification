@@ -11,7 +11,7 @@ Videos are downloaded from the edge-ai-resources GitHub repository.
 import logging
 from pathlib import Path
 
-from esq.utils.genutils import download_file_from_url
+from sysagent.utils.infrastructure import download_file
 
 logger = logging.getLogger(__name__)
 
@@ -58,8 +58,10 @@ def download_media_resources(videos_dir: str) -> bool:
             continue
 
         logger.info(f"Downloading {video_name} from GitHub...")
-        if not download_file_from_url(video_url, dest_video):
-            logger.error(f"Failed to download video: {video_name}")
+        try:
+            download_file(url=video_url, target_path=str(dest_video))
+        except RuntimeError as e:
+            logger.error(f"Failed to download video: {video_name}: {e}")
             success = False
         else:
             logger.info(f"Successfully downloaded: {video_name}")

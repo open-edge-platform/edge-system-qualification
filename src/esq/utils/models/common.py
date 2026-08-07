@@ -30,7 +30,7 @@ def download_model(model_id_or_path: str, revision: str = "main", ignore_pattern
     Raises:
         RuntimeError: If download fails or is interrupted
     """
-    logger.info(f"Downloading model: {model_id_or_path}")
+    logger.debug(f"Downloading model: {model_id_or_path}")
     try:
         from huggingface_hub import snapshot_download
 

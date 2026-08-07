@@ -123,6 +123,34 @@ class DockerClient:
 
         logger.info(f"Successfully pulled Docker image: {image}")
 
+    @staticmethod
+    def _normalize_buildargs(buildargs: dict | None) -> list[list[str]]:
+        """Normalize build args for deterministic build cache keys."""
+        if not buildargs:
+            return []
+
+        normalized: list[list[str]] = []
+        for key in sorted(buildargs.keys()):
+            value = buildargs.get(key)
+            normalized.append([str(key), "" if value is None else str(value)])
+        return normalized
+
+    def _get_build_cache_key(
+        self,
+        path: str | None,
+        dockerfile: str | None,
+        tag: str | None,
+        buildargs: dict | None,
+    ) -> str:
+        """Create a deterministic cache key for a Docker build invocation."""
+        key_payload = {
+            "path": os.path.abspath(path) if path else "",
+            "dockerfile": dockerfile if dockerfile else "Dockerfile",
+            "tag": tag if tag else "",
+            "buildargs": self._normalize_buildargs(buildargs),
+        }
+        return json.dumps(key_payload, sort_keys=True, separators=(",", ":"))
+
     def build_image(
         self,
         path: str = None,
@@ -148,12 +176,13 @@ class DockerClient:
         Returns:
             dict: {"docker_image": tag, "image_id": image.id, "build_log_text": ..., "image_obj": image}
         """
-        # If image already built in this CLI session, reuse it
         built_tags_env = os.environ.get("CORE_BUILT_DOCKER_TAGS", "")
-        built_tags = set(built_tags_env.split(";")) if built_tags_env else set()
-        if tag in built_tags:
-            logger.info(f"Reusing cached Docker image for tag: {tag} in CLI session")
-            nocache = False
+        built_tags = set(filter(None, built_tags_env.split(";"))) if built_tags_env else set()
+
+        built_keys_env = os.environ.get("CORE_BUILT_DOCKER_BUILD_KEYS", "")
+        built_keys = set(filter(None, built_keys_env.split(";"))) if built_keys_env else set()
+
+        build_cache_key = self._get_build_cache_key(path=path, dockerfile=dockerfile, tag=tag, buildargs=buildargs)
 
         try:
             logger.info("Verifying Docker client connection")
@@ -161,6 +190,58 @@ class DockerClient:
         except Exception as e:
             logger.error(f"Failed to connect to Docker: {e}")
             raise RuntimeError(f"Docker is not available: {e}")
+
+        # Skip rebuild only when this exact build context/args/tag combo was already built in this CLI session.
+        if not nocache and tag and build_cache_key in built_keys:
+            try:
+                image = self.client.images.get(tag)
+                logger.info(
+                    f"Skipping Docker build for tag '{tag}': identical build request "
+                    f"(context, dockerfile, build args) already built in this CLI session "
+                    f"and image exists locally. Reusing existing image to save build time."
+                )
+                build_log_text = (
+                    f"Build skipped for '{tag}'.\n"
+                    f"Reason: An identical build request was already completed earlier in this CLI session, "
+                    f"and the resulting image is still present locally.\n"
+                    f"Build key (path + dockerfile + tag + build args): {build_cache_key}\n"
+                    f"No Docker build was invoked; the existing image was reused as-is."
+                )
+                allure.attach(
+                    build_log_text,
+                    name=f"Docker Build Logs - {tag}",
+                    attachment_type=allure.attachment_type.TEXT,
+                )
+
+                dockerfile_path = ""
+                if path:
+                    dockerfile_name = dockerfile if dockerfile else "Dockerfile"
+                    dockerfile_path = os.path.join(path, dockerfile_name)
+
+                if extract_packages:
+                    self._extract_package_list(tag, dockerfile_path)
+                elif extract_base_image_info:
+                    logger.info(f"Extracting base image information from Docker image: {tag}")
+                    base_image_info = self._extract_base_image_info(tag, dockerfile_path)
+                    self._create_base_image_attachment(tag, base_image_info)
+
+                result = {
+                    "docker_image": tag,
+                    "image_id": image.id,
+                    "build_log_text": build_log_text,
+                    "image_obj": image,
+                }
+                built_tags.add(tag)
+                built_keys.add(build_cache_key)
+                os.environ["CORE_BUILT_DOCKER_TAGS"] = ";".join(sorted(built_tags))
+                os.environ["CORE_BUILT_DOCKER_BUILD_KEYS"] = ";".join(sorted(built_keys))
+                return result
+            except docker.errors.ImageNotFound:
+                logger.warning(
+                    f"Build key was cached but image '{tag}' is missing locally; rebuilding image"
+                )
+                built_keys.discard(build_cache_key)
+                os.environ["CORE_BUILT_DOCKER_BUILD_KEYS"] = ";".join(sorted(built_keys))
 
         logger.debug(f"Building Docker image from: {path}")
         try:
@@ -351,8 +432,11 @@ class DockerClient:
 
         result = {"docker_image": tag, "image_id": image.id, "build_log_text": build_log_text, "image_obj": image}
         # Cache the result for this CLI session
-        built_tags.add(tag)
-        os.environ["CORE_BUILT_DOCKER_TAGS"] = ";".join(built_tags)
+        if tag:
+            built_tags.add(tag)
+        built_keys.add(build_cache_key)
+        os.environ["CORE_BUILT_DOCKER_TAGS"] = ";".join(sorted(built_tags))
+        os.environ["CORE_BUILT_DOCKER_BUILD_KEYS"] = ";".join(sorted(built_keys))
         return result
 
     def _extract_package_list(self, tag: str, dockerfile_path: str = None) -> None:

@@ -17,7 +17,7 @@ from esq.utils.media import (
     get_x11_environment,
     get_x11_volumes,
 )
-from esq.utils.media.validation import detect_platform_type
+from esq.utils.media.validation import detect_platform_type, get_unsupported_metro_dgpu_ids
 from sysagent.utils.config import ensure_dir_permissions
 from sysagent.utils.core import Metrics, Result
 from sysagent.utils.infrastructure import DockerClient
@@ -550,6 +550,12 @@ def test_media_pipelines(
     device = configs.get("device", "igpu")
     device_categories = _normalize_device_categories(device)
     device = device_categories[0]
+    unsupported_ids = sorted(get_unsupported_metro_dgpu_ids(device_categories))
+    if unsupported_ids:
+        pytest.skip(
+            "Metro/dependent dGPU test is not supported on device ID(s): "
+            f"{', '.join(unsupported_ids)}"
+        )
     operation = configs.get("operation", "decode")
     codec = configs.get("codec", "H.264")
     bitrate = configs.get("bitrate", "4Mbps")

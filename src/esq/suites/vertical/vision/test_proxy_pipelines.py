@@ -19,7 +19,7 @@ from esq.utils.media import (
     get_x11_environment,
     get_x11_volumes,
 )
-from esq.utils.media.validation import detect_platform_type
+from esq.utils.media.validation import detect_platform_type, get_unsupported_metro_dgpu_ids
 from sysagent.utils.config import ensure_dir_permissions
 from sysagent.utils.core import Metrics, Result
 from sysagent.utils.infrastructure import DockerClient
@@ -50,6 +50,15 @@ def _normalize_device_categories(device_value, default: str = "igpu") -> list[st
 
     normalized = [category.strip().lower() for category in categories if str(category).strip()]
     return normalized if normalized else [default]
+
+
+def _skip_unsupported_metro_dgpu(device_categories: list[str]) -> None:
+    unsupported_ids = sorted(get_unsupported_metro_dgpu_ids(device_categories))
+    if unsupported_ids:
+        pytest.skip(
+            "Metro/dependent dGPU test is not supported on device ID(s): "
+            f"{', '.join(unsupported_ids)}"
+        )
 
 
 def _resolve_esq_build_context(test_file_dir: Path, relative_dockerfile: str) -> Path:
@@ -744,6 +753,7 @@ def test_proxy_pipelines(
     timeout = int(configs.get("timeout", 300))
     devices = configs.get("devices", "igpu")
     device_categories = _normalize_device_categories(devices)
+    _skip_unsupported_metro_dgpu(device_categories)
     devices = ",".join(device_categories)
 
     # Setup

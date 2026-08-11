@@ -34,7 +34,7 @@ from sysagent.utils.core import Result
 from sysagent.utils.infrastructure import DockerClient
 from sysagent.utils.system.ov_helper import get_available_devices_by_category
 
-from esq.utils.media.validation import detect_platform_type
+from esq.utils.media.validation import detect_platform_type, get_unsupported_metro_dgpu_ids
 
 # Import shared VA utilities
 from .va_common import (
@@ -134,6 +134,12 @@ def test_va_light(
     docker_image_tag = f"{configs.get('container_image', 'va_light_bm')}:{configs.get('image_tag', '1.0')}"
     timeout = int(configs.get("timeout", 600))
     devices = configs.get("devices", "igpu")
+    unsupported_ids = sorted(get_unsupported_metro_dgpu_ids(devices))
+    if unsupported_ids:
+        pytest.skip(
+            "Metro/dependent dGPU test is not supported on device ID(s): "
+            f"{', '.join(unsupported_ids)}"
+        )
 
     # Setup
     test_dir = os.path.dirname(os.path.abspath(__file__))

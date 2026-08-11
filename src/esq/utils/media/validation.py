@@ -12,6 +12,7 @@ Consolidates shell script functionality from:
 """
 
 import logging
+import re
 from typing import Dict, List, Tuple
 
 # Support both installed package and Docker container usage
@@ -182,7 +183,6 @@ DGPU_DEV_IDS = [
     "56A6",
     "56A5",
     "56A1",
-    "56A0",
     "5694",
     "5693",
     "5692",
@@ -190,7 +190,6 @@ DGPU_DEV_IDS = [
     "5690",
     "56A2",
     "E20B",
-    "E20C",
     "64A0",
     "7D55",
     "56BC",
@@ -199,6 +198,8 @@ DGPU_DEV_IDS = [
     "E212",
     "E211",
 ]
+
+_METRO_UNSUPPORTED_DGPU_IDS = frozenset({"56A0", "E20C"})
 
 # NPU Platform Device IDs (Meteor Lake, Arrow Lake, Lunar Lake)
 # These platforms have NPU co-processor support when paired with iGPU
@@ -233,6 +234,33 @@ NPU_PLATFORM_DEV_IDS = [
 ]
 
 logger = logging.getLogger(__name__)
+
+
+def get_unsupported_metro_dgpu_ids(device_categories) -> set[str]:
+    """Return retired Metro dGPU PCI IDs present for a dGPU test request."""
+    if isinstance(device_categories, str):
+        device_categories = [device_categories]
+    normalized_categories = {
+        str(category).strip().lower() for category in (device_categories or [])
+    }
+    if "dgpu" not in normalized_categories:
+        return set()
+
+    try:
+        result = run_command(["lspci", "-nn"], capture_output=True)
+    except OSError as error:
+        logger.warning(f"Unable to inspect PCI devices for Metro support: {error}")
+        return set()
+
+    if not result.success:
+        logger.warning(f"Unable to inspect PCI devices for Metro support: {result.stderr}")
+        return set()
+
+    device_ids = {
+        match.group(1).upper()
+        for match in re.finditer(r"\[8086:([0-9a-fA-F]{4})\]", result.stdout)
+    }
+    return device_ids.intersection(_METRO_UNSUPPORTED_DGPU_IDS)
 
 
 def normalize_device_name(device: str, device_type: str = None) -> str:

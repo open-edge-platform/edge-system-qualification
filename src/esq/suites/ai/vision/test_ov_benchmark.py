@@ -15,6 +15,7 @@ from sysagent.utils.system.ov_helper import get_available_devices_by_category
 
 from esq.utils.genutils import extract_csv_values, plot_grouped_bar_chart
 from esq.utils.media import get_platform_identifier, get_vdbox_count_for_device, match_platform
+from esq.utils.media.validation import get_unsupported_metro_dgpu_ids
 
 logger = logging.getLogger(__name__)
 
@@ -444,6 +445,12 @@ def test_ov_benchmark(
     devices = configs.get("devices", "igpu")
     model = configs.get("model", "resnet-50-tf")
     precision = configs.get("precision", "INT8")
+    unsupported_ids = sorted(get_unsupported_metro_dgpu_ids(devices))
+    if unsupported_ids:
+        pytest.skip(
+            "Metro/dependent dGPU test is not supported on device ID(s): "
+            f"{', '.join(unsupported_ids)}"
+        )
 
     # Build a device-specific runner image tag. The runner image is built on top of a
     # device-specific FW base image, so a single shared tag would collide across the

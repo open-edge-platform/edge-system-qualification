@@ -13,6 +13,7 @@ import pytest
 from esq.utils.genutils import (
     extract_csv_values,
 )
+from esq.utils.media.validation import get_unsupported_metro_dgpu_ids
 from sysagent.utils.config import ensure_dir_permissions
 from sysagent.utils.core import Metrics, Result
 from sysagent.utils.infrastructure import DockerClient
@@ -96,6 +97,12 @@ def test_system_gpu(
     )
     timeout = int(configs.get("timeout", 300))
     device = configs.get("device", "igpu")
+    unsupported_ids = sorted(get_unsupported_metro_dgpu_ids(device))
+    if unsupported_ids:
+        pytest.skip(
+            "Metro/dependent dGPU test is not supported on device ID(s): "
+            f"{', '.join(unsupported_ids)}"
+        )
     # Setup
     test_dir = os.path.dirname(os.path.abspath(__file__))
     docker_dir = os.path.join(test_dir, test_container_path)

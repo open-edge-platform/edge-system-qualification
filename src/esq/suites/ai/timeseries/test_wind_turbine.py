@@ -127,6 +127,9 @@ def _download_configured_assets(configs, suite_assets_root):
     assets_root.mkdir(parents=True, exist_ok=True)
 
     for asset in assets:
+        if str(asset.get("type", "file")).strip().lower() != "file":
+            continue
+
         asset_id = str(asset.get("id", "")).strip() or "unnamed-asset"
         asset_url = str(asset.get("url", "")).strip()
         raw_path = str(asset.get("path", "")).strip()
@@ -412,7 +415,7 @@ def test_wind_turbine(
     simulation_data_dir = str(configs.get("simulation_data_dir", os.environ.get("TIMESERIES_ASSETS_DIR", ""))).strip()
 
     core_data_dir = Path(os.environ.get("CORE_DATA_DIR", os.path.join(os.getcwd(), "esq_data"))).resolve()
-    suite_runtime_root = core_data_dir / "data" / "suites" / "ai" / "timeseries" / "wt"
+    suite_runtime_root = core_data_dir / "data" / "manufacturing" / "timeseries" / "wt"
     suite_assets_root = suite_runtime_root / "assets"
     _download_configured_assets(configs=configs, suite_assets_root=suite_assets_root)
     # Pre-create bind-mount source paths as the host user so the Docker daemon

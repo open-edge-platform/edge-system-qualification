@@ -24,7 +24,7 @@ Intel® ESQ provides a comprehensive collection of test suites to assess and qua
     - [System GPU - OpenVINO](#system-gpu---openvino)
     - [System Memory - STREAM](#system-memory---stream)
     - [Media Performance](#media-performance)
-    - [Timeseries AI](#timeseries-ai)
+    - [Manufacturing Timeseries](#manufacturing-timeseries)
 
 
 ---
@@ -42,7 +42,7 @@ Quick reference of all available test suites and their profile names.
 | `profile.vertical.retail-lp` | Vertical | Retail Loss Prevention | `esq run --profile profile.vertical.retail-lp` |
 | `profile.vertical.retail-lp-vlm` | Vertical | Retail Loss Prevention Visual Language Model | `esq run --profile profile.vertical.retail-lp-vlm` |
 | `profile.suite.ai.gen` | Horizontal | Gen AI profile | `esq run --profile profile.suite.ai.gen` |
-| `profile.suite.ai.timeseries-wind-turbine` | Horizontal | Timeseries AI profile - Wind Turbine Skeleton | `esq run --profile profile.suite.ai.timeseries-wind-turbine` |
+| `profile.vertical.manufacturing.timeseries-wt` | Vertical | Manufacturing Timeseries Wind Turbine scenarios | `esq run --profile profile.vertical.manufacturing.timeseries-wt` |
 | `profile.suite.ai.vision-light` | Horizontal | DL Streamer Analysis - Multi-Stream Pipelines With Multiple AI Stages | `esq run --profile profile.suite.ai.vision-light` |
 | `profile.suite.ai.vision-ov` | Horizontal | OpenVINO™ Toolkit Benchmark - Measures raw inference performance using OpenVINO Runtime API | `esq run --profile profile.suite.ai.vision-ov` |
 | `profile.suite.ai.vision-va` | Horizontal | Multi-stage video analytics pipelines with detection, tracking, and classification | `esq run --profile profile.suite.ai.vision-va` |
@@ -508,19 +508,19 @@ esq run --profile profile.suite.system.memory-stream
 esq run --profile profile.suite.media.performance-pipelines
 ```
 
-### Timeseries AI
-**Profile**: `profile.suite.ai.timeseries-wind-turbine`
+### Manufacturing Timeseries
+**Profile**: `profile.vertical.manufacturing.timeseries-wt`
 
 <details markdown="1">
 <summary><b>Test Cases</b> (click to expand)</summary>
 
 | Test ID | Test Case |
 |---------|-----------| 
-| TS-WT-CONS-001 | Wind Turbine Timeseries - Combined Functional Flow |
-| TS-WT-001 | TS Wind Turbine - s40p500 CPU OPCUA |
-| TS-WT-002 | TS Wind Turbine - s40p500 GPU OPCUA |
-| TS-WT-003 | TS Wind Turbine - s40p500 CPU MQTT |
-| TS-WT-004 | TS Wind Turbine - s40p500 GPU MQTT |
+| MFG-WTC-001 | Wind Turbine Timeseries - Combined Functional Flow |
+| MFG-WTS-001 | TS Wind Turbine - s40p500 CPU OPCUA |
+| MFG-WTS-002 | TS Wind Turbine - s40p500 GPU OPCUA |
+| MFG-WTS-003 | TS Wind Turbine - s40p500 CPU MQTT |
+| MFG-WTS-004 | TS Wind Turbine - s40p500 GPU MQTT |
 
 </details>
 
@@ -528,7 +528,7 @@ esq run --profile profile.suite.media.performance-pipelines
 
 **Run this profile**:
 ```bash
-esq run --profile profile.suite.ai.timeseries-wind-turbine
+esq run --profile profile.vertical.manufacturing.timeseries-wt
 ```
 
 ---

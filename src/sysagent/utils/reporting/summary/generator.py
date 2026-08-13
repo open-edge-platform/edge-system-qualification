@@ -12,7 +12,7 @@ import json
 import logging
 import os
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ except ImportError:
 
 
 # Report metadata availability flag — lazy-evaluated on first use
-_REPORT_METADATA_AVAILABLE: Optional[bool] = None
+_REPORT_METADATA_AVAILABLE: bool | None = None
 
 
 class CoreResultsSummaryGenerator:
@@ -73,7 +73,7 @@ class CoreResultsSummaryGenerator:
             seconds = remaining_seconds % 60
             return f"{hours}h {minutes}m {seconds:.3f}s"
 
-    def should_exclude_from_summary(self, profile_name: Optional[str]) -> bool:
+    def should_exclude_from_summary(self, profile_name: str | None) -> bool:
         """
         Check if profile should be excluded from text execution summary.
 
@@ -92,7 +92,7 @@ class CoreResultsSummaryGenerator:
 
         return False
 
-    def _collect_report_metadata(self) -> Dict[str, Any]:
+    def _collect_report_metadata(self) -> dict[str, Any]:
         """
         Collect report filename metadata for inclusion in the summary.
 
@@ -126,11 +126,17 @@ class CoreResultsSummaryGenerator:
             timestamp = _generate_short_timestamp()
             platform = build_report_platform_string(app_name, system_info)
 
+            # Resolve installed package version using existing utility
+            from sysagent.utils.config import get_dist_version
+
+            esq_version = get_dist_version() or ""
+
             _REPORT_METADATA_AVAILABLE = True
             return {
                 "cli_name": cli_name,
                 "platform": platform,
                 "timestamp": timestamp,
+                "version": esq_version,
             }
 
         except Exception as exc:
@@ -138,7 +144,7 @@ class CoreResultsSummaryGenerator:
             _REPORT_METADATA_AVAILABLE = False
             return {}
 
-    def _collect_system_summary_data(self) -> Dict[str, Any]:
+    def _collect_system_summary_data(self) -> dict[str, Any]:
         """
         Collect system summary data for inclusion in JSON summary.
 
@@ -171,7 +177,7 @@ class CoreResultsSummaryGenerator:
             logger.debug(f"Failed to collect system summary data: {e}")
             return {}
 
-    def generate_summary(self, verbose: bool = False) -> Dict[str, Any]:
+    def generate_summary(self, verbose: bool = False) -> dict[str, Any]:
         """
         Generate comprehensive test results summary.
 
@@ -219,7 +225,7 @@ class CoreResultsSummaryGenerator:
 
         return summary
 
-    def _create_empty_summary(self, profile_name: Optional[str], suite_name: Optional[str]) -> Dict[str, Any]:
+    def _create_empty_summary(self, profile_name: str | None, suite_name: str | None) -> dict[str, Any]:
         """Create empty summary when no results are available."""
         return {
             "summary": {
@@ -248,11 +254,11 @@ class CoreResultsSummaryGenerator:
 
     def _build_summary(
         self,
-        test_results: List[Dict[str, Any]],
-        profile_name: Optional[str],
-        suite_name: Optional[str],
+        test_results: list[dict[str, Any]],
+        profile_name: str | None,
+        suite_name: str | None,
         verbose: bool,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Summary from test results using simplified historyId-based grouping.
 
@@ -479,7 +485,7 @@ class CoreResultsSummaryGenerator:
 
         return summary
 
-    def save_summary_to_file(self, summary: Dict[str, Any], filename: Optional[str] = None) -> str:
+    def save_summary_to_file(self, summary: dict[str, Any], filename: str | None = None) -> str:
         """
         Save summary to JSON file.
 
@@ -508,7 +514,7 @@ class CoreResultsSummaryGenerator:
             logger.error(f"Failed to save summary to {filepath}: {e}")
             raise
 
-    def generate_and_save_summary(self, verbose: bool = False, filename: Optional[str] = None) -> str:
+    def generate_and_save_summary(self, verbose: bool = False, filename: str | None = None) -> str:
         """
         Generate and save test results summary in one call.
 

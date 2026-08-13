@@ -11,13 +11,11 @@ including CPU, GPU, NPU, memory, storage, and network interfaces.
 import ipaddress
 import logging
 import os
-import platform
-from typing import Any, Dict, Optional
+from typing import Any
 
-import cpuinfo
 import psutil
 
-from .cpu import detect_cpu_generation_and_segment
+from .cpu import collect_cpu_info
 from .gpu import collect_gpu_sysfs_info
 from .memory import collect_memory_info
 from .ov_helper import collect_openvino_devices
@@ -134,7 +132,7 @@ def _mask_address(address_str: str, family: str, enable_masking: bool = None) ->
     return address_str
 
 
-def collect_hardware_info() -> Dict[str, Any]:
+def collect_hardware_info() -> dict[str, Any]:
     """
     Collect comprehensive hardware information.
 
@@ -175,108 +173,7 @@ def collect_hardware_info() -> Dict[str, Any]:
     return hardware_info
 
 
-def collect_cpu_info(openvino_cpu=None) -> Dict[str, Any]:
-    """
-    Collect CPU information including cores, architecture, and OpenVINO capabilities.
-
-    Args:
-        openvino_cpu: List of OpenVINO CPU devices
-
-    Returns:
-        Dict containing CPU information
-    """
-    try:
-        cpu_info_data = cpuinfo.get_cpu_info()
-        socket_count = _get_cpu_socket_count()
-
-        cpu_info = {
-            "brand": cpu_info_data.get("brand_raw", "Unknown"),
-            "architecture": cpu_info_data.get("arch", platform.machine()),
-            "bits": cpu_info_data.get("bits", 64),
-            "count": psutil.cpu_count(logical=False),  # Physical cores
-            "logical_count": psutil.cpu_count(logical=True),  # Logical cores (including hyperthreading)
-            "sockets": socket_count,  # Physical CPU sockets
-            "frequency": {
-                "current": round(psutil.cpu_freq().current, 2) if psutil.cpu_freq() else None,
-                "min": round(psutil.cpu_freq().min, 2) if psutil.cpu_freq() else None,
-                "max": round(psutil.cpu_freq().max, 2) if psutil.cpu_freq() else None,
-            },
-            "flags": cpu_info_data.get("flags", []),
-            "vendor_id": cpu_info_data.get("vendor_id_raw", "Unknown"),
-            "family": cpu_info_data.get("family", 0),
-            "model": cpu_info_data.get("model", 0),
-            "stepping": cpu_info_data.get("stepping", 0),
-            "cache_size": cpu_info_data.get("l3_cache_size", "Unknown"),
-            "microcode": cpu_info_data.get("microcode", "Unknown"),
-        }
-
-        # Add OpenVINO CPU device information if available
-        if openvino_cpu:
-            for ov_cpu in openvino_cpu:
-                if ov_cpu:
-                    # Extract from quick_access if present, otherwise from top level
-                    quick_access = ov_cpu.get("quick_access", {})
-                    device_info = ov_cpu.get("device", {})
-                    all_props = device_info.get("all_properties", {})
-
-                    # Include essential OpenVINO properties for direct access
-                    cpu_openvino = {
-                        "device_name": quick_access.get("device_name", ov_cpu.get("device_name", "CPU")),
-                        "full_device_name": quick_access.get(
-                            "full_device_name",
-                            ov_cpu.get("full_device_name", "Unknown"),
-                        ),
-                        "device_type": quick_access.get("device_type", ov_cpu.get("device_type", "CPU")),
-                        "capabilities": quick_access.get("capabilities", ov_cpu.get("capabilities", [])),
-                        "vendor": quick_access.get("vendor", ov_cpu.get("vendor", "Unknown")),
-                    }
-
-                    # Add memory and performance related properties
-                    if "CPU_THREADS_NUM" in all_props:
-                        cpu_openvino["threads"] = all_props["CPU_THREADS_NUM"]
-                    if "PERFORMANCE_HINT_NUM_REQUESTS" in all_props:
-                        cpu_openvino["performance_hint_requests"] = all_props["PERFORMANCE_HINT_NUM_REQUESTS"]
-                    if "INFERENCE_NUM_THREADS" in all_props:
-                        cpu_openvino["inference_threads"] = all_props["INFERENCE_NUM_THREADS"]
-
-                    # Store the flattened OpenVINO device info
-                    cpu_info["openvino"] = cpu_openvino
-                    break
-
-        # Add extended CPU features detection
-        extended_features = _detect_cpu_features(cpu_info_data)
-        cpu_info.update(extended_features)
-
-        # Add CPU generation and segment detection for Intel processors
-        if "Intel" in cpu_info.get("vendor_id", ""):
-            try:
-                cpu_detection = detect_cpu_generation_and_segment(
-                    family=cpu_info.get("family", 0),
-                    model=cpu_info.get("model", 0),
-                    stepping=cpu_info.get("stepping", 0),
-                    brand=cpu_info.get("brand", ""),
-                    core_count=cpu_info.get("count", 0),
-                )
-                cpu_info["generation_info"] = cpu_detection
-                logger.debug(f"Detected Intel CPU: {cpu_detection}")
-            except Exception as e:
-                logger.warning(f"Failed to detect CPU generation/segment: {e}")
-                cpu_info["generation_info"] = {
-                    "codename": "Unknown",
-                    "series": "unknown",
-                    "generation": "Unknown",
-                    "segment": "unknown",
-                    "is_supported": False,
-                }
-
-        return cpu_info
-
-    except Exception as e:
-        logger.warning(f"Failed to collect CPU info: {e}")
-        return {"error": str(e)}
-
-
-def get_render_device_mapping() -> Dict[str, Dict[str, str]]:
+def get_render_device_mapping() -> dict[str, dict[str, str]]:
     """
     Map DRM render nodes to PCI devices by reading sysfs.
 
@@ -346,7 +243,7 @@ def get_render_device_mapping() -> Dict[str, Dict[str, str]]:
 
                     logger.debug(f"Mapped {render_device} -> PCI {pci_slot} (driver={driver}, {vendor_id}:{device_id})")
 
-            except (IOError, ValueError) as e:
+            except (OSError, ValueError) as e:
                 logger.debug(f"Failed to read uevent for {render_device}: {e}")
 
     except Exception as e:
@@ -963,7 +860,7 @@ def collect_npu_info(pci_devices, openvino_npu=None) -> dict:
     return npu_info
 
 
-def _get_disk_mapping() -> Dict[str, Dict[str, str]]:
+def _get_disk_mapping() -> dict[str, dict[str, str]]:
     """
     Get mapping of physical disks from /dev/disk/by-id/ with model information.
 
@@ -1028,7 +925,7 @@ def _get_disk_mapping() -> Dict[str, Dict[str, str]]:
                         "interface": interface,
                         "by_id_link": link_name,
                     }
-                except (OSError, IOError):
+                except OSError:
                     continue
 
         # Fallback: get remaining disks from /sys/class/block/
@@ -1070,7 +967,7 @@ def _get_disk_model_from_sysfs(device_name: str) -> str:
         if os.path.exists(model_path):
             with open(model_path, "r") as f:
                 return f.read().strip()
-    except (OSError, IOError):
+    except OSError:
         pass
 
     return "Unknown"
@@ -1146,13 +1043,13 @@ def _get_disk_size(device_name: str) -> int:
                 # Size is in 512-byte sectors
                 sectors = int(f.read().strip())
                 return sectors * 512
-    except (OSError, IOError, ValueError):
+    except (OSError, ValueError):
         pass
 
     return 0
 
 
-def collect_storage_info() -> Dict[str, Any]:
+def collect_storage_info() -> dict[str, Any]:
     """
     Collect storage information grouped by disk model/name with partitions
     as part of disk objects.
@@ -1280,7 +1177,7 @@ def collect_storage_info() -> Dict[str, Any]:
         return {"error": str(e)}
 
 
-def collect_network_info() -> Dict[str, Any]:
+def collect_network_info() -> dict[str, Any]:
     """
     Collect network interface information including addresses and statistics.
 
@@ -1346,7 +1243,7 @@ def collect_network_info() -> Dict[str, Any]:
         return {"error": str(e)}
 
 
-def collect_dmi_info() -> Dict[str, Any]:
+def collect_dmi_info() -> dict[str, Any]:
     """
     Collect DMI (Desktop Management Interface) information about the system.
 
@@ -1412,99 +1309,6 @@ def collect_dmi_info() -> Dict[str, Any]:
         dmi_info["error"] = str(e)
 
     return dmi_info
-
-
-def _get_cpu_socket_count() -> Optional[int]:
-    """
-    Extract the number of physical CPU sockets from /proc/cpuinfo.
-
-    This function reads /proc/cpuinfo and counts unique physical IDs to determine
-    the number of CPU sockets installed in the system.
-
-    Returns:
-        Optional[int]: Number of physical CPU sockets, or None if cannot be determined.
-                      Returns None instead of making assumptions about socket count,
-                      allowing consumers to handle unknown values appropriately.
-    """
-    try:
-        cpuinfo_path = "/proc/cpuinfo"
-        if not os.path.exists(cpuinfo_path):
-            logger.debug("'/proc/cpuinfo' not found, cannot determine socket count")
-            return None
-
-        physical_ids = set()
-
-        with open(cpuinfo_path, "r") as f:
-            for line in f:
-                # Look for the "physical id" field in /proc/cpuinfo
-                # Format: "physical id\t: 0"
-                if line.startswith("physical id"):
-                    try:
-                        # Extract the physical ID after the colon
-                        parts = line.split(":")
-                        if len(parts) >= 2:
-                            physical_id = parts[1].strip()
-                            physical_ids.add(physical_id)
-                    except (ValueError, IndexError) as e:
-                        logger.debug(f"Failed to parse physical id from line: {line.strip()} - {e}")
-                        continue
-
-        # If no physical IDs found, return None (cannot determine)
-        # This handles single-socket systems that may not have "physical id" field
-        if not physical_ids:
-            logger.debug("No 'physical id' entries found in /proc/cpuinfo, cannot determine socket count")
-            return None
-
-        socket_count = len(physical_ids)
-        logger.debug(f"Detected {socket_count} CPU socket(s) from /proc/cpuinfo")
-        return socket_count
-
-    except Exception as e:
-        logger.warning(f"Failed to read CPU socket count from /proc/cpuinfo: {e}")
-        return None
-
-
-def _detect_cpu_features(cpu_info_data: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Detect advanced CPU features and capabilities.
-
-    Args:
-        cpu_info_data: Raw CPU information from cpuinfo
-
-    Returns:
-        Dict containing extended CPU features
-    """
-    features = {
-        "virtualization": False,
-        "hyper_threading": False,
-        "turbo_boost": False,
-        "aes_ni": False,
-        "avx": False,
-        "avx2": False,
-        "avx512": False,
-    }
-
-    flags = cpu_info_data.get("flags", [])
-    if isinstance(flags, list):
-        flags_lower = [flag.lower() for flag in flags]
-
-        # Check for virtualization support
-        features["virtualization"] = any(flag in flags_lower for flag in ["vmx", "svm"])
-
-        # Check for AES-NI support
-        features["aes_ni"] = "aes" in flags_lower
-
-        # Check for AVX support
-        features["avx"] = "avx" in flags_lower
-        features["avx2"] = "avx2" in flags_lower
-        features["avx512"] = any("avx512" in flag for flag in flags_lower)
-
-    # Check hyper-threading
-    logical_cores = cpu_info_data.get("count", psutil.cpu_count(logical=True))
-    physical_cores = psutil.cpu_count(logical=False)
-    features["hyper_threading"] = logical_cores > physical_cores
-
-    return features
 
 
 def _detect_interface_type(interface_name: str, driver: str = None) -> str:

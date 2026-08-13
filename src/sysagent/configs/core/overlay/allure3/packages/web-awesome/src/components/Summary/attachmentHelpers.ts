@@ -298,7 +298,7 @@ export async function getTestDescriptionsFromSummary(
  */
 export async function getSummaryMetaFromAttachment(
   individualTestResults: Record<string, any>,
-): Promise<{ cliName: string; platform: string; timestamp: string } | null> {
+): Promise<{ cliName: string; platform: string; timestamp: string; version?: string } | null> {
   if (Object.keys(individualTestResults).length === 0) {
     return null;
   }
@@ -338,9 +338,10 @@ export async function getSummaryMetaFromAttachment(
       const meta = data?.summary?.metadata;
       if (meta?.cli_name && meta?.platform && meta?.timestamp) {
         return {
-          cliName: String(meta.cli_name),
+          cliName:  String(meta.cli_name),
           platform: String(meta.platform),
           timestamp: String(meta.timestamp),
+          ...(meta.version ? { version: String(meta.version) } : {}),
         };
       }
     }

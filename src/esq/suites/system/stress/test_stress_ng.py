@@ -10,8 +10,8 @@ test function covers CPU-only, memory-only, iGPU-only, and mixed scenarios.
 
 The profile duration is the default and can be overridden at runtime without
 editing profiles via the per-suite environment variable
-``SUITE_STRESS_DURATION_SECONDS``. The variable is named after this suite so it
-never collides with another suite's duration knob.
+``ENV_SUITE_STRESS_NG_DURATION_SECONDS``. The variable is named after this test
+file so it never collides with another suite's duration knob.
 
 Metrics are collected from the native stress-ng YAML output file and exposed
 as bogo-ops per second for KPI validation and telemetry correlation.
@@ -21,7 +21,6 @@ import logging
 import os
 import threading
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 
 import allure
 import pytest
@@ -33,10 +32,10 @@ from sysagent.utils.system.drm import count_intel_drm_cards, resolve_intel_gpu_d
 logger = logging.getLogger(__name__)
 
 # Per-suite environment override for the stress duration. Named after this
-# suite ("stress") so it never collides with another suite's duration knob.
+# test file ("stress_ng") so it never collides with another suite's duration knob.
 # The profile value is the default; export this to retune at runtime without
-# editing profiles, e.g. SUITE_STRESS_DURATION_SECONDS=300.
-_DURATION_ENV_VAR = "SUITE_STRESS_DURATION_SECONDS"
+# editing profiles, e.g. ENV_SUITE_STRESS_NG_DURATION_SECONDS=300.
+_DURATION_ENV_VAR = "ENV_SUITE_STRESS_NG_DURATION_SECONDS"
 
 
 def _check_command_available(command: str) -> bool:
@@ -53,10 +52,10 @@ def _safe_int(value, default: int) -> int:
         return default
 
 
-def _resolve_stress_duration(configs: Dict) -> int:
+def _resolve_stress_duration(configs: dict) -> int:
     """Resolve the stress duration (seconds), honoring the per-suite env override.
 
-    Priority: ``SUITE_STRESS_DURATION_SECONDS`` env var > profile
+    Priority: ``ENV_SUITE_STRESS_NG_DURATION_SECONDS`` env var > profile
     ``stress_duration_seconds`` > 60s default. Non-integer overrides are ignored
     with a warning. The resolved value is clamped to at least 1 second.
     """
@@ -86,14 +85,14 @@ def _detect_intel_gpu_cards() -> int:
                 vendor = file.read().strip().lower()
             if vendor == "0x8086":
                 count += 1
-        except (IOError, OSError):
+        except OSError:
             continue
     return count
 
 
-def _get_intel_drm_cards() -> List[str]:
+def _get_intel_drm_cards() -> list[str]:
     """Return Intel DRM card device nodes sorted by card index."""
-    cards: List[Tuple[int, str]] = []
+    cards: list[tuple[int, str]] = []
     for vendor_file in Path("/sys/class/drm").glob("card*/device/vendor"):
         try:
             with open(vendor_file, "r", encoding="utf-8") as file:
@@ -107,7 +106,7 @@ def _get_intel_drm_cards() -> List[str]:
             devnode = f"/dev/dri/{card_name}"
             if os.path.exists(devnode):
                 cards.append((card_index, devnode))
-        except (IOError, OSError, ValueError):
+        except (OSError, ValueError):
             continue
 
     cards.sort(key=lambda item: item[0])
@@ -133,14 +132,14 @@ def _detect_intel_gpu_cards() -> int:
                 vendor = file.read().strip().lower()
             if vendor == "0x8086":
                 count += 1
-        except (IOError, OSError):
+        except OSError:
             continue
     return count
 
 
-def _get_intel_drm_cards() -> List[str]:
+def _get_intel_drm_cards() -> list[str]:
     """Return Intel DRM card device nodes sorted by card index."""
-    cards: List[Tuple[int, str]] = []
+    cards: list[tuple[int, str]] = []
     for vendor_file in Path("/sys/class/drm").glob("card*/device/vendor"):
         try:
             with open(vendor_file, "r", encoding="utf-8") as file:
@@ -154,7 +153,7 @@ def _get_intel_drm_cards() -> List[str]:
             devnode = f"/dev/dri/{card_name}"
             if os.path.exists(devnode):
                 cards.append((card_index, devnode))
-        except (IOError, OSError, ValueError):
+        except (OSError, ValueError):
             continue
 
     cards.sort(key=lambda item: item[0])
@@ -171,20 +170,20 @@ def _resolve_gpu_devnode(gpu_device_index: int) -> str:
     return intel_cards[gpu_device_index]
 
 
-def _command_to_text(command: Optional[List[str]]) -> str:
+def _command_to_text(command: list[str] | None) -> str:
     """Convert command tokens to readable text safely."""
     if not command:
         return ""
     return " ".join(command)
 
 
-def _build_cpu_stress_command(configs: Dict) -> Optional[List[str]]:
+def _build_cpu_stress_command(configs: dict) -> list[str] | None:
     """Build CPU/memory stress-ng command line from profile params."""
     duration = max(_safe_int(configs.get("stress_duration_seconds", 60), 60), 1)
     enable_cpu_stress = bool(configs.get("enable_cpu_stress", True))
     enable_memory_stress = bool(configs.get("enable_memory_stress", True))
 
-    command: List[str] = [
+    command: list[str] = [
         "stress-ng",
         "--timeout",
         f"{duration}s",
@@ -240,7 +239,7 @@ def _metric_unit_from_name(metric_name: str) -> str:
     return ""
 
 
-def _resolve_key_metric_name(configs: Dict, gpu_requested: bool) -> str:
+def _resolve_key_metric_name(configs: dict, gpu_requested: bool) -> str:
     """Resolve key metric name from profile config with sensible defaults."""
     configured_name = str(configs.get("key_metric_name", "")).strip()
     if configured_name:
@@ -248,9 +247,9 @@ def _resolve_key_metric_name(configs: Dict, gpu_requested: bool) -> str:
     return "gpu_bogo_ops_per_real_time" if gpu_requested else "cpu_bogo_ops_per_real_time"
 
 
-def _normalize_key_metric(metrics: Dict[str, Metrics], key_metric_name: str, success: bool) -> Dict[str, Metrics]:
+def _normalize_key_metric(metrics: dict[str, Metrics], key_metric_name: str, success: bool) -> dict[str, Metrics]:
     """Mark one deterministic key metric and ensure it exists on failure."""
-    normalized: Dict[str, Metrics] = {}
+    normalized: dict[str, Metrics] = {}
     for metric_name, metric in metrics.items():
         normalized[metric_name] = Metrics(value=metric.value, unit=metric.unit, is_key_metric=False)
 
@@ -264,7 +263,7 @@ def _normalize_key_metric(metrics: Dict[str, Metrics], key_metric_name: str, suc
     return normalized
 
 
-def _build_gpu_stress_command(configs: Dict, gpu_enabled: bool) -> Tuple[Optional[List[str]], str]:
+def _build_gpu_stress_command(configs: dict, gpu_enabled: bool) -> tuple[list[str] | None, str]:
     """Build GPU stress command.
 
     Supports:
@@ -332,7 +331,7 @@ def _build_gpu_stress_command(configs: Dict, gpu_enabled: bool) -> Tuple[Optiona
     return None, gpu_tool
 
 
-def _run_command_worker(command: List[str], timeout: int, sink: Dict, sink_key: str) -> None:
+def _run_command_worker(command: list[str], timeout: int, sink: dict, sink_key: str) -> None:
     """Run a command and store normalized result into sink."""
     result = run_command(command, timeout=timeout)
     sink[sink_key] = {
@@ -344,7 +343,7 @@ def _run_command_worker(command: List[str], timeout: int, sink: Dict, sink_key: 
     }
 
 
-def _parse_stress_ng_yaml_metrics(yaml_path: str) -> Tuple[Dict[str, Metrics], str]:
+def _parse_stress_ng_yaml_metrics(yaml_path: str) -> tuple[dict[str, Metrics], str]:
     """Parse stress-ng native YAML metrics file.
 
     Returns:
@@ -358,7 +357,7 @@ def _parse_stress_ng_yaml_metrics(yaml_path: str) -> Tuple[Dict[str, Metrics], s
     try:
         with open(yaml_path, "r", encoding="utf-8") as file:
             payload = yaml.safe_load(file) or {}
-    except (IOError, OSError, yaml.YAMLError) as error:
+    except (OSError, yaml.YAMLError) as error:
         return {}, f"failed to read yaml metrics file '{yaml_path}': {error}"
 
     metrics_section = payload.get("metrics")
@@ -383,7 +382,7 @@ def _parse_stress_ng_yaml_metrics(yaml_path: str) -> Tuple[Dict[str, Metrics], s
         "bogo_ops_per_usr_sys_time": "ops/s",
     }
 
-    parsed: Dict[str, Metrics] = {}
+    parsed: dict[str, Metrics] = {}
     for entry in metrics_section:
         if not isinstance(entry, dict):
             continue
@@ -411,12 +410,12 @@ def _parse_stress_ng_yaml_metrics(yaml_path: str) -> Tuple[Dict[str, Metrics], s
 
 
 def _run_parallel_stress_and_sample(
-    cpu_command: Optional[List[str]],
-    gpu_command: Optional[List[str]],
+    cpu_command: list[str] | None,
+    gpu_command: list[str] | None,
     timeout: int,
-) -> Tuple[Dict, Dict]:
+) -> tuple[dict, dict]:
     """Run CPU/GPU stress concurrently and return normalized command results."""
-    results: Dict[str, Dict] = {}
+    results: dict[str, dict] = {}
 
     cpu_thread = None
     if cpu_command:
@@ -444,7 +443,7 @@ def _run_parallel_stress_and_sample(
     return results.get("cpu", {}), results.get("gpu", {})
 
 
-def _write_command_logs(cpu_result: Dict, gpu_result: Dict, output_dir: str) -> Dict[str, str]:
+def _write_command_logs(cpu_result: dict, gpu_result: dict, output_dir: str) -> dict[str, str]:
     """Persist non-empty command logs only and return created file paths."""
 
     def _write_if_non_empty(stream_text: str, filename: str) -> str:
@@ -489,7 +488,7 @@ def _attach_native_yaml_file(file_path: str, attachment_name: str) -> None:
         logger.warning(f"Failed to attach native YAML '{file_path}': {error}")
 
 
-def _run_stress_command(configs: Dict, timeout: int, output_dir: str, gpu_enabled: bool) -> Dict:
+def _run_stress_command(configs: dict, timeout: int, output_dir: str, gpu_enabled: bool) -> dict:
     """Execute CPU and GPU stress concurrently."""
     cpu_command = _build_cpu_stress_command(configs)
     gpu_command, gpu_tool = _build_gpu_stress_command(configs, gpu_enabled=gpu_enabled)
@@ -513,7 +512,7 @@ def _run_stress_command(configs: Dict, timeout: int, output_dir: str, gpu_enable
     }
     try:
         log_paths = _write_command_logs(cpu_result, gpu_result, output_dir)
-    except (IOError, OSError) as error:
+    except OSError as error:
         logger.warning(f"Failed to write stress logs: {error}")
 
     cpu_attempted = cpu_command is not None
@@ -672,8 +671,8 @@ def test_stress_ng(
                 )
 
         message = "Host stress completed" if run_info["success"] else "Host stress execution failed"
-        metrics: Dict[str, Metrics] = {}
-        yaml_errors: List[str] = []
+        metrics: dict[str, Metrics] = {}
+        yaml_errors: list[str] = []
 
         if run_info.get("cpu_attempted"):
             cpu_metrics, cpu_yaml_error = _parse_stress_ng_yaml_metrics(run_info.get("cpu_yaml_metrics", ""))
@@ -745,7 +744,7 @@ def test_stress_ng(
         logger.error(failure_message)
     except Exception as e:
         test_failed = True
-        failure_message = f"Unexpected error during host stress test execution: {str(e)}"
+        failure_message = f"Unexpected error during host stress test execution: {e!s}"
         logger.error(failure_message, exc_info=True)
 
     # Ensure a result object always exists so the test terminates cleanly even

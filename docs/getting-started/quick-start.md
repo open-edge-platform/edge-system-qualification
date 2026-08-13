@@ -145,7 +145,8 @@ Run the setup scripts to configure system settings:
 | Script | Purpose |
 |--------|----------|
 | `system-setup.sh` | Installs packages and configures file read permissions (run once after OS installation) |
-| `system-setup-advanced.sh` | Optional. Applies runtime resource limit settings — current session only, re-run after each reboot. Required for full test coverage |
+| `system-setup-advanced.sh` | Optional. Applies runtime resource limit settings — current session only, re-run after each reboot |
+| `system-setup-rt.sh` | Optional. Required for RT latency tests. Configures session-scoped RT tools (cyclictest/chrt, MSR access, kernel tuning) — re-run after each reboot |
 
 Run `system-setup.sh` once after OS installation:
 
@@ -170,6 +171,23 @@ sudo bash -c "$(wget -qLO - https://raw.githubusercontent.com/open-edge-platform
 | Module | What it changes |
 |--------|----------------|
 | **Locked Memory Limit** | Sets `RLIMIT_MEMLOCK` to unlimited for the current session so memtester can lock all available RAM pages. Without this, memory-related tests will be limited or fail |
+
+For RT latency tests, also run the RT setup script:
+
+```bash
+sudo bash -c "$(wget -qLO - https://raw.githubusercontent.com/open-edge-platform/edge-system-qualification/refs/heads/main/scripts/system-setup-rt.sh)"
+```
+
+!!! warning "Re-run after reboot"
+    All changes applied by `system-setup-rt.sh` are **current session only** and reset automatically after reboot. Re-run after each reboot before executing RT tests.
+
+**RT setup modules:**
+
+| Module | What it changes |
+|--------|----------------|
+| **Real-Time Latency Tools** | Copies `cyclictest` and `chrt` with `cap_sys_nice` and `cap_ipc_lock` capabilities to a session tmpfs so RT latency tests run at `SCHED_FIFO` priority without `sudo`. Cleared on reboot |
+| **MSR Tools** | Copies `rdmsr` and `wrmsr` with `cap_sys_rawio` to the same session tmpfs for Intel® RDT/CAT partition reporting and L3 CAT write verification. Cleared on reboot |
+| **Kernel Tuning** | Grants world-write on cpuidle sysfs disable files (C-state control); disables timer migration (`/proc/sys/kernel/timer_migration=0`); sets up a session `tee` with `cap_sys_admin` for non-root cpuidle writes. Cleared on reboot |
 
 
 ### 6. Intel® ESQ

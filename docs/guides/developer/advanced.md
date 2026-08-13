@@ -199,6 +199,57 @@ summarize_test_results(
 
 ---
 
+## Runtime Environment Overrides
+
+!!! warning "For development and advanced testing only"
+    These variables are intended for local iteration (for example, shortening a long test run) and must **not** be set during actual runs. Overriding profile parameters invalidates qualification results.
+
+Several built-in test suites support optional runtime parameter overrides through environment variables. Set the variable before the `esq run` command to tune a parameter for one run without editing any profile file.
+
+All variables follow the naming convention:
+
+```
+ENV_SUITE_<TEST_FILENAME>_<PARAMETER>
+```
+
+where `<TEST_FILENAME>` is the test file name with `test_` and `.py` removed, uppercased, with hyphens replaced by underscores.
+
+### Available variables
+
+| Variable | Test file | Overrides | Accepted values |
+|---|---|---|---|
+| `ENV_SUITE_CYCLICTEST_DURATION` | `test_cyclictest.py` | `cyclic_duration` | `60s`, `30m`, `2h`, `24h` |
+| `ENV_SUITE_CSTATE_RT_CPU_IDS` | `test_cstate.py` | isolcpus requirement | comma-separated CPU list, e.g. `2,3` or `2-3` |
+| `ENV_SUITE_CPUFREQ_RT_CPU_IDS` | `test_cpufreq.py` | isolcpus requirement | comma-separated CPU list, e.g. `2,3` or `2-3` |
+| `ENV_SUITE_STRESS_NG_DURATION_SECONDS` | `test_stress_ng.py` | `stress_duration_seconds` | Integer seconds, e.g. `120` |
+| `ENV_SUITE_MEMORY_HEALTH_MEMTESTER_SIZE_MB` | `test_memory_health.py` | `memtester_size_mb` | Integer MB or `auto` for dynamic sizing |
+| `ENV_SUITE_MEMORY_HEALTH_MEMTESTER_ITERATIONS` | `test_memory_health.py` | `memtester_iterations` | Positive integer, e.g. `1`, `3` |
+
+### Usage examples
+
+```bash
+# Run cyclictest for 60 seconds instead of the profile default (24 h)
+ENV_SUITE_CYCLICTEST_DURATION=60s esq -v run --profile profile.suite.realtime.performance
+```
+
+### Priority rules
+
+Each override resolver applies the same priority order:
+
+1. **Env var** — always wins when set; invalid values (wrong type, empty string) are logged as a warning and ignored
+2. **Profile param** — the value in the YAML `params` block
+3. **Built-in default** — hard-coded fallback when neither is present
+
+A warning is logged whenever an env var value is rejected, so the active parameter is always visible in the run log.
+
+### Cache isolation
+
+Resolved values — whether from the env var or the profile — are written back into `configs` before `execute_test_with_cache` is called. This ensures that runs with different override values are cached independently and never share a stale result from a prior run with different parameters.
+
+For guidance on implementing this pattern in a new test, see [Optional: Runtime Parameter Overrides via Environment Variables](writing-tests.md#optional-runtime-parameter-overrides-via-environment-variables).
+
+---
+
 ## Related Pages
 
 - [Writing Tests](writing-tests.md) — Full step-by-step test creation guide

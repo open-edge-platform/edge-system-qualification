@@ -21,12 +21,12 @@ import logging
 import os
 import shlex
 import shutil
+import signal
 import subprocess  # nosec B404 # For secure process execution API
 import threading
 import time
 from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
 
 logger = logging.getLogger(__name__)
 
@@ -41,9 +41,9 @@ class ProcessResult:
         returncode: int,
         stdout: str = "",
         stderr: str = "",
-        command: List[str] = None,
+        command: list[str] = None,
         execution_time: float = 0.0,
-        pid: Optional[int] = None,
+        pid: int | None = None,
         timed_out: bool = False,
     ):
         self.returncode = returncode
@@ -83,11 +83,11 @@ class ProcessSecurityConfig:
 
     def __init__(
         self,
-        allowed_commands: Optional[List[str]] = None,
-        blocked_commands: Optional[List[str]] = None,
-        allowed_paths: Optional[List[str]] = None,
+        allowed_commands: list[str] | None = None,
+        blocked_commands: list[str] | None = None,
+        allowed_paths: list[str] | None = None,
         max_execution_time: float = 300.0,  # 5 minutes default
-        max_memory_mb: Optional[int] = None,
+        max_memory_mb: int | None = None,
         sanitize_environment: bool = True,
         allow_shell: bool = False,
         log_commands: bool = True,
@@ -110,7 +110,7 @@ class SecureProcessExecutor:
     with built-in security controls, logging, and error handling.
     """
 
-    def __init__(self, security_config: Optional[ProcessSecurityConfig] = None):
+    def __init__(self, security_config: ProcessSecurityConfig | None = None):
         """
         Initialize the secure process executor.
 
@@ -118,19 +118,19 @@ class SecureProcessExecutor:
             security_config: Security configuration for subprocess execution
         """
         self.security_config = security_config or ProcessSecurityConfig()
-        self._active_processes: Dict[int, subprocess.Popen] = {}
+        self._active_processes: dict[int, subprocess.Popen] = {}
         self._process_lock = threading.Lock()
 
     def run(
         self,
-        command: Union[str, List[str]],
-        cwd: Optional[str] = None,
-        env: Optional[Dict[str, str]] = None,
-        timeout: Optional[float] = None,
+        command: str | list[str],
+        cwd: str | None = None,
+        env: dict[str, str] | None = None,
+        timeout: float | None = None,
         check: bool = False,
         capture_output: bool = True,
         text: bool = True,
-        input_data: Optional[str] = None,
+        input_data: str | None = None,
         mode: ProcessExecutionMode = ProcessExecutionMode.CAPTURE,
     ) -> ProcessResult:
         """
@@ -220,7 +220,7 @@ class SecureProcessExecutor:
                 raise
             return result
 
-    def _prepare_command(self, command: Union[str, List[str]]) -> List[str]:
+    def _prepare_command(self, command: str | list[str]) -> list[str]:
         """Prepare and validate command format."""
         if isinstance(command, str):
             if self.security_config.allow_shell:
@@ -237,7 +237,7 @@ class SecureProcessExecutor:
         else:
             raise SecurityError(f"Invalid command type: {type(command)}")
 
-    def _validate_security(self, cmd_list: List[str], cwd: Optional[str]) -> None:
+    def _validate_security(self, cmd_list: list[str], cwd: str | None) -> None:
         """Validate command against security policy."""
         if not cmd_list:
             raise SecurityError("Empty command not allowed")
@@ -266,7 +266,7 @@ class SecureProcessExecutor:
             if pattern in command_str.lower():
                 logger.warning(f"Potentially dangerous command detected: {pattern}")
 
-    def _prepare_environment(self, env: Optional[Dict[str, str]]) -> Dict[str, str]:
+    def _prepare_environment(self, env: dict[str, str] | None) -> dict[str, str]:
         """
         Prepare environment variables for subprocess execution.
         Args:
@@ -290,13 +290,13 @@ class SecureProcessExecutor:
 
     def _run_standard(
         self,
-        cmd_list: List[str],
-        cwd: Optional[str],
-        env: Dict[str, str],
+        cmd_list: list[str],
+        cwd: str | None,
+        env: dict[str, str],
         timeout: float,
         capture_output: bool,
         text: bool,
-        input_data: Optional[str],
+        input_data: str | None,
         check: bool,
     ) -> ProcessResult:
         """Execute command with standard subprocess.run."""
@@ -323,7 +323,7 @@ class SecureProcessExecutor:
             execution_time=execution_time,
         )
 
-    def _run_background(self, cmd_list: List[str], cwd: Optional[str], env: Dict[str, str]) -> ProcessResult:
+    def _run_background(self, cmd_list: list[str], cwd: str | None, env: dict[str, str]) -> ProcessResult:
         """Execute command in background mode."""
         start_time = time.time()
 
@@ -344,7 +344,7 @@ class SecureProcessExecutor:
         )
 
     def _run_with_pipe(
-        self, cmd_list: List[str], cwd: Optional[str], env: Dict[str, str], timeout: float
+        self, cmd_list: list[str], cwd: str | None, env: dict[str, str], timeout: float
     ) -> ProcessResult:
         """Execute command with real-time output streaming to console and logging."""
         import select
@@ -464,23 +464,191 @@ class SecureProcessExecutor:
                 finally:
                     self._active_processes.pop(pid, None)
 
-    def get_active_processes(self) -> List[int]:
+    def get_active_processes(self) -> list[int]:
         """Get list of active process PIDs."""
         with self._process_lock:
             return list(self._active_processes.keys())
+
+    def start_process(
+        self,
+        command: str | list[str],
+        cwd: str | None = None,
+        env: dict[str, str] | None = None,
+        stdout=None,
+        stderr=subprocess.PIPE,
+    ) -> "ProcessHandle":
+        """Start a process in a new session and return a :class:`ProcessHandle`.
+
+        Unlike :meth:`run`, this method returns **immediately** — the process
+        runs concurrently.  The caller is responsible for lifecycle management
+        via the returned handle.
+
+        The process is started with ``start_new_session=True`` so it receives
+        its own process group ID.  :meth:`ProcessHandle.terminate` and
+        :meth:`ProcessHandle.kill` therefore affect all child processes in that
+        group, enabling clean shutdown of multi-worker tools like stress-ng.
+
+        Args:
+            command: Command and arguments.  Never pass user-controlled strings
+                     directly; validate inputs at system boundaries first.
+            cwd:     Working directory for the process.
+            env:     Extra environment variables merged with ``os.environ``.
+            stdout:  Stdout destination.  ``None`` (default) redirects to
+                     ``DEVNULL``; pass an open file object to capture output;
+                     pass ``subprocess.PIPE`` to read via the handle.
+            stderr:  Stderr destination.  Defaults to ``subprocess.PIPE`` so
+                     error output can be retrieved via
+                     :meth:`ProcessHandle.read_stderr`.
+
+        Returns:
+            :class:`ProcessHandle` for the running process.
+        """
+        cmd_list = self._prepare_command(command)
+        self._validate_security(cmd_list, cwd)
+        safe_env = self._prepare_environment(env)
+
+        effective_stdout = subprocess.DEVNULL if stdout is None else stdout
+
+        proc = subprocess.Popen(  # nosec B603 # validated above
+            cmd_list,
+            cwd=cwd,
+            env=safe_env,
+            stdout=effective_stdout,
+            stderr=stderr,
+            start_new_session=True,
+        )
+
+        with self._process_lock:
+            self._active_processes[proc.pid] = proc
+
+        if self.security_config.log_commands:
+            logger.debug("Started process (PID=%s): %s", proc.pid, " ".join(cmd_list))
+
+        return ProcessHandle(proc, cmd_list)
 
 
 class SecurityError(Exception):
     """Exception raised for security policy violations."""
 
-    pass
+
+class ProcessHandle:
+    """Handle for a long-running process started via :func:`start_process`.
+
+    Processes are launched in a new session (``start_new_session=True``),
+    creating their own process group.  :meth:`terminate` and :meth:`kill`
+    therefore send the signal to the **entire process group**, ensuring all
+    child workers (e.g. stress-ng workers or cyclictest threads) are cleaned
+    up together.
+
+    Usage example::
+
+        handle = start_process(["cyclictest", "-a2-3", "-t2", "-p99", "-D5s"],
+                               stderr=subprocess.PIPE)
+        try:
+            handle.wait(timeout=30)
+        finally:
+            handle.terminate()
+        stderr = handle.read_stderr()
+    """
+
+    def __init__(self, proc: subprocess.Popen, command: list[str]) -> None:
+        self._proc = proc
+        self.command = command
+        self.pid: int = proc.pid
+
+    def poll(self) -> int | None:
+        """Return the exit code if the process has finished, else ``None``."""
+        return self._proc.poll()
+
+    @property
+    def returncode(self) -> int | None:
+        """Exit code of the process, or ``None`` if still running."""
+        return self._proc.returncode
+
+    def wait(self, timeout: float | None = None) -> int:
+        """Block until the process exits.
+
+        Args:
+            timeout: Maximum seconds to wait.  Returns ``-1`` on timeout
+                     (process is still running — call :meth:`terminate` to
+                     stop it).
+
+        Returns:
+            The process exit code, or ``-1`` if the timeout elapsed.
+        """
+        try:
+            return self._proc.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            return -1
+
+    def terminate(self, wait_secs: float = 10.0) -> None:
+        """Send ``SIGTERM`` to the process group and wait for exit.
+
+        Falls back to ``SIGKILL`` if the process does not exit within
+        *wait_secs* seconds.
+        """
+        if self._proc.poll() is not None:
+            return
+        try:
+            os.killpg(os.getpgid(self._proc.pid), signal.SIGTERM)
+        except (ProcessLookupError, OSError):
+            return
+        try:
+            self._proc.wait(timeout=wait_secs)
+        except subprocess.TimeoutExpired:
+            self.kill()
+
+    def kill(self) -> None:
+        """Send ``SIGKILL`` to the process group immediately."""
+        if self._proc.poll() is not None:
+            return
+        try:
+            os.killpg(os.getpgid(self._proc.pid), signal.SIGKILL)
+            self._proc.wait()
+        except (ProcessLookupError, OSError):
+            pass
+
+    def read_stderr(self) -> str:
+        """Read all remaining stderr output as a decoded string.
+
+        Safe to call after the process has exited.  Returns an empty string
+        if stderr was not captured (e.g. redirected to ``DEVNULL``).
+        """
+        if self._proc.stderr is None:
+            return ""
+        try:
+            data = self._proc.stderr.read()
+            if isinstance(data, bytes):
+                return data.decode("utf-8", errors="replace")
+            return str(data) if data else ""
+        except Exception:
+            return ""
+
+    def communicate(self, timeout: float | None = None) -> tuple[str, str]:
+        """Wait for process completion and return ``(stdout, stderr)`` strings.
+
+        Sends ``SIGKILL`` and drains output on timeout so the caller is never
+        left with a zombie process.
+        """
+        try:
+            out, err = self._proc.communicate(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            self.kill()
+            out, err = self._proc.communicate()
+
+        def _decode(b) -> str:
+            if isinstance(b, bytes):
+                return b.decode("utf-8", errors="replace")
+            return str(b) if b else ""
+
+        return _decode(out), _decode(err)
 
 
 # Global secure executor instance
 _global_executor = None
 
 
-def get_executor(security_config: Optional[ProcessSecurityConfig] = None) -> SecureProcessExecutor:
+def get_executor(security_config: ProcessSecurityConfig | None = None) -> SecureProcessExecutor:
     """
     Get the global secure process executor instance.
 
@@ -500,10 +668,10 @@ def get_executor(security_config: Optional[ProcessSecurityConfig] = None) -> Sec
 
 
 def run_command(
-    command: Union[str, List[str]],
-    cwd: Optional[str] = None,
-    env: Optional[Dict[str, str]] = None,
-    timeout: Optional[float] = None,
+    command: str | list[str],
+    cwd: str | None = None,
+    env: dict[str, str] | None = None,
+    timeout: float | None = None,
     check: bool = False,
     capture_output: bool = True,
     stream_output: bool = False,
@@ -540,11 +708,11 @@ def run_command(
 
 
 def run_command_with_output(
-    command: Union[str, List[str]],
-    cwd: Optional[str] = None,
-    env: Optional[Dict[str, str]] = None,
-    timeout: Optional[float] = None,
-) -> Tuple[int, str, str]:
+    command: str | list[str],
+    cwd: str | None = None,
+    env: dict[str, str] | None = None,
+    timeout: float | None = None,
+) -> tuple[int, str, str]:
     """
     Execute a command and return exit code, stdout, and stderr.
 
@@ -588,9 +756,7 @@ def check_command_available(command: str, timeout: float = 5.0) -> bool:
         return False
 
 
-def run_git_command(
-    cmd: List[str], cwd: Optional[str] = None, check: bool = True, timeout: float = 30.0
-) -> ProcessResult:
+def run_git_command(cmd: list[str], cwd: str | None = None, check: bool = True, timeout: float = 30.0) -> ProcessResult:
     """
     Execute a git command securely.
 
@@ -608,8 +774,8 @@ def run_git_command(
 
 
 def configure_security(
-    allowed_commands: Optional[List[str]] = None,
-    blocked_commands: Optional[List[str]] = None,
+    allowed_commands: list[str] | None = None,
+    blocked_commands: list[str] | None = None,
     max_execution_time: float = 300.0,
     allow_shell: bool = False,
 ) -> None:
@@ -638,3 +804,52 @@ def cleanup_processes() -> None:
     global _global_executor
     if _global_executor:
         _global_executor.terminate_all_processes()
+
+
+def start_process(
+    command: str | list[str],
+    cwd: str | None = None,
+    env: dict[str, str] | None = None,
+    stdout=None,
+    stderr=subprocess.PIPE,
+) -> "ProcessHandle":
+    """Start a long-running process and return a handle for lifecycle management.
+
+    This is the preferred way to launch background processes from test code
+    instead of calling ``subprocess.Popen`` directly.  The process runs in a
+    new session (own process group) so :meth:`~ProcessHandle.terminate` and
+    :meth:`~ProcessHandle.kill` clean up all child workers correctly.
+
+    Unlike :func:`run_command` (which blocks), this function returns
+    immediately.  Call :meth:`ProcessHandle.wait` to block for completion, or
+    :meth:`ProcessHandle.terminate` to stop the process early.
+
+    Args:
+        command: Command and arguments list.  Do **not** pass user-controlled
+                 strings without validation; sanitize at system boundaries.
+        cwd:     Optional working directory.
+        env:     Extra environment variables merged with ``os.environ``.
+        stdout:  Stdout destination.  ``None`` (default) → ``DEVNULL``; pass
+                 an open file object to capture output to a file; pass
+                 ``subprocess.PIPE`` to read via :meth:`ProcessHandle.communicate`.
+        stderr:  Stderr destination.  Defaults to ``subprocess.PIPE`` so
+                 error output is available via
+                 :meth:`ProcessHandle.read_stderr` after completion.
+
+    Returns:
+        :class:`ProcessHandle` wrapping the running process.
+
+    Example::
+
+        # Run cyclictest to a file and stress-ng concurrently
+        with open(output_path, "w") as out_f:
+            cyclic = start_process(cyclic_cmd, stdout=out_f)
+        stress = start_process(stress_cmd)
+        try:
+            cyclic.wait(timeout=3600)
+        finally:
+            cyclic.terminate()
+            stress.terminate()
+        stderr = cyclic.read_stderr()
+    """
+    return get_executor().start_process(command, cwd=cwd, env=env, stdout=stdout, stderr=stderr)

@@ -1,0 +1,535 @@
+// ─── Charts Section wrapper ───────────────────────────────────────────────────
+// Mirrors the TelemetrySection layout so both feel part of the same design
+// language (collapsible header bar → content area).
+
+.chartsSection {
+  margin-top: 8px;
+  margin-bottom: 16px;
+  border: 1px solid var(--on-border-secondary);
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--bg-base-secondary);
+}
+
+.chartsSectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  height: 44px;
+  background: var(--bg-base-secondary);
+  border: none;
+  width: 100%;
+  cursor: pointer;
+  user-select: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  transition: background 0.15s;
+
+  &:hover {
+    background: var(--bg-base-neutral, #ececec);
+  }
+}
+
+.chartsToggle {
+  background-color: var(--bg-base-modal);
+  border: 1px solid var(--bg-base-neutral);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: normal;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 0;
+  flex-shrink: 0;
+  transition: background-color 0.2s;
+
+  &:hover {
+    background-color: var(--bg-base-secondary);
+  }
+}
+
+.chartsSectionTitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  flex: 1;
+}
+
+.chartsBadge {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--bg-base-secondary, #f0f0f0);
+  border-radius: 10px;
+  padding: 2px 7px;
+  flex-shrink: 0;
+}
+
+// ─── Charts grid ─────────────────────────────────────────────────────────────
+
+.chartsGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 12px;
+}
+
+// ─── Individual chart card ────────────────────────────────────────────────────
+// Mirrors .chartCard / .kpiCard from TelemetryChartStyle.scss
+
+.chartCard {
+  background: var(--bg-base-primary, #fff);
+  border: 1px solid var(--on-border-secondary, #e0e0e0);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.chartCardHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px 4px;
+}
+
+.chartCardTitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  flex: 1;
+  text-transform: capitalize;
+}
+
+// Optional description shown below the title.
+.chartDescription {
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin: 0 12px 6px;
+  padding: 0;
+}
+
+// Container for the SVG element – must be `position: relative` so the
+// floating tooltip can be absolutely positioned inside it.
+.chartSvgWrap {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  // Match TelemetryChart's chartCard background so the SVG area is
+  // consistent between light and dark themes.
+  background: var(--bg-base-primary, #fff);
+}
+
+// ─── Legend ───────────────────────────────────────────────────────────────────
+// Mirrors .legend / .legendItem from TelemetryChartStyle.scss
+
+.chartLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  padding: 8px 12px 10px;
+  border-top: 1px solid var(--on-border-secondary, #eee);
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+// Filled rectangle representing the series line colour.
+// Uses a rectangle (not a circle) to convey "line chart" visually.
+.legendSwatch {
+  display: inline-block;
+  width: 20px;
+  height: 3px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.legendLabel {
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+// ─── Tooltip ─────────────────────────────────────────────────────────────────
+// Absolutely positioned inside .chartSvgWrap; pointer-events disabled so it
+// doesn't interfere with mouse tracking on the SVG.
+// Style mirrors TelemetryChartStyle.scss .tooltip (Intel-blue border).
+
+.tooltip {
+  position: absolute;
+  background: var(--bg-base-primary, #fff);
+  border: 1px solid #0071c5;
+  border-radius: 4px;
+  padding: 6px 8px;
+  pointer-events: none;
+  z-index: 10;
+  min-width: 160px;
+  max-width: 240px;
+  box-shadow: 0 2px 8px rgba(0, 113, 197, 0.18);
+}
+
+.tooltipRow {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  line-height: 1.7;
+}
+
+.tooltipDot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.tooltipKey {
+  flex: 1;
+  font-size: 10px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tooltipVal {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+// ─── SVG element classes (theme-aware) ───────────────────────────────────────
+// Using CSS classes (not inline SVG presentation attributes) ensures dark-mode
+// overrides win via specificity — mirrors .axisTick in TelemetryChartStyle.scss.
+
+// Grid lines: horizontal guides behind the data series.
+.svgGrid {
+  stroke: var(--on-border-secondary, #e0e0e0);
+  :global([data-theme="dark"]) & {
+    stroke: var(--on-border-muted, #3a3f45);
+  }
+}
+
+// Axis lines and tick marks.
+.svgAxis {
+  stroke: var(--text-secondary, #bbb);
+  :global([data-theme="dark"]) & {
+    stroke: #5a6370;
+  }
+}
+
+// Axis tick labels and axis name labels.
+.axisTick {
+  fill: #555;
+  font-weight: 500;
+  :global([data-theme="dark"]) & {
+    fill: #d0d6dc;
+    font-weight: 600;
+  }
+}
+
+// ─── Dark mode overrides ──────────────────────────────────────────────────────
+// Explicit [data-theme="dark"] blocks mirror TelemetryChartStyle.scss so that
+// components which don't rely solely on CSS custom properties also adapt.
+
+.chartsSection {
+  :global([data-theme="dark"]) & {
+    border-color: var(--on-border-muted);
+    background: var(--bg-base-secondary);
+  }
+}
+
+.chartsSectionTitle {
+  :global([data-theme="dark"]) & { color: var(--on-text-primary); }
+}
+
+.chartsToggle {
+  :global([data-theme="dark"]) & { color: var(--on-text-primary); }
+}
+
+.chartsBadge {
+  :global([data-theme="dark"]) & {
+    color: var(--on-text-primary);
+    background: var(--bg-base-neutral);
+  }
+}
+
+.chartCard {
+  :global([data-theme="dark"]) & {
+    background: var(--bg-base-primary);
+    border-color: var(--on-border-muted);
+  }
+}
+
+.chartCardTitle {
+  :global([data-theme="dark"]) & { color: var(--on-text-primary); }
+}
+
+.chartDescription {
+  :global([data-theme="dark"]) & { color: var(--on-text-primary); }
+}
+
+.chartSvgWrap {
+  :global([data-theme="dark"]) & { background: var(--bg-base-primary); }
+}
+
+.chartLegend {
+  :global([data-theme="dark"]) & { border-top-color: var(--on-border-muted); }
+}
+
+.legendLabel {
+  :global([data-theme="dark"]) & { color: var(--on-text-primary); }
+}
+
+.tooltipKey {
+  :global([data-theme="dark"]) & { color: var(--on-text-primary); }
+}
+
+.tooltipVal {
+  :global([data-theme="dark"]) & { color: var(--on-text-primary); }
+}
+
+// ─── Chart card action buttons ────────────────────────────────────────────────
+
+// Container for per-card action buttons aligned to the right of the header.
+.chartCardActions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+// Borderless icon-only button — invisible at rest, soft pill background on
+// hover. Mimics the title-bar / terminal-window button convention so the
+// controls do not compete visually with chart content.
+.iconButton {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  flex-shrink: 0;
+  outline: none;
+  transition: background-color 0.15s, color 0.15s;
+
+  &:hover {
+    background-color: rgba(0, 0, 0, 0.08);
+    color: var(--text-primary);
+  }
+
+  :global([data-theme="dark"]) & {
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.12);
+    }
+  }
+}
+
+// Danger variant — same shape as .iconButton but with a red-tinted hover.
+// Used for the modal close (✕) button to signal the destructive action.
+.iconButtonDanger {
+  &:hover {
+    background-color: rgba(211, 47, 47, 0.12);
+    color: #d32f2f;
+  }
+
+  :global([data-theme="dark"]) & {
+    &:hover {
+      background-color: rgba(211, 47, 47, 0.18);
+      color: #ef5350;
+    }
+  }
+}
+
+// Relative wrapper for the ⋮ kebab menu button so the dropdown panel can be
+// absolutely positioned below it regardless of surrounding layout.
+.menuWrap {
+  position: relative;
+}
+
+// Dropdown panel revealed by clicking the ⋮ button.
+.menuDropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  background: var(--bg-base-primary, #fff);
+  border: 1px solid var(--on-border-secondary, #e0e0e0);
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  min-width: 130px;
+  z-index: 200;
+  overflow: hidden;
+
+  :global([data-theme="dark"]) & {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  }
+}
+
+// Individual item inside the dropdown.
+.menuDropdownItem {
+  display: block;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 8px 14px;
+  font-size: 12px;
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+  font-family: inherit;
+  transition: background 0.12s;
+
+  &:hover {
+    background: var(--bg-base-secondary, #f5f5f5);
+  }
+}
+
+// Download button — retained for the modal header where a text label fits.
+.pngButton {
+  background-color: var(--bg-base-modal);
+  color: var(--text-primary);
+  border: 1px solid var(--bg-base-neutral);
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  white-space: nowrap;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+
+  &:hover {
+    background-color: var(--bg-base-secondary);
+  }
+}
+
+// ─── Run info metadata grid ──────────────────────────────────────────────────
+// Compact key/value grid rendered below the legend for per-run context:
+// duration, latency summary, and optimization status flags.
+
+.chartMetaGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 3px 16px;
+  padding: 7px 12px 10px;
+  border-top: 1px solid var(--on-border-secondary, #eee);
+  background: var(--bg-base-secondary, #fafafa);
+
+  :global([data-theme="dark"]) & {
+    border-top-color: var(--on-border-muted);
+    background: var(--bg-base-secondary);
+  }
+}
+
+.chartMetaItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.chartMetaKey {
+  font-size: 10px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  flex-shrink: 0;
+
+  :global([data-theme="dark"]) & { color: var(--on-text-primary); }
+}
+
+.chartMetaValue {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  :global([data-theme="dark"]) & { color: var(--on-text-primary); }
+}
+
+// ─── Modal ────────────────────────────────────────────────────────────────────
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 32px;
+}
+
+.modalContent {
+  background: var(--bg-base-primary, #fff);
+  border-radius: 6px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.28);
+  padding: 20px 24px 18px;
+  max-width: min(calc(1100px + 48px), 98vw);
+  width: 100%;
+  max-height: 96vh;
+  overflow: auto;
+}
+
+.modalHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--on-border-secondary, #e0e0e0);
+}
+
+.modalTitle {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+// Close button — borderless icon button; red-tinted hover signals destructive.
+.modalClose {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  flex-shrink: 0;
+  outline: none;
+  transition: background-color 0.15s, color 0.15s;
+
+  &:hover {
+    background-color: rgba(211, 47, 47, 0.12);
+    color: #d32f2f;
+  }
+}

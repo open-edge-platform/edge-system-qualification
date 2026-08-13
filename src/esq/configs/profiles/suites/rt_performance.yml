@@ -1,0 +1,109 @@
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+name: "profile.suite.realtime.performance"
+description: "Real-time wakeup latency measurement with cyclictest under stress load"
+version: "1.0.0"
+params:
+  labels:
+    profile_display_name: "Real-Time Performance"
+    group: "realtime.performance"
+    type: "suite"
+    display_status: false
+  requirements:
+    memory_min_gib: 4.0
+    os_type:
+      - "linux"
+  telemetry:
+    enabled: true # enable for all tests in this profile unless overridden at the test level
+    interval: 10  # seconds between samples
+    prerun:
+      enabled: true
+      duration_s: 10   # idle baseline window before the test
+      interval_s: 1    # sample cadence during the idle window
+    modules:
+      - name: cpu_usage
+        enabled: true
+      - name: cpu_freq
+        enabled: true
+      - name: cpu_temp
+        enabled: true
+      - name: memory_usage
+        enabled: true
+      - name: package_power
+        enabled: true
+
+suites:
+  - name: "realtime"
+    sub_suites:
+      - name: "performance"
+        tests:
+          test_cyclictest:
+            params:
+              - test_id: "RT-CYC-001"
+                display_name: "RT Wakeup Latency"
+                description: |
+                  Measures worst-case RT wakeup latency using cyclictest on CPU cores 2 and 3
+                  while stress-ng saturates cores 0-1 at 100 % load.
+                  Key metric: max_latency_us (µs, lower is better).
+
+                # --- cyclictest parameters ---
+                cyclic_cpu_affinity:         # RT thread cores
+                  - 2
+                  - 3
+                cyclic_priority: 99          # SCHED_FIFO priority (max = 99)
+                                             # Thread count is auto-derived from cyclic_cpu_affinity
+                cyclic_interval_us: 250      # Timer interval in microseconds
+                cyclic_histogram_us: 700     # Histogram bucket count / max µs
+                cyclic_mlock: true           # mlockall to prevent paging (requires cap_ipc_lock)
+                cyclic_duration: "24h"       # Default run duration
+
+                requirements:
+                  cpu_min_cores: 4  # Needs cores 0-1 (stress) + cores 2-3 (RT) at minimum
+
+                # --- concurrent stress-ng parameters ---
+                stress_enabled: true
+                stress_cpu_affinity:         # Cores to stress
+                  - 0
+                  - 1
+                stress_cpu_load: 100         # 100 % load per stressor worker
+
+              - test_id: "RT-CYC-002"
+                display_name: "RT Wakeup Latency (Optimized)"
+                description: |
+                  Measures worst-case RT wakeup latency with multiple RT
+                  optimizations active: Intel L3 CAT cache partitioning
+                  (RT cores in a dedicated CLOS with upper L3 ways; stress-ng
+                  cores share lower ways via CLOS 0) and C-state disable (RT
+                  cores held in POLL/C0 to eliminate wake-from-sleep jitter).
+                  All pre-test state is saved and restored on completion or
+                  interrupt.
+
+                # --- CAT optimization parameters ---
+                cat_enabled: true
+                cat_rt_clos: 1               # CLOS ID for RT cores (default: 1)
+                # cat_rt_ways: 6             # L3 ways for RT cores; default = ceil(total/2)
+
+                # --- C-state optimization parameters ---
+                cstate_disable_enabled: true # Disable deep C-states on RT cores before test
+                cstate_max_latency_us: 0     # Only POLL (latency=0µs) permitted on RT cores
+
+                # --- cyclictest parameters (same as RT-CYC-001) ---
+                cyclic_cpu_affinity:
+                  - 2
+                  - 3
+                cyclic_priority: 99
+                cyclic_interval_us: 250
+                cyclic_histogram_us: 700
+                cyclic_mlock: true
+                cyclic_duration: "24h"
+
+                requirements:
+                  cpu_min_cores: 4  # Needs cores 0-1 (stress) + cores 2-3 (RT) at minimum
+
+                # --- concurrent stress-ng parameters ---
+                stress_enabled: true
+                stress_cpu_affinity:
+                  - 0
+                  - 1
+                stress_cpu_load: 100

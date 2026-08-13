@@ -31,6 +31,7 @@ Key rules:
 - **Data-collection suites (horizontal and vertical) usually skip `config.yml`.** They collect metrics without pass/fail validation, so no KPI definitions are needed. Mark the metrics you want highlighted with `key_metrics` in the profile instead.
 - **Qualification profiles reuse the shared definitions.** A qualification references KPIs by name with `kpi_refs` and refines only what differs (for example the threshold) with `kpi_override`. The base definition stays in `config.yml`.
 - **Each result must have exactly one key metric.** Call `result.set_key_metric("metric_name")` after populating `result.metrics` to designate the single most representative value. This is the value surfaced in summary views and used as the primary comparison point. A result with no key metric, or multiple key metrics, produces incomplete reports.
+- **Prerequisite guards must fail, not skip, in qualification profiles.** When a test cannot run because a required tool, capability, or kernel setting is absent, call `pytest.fail` for qualification profiles and `pytest.skip` for data-collection profiles. Use `(pytest.fail if is_qualification else pytest.skip)(reason)` so the same guard works correctly in both contexts. A silent skip in a qualification run hides a real system deficiency.
 - **Do not add `test_id` or `display_name` to `result.parameters`.** These are already encoded in `result.name` (set as `f"{test_id} - {test_display_name}"`) and are auto-populated by the framework. Use `result.parameters` for domain-specific context that aids debugging — for example the device list, model name, codec, or resolution.
 
 ---
@@ -232,6 +233,85 @@ tests:
               enabled: true    # enable using the base 0.90 threshold
 ```
 
+### Optional: Runtime Parameter Overrides via Environment Variables
+
+Some tests support overriding profile parameters at runtime through environment variables. This lets you tune a single parameter — for example, run duration or allocation size — without editing any profile file. This is useful for quick iteration, CI customization, or hardware-specific tuning.
+
+#### Naming convention
+
+All runtime override variables follow this format:
+
+```
+ENV_SUITE_<TEST_FILENAME>_<PARAMETER>
+```
+
+| Segment | Meaning | Example |
+|---|---|---|
+| `ENV_SUITE_` | Fixed prefix distinguishing suite-level overrides | — |
+| `<TEST_FILENAME>` | Test file name without `test_` and `.py`, uppercased; `-` replaced with `_` | `test_stress_ng.py` → `STRESS_NG` |
+| `<PARAMETER>` | Parameter name in uppercase | `DURATION_SECONDS` |
+
+#### When to implement this
+
+Add an env override only when:
+
+- The parameter directly controls test duration or allocation size — values that users commonly need to reduce for faster iteration
+- Users may need to adjust it per-system without editing profiles
+
+!!! warning
+    Do **not** add overrides for parameters that affect result validity, such as thresholds, device selection, or test logic flags. These variables are for development and advanced testing only — setting them during a qualification run invalidates the results.
+
+#### Implementation pattern
+
+```python
+# Module-level constant — single source of truth for the var name
+_DURATION_ENV_VAR = "ENV_SUITE_MY_TEST_DURATION_SECONDS"
+
+def _resolve_my_duration(configs: dict) -> int:
+    """Resolve test duration, honouring the per-suite env override.
+
+    Priority: ENV_SUITE_MY_TEST_DURATION_SECONDS env var > profile
+    ``my_duration_seconds`` param > 60 default. Invalid overrides are
+    ignored with a warning.
+    """
+    default = max(int(configs.get("my_duration_seconds", 60)), 1)
+
+    raw_override = os.environ.get(_DURATION_ENV_VAR)
+    if raw_override is None:
+        return default
+
+    try:
+        override = max(int(raw_override), 1)
+    except (TypeError, ValueError):
+        logger.warning(
+            "Ignoring non-integer %s=%r; using profile default %s",
+            _DURATION_ENV_VAR, raw_override, default,
+        )
+        return default
+
+    logger.info("Duration override from %s: %ss", _DURATION_ENV_VAR, override)
+    return override
+```
+
+Write the resolved value back into `configs` before calling `execute_test_with_cache` so that runs with different override values are cached independently:
+
+```python
+duration = _resolve_my_duration(configs)
+configs["my_duration_seconds"] = duration  # isolate cache key per override value
+
+results = execute_test_with_cache(
+    cached_result=cached_result,
+    cache_result=cache_result,
+    run_test_func=lambda: _execute_logic(duration, ...),
+    test_name=test_name,
+    configs=configs,
+)
+```
+
+For the complete list of env vars supported by built-in suites, see [Runtime Environment Overrides](advanced.md#runtime-environment-overrides).
+
+---
+
 ### Step 5: Run Your Test
 
 ```bash
@@ -246,6 +326,9 @@ esq -d run --profile profile.suite.my_feature --filter test_id=MYF-FEA-001
 
 # Run without cache (force fresh execution)
 esq -d run -nc --profile profile.suite.my_feature
+
+# Override a runtime parameter for this run only
+ENV_SUITE_MY_TEST_DURATION_SECONDS=60 esq -v run --profile profile.suite.my_feature
 ```
 
 ---
@@ -306,6 +389,20 @@ def test_example(
     # STEP 2: Validate System Requirements
     # ================================================================
     validate_system_requirements_from_configs(configs)
+
+    # Prerequisite guards — placed after is_qualification is resolved so each
+    # guard can call pytest.fail (qualification) or pytest.skip (data-collection)
+    # as appropriate.  A silent skip in a qualification run hides a real system
+    # deficiency; pytest.fail surfaces it clearly.
+    #
+    # Pattern for every prerequisite check:
+    #   _outcome = pytest.fail if is_qualification else pytest.skip
+    #   _outcome("reason message")
+    #
+    # Example — binary or capability not available:
+    #   if not shutil.which("my_tool"):
+    #       _outcome = pytest.fail if is_qualification else pytest.skip
+    #       _outcome("my_tool not found. Install it and re-run.")
 
     # Outcome tracking — initialized before the try block so the finally and
     # post-run blocks can always reference them.
@@ -457,8 +554,9 @@ def test_example(
 2. System Validation
    ├─> Check CPU / Memory / Storage
    ├─> Check device availability
-   ├─> Check software dependencies
-   └─> Skip test if requirements not met
+   ├─> Check software dependencies and tool prerequisites
+   ├─> Data-collection profile → pytest.skip when prerequisites not met
+   └─> Qualification profile  → pytest.fail when prerequisites not met
 
 3. Asset Preparation
    ├─> Download models and videos
@@ -495,3 +593,4 @@ def test_example(
 - [Fixtures Reference](fixtures.md) — All available pytest fixtures
 - [Results & Metrics](results-metrics.md) — Working with `Result` and `Metrics` objects
 - [KPI Validation](kpi-validation.md) — Defining and validating KPI thresholds
+- [Runtime Environment Overrides](advanced.md#runtime-environment-overrides) — All available env vars and example values

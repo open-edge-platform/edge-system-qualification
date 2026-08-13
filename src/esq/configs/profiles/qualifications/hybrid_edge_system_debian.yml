@@ -124,7 +124,6 @@ suites:
                 display_name: "CPU 100% (stress-ng)"
                 description: |
                   CPU-only stress at 100% CPU load for 15 minutes.
-                  Override duration via SUITE_STRESS_DURATION_SECONDS.
                 stress_duration_seconds: 900
                 enable_cpu_stress: true
                 stress_cpu_workers: 0

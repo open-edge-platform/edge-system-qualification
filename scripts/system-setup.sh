@@ -62,6 +62,12 @@ setup_system_packages() {
 
         # System stress tests
         stress-ng
+
+        # Real-time latency measurement (provides cyclictest)
+        rt-tests
+
+        # MSR read/write tools for Intel L3 CAT reporting and C-state control
+        msr-tools
     )
 
     DEBIAN_FRONTEND=noninteractive apt-get update -qq || true

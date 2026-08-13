@@ -4,6 +4,8 @@
 """
 CPU generation and segment detection for Intel processors.
 
+Part of the ``sysagent.utils.system.cpu`` sub-package.
+
 This module provides utilities to detect Intel CPU generation (Series 1, 2, 3, etc.)
 and vertical segment (server, desktop, mobile, embedded, workstation) based on CPU
 family, model, stepping, and brand string.
@@ -36,7 +38,6 @@ Data Sources:
 
 import logging
 import re
-from typing import Dict, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -51,22 +52,22 @@ CPU_GENERATION_MAP = {
     # Launched April 2026 as entry-level variant of Panther Lake platform
     # Brand: Intel Core 7/5/3 with 3XX model numbers, no suffix (360, 350, 330, 320, 315, 305, 304)
     # Product Collection: "Intel Core processors (Series 3)" - distinct from Core Ultra Series 3
-    (6, 213, range(0, 10)): ("Wildcat Lake", "Core (Series 3)", "mobile"),
+    (6, 213, range(10)): ("Wildcat Lake", "Core (Series 3)", "mobile"),
     # Panther Lake (PTL) - Core Ultra Series 3 - Mobile only (H-series and low-power variants)
     # Models: Core Ultra X9 388H/386H, X7 368H/358H, 7 366H/356H, 5 338H/336H (H-series)
     #         Core Ultra 7 365/355, 5 335/332/325/322 (low-power variants)
-    (6, 204, range(0, 10)): ("Panther Lake", "Core Ultra (Series 3)", "mobile"),
+    (6, 204, range(10)): ("Panther Lake", "Core Ultra (Series 3)", "mobile"),
     # Lunar Lake (LNL) - Core Ultra Series 2
     # InstLatx64: 0xB06D1 = 182 decimal
-    (6, 182, range(0, 10)): ("Lunar Lake", "Core Ultra (Series 2)", "mobile"),
+    (6, 182, range(10)): ("Lunar Lake", "Core Ultra (Series 2)", "mobile"),
     # Arrow Lake-S (ARL-S) - Core Ultra Series 2
     # InstLatx64: 0xC0662 = 198 decimal
-    (6, 198, range(0, 10)): ("Arrow Lake-S", "Core Ultra (Series 2)", "desktop"),
+    (6, 198, range(10)): ("Arrow Lake-S", "Core Ultra (Series 2)", "desktop"),
     # Arrow Lake-H (ARL-H) - Core Ultra Series 2
-    (6, 197, range(0, 10)): ("Arrow Lake-H", "Core Ultra (Series 2)", "mobile"),
+    (6, 197, range(10)): ("Arrow Lake-H", "Core Ultra (Series 2)", "mobile"),
     # Arrow Lake-U (ARL-U) - Core Ultra Series 2
     # InstLatx64: GenuineIntel00B0650_ArrowLakeU_03_CPUID.txt (0xB0650 = 181 decimal)
-    (6, 181, range(0, 10)): ("Arrow Lake-U", "Core Ultra (Series 2)", "mobile"),
+    (6, 181, range(10)): ("Arrow Lake-U", "Core Ultra (Series 2)", "mobile"),
     # Bartlett Lake-S (BTL-S) - 14th Gen Core
     (6, 183, range(4, 10)): ("Bartlett Lake-S", "14th Gen Core", "desktop"),
     # Meteor Lake (MTL) - Core Ultra Series 1
@@ -75,73 +76,73 @@ CPU_GENERATION_MAP = {
     # All Meteor Lake variants (H, U, HL, UL, PS) share family 6, model 0xAA = 170.
     # No separate model exists for MTL-U; H vs U distinction is marketing/TDP, not silicon.
     # Segment (mobile for all) and H/U suffix are detected later via brand string parsing.
-    (6, 170, range(0, 10)): ("Meteor Lake-H", "Core Ultra (Series 1)", "mobile"),
+    (6, 170, range(10)): ("Meteor Lake-H", "Core Ultra (Series 1)", "mobile"),
     # Raptor Lake (RPL) - 13th Gen Core AND Raptor Lake Refresh (RPL-S Refresh) - 14th Gen Core
     # IMPORTANT: Model 183 is shared between 13th gen (RPL) and 14th gen (RPL Refresh)
     # Differentiation is done by brand string detection in _detect_generation_from_brand()
     # - 13th gen: i[3579]-13xxx pattern (e.g., i9-13900K)
     # - 14th gen: i[3579]-14xxx pattern (e.g., i9-14900T, i7-14700K)
     # Default to 13th gen here; brand string detection will override to 14th gen if needed
-    (6, 183, range(0, 4)): ("Raptor Lake-S", "13th Gen Core", "desktop"),
-    (6, 191, range(0, 10)): ("Raptor Lake-P", "13th Gen Core", "mobile"),
-    (6, 186, range(0, 10)): ("Raptor Lake-HX", "13th Gen Core", "mobile"),
+    (6, 183, range(4)): ("Raptor Lake-S", "13th Gen Core", "desktop"),
+    (6, 191, range(10)): ("Raptor Lake-P", "13th Gen Core", "mobile"),
+    (6, 186, range(10)): ("Raptor Lake-HX", "13th Gen Core", "mobile"),
     # Alder Lake (ADL) - 12th Gen Core
-    (6, 151, range(0, 10)): ("Alder Lake-S", "12th Gen Core", "desktop"),
-    (6, 154, range(0, 10)): ("Alder Lake-P", "12th Gen Core", "mobile"),
-    (6, 190, range(0, 10)): ("Alder Lake-N", "Intel N-series", "mobile"),  # Alder Lake-N / Twin Lake
+    (6, 151, range(10)): ("Alder Lake-S", "12th Gen Core", "desktop"),
+    (6, 154, range(10)): ("Alder Lake-P", "12th Gen Core", "mobile"),
+    (6, 190, range(10)): ("Alder Lake-N", "Intel N-series", "mobile"),  # Alder Lake-N / Twin Lake
     # Tiger Lake (TGL) - 11th Gen Core
-    (6, 140, range(0, 10)): ("Tiger Lake", "11th Gen Core", "mobile"),
-    (6, 141, range(0, 10)): ("Tiger Lake-H", "11th Gen Core", "mobile"),
+    (6, 140, range(10)): ("Tiger Lake", "11th Gen Core", "mobile"),
+    (6, 141, range(10)): ("Tiger Lake-H", "11th Gen Core", "mobile"),
     # Rocket Lake (RKL) - 11th Gen Core
-    (6, 167, range(0, 10)): ("Rocket Lake-S", "11th Gen Core", "desktop"),
+    (6, 167, range(10)): ("Rocket Lake-S", "11th Gen Core", "desktop"),
     # Ice Lake (ICL) - 10th Gen Core
-    (6, 125, range(0, 10)): ("Ice Lake-U", "10th Gen Core", "mobile"),
-    (6, 126, range(0, 10)): ("Ice Lake-Y", "10th Gen Core", "mobile"),
+    (6, 125, range(10)): ("Ice Lake-U", "10th Gen Core", "mobile"),
+    (6, 126, range(10)): ("Ice Lake-Y", "10th Gen Core", "mobile"),
     # Comet Lake (CML) - 10th Gen Core
-    (6, 165, range(0, 10)): ("Comet Lake-S", "10th Gen Core", "desktop"),
-    (6, 166, range(0, 10)): ("Comet Lake-U", "10th Gen Core", "mobile"),
+    (6, 165, range(10)): ("Comet Lake-S", "10th Gen Core", "desktop"),
+    (6, 166, range(10)): ("Comet Lake-U", "10th Gen Core", "mobile"),
     # Coffee Lake (CFL) - 8th/9th Gen Core
-    (6, 142, range(0, 10)): ("Coffee Lake-U", "8th Gen Core", "mobile"),
-    (6, 158, range(0, 10)): ("Coffee Lake-S", "8th Gen Core", "desktop"),
-    (6, 159, range(0, 10)): ("Coffee Lake-R", "9th Gen Core", "desktop"),  # Coffee Lake Refresh
+    (6, 142, range(10)): ("Coffee Lake-U", "8th Gen Core", "mobile"),
+    (6, 158, range(10)): ("Coffee Lake-S", "8th Gen Core", "desktop"),
+    (6, 159, range(10)): ("Coffee Lake-R", "9th Gen Core", "desktop"),  # Coffee Lake Refresh
     # Kaby Lake (KBL) - 7th Gen Core
     (6, 142, range(10, 20)): ("Kaby Lake-U", "7th Gen Core", "mobile"),  # Amber Lake, Whiskey Lake variants
     (6, 158, range(10, 20)): ("Kaby Lake-S", "7th Gen Core", "desktop"),
-    (6, 78, range(0, 10)): ("Kaby Lake-G", "7th Gen Core", "mobile"),
+    (6, 78, range(10)): ("Kaby Lake-G", "7th Gen Core", "mobile"),
     # Skylake (SKL) - 6th Gen Core
     (6, 78, range(10, 20)): ("Skylake-U", "6th Gen Core", "mobile"),
-    (6, 94, range(0, 10)): ("Skylake-S", "6th Gen Core", "desktop"),
-    (6, 85, range(0, 10)): ("Skylake-H", "6th Gen Core", "mobile"),
+    (6, 94, range(10)): ("Skylake-S", "6th Gen Core", "desktop"),
+    (6, 85, range(10)): ("Skylake-H", "6th Gen Core", "mobile"),
     # Broadwell (BDW) - 5th Gen Core
-    (6, 61, range(0, 10)): ("Broadwell-U", "5th Gen Core", "mobile"),
-    (6, 71, range(0, 10)): ("Broadwell-H", "5th Gen Core", "mobile"),
-    (6, 86, range(0, 10)): ("Broadwell-DE", "5th Gen Core", "server"),
-    (6, 87, range(0, 10)): ("Broadwell-DT", "5th Gen Core", "desktop"),
+    (6, 61, range(10)): ("Broadwell-U", "5th Gen Core", "mobile"),
+    (6, 71, range(10)): ("Broadwell-H", "5th Gen Core", "mobile"),
+    (6, 86, range(10)): ("Broadwell-DE", "5th Gen Core", "server"),
+    (6, 87, range(10)): ("Broadwell-DT", "5th Gen Core", "desktop"),
     # Haswell (HSW) - 4th Gen Core
-    (6, 60, range(0, 10)): ("Haswell", "4th Gen Core", "desktop"),
-    (6, 69, range(0, 10)): ("Haswell-MB", "4th Gen Core", "mobile"),
-    (6, 70, range(0, 10)): ("Haswell-DT", "4th Gen Core", "desktop"),  # Devil's Canyon
-    (6, 63, range(0, 10)): ("Haswell-E", "4th Gen Core", "desktop"),
+    (6, 60, range(10)): ("Haswell", "4th Gen Core", "desktop"),
+    (6, 69, range(10)): ("Haswell-MB", "4th Gen Core", "mobile"),
+    (6, 70, range(10)): ("Haswell-DT", "4th Gen Core", "desktop"),  # Devil's Canyon
+    (6, 63, range(10)): ("Haswell-E", "4th Gen Core", "desktop"),
     # Ivy Bridge (IVB) - 3rd Gen Core
-    (6, 58, range(0, 10)): ("Ivy Bridge", "3rd Gen Core", "desktop"),
-    (6, 62, range(0, 10)): ("Ivy Bridge-E", "3rd Gen Core", "desktop"),
+    (6, 58, range(10)): ("Ivy Bridge", "3rd Gen Core", "desktop"),
+    (6, 62, range(10)): ("Ivy Bridge-E", "3rd Gen Core", "desktop"),
     # Sandy Bridge (SNB) - 2nd Gen Core
-    (6, 42, range(0, 10)): ("Sandy Bridge", "2nd Gen Core", "mobile"),
-    (6, 45, range(0, 10)): ("Sandy Bridge", "2nd Gen Core", "desktop"),
+    (6, 42, range(10)): ("Sandy Bridge", "2nd Gen Core", "mobile"),
+    (6, 45, range(10)): ("Sandy Bridge", "2nd Gen Core", "desktop"),
     # Westmere (WSM) - 2nd Gen Core (32nm shrink of Nehalem)
-    (6, 37, range(0, 10)): ("Westmere", "2nd Gen Core", "mobile"),  # Arrandale
-    (6, 44, range(0, 10)): ("Westmere", "2nd Gen Core", "desktop"),  # Gulftown
+    (6, 37, range(10)): ("Westmere", "2nd Gen Core", "mobile"),  # Arrandale
+    (6, 44, range(10)): ("Westmere", "2nd Gen Core", "desktop"),  # Gulftown
     # Nehalem (NHM) - 1st Gen Core
-    (6, 30, range(0, 10)): ("Nehalem", "1st Gen Core", "desktop"),  # Lynnfield, Bloomfield
-    (6, 46, range(0, 10)): ("Nehalem-EX", "1st Gen Core", "server"),
+    (6, 30, range(10)): ("Nehalem", "1st Gen Core", "desktop"),  # Lynnfield, Bloomfield
+    (6, 46, range(10)): ("Nehalem-EX", "1st Gen Core", "server"),
     # Core 2 (Penryn) - Pre-i7/i5/i3 era (2007-2008)
-    (6, 23, range(0, 10)): ("Penryn", "Core 2", "mobile"),
-    (6, 29, range(0, 10)): ("Penryn", "Core 2", "desktop"),
+    (6, 23, range(10)): ("Penryn", "Core 2", "mobile"),
+    (6, 29, range(10)): ("Penryn", "Core 2", "desktop"),
     # Core 2 (Core) - Original Core microarchitecture (2006-2007)
-    (6, 15, range(0, 10)): ("Conroe", "Core 2", "desktop"),  # Core 2 Duo/Quad
-    (6, 22, range(0, 10)): ("Merom", "Core 2", "mobile"),  # Core 2 Duo mobile
+    (6, 15, range(10)): ("Conroe", "Core 2", "desktop"),  # Core 2 Duo/Quad
+    (6, 22, range(10)): ("Merom", "Core 2", "mobile"),  # Core 2 Duo mobile
     # Core (Yonah) - Enhanced Pentium M (2006)
-    (6, 14, range(0, 10)): ("Yonah", "Core (Yonah)", "mobile"),  # Core Solo/Duo
+    (6, 14, range(10)): ("Yonah", "Core (Yonah)", "mobile"),  # Core Solo/Duo
     # Pentium Era - Pre-Core processors
     # Note: These are legacy processors; detection is basic codename-based
     # Pentium 4 (NetBurst): Family 15
@@ -153,24 +154,24 @@ CPU_GENERATION_MAP = {
     # Model number TBD - will be added when CPUID data becomes available
     # (6, xxx, range(0, 10)): ("Amston Lake", "Atom x7000", "embedded"),
     # Intel Atom X-series (Embedded/IoT) - older unsupported series
-    (6, 96, range(0, 10)): ("Elkhart Lake", "Atom x6000", "embedded"),
-    (6, 92, range(0, 10)): ("Apollo Lake", "Atom x5000", "embedded"),
-    (6, 76, range(0, 10)): ("Cherry Trail", "Atom (Cherry Trail)", "embedded"),
-    (6, 55, range(0, 10)): ("Bay Trail", "Atom (Bay Trail)", "embedded"),
+    (6, 96, range(10)): ("Elkhart Lake", "Atom x6000", "embedded"),
+    (6, 92, range(10)): ("Apollo Lake", "Atom x5000", "embedded"),
+    (6, 76, range(10)): ("Cherry Trail", "Atom (Cherry Trail)", "embedded"),
+    (6, 55, range(10)): ("Bay Trail", "Atom (Bay Trail)", "embedded"),
     # Intel Atom Z-series (Mobile/Tablet) - all unsupported legacy series
-    (6, 74, range(0, 10)): ("Clover Trail", "Atom Z-series", "mobile"),
-    (6, 77, range(0, 10)): ("Merrifield", "Atom Z-series", "mobile"),
-    (6, 90, range(0, 10)): ("Moorefield", "Atom Z-series", "mobile"),
+    (6, 74, range(10)): ("Clover Trail", "Atom Z-series", "mobile"),
+    (6, 77, range(10)): ("Merrifield", "Atom Z-series", "mobile"),
+    (6, 90, range(10)): ("Moorefield", "Atom Z-series", "mobile"),
     # Xeon 6 - Model 173 shared by both Sierra Forest and Granite Rapids
     # Distinguished by suffix: E=Sierra Forest (E-cores), P=Granite Rapids (P-cores)
     # Sierra Forest (SRF) - Xeon 6 E-cores (launched June 2024)
     # Official name: "Intel Xeon 6" (6700E series: 6766E, 6740E, 6731E, 6710E, etc.)
-    (6, 173, range(0, 10)): ("Sierra Forest", "Xeon 6", "server"),  # E-core default
+    (6, 173, range(10)): ("Sierra Forest", "Xeon 6", "server"),  # E-core default
     # Granite Rapids (GNR) - Xeon 6 P-cores (launched Sept 2024)
     # Official name: "Intel Xeon 6" (6900P/6700P/6500P series: 6980P, 6787P, etc.)
     # Note: Codename override handled in _detect_generation() based on P suffix
     # Xeon Emerald Rapids (EMR)
-    (6, 207, range(0, 10)): ("Emerald Rapids", "5th Gen Xeon Scalable", "server"),
+    (6, 207, range(10)): ("Emerald Rapids", "5th Gen Xeon Scalable", "server"),
     # Xeon Sapphire Rapids (SPR) - Model 143 shared across variants:
     # - SPR-SP (Xeon Scalable server): Standard "Xeon Gold/Platinum/Silver" branding
     # - SPR-WS (Xeon W workstation): "Xeon w3/w5/w7/w9" pattern (detect_cpu_generation_and_segment)
@@ -178,7 +179,7 @@ CPU_GENERATION_MAP = {
     # Default classification for model 143 is server Xeon Scalable unless brand indicates otherwise
     (6, 143, range(8, 20)): ("Sapphire Rapids", "4th Gen Xeon Scalable", "server"),
     # Xeon Ice Lake-SP
-    (6, 106, range(0, 10)): ("Ice Lake-SP", "3rd Gen Xeon Scalable", "server"),
+    (6, 106, range(10)): ("Ice Lake-SP", "3rd Gen Xeon Scalable", "server"),
 }
 
 
@@ -209,7 +210,7 @@ def _get_cli_unsupported_generations():
         module = __import__(module_path, fromlist=["UNSUPPORTED_GENERATIONS"])
 
         if hasattr(module, "UNSUPPORTED_GENERATIONS"):
-            unsupported_gens = getattr(module, "UNSUPPORTED_GENERATIONS")
+            unsupported_gens = module.UNSUPPORTED_GENERATIONS
             logger.debug(
                 f"Using CLI-specific unsupported generations list from {module_path} ({len(unsupported_gens)} entries)"
             )
@@ -690,7 +691,7 @@ SEGMENT_PATTERNS = {
 }
 
 
-def _detect_generation_from_brand(brand: str) -> Tuple[Optional[str], Optional[str], Optional[str], Optional[str]]:
+def _detect_generation_from_brand(brand: str) -> tuple[str | None, str | None, str | None, str | None]:
     """
     Fallback: Try to detect generation from brand string when model number is unmapped.
 
@@ -1279,7 +1280,7 @@ def _detect_generation_from_brand(brand: str) -> Tuple[Optional[str], Optional[s
 
 def detect_cpu_generation_and_segment(
     family: int, model: int, stepping: int, brand: str, core_count: int
-) -> Dict[str, str]:
+) -> dict[str, str]:
     """
     Detect Intel CPU generation, product collection, and vertical segment.
 
@@ -1550,7 +1551,7 @@ def _extract_product_collection_from_generation(generation: str) -> str:
 
 def _detect_generation(
     family: int, model: int, stepping: int, brand: str = ""
-) -> Tuple[Optional[str], Optional[str], Optional[str], Optional[str]]:
+) -> tuple[str | None, str | None, str | None, str | None]:
     """
     Detect CPU generation from family, model, and stepping.
 
@@ -1605,11 +1606,9 @@ def _detect_generation(
                 # Assume it's a newer workstation variant not yet in our pattern
                 # This ensures new Xeon 6 workstation models work without code updates
                 # Pattern matches: 699X, 655, 6990, etc. (but not 6787P or 6766E)
-                elif re.search(r"Xeon\(R\) 6\d{2,3}[X]?(?![PE])\b", brand, re.IGNORECASE):
-                    codename = "Granite Rapids-WS"
-                    segment_hint = "workstation"
-                    logger.debug(f"Detected newer Xeon 6 Workstation (forward compatibility) from brand: {brand}")
-                elif re.search(r"Xeon\(R\) 6\d{2,3}(?![PE])\b", brand, re.IGNORECASE):
+                elif re.search(r"Xeon\(R\) 6\d{2,3}[X]?(?![PE])\b", brand, re.IGNORECASE) or re.search(
+                    r"Xeon\(R\) 6\d{2,3}(?![PE])\b", brand, re.IGNORECASE
+                ):
                     codename = "Granite Rapids-WS"
                     segment_hint = "workstation"
                     logger.debug(f"Detected newer Xeon 6 Workstation (forward compatibility) from brand: {brand}")
@@ -1630,7 +1629,7 @@ def _detect_generation(
     return None, None, None, None
 
 
-def _detect_segment(brand: str, model: int, core_count: int) -> Optional[str]:
+def _detect_segment(brand: str, model: int, core_count: int) -> str | None:
     """
     Detect Intel vertical segment from brand string and CPU characteristics.
 

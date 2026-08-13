@@ -57,8 +57,7 @@ suites:
               - test_id: "SNG-CPU-001"
                 display_name: "CPU 100% (stress-ng)"
                 description: |
-                  CPU-only stress at 100% CPU load. Duration defaults to the
-                  profile value and can be overridden via SUITE_STRESS_DURATION_SECONDS.
+                  CPU-only stress at 100% CPU load.
                 stress_duration_seconds: *stress_duration_seconds_default
                 enable_cpu_stress: true
                 stress_cpu_workers: 0
@@ -74,8 +73,7 @@ suites:
               - test_id: "SNG-CPU-002"
                 display_name: "CPU 50% (stress-ng)"
                 description: |
-                  CPU-only stress at 50% CPU load. Duration defaults to the
-                  profile value and can be overridden via SUITE_STRESS_DURATION_SECONDS.
+                  CPU-only stress at 50% CPU load.
                 stress_duration_seconds: *stress_duration_seconds_default
                 enable_cpu_stress: true
                 stress_cpu_workers: 0
@@ -92,8 +90,7 @@ suites:
                 display_name: "Memory 100% (stress-ng)"
                 description: |
                   Memory stress sized to 100% of physical RAM (percentage of
-                  physical memory, kept resident to avoid swap). Duration defaults
-                  to the profile value and can be overridden via SUITE_STRESS_DURATION_SECONDS.
+                  physical memory, kept resident to avoid swap).
                 stress_duration_seconds: *stress_duration_seconds_default
                 enable_cpu_stress: false
                 stress_cpu_workers: 0
@@ -110,8 +107,7 @@ suites:
                 display_name: "Memory 50% (stress-ng)"
                 description: |
                   Memory stress sized to 50% of physical RAM (percentage of
-                  physical memory, kept resident to avoid swap). Duration defaults
-                  to the profile value and can be overridden via SUITE_STRESS_DURATION_SECONDS.
+                  physical memory, kept resident to avoid swap).
                 stress_duration_seconds: *stress_duration_seconds_default
                 enable_cpu_stress: false
                 stress_cpu_workers: 0
@@ -127,8 +123,7 @@ suites:
               - test_id: "SNG-IGP-001"
                 display_name: "iGPU Rendering (stress-ng)"
                 description: |
-                  iGPU rendering stress. Duration defaults to the profile value
-                  and can be overridden via SUITE_STRESS_DURATION_SECONDS.
+                  iGPU rendering stress.
                 stress_duration_seconds: *stress_duration_seconds_default
                 enable_cpu_stress: false
                 stress_cpu_workers: 0
@@ -154,8 +149,7 @@ suites:
               - test_id: "SNG-MIX-001"
                 display_name: "CPU 100% + iGPU Rendering (stress-ng)"
                 description: |
-                  Mixed stress with CPU at 100% and iGPU rendering. Duration defaults
-                  to the profile value and can be overridden via SUITE_STRESS_DURATION_SECONDS.
+                  Mixed stress with CPU at 100% and iGPU rendering.
                 stress_duration_seconds: *stress_duration_seconds_default
                 enable_cpu_stress: true
                 stress_cpu_workers: 0
@@ -181,8 +175,7 @@ suites:
               - test_id: "SNG-MIX-002"
                 display_name: "CPU 50% + iGPU Rendering (stress-ng)"
                 description: |
-                  Mixed stress with CPU at 50% and iGPU rendering. Duration defaults
-                  to the profile value and can be overridden via SUITE_STRESS_DURATION_SECONDS.
+                  Mixed stress with CPU at 50% and iGPU rendering.
                 stress_duration_seconds: *stress_duration_seconds_default
                 enable_cpu_stress: true
                 stress_cpu_workers: 0

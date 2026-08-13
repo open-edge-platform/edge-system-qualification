@@ -14,6 +14,7 @@ import { testResultNavStore, fetchTestResultNav, testResultStore, fetchTestResul
 import { BulletChart } from "./BulletChart";
 import * as bulletChartStyles from "./BulletChartStyle.scss";
 import { TelemetrySection } from "./TelemetrySection";
+import { ChartsSection } from "./ChartsSection";
 
 // Summary table components
 interface SortableTableProps {
@@ -38,6 +39,7 @@ interface SystemInfoTableProps {
 // Metadata table component for test metrics
 interface MetadataTableProps {
   metricsData: any;
+  include?: string[]; // which sections to render: 'metrics' | 'metadata' | 'kpis'
 }
 
 // Attachment Image component for Summary
@@ -530,12 +532,15 @@ const renderKpisSection = (
 const DescriptionBlock = ({ text }: { text: string }) => {
   const [expanded, setExpanded] = useState(false);
   const LIMIT = 220;
-  const isTruncatable = text.length > LIMIT;
+  // Normalize: collapse newlines and surrounding whitespace to a single space
+  // so YAML literal-block (|) descriptions don't render as raw multi-line text.
+  const normalizedText = text.replace(/[ \t]*\n[ \t]*/g, ' ').replace(/  +/g, ' ').trim();
+  const isTruncatable = normalizedText.length > LIMIT;
   const truncated = !expanded && isTruncatable;
   return (
     <div className={styles["test-description"]}>
       <span className={styles["test-description-text"]}>
-        {truncated ? text.slice(0, LIMIT).trimEnd() : text}
+        {truncated ? normalizedText.slice(0, LIMIT).trimEnd() : normalizedText}
         {isTruncatable && (
           <button
             type="button"
@@ -550,8 +555,8 @@ const DescriptionBlock = ({ text }: { text: string }) => {
   );
 };
 
-const MetadataTable = ({ metricsData }: MetadataTableProps) => {
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set()); // Collapsed by default
+const MetadataTable = ({ metricsData, include }: MetadataTableProps) => {
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['metrics'])); // Metrics expanded by default
   
   if (!metricsData) {
     return null;
@@ -652,7 +657,7 @@ const MetadataTable = ({ metricsData }: MetadataTableProps) => {
   // }
 
   // Metrics section
-  if (metricsData.metrics && Object.keys(metricsData.metrics).length > 0) {
+  if ((include == null || include.includes('metrics')) && metricsData.metrics && Object.keys(metricsData.metrics).length > 0) {
     // Transform metrics to display value and unit properly
     const metricsForDisplay: Record<string, any> = {};
     Object.entries(metricsData.metrics).forEach(([key, metricData]: [string, any]) => {
@@ -668,12 +673,12 @@ const MetadataTable = ({ metricsData }: MetadataTableProps) => {
   }
 
   // Metadata section
-  if (metricsData.metadata && Object.keys(metricsData.metadata).length > 0) {
+  if ((include == null || include.includes('metadata')) && metricsData.metadata && Object.keys(metricsData.metadata).length > 0) {
     sections.push(renderIndividualSection('Metadata', metricsData.metadata, 'metadata'));
   }
 
   // KPIs section - transform to display readable format
-  if (metricsData.kpis && Object.keys(metricsData.kpis).length > 0) {
+  if ((include == null || include.includes('kpis')) && metricsData.kpis && Object.keys(metricsData.kpis).length > 0) {
     const transformResult = transformKpisData(metricsData.kpis, metricsData);
     sections.push(renderKpisSection(transformResult, expandedSections, toggleSection));
   }
@@ -1879,7 +1884,7 @@ export const Summary = () => {
   }, [loadingTests, individualTestResults]);
 
   // State for summary metadata (cli_name, platform, timestamp from test_summary.json)
-  const [summaryMeta, setSummaryMeta] = useState<{ cliName: string; platform: string; timestamp: string } | null>(null);
+  const [summaryMeta, setSummaryMeta] = useState<{ cliName: string; platform: string; timestamp: string; version?: string } | null>(null);
 
   // Fetch summary metadata and test descriptions from the same test_summary.json attachment
   useEffect(() => {
@@ -2749,8 +2754,14 @@ export const Summary = () => {
                                       </div>
                                     </div>
 
-                                    {/* Metadata Section */}
-                                    <MetadataTable metricsData={testFullMetrics[testId]} />
+                                    {/* Metrics Section */}
+                                    <MetadataTable metricsData={testFullMetrics[testId]} include={['metrics']} />
+
+                                    {/* Charts Section */}
+                                    <ChartsSection extendedMetadata={testFullMetrics[testId]?.extended_metadata} summaryMeta={summaryMeta} testId={testAlias} systemInfo={systemInfo} />
+
+                                    {/* Metadata & KPIs Sections */}
+                                    <MetadataTable metricsData={testFullMetrics[testId]} include={['metadata', 'kpis']} />
 
                                     {/* Telemetry Section */}
                                     <TelemetrySection extendedMetadata={testFullMetrics[testId]?.extended_metadata} summaryMeta={summaryMeta} testId={testAlias} />
@@ -3006,8 +3017,14 @@ export const Summary = () => {
                                       </div>
                                     </div>
 
-                                    {/* Metadata Section */}
-                                    <MetadataTable metricsData={testFullMetrics[testId]} />
+                                    {/* Metrics Section */}
+                                    <MetadataTable metricsData={testFullMetrics[testId]} include={['metrics']} />
+
+                                    {/* Charts Section */}
+                                    <ChartsSection extendedMetadata={testFullMetrics[testId]?.extended_metadata} summaryMeta={summaryMeta} testId={testAlias} systemInfo={systemInfo} />
+
+                                    {/* Metadata & KPIs Sections */}
+                                    <MetadataTable metricsData={testFullMetrics[testId]} include={['metadata', 'kpis']} />
 
                                     {/* Telemetry Section */}
                                     <TelemetrySection extendedMetadata={testFullMetrics[testId]?.extended_metadata} summaryMeta={summaryMeta} testId={testAlias} />
@@ -3300,8 +3317,14 @@ export const Summary = () => {
                                       </div>
                                     </div>
 
-                                    {/* Metadata Section */}
-                                    <MetadataTable metricsData={testFullMetrics[testId]} />
+                                    {/* Metrics Section */}
+                                    <MetadataTable metricsData={testFullMetrics[testId]} include={['metrics']} />
+
+                                    {/* Charts Section */}
+                                    <ChartsSection extendedMetadata={testFullMetrics[testId]?.extended_metadata} summaryMeta={summaryMeta} testId={testAlias} systemInfo={systemInfo} />
+
+                                    {/* Metadata & KPIs Sections */}
+                                    <MetadataTable metricsData={testFullMetrics[testId]} include={['metadata', 'kpis']} />
 
                                     {/* Telemetry Section */}
                                     <TelemetrySection extendedMetadata={testFullMetrics[testId]?.extended_metadata} summaryMeta={summaryMeta} testId={testAlias} />

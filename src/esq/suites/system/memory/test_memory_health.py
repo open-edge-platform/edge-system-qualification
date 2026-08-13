@@ -32,7 +32,6 @@ import re
 import resource
 import time
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 
 import allure
 import pytest
@@ -49,25 +48,25 @@ _VALID_CHECK_TYPES = ("edac", "memtester")
 _EDAC_BASE = "/sys/devices/system/edac/mc"
 
 # Per-suite environment overrides for memtester parameters. Named after this
-# suite ("memory") so they never collide with other suite knobs. Export these
+# test file ("memory_health") so they never collide with other suite knobs. Export these
 # at runtime to retune without editing profiles, e.g.
-#   SUITE_MEMTESTER_SIZE_MB=1024  esq run --profile ...
-#   SUITE_MEMTESTER_ITERATIONS=2  esq run --profile ...
-_MEMTESTER_SIZE_MB_ENV_VAR = "SUITE_MEMTESTER_SIZE_MB"
-_MEMTESTER_ITERATIONS_ENV_VAR = "SUITE_MEMTESTER_ITERATIONS"
+#   ENV_SUITE_MEMORY_HEALTH_MEMTESTER_SIZE_MB=1024  esq run --profile ...
+#   ENV_SUITE_MEMORY_HEALTH_MEMTESTER_ITERATIONS=2  esq run --profile ...
+_MEMTESTER_SIZE_MB_ENV_VAR = "ENV_SUITE_MEMORY_HEALTH_MEMTESTER_SIZE_MB"
+_MEMTESTER_ITERATIONS_ENV_VAR = "ENV_SUITE_MEMORY_HEALTH_MEMTESTER_ITERATIONS"
 # Sentinel values accepted in profile ``memtester_size_mb`` to enable dynamic
 # sizing. When one of these is detected the test reads ``MemAvailable`` from
 # /proc/meminfo and allocates all available memory minus a safety reserve.
-# ``SUITE_MEMTESTER_SIZE_MB`` always wins over dynamic mode.
+# ``ENV_SUITE_MEMORY_HEALTH_MEMTESTER_SIZE_MB`` always wins over dynamic mode.
 _MEMTESTER_SIZE_DYNAMIC_SENTINELS = frozenset(("auto", "dynamic", "available", "all"))
 
 
-def _read_int(path: Path) -> Optional[int]:
+def _read_int(path: Path) -> int | None:
     """Read a single integer from a sysfs file, or None if unavailable."""
     try:
         with open(path, "r", encoding="utf-8") as handle:
             return int(handle.read().strip())
-    except (IOError, OSError, ValueError):
+    except (OSError, ValueError):
         return None
 
 
@@ -76,7 +75,7 @@ def _read_str(path: Path) -> str:
     try:
         with open(path, "r", encoding="utf-8") as handle:
             return handle.read().strip()
-    except (IOError, OSError):
+    except OSError:
         return ""
 
 
@@ -98,13 +97,13 @@ def _write_and_return(output_dir: str, filename: str, content: str) -> str:
     try:
         with open(file_path, "w", encoding="utf-8") as handle:
             handle.write(content)
-    except (IOError, OSError) as error:
+    except OSError as error:
         logger.warning(f"Failed to write '{file_path}': {error}")
         return ""
     return file_path
 
 
-def _collect_edac() -> Tuple[Dict[str, int], List[str], str]:
+def _collect_edac() -> tuple[dict[str, int], list[str], str]:
     """
     Read EDAC ECC error counters from sysfs.
 
@@ -115,8 +114,8 @@ def _collect_edac() -> Tuple[Dict[str, int], List[str], str]:
         Allure attachment.
     """
     base = Path(_EDAC_BASE)
-    lines: List[str] = []
-    faulty: List[str] = []
+    lines: list[str] = []
+    faulty: list[str] = []
     summary = {
         "available": 0,
         "memory_controllers": 0,
@@ -207,7 +206,7 @@ def _collect_edac() -> Tuple[Dict[str, int], List[str], str]:
     return summary, faulty, "\n".join(lines)
 
 
-def _run_memtester(size_mb: int, iterations: int, timeout: int) -> Tuple[Dict[str, int], str]:
+def _run_memtester(size_mb: int, iterations: int, timeout: int) -> tuple[dict[str, int], str]:
     """
     Run memtester over a userspace-allocated region and parse the outcome.
 
@@ -331,7 +330,7 @@ def _get_available_memory_mb(reserve_mb: int, reserve_percent: float) -> int:
                 if line.startswith("MemAvailable:"):
                     available_kb = int(line.split()[1])
                     break
-    except (IOError, OSError, ValueError, IndexError):
+    except (OSError, ValueError, IndexError):
         logger.warning("Could not read /proc/meminfo; dynamic memtester size unavailable")
         return 0
 
@@ -364,12 +363,12 @@ def _get_available_memory_mb(reserve_mb: int, reserve_percent: float) -> int:
     return safe_mb
 
 
-def _resolve_memtester_size_mb(configs: Dict) -> int:
+def _resolve_memtester_size_mb(configs: dict) -> int:
     """Resolve the memtester region size (MB), honoring env override and dynamic mode.
 
     Priority order:
 
-    1. ``SUITE_MEMTESTER_SIZE_MB`` env var — always wins, including dynamic mode:
+    1. ``ENV_SUITE_MEMORY_HEALTH_MEMTESTER_SIZE_MB`` env var — always wins, including dynamic mode:
          - A sentinel value (``auto``, ``dynamic``, ``available``, ``all``) activates
            dynamic sizing even when the profile specifies a static integer.
          - An integer value pins the allocation to that many MB.
@@ -434,10 +433,10 @@ def _resolve_memtester_size_mb(configs: Dict) -> int:
     return max(_safe_int(profile_value, 256), 1)
 
 
-def _resolve_memtester_iterations(configs: Dict) -> int:
+def _resolve_memtester_iterations(configs: dict) -> int:
     """Resolve the memtester iteration count, honoring the per-suite env override.
 
-    Priority: ``SUITE_MEMTESTER_ITERATIONS`` env var > profile
+    Priority: ``ENV_SUITE_MEMORY_HEALTH_MEMTESTER_ITERATIONS`` env var > profile
     ``memtester_iterations`` > 1 default. Non-integer overrides are ignored
     with a warning. The resolved value is clamped to at least 1.
     """
@@ -495,7 +494,7 @@ def test_memory_health(
     memtester_iterations = _resolve_memtester_iterations(configs)
     # Propagate the resolved values (env var or dynamic) back into configs so the
     # cache key reflects the parameters that were actually used.  This prevents
-    # a run with SUITE_MEMTESTER_SIZE_MB=auto from getting a cache hit from a
+    # a run with ENV_SUITE_MEMORY_HEALTH_MEMTESTER_SIZE_MB=auto from getting a cache hit from a
     # previous run that used a different profile-static size (mirrors the same
     # pattern used in test_stress_ng: configs["stress_duration_seconds"] = duration).
     configs["memtester_size_mb"] = memtester_size_mb
@@ -539,8 +538,8 @@ def test_memory_health(
 
     def _collect_memory_health() -> Result:
         """Run the selected probe, attach its output, and build the result."""
-        metrics: Dict[str, Metrics] = {}
-        extended: Dict[str, object] = {"memory_output_dir": results_dir, "check_type": check_type}
+        metrics: dict[str, Metrics] = {}
+        extended: dict[str, object] = {"memory_output_dir": results_dir, "check_type": check_type}
 
         if check_type == "edac":
             with allure.step("EDAC / RAS ECC error scan"):
@@ -650,7 +649,7 @@ def test_memory_health(
         logger.error(failure_message)
     except Exception as e:
         test_failed = True
-        failure_message = f"Unexpected error during memory health test execution: {str(e)}"
+        failure_message = f"Unexpected error during memory health test execution: {e!s}"
         logger.error(failure_message, exc_info=True)
 
     # Ensure a result object always exists so the test terminates cleanly even

@@ -16,7 +16,7 @@ params:
     - "profile.suite.realtime.platform"
   requirements:
     # Hardware requirements
-    cpu_min_cores: 2
+    cpu_min_cores: 4
     memory_min_gib: 4.0
     # Software requirements
     os_type:
@@ -135,6 +135,57 @@ suites:
                       enabled: true
                 telemetry:
                   enabled: false
+
+      - name: "performance"
+        tests:
+          test_cyclictest:
+            params:
+              - test_id: "ROB-CYC-001"
+                display_name: "RT Wakeup Latency (Robotics)"
+                description: >
+                  Measures worst-case RT wakeup latency using cyclictest pinned
+                  to the designated RT core (CPU 11) while stress-ng loads
+                  non-RT cores.  CAT L3 cache partitioning and C-state disable
+                  are applied before the run to eliminate shared-cache
+                  contention and wake-from-sleep jitter.
+                  Key metric: max_latency_us (µs, lower is better).
+
+                # --- cyclictest parameters ---
+                cyclic_cpu_affinity:
+                  - 11               # RT thread core for robotics RT tasks
+                cyclic_priority: 99
+                cyclic_interval_us: 250
+                cyclic_histogram_us: 700
+                cyclic_mlock: true
+                cyclic_duration: "24h"
+
+                # --- CAT optimization ---
+                cat_enabled: true
+                cat_rt_clos: 1
+
+                # --- C-state optimization ---
+                cstate_disable_enabled: true
+                cstate_max_latency_us: 0
+
+                # Main-thread affinity — pins cyclictest's parent (main) thread
+                # to avoid scheduling jitter on the RT core.
+                cyclic_main_affinity: 10
+
+                requirements:
+                  cpu_min_cores: 16  # Core 11 (RT) must be present; needs 16+ cores
+
+                # --- concurrent stress-ng parameters ---
+                stress_enabled: true
+                stress_cpu_affinity:
+                  - 0
+                  - 1
+                  - 2
+                  - 3
+                  - 4
+                  - 5
+                  - 6
+                  - 7
+                stress_cpu_load: 100
 
   - name: "vertical"
     sub_suites:

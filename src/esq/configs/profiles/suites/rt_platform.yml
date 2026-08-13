@@ -1,0 +1,152 @@
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+name: "profile.suite.realtime.platform"
+description: "Real-time platform capability detection and configuration checks"
+version: "1.0.0"
+params:
+  labels:
+    profile_display_name: "Real-Time Platform"
+    group: "realtime.platform"
+    type: "suite"
+    display_status: false
+  requirements:
+    # Hardware requirements
+    cpu_min_cores: 2
+    memory_min_gib: 2.0
+    # Software requirements
+    os_type:
+      - "linux"
+
+suites:
+  - name: "realtime"
+    sub_suites:
+      - name: "platform"
+        tests:
+          # -----------------------------------------------------------------
+          test_preempt_rt:
+            params:
+              - test_id: "RT-KRN-001"
+                display_name: "PREEMPT-RT Kernel Check"
+                description: |
+                  Verifies the running Linux kernel provides full real-time
+                  preemption (PREEMPT_RT), required for deterministic
+                  low-latency workloads. Detected via
+                  CONFIG_PREEMPT_RT=y in /boot/config-<release>.
+                timeout: 60
+
+          test_tsn:
+            params:
+              - test_id: "RT-TSN-001"
+                display_name: "TSN Detection"
+                description: |
+                  Detects Time-Sensitive Networking capabilities: Ethernet
+                  interfaces using the Intel igc driver with PTP hardware
+                  clock association via PCI sysfs paths.
+                timeout: 120
+
+          test_tsc_clocksource:
+            params:
+              - test_id: "RT-TSC-001"
+                display_name: "TSC Active Clocksource"
+                description: |
+                  Verifies TSC is the active kernel clocksource, indicating
+                  the platform is configured for deterministic timing.
+                timeout: 30
+
+          test_pci_multi_vc:
+            params:
+              - test_id: "RT-PCI-001"
+                display_name: "PCI Multi-VC Detection"
+                description: |
+                  Counts PCIe devices with VC extended capability and Extended
+                  VC Count >= 1. On Intel TCC platforms with Multi Virtual
+                  Channel enabled, additional VCs provide a dedicated real-time
+                  traffic queue for deterministic memory-access latency.
+                timeout: 30
+
+          test_cat_config:
+            params:
+              - test_id: "RT-CAT-001"
+                display_name: "L3/L2 CAT Configuration"
+                description: |
+                  Detects whether Intel CAT cache partitioning is active.
+                  Reads CLOS assignments and L3/L2 bitmasks via MSR registers.
+                  Skips if MSR access prerequisites are not met — refer to
+                  the installation guide to run system-setup-rt.sh.
+                timeout: 60
+
+          test_cstate:
+            params:
+              - test: "test_cstate_rt_check"
+                test_id: "RT-CST-001"
+                display_name: "RT Core C-State Disabled"
+                description: |
+                  Verifies C-states with non-zero exit latency are disabled on
+                  isolated RT cores. C-states cause scheduling jitter — the core
+                  must wake from sleep before running the RT task. Keeping RT
+                  cores in C0/POLL eliminates this jitter source.
+                  Requires isolcpus= in kernel boot params; skips if absent.
+                  Key metric: rt_cores_cstate_disabled
+                  (1 = jitter eliminated, 0 = C-states still active).
+                # rt_cpu_ids: optional — restrict check to specific RT-task cores.
+                # Omit to check ALL cores listed in the isolcpus kernel parameter.
+                # Example: uncomment to target only cores 2 and 3 when isolcpus=2-5:
+                # rt_cpu_ids:
+                #   - 2
+                #   - 3
+                rt_cstate_max_latency_us: 0  # Only POLL (latency=0µs) is acceptable
+                timeout: 60
+
+          test_timer_migration:
+            params:
+              - test_id: "RT-TMR-001"
+                display_name: "Timer Migration Disabled"
+                description: |
+                  Checks whether kernel timer migration is disabled. Timer
+                  migration moves timer callbacks from one CPU to another for
+                  power management, but can place timers on isolated RT cores,
+                  introducing unexpected interrupt overhead and latency jitter.
+                  Disabling timer migration (/proc/sys/kernel/timer_migration=0)
+                  keeps timers on their origin CPU and eliminates this jitter source.
+                  Key metric: timer_migration_disabled
+                  (1 = disabled = RT-safe, 0 = enabled or unavailable).
+                timeout: 30
+
+          test_cpufreq:
+            params:
+              - test: "test_energy_perf_pref_check"
+                test_id: "RT-FRQ-001"
+                display_name: "Energy Performance Preference"
+                description: |
+                  Reads the global CPU energy/performance preference using
+                  cpufreq sysfs data (no isolcpus required).
+                  Priority: EPP string (modern intel_pstate HWP mode) converted
+                  to a 0–15 integer; legacy EPB sysfs as fallback (-1 = unavailable).
+                  0 = performance (no power-saving), 15 = power (maximum
+                  power-saving), -1 = unavailable (neither interface present).
+                  Key metric: energy_perf_pref.
+                timeout: 30
+
+              - test: "test_cpufreq_rt_check"
+                test_id: "RT-FRQ-002"
+                display_name: "RT Core CPU Frequency Scaling Governor"
+                description: |
+                  Verifies that the CPU frequency scaling governor on isolated
+                  RT cores is set to 'performance', preventing the kernel from
+                  dynamically scaling CPU frequency during RT workloads.
+                  Frequency scaling causes P-state transitions that add 10–100 µs
+                  of latency before an RT thread executes at full CPU speed.
+                  Keeping RT cores on the 'performance' governor eliminates
+                  this jitter source.
+                  Requires isolcpus= in kernel boot params; skips if absent.
+                  Key metric: rt_cores_cpufreq_performance
+                  (1 = all RT cores use performance governor, 0 = at least one differs).
+                # rt_cpu_ids: optional — restrict check to specific RT-task cores.
+                # Omit to check ALL cores listed in the isolcpus kernel parameter.
+                # Example: uncomment to target only cores 2 and 3 when isolcpus=2-5:
+                # rt_cpu_ids:
+                #   - 2
+                #   - 3
+                # rt_cpufreq_expected_governor: "performance"  # default
+                timeout: 30

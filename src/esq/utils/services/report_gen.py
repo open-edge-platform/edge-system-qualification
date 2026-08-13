@@ -193,7 +193,7 @@ def _format_numeric(value: ValueType, decimals: int = 4) -> str:
 
 def ensure_timeseries_report_paths(base_dir: str) -> Dict[str, str]:
     """Create report output directory and return artifact paths."""
-    report_dir = Path(base_dir) / "data" / "suites" / "ai" / "timeseries" / "wt" / "results"
+    report_dir = Path(base_dir) / "data" / "manufacturing" / "timeseries" / "wt" / "results"
     report_dir.mkdir(parents=True, exist_ok=True)
 
     return {

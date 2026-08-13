@@ -40,7 +40,7 @@ services:
     ports:
       - "127.0.0.1:1883:1883"
     volumes:
-      - ${REFERENCE_APP_SRC_PATH:-${CORE_DATA_DIR:-./esq_data}/data/suites/ai/timeseries/wt/assets}/configs/mqtt-broker/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ${REFERENCE_APP_SRC_PATH:-${CORE_DATA_DIR:-./esq_data}/data/manufacturing/timeseries/wt/assets}/configs/mqtt-broker/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
 
   ia-opcua-server:
     image: ${DOCKER_REGISTRY:-}intel/ia-opcua-server:${IMAGE_SUFFIX:-1.1.0}
@@ -54,7 +54,7 @@ services:
     tmpfs:
       - /tmp
     volumes:
-      - ${TIMESERIES_ASSETS_DIR:-${CORE_DATA_DIR:-./esq_data}/data/suites/ai/timeseries/wt/assets/apps/wind-turbine-anomaly-detection/simulation-data}:/app/simulation-data:ro
+      - ${TIMESERIES_ASSETS_DIR:-${CORE_DATA_DIR:-./esq_data}/data/manufacturing/timeseries/wt/assets/apps/wind-turbine-anomaly-detection/simulation-data}:/app/simulation-data:ro
     environment:
       TS_MS_SERVER: ia-time-series-analytics-microservice
       TS_MS_PORT: 9092
@@ -88,8 +88,8 @@ services:
       - --subsample
       - ${MQTT_PUBLISHER_SUBSAMPLE:-1}
     volumes:
-      - ${TIMESERIES_ASSETS_DIR:-${CORE_DATA_DIR:-./esq_data}/data/suites/ai/timeseries/wt/assets/apps/wind-turbine-anomaly-detection/simulation-data}:/app/simulation-data:ro
-      - ${TIMESERIES_ASSETS_DIR:-${CORE_DATA_DIR:-./esq_data}/data/suites/ai/timeseries/wt/assets/apps/wind-turbine-anomaly-detection/simulation-data}:/simulation-data:ro
+      - ${TIMESERIES_ASSETS_DIR:-${CORE_DATA_DIR:-./esq_data}/data/manufacturing/timeseries/wt/assets/apps/wind-turbine-anomaly-detection/simulation-data}:/app/simulation-data:ro
+      - ${TIMESERIES_ASSETS_DIR:-${CORE_DATA_DIR:-./esq_data}/data/manufacturing/timeseries/wt/assets/apps/wind-turbine-anomaly-detection/simulation-data}:/simulation-data:ro
     environment:
       AppName: "mqtt-publisher"
       HOST_IP: ${MQTT_BROKER_HOST:-ia-mqtt-broker}
@@ -137,11 +137,10 @@ services:
       NO_PROXY: "127.0.0.1,localhost,ia-influxdb,ia-mqtt-broker,ia-time-series-analytics-microservice"
       no_proxy: "127.0.0.1,localhost,ia-influxdb,ia-mqtt-broker,ia-time-series-analytics-microservice"
     volumes:
-      - ${REFERENCE_APP_SRC_PATH:-${CORE_DATA_DIR:-./esq_data}/data/suites/ai/timeseries/wt/assets}/apps/${SAMPLE_APP:-wind-turbine-anomaly-detection}/time-series-analytics-config/udfs/:/tmp/${SAMPLE_APP:-wind-turbine-anomaly-detection}/udfs/:ro
-      - ./configs/empty-requirements.txt:/tmp/${SAMPLE_APP:-wind-turbine-anomaly-detection}/udfs/requirements.txt:ro
-      - ${REFERENCE_APP_SRC_PATH:-${CORE_DATA_DIR:-./esq_data}/data/suites/ai/timeseries/wt/assets}/apps/${SAMPLE_APP:-wind-turbine-anomaly-detection}/time-series-analytics-config/tick_scripts/:/tmp/${SAMPLE_APP:-wind-turbine-anomaly-detection}/tick_scripts/:ro
-      - ${REFERENCE_APP_SRC_PATH:-${CORE_DATA_DIR:-./esq_data}/data/suites/ai/timeseries/wt/assets}/apps/${SAMPLE_APP:-wind-turbine-anomaly-detection}/time-series-analytics-config/config.json:/app/config.json:ro
-      - ${REFERENCE_APP_SRC_PATH:-${CORE_DATA_DIR:-./esq_data}/data/suites/ai/timeseries/wt/assets}/apps/${SAMPLE_APP:-wind-turbine-anomaly-detection}/time-series-analytics-config/models/:/tmp/${SAMPLE_APP:-wind-turbine-anomaly-detection}/models/:ro
+      - ${REFERENCE_APP_SRC_PATH:-${CORE_DATA_DIR:-./esq_data}/data/manufacturing/timeseries/wt/assets}/apps/${SAMPLE_APP:-wind-turbine-anomaly-detection}/time-series-analytics-config/udfs/:/tmp/${SAMPLE_APP:-wind-turbine-anomaly-detection}/udfs/:ro
+      - ${REFERENCE_APP_SRC_PATH:-${CORE_DATA_DIR:-./esq_data}/data/manufacturing/timeseries/wt/assets}/apps/${SAMPLE_APP:-wind-turbine-anomaly-detection}/time-series-analytics-config/tick_scripts/:/tmp/${SAMPLE_APP:-wind-turbine-anomaly-detection}/tick_scripts/:ro
+      - ${REFERENCE_APP_SRC_PATH:-${CORE_DATA_DIR:-./esq_data}/data/manufacturing/timeseries/wt/assets}/apps/${SAMPLE_APP:-wind-turbine-anomaly-detection}/time-series-analytics-config/config.json:/app/config.json:ro
+      - ${REFERENCE_APP_SRC_PATH:-${CORE_DATA_DIR:-./esq_data}/data/manufacturing/timeseries/wt/assets}/apps/${SAMPLE_APP:-wind-turbine-anomaly-detection}/time-series-analytics-config/models/:/tmp/${SAMPLE_APP:-wind-turbine-anomaly-detection}/models/:ro
     depends_on:
       - ia-influxdb
       - ia-mqtt-broker
@@ -176,8 +175,8 @@ services:
       NO_PROXY: "127.0.0.1,localhost,ia-influxdb,ia-mqtt-broker,ia-opcua-server,ia-time-series-analytics-microservice"
       no_proxy: "127.0.0.1,localhost,ia-influxdb,ia-mqtt-broker,ia-opcua-server,ia-time-series-analytics-microservice"
     volumes:
-      - ${REFERENCE_APP_SRC_PATH:-${CORE_DATA_DIR:-./esq_data}/data/suites/ai/timeseries/wt/assets}/configs/telegraf/entrypoint.sh:/entrypoint.sh:ro
-      - ${TELEGRAF_CONFIG_DIR:-${CORE_DATA_DIR:-./esq_data}/data/suites/ai/timeseries/wt/assets/apps/wind-turbine-anomaly-detection/telegraf-config}:/etc/telegraf:ro
+      - ${REFERENCE_APP_SRC_PATH:-${CORE_DATA_DIR:-./esq_data}/data/manufacturing/timeseries/wt/assets}/configs/telegraf/entrypoint.sh:/entrypoint.sh:ro
+      - ${TELEGRAF_CONFIG_DIR:-${CORE_DATA_DIR:-./esq_data}/data/manufacturing/timeseries/wt/assets/apps/wind-turbine-anomaly-detection/telegraf-config}:/etc/telegraf:ro
     depends_on:
       - ia-influxdb
       - ia-time-series-analytics-microservice

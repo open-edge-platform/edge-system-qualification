@@ -180,7 +180,6 @@ suites:
                   igpu_required: true
                 kpi_refs:
                   - streams_max
-
               - test_id: "MFG-PDD-003"
                 display_name: "Pallet Defect Detection - multi-stream 480p30 H.264 gvadetect YOLOX-TINY INT8 (dGPU)"
                 target_fps: 29.5
@@ -194,7 +193,6 @@ suites:
                   dgpu_required: true
                 kpi_refs:
                   - streams_max
-
               # Pallet Defect Detection - FP32 variants
               - test_id: "MFG-PDD-004"
                 display_name: "Pallet Defect Detection - multi-stream 480p30 H.264 gvadetect YOLOX-TINY FP32 (CPU)"
@@ -207,7 +205,6 @@ suites:
                 devices: [cpu]
                 kpi_refs:
                   - streams_max
-
               - test_id: "MFG-PDD-005"
                 display_name: "Pallet Defect Detection - multi-stream 480p30 H.264 gvadetect YOLOX-TINY FP32 (iGPU)"
                 target_fps: 29.5
@@ -235,7 +232,6 @@ suites:
                   dgpu_required: true
                 kpi_refs:
                   - streams_max
-
               # Pallet Defect Detection - FP16 variants
               - test_id: "MFG-PDD-007"
                 display_name: "Pallet Defect Detection - multi-stream 480p30 H.264 gvadetect YOLOX-TINY FP16 (CPU)"

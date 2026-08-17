@@ -29,79 +29,78 @@ params:
       sha256: "bd03e671f0cbf8bfc32dae80a11e08a3ff9c3ec5edf6871a26c861bfd6e6af7b"
     # Model assets
     # Pallet Defect Detection (PDD) - YOLOX-TINY (INT8 / FP16 / FP32) from open-edge-platform/edge-ai-resources
-    # Model commit: b943adcf240e22c5c2942a59909982ee2f103f92
+    # Model commit: 474b3a33e9108ef81c8213cac1c230ee40a30db8
     - id: "pallet_defect_detection_int8"
       type: "model"
       source: "zip"
-      url: "https://github.com/open-edge-platform/edge-ai-resources/raw/b943adcf240e22c5c2942a59909982ee2f103f92/models/INT8/pallet_defect_detection.zip"
-      sha256: "d8a5cb812421740777723652840555eaa9ad70e5a68bfe1aa717f37b47eb1059"
+      url: "https://github.com/open-edge-platform/edge-ai-resources/raw/474b3a33e9108ef81c8213cac1c230ee40a30db8/models/INT8/pallet_defect_detection.zip"
+      sha256: "da1bc01cc9b7f9c72d8bc6012fac506d9b93d01dcd2a01de494ef1db2e77cb30"
       precision: "int8"
       format: "openvino"
     - id: "pallet_defect_detection_fp16"
       type: "model"
       source: "zip"
-      url: "https://github.com/open-edge-platform/edge-ai-resources/raw/b943adcf240e22c5c2942a59909982ee2f103f92/models/FP16/pallet_defect_detection.zip"
-      sha256: "ab18da2dd5b589f708b479d40f579b161a61dcca0b3d179e920dc6b397a7f559"
+      url: "https://github.com/open-edge-platform/edge-ai-resources/raw/474b3a33e9108ef81c8213cac1c230ee40a30db8/models/FP16/pallet_defect_detection.zip"
+      sha256: "7e993dd9b63670fc5331ddd66487348708b573df892dc98080e598462a8ec3a0"
       precision: "fp16"
       format: "openvino"
     - id: "pallet_defect_detection_fp32"
       type: "model"
       source: "zip"
-      url: "https://github.com/open-edge-platform/edge-ai-resources/raw/b943adcf240e22c5c2942a59909982ee2f103f92/models/FP32/pallet_defect_detection.zip"
-      sha256: "448a081061ebf127edae08d0e8dbaba07dfe120121a96e5910cf09762c4af51c"
+      url: "https://github.com/open-edge-platform/edge-ai-resources/raw/474b3a33e9108ef81c8213cac1c230ee40a30db8/models/FP32/pallet_defect_detection.zip"
+      sha256: "fc734de071ee6ed0fb62d1da959d66408de73ad0841696c99db14e6a4f23febd"
       precision: "fp32"
       format: "openvino"
     # Weld Porosity Classification (WPC) - EfficientNet-B0 (INT8 / FP16 / FP32) from open-edge-platform/edge-ai-resources
-    # Model commit: b943adcf240e22c5c2942a59909982ee2f103f92
+    # Model commit: 474b3a33e9108ef81c8213cac1c230ee40a30db8
     - id: "weld_porosity_classification_int8"
       type: "model"
       source: "zip"
-      url: "https://github.com/open-edge-platform/edge-ai-resources/raw/b943adcf240e22c5c2942a59909982ee2f103f92/models/INT8/weld_porosity_classification.zip"
-      sha256: "ae4c642df912525fa1b6e87583c33f751f6600a4ccad3021f10690cfe73a7ebd"
+      url: "https://github.com/open-edge-platform/edge-ai-resources/raw/474b3a33e9108ef81c8213cac1c230ee40a30db8/models/INT8/weld_porosity_classification.zip"
+      sha256: "555d1859e3855024a710fe38e9782829e4e6144efab63f7a61e05ebf56c7c02c"
       precision: "int8"
       format: "openvino"
     - id: "weld_porosity_classification_fp16"
       type: "model"
       source: "zip"
-      url: "https://github.com/open-edge-platform/edge-ai-resources/raw/b943adcf240e22c5c2942a59909982ee2f103f92/models/FP16/weld_porosity_classification.zip"
-      sha256: "05329350a13163d4cc7481ba4e42b2f08be06686293ba41d8820eebaf4718b03"
+      url: "https://github.com/open-edge-platform/edge-ai-resources/raw/474b3a33e9108ef81c8213cac1c230ee40a30db8/models/FP16/weld_porosity_classification.zip"
+      sha256: "ebc0603f91eba9f1df5d38c66f90a4d80d4b77c83dda0dc97e3c4b02a1a5ad6a"
       precision: "fp16"
       format: "openvino"
     - id: "weld_porosity_classification_fp32"
       type: "model"
       source: "zip"
-      url: "https://github.com/open-edge-platform/edge-ai-resources/raw/b943adcf240e22c5c2942a59909982ee2f103f92/models/FP32/weld_porosity_classification.zip"
-      sha256: "ed26b1684a7132cc3b8f7bd1b1cefa7c33b3fa444c767b19a8eb4e23f43aaa8d"
+      url: "https://github.com/open-edge-platform/edge-ai-resources/raw/474b3a33e9108ef81c8213cac1c230ee40a30db8/models/FP32/weld_porosity_classification.zip"
+      sha256: "7209e93ffac317eccf21eca82372faf2f3a104f95a04645b2046f312a22fa9eb"
       precision: "fp32"
       format: "openvino"
   pipeline_params:
-    # PDD baseline reference (upstream team config):
-    # https://github.com/open-edge-platform/edge-ai-suites/blob/fb66a5fab8bd69acfc3eefb73c6e6678d7d16be2/manufacturing-ai-suite/industrial-edge-insights-vision/apps/pallet-defect-detection/configs/pipeline-server-config.json
-    # Note: ESQ profile applies local tuning/adjustments (for example decode strategy and benchmark-oriented composition).
+    # PDD baseline reference (upstream team config, OEP 2026.1):
+    # https://github.com/open-edge-platform/edge-ai-suites/blob/a6b9af8a1c8f6197b06e7001dc1ae7c6a5e234e7/manufacturing-ai-suite/industrial-edge-insights-vision/apps/pallet-defect-detection/configs/pipeline-server-config.json
     PDD_DECODE_ELEMENTS:
       default: "decodebin3"
-      cpu: "decodebin ! videoconvert"
-      npu: "parsebin ! vah264dec ! 'video/x-raw(memory:VAMemory)'"
-      igpu: "parsebin ! va${RENDER_DEVICE}h264dec ! va${RENDER_DEVICE}postproc ! 'video/x-raw(memory:VAMemory)'"
-      dgpu: "parsebin ! va${RENDER_DEVICE}h264dec ! 'video/x-raw(memory:VAMemory)'"
+      cpu: "decodebin3"
+      npu: "decodebin3"
+      igpu: "decodebin3"
+      dgpu: "decodebin3"
     PDD_INFERENCE_ELEMENTS:
       default: "model-instance-id=inst0"
-      cpu: "pre-process-backend=opencv model-instance-id=inst0"
-      npu: "pre-process-backend=va model-instance-id=inst0"
-      igpu: "model-instance-id=instgpu0 inference-region=full-frame inference-interval=1 batch-size=8 nireq=2 ie-config=\"GPU_THROUGHPUT_STREAMS=2\" threshold=0.7 pre-process-backend=va-surface-sharing"
-      dgpu: "pre-process-backend=va-surface-sharing model-instance-id=inst0"
+      cpu: "model-instance-id=inst0 threshold=0.4"
+      npu: "model-instance-id=instnpu0 inference-region=full-frame inference-interval=1 batch-size=1 nireq=4 threshold=0.4"
+      igpu: "model-instance-id=instgpu0 inference-region=full-frame inference-interval=1 batch-size=8 nireq=2 ie-config=\"GPU_THROUGHPUT_STREAMS=2\" threshold=0.4"
+      dgpu: "model-instance-id=instgpu0 inference-region=full-frame inference-interval=1 batch-size=8 nireq=2 ie-config=\"GPU_THROUGHPUT_STREAMS=2\" threshold=0.4"
     WELD_DECODE_ELEMENTS:
-      default: "decodebin ! videoconvert"
-      cpu: "decodebin ! videoconvert"
-      npu: "parsebin ! vah264dec ! 'video/x-raw(memory:VAMemory)'"
-      igpu: "parsebin ! va${RENDER_DEVICE}h264dec ! va${RENDER_DEVICE}postproc ! 'video/x-raw(memory:VAMemory)'"
-      dgpu: "parsebin ! va${RENDER_DEVICE}h264dec ! 'video/x-raw(memory:VAMemory)'"
+      default: "decodebin3"
+      cpu: "decodebin3"
+      npu: "decodebin3"
+      igpu: "decodebin3"
+      dgpu: "decodebin3"
     WELD_INFERENCE_ELEMENTS:
-      default: "pre-process-backend=opencv model-instance-id=inst0"
-      cpu: "pre-process-backend=opencv model-instance-id=inst0"
-      npu: "pre-process-backend=va"
-      igpu: "pre-process-backend=va-surface-sharing model-instance-id=inst0"
-      dgpu: "pre-process-backend=va-surface-sharing"
+      default: "inference-region=full-frame model-instance-id=inst0"
+      cpu: "inference-region=full-frame model-instance-id=inst0"
+      npu: "inference-region=full-frame model-instance-id=instnpu0 inference-interval=1 batch-size=1 nireq=4"
+      igpu: "inference-region=full-frame model-instance-id=instgpu0 inference-interval=1 batch-size=8 nireq=2 ie-config=\"GPU_THROUGHPUT_STREAMS=2\""
+      dgpu: "inference-region=full-frame model-instance-id=instgpu0 inference-interval=1 batch-size=8 nireq=2 ie-config=\"GPU_THROUGHPUT_STREAMS=2\""
     SINK_ELEMENT:
       default: "fakesink sync=true"
   # Modular telemetry configuration
@@ -162,7 +161,7 @@ suites:
                 pipeline: |
                   filesrc location=./videos/warehouse_30fps.avi
                     ! ${PDD_DECODE_ELEMENTS}
-                    ! gvadetect model=./models/pallet_defect_detection_int8/model.xml device=CPU ${PDD_INFERENCE_ELEMENTS}
+                    ! gvadetect model=./models/pallet_defect_detection_int8/deployment/Detection/model/model.xml device=CPU ${PDD_INFERENCE_ELEMENTS}
                     ! queue
                 devices: [cpu]
                 kpi_refs:
@@ -173,7 +172,7 @@ suites:
                 pipeline: |
                   filesrc location=./videos/warehouse_30fps.avi
                     ! ${PDD_DECODE_ELEMENTS}
-                    ! gvadetect model=./models/pallet_defect_detection_int8/model.xml device=GPU.0 ${PDD_INFERENCE_ELEMENTS}
+                    ! gvadetect model=./models/pallet_defect_detection_int8/deployment/Detection/model/model.xml device=GPU.0 ${PDD_INFERENCE_ELEMENTS}
                     ! queue
                 devices: [igpu]
                 requirements:
@@ -186,7 +185,7 @@ suites:
                 pipeline: |
                   filesrc location=./videos/warehouse_30fps.avi
                     ! ${PDD_DECODE_ELEMENTS}
-                    ! gvadetect model=./models/pallet_defect_detection_int8/model.xml device=${DEVICE_ID} ${PDD_INFERENCE_ELEMENTS}
+                    ! gvadetect model=./models/pallet_defect_detection_int8/deployment/Detection/model/model.xml device=${DEVICE_ID} ${PDD_INFERENCE_ELEMENTS}
                     ! queue
                 devices: [dgpu]
                 requirements:
@@ -200,7 +199,7 @@ suites:
                 pipeline: |
                   filesrc location=./videos/warehouse_30fps.avi
                     ! ${PDD_DECODE_ELEMENTS}
-                    ! gvadetect model=./models/pallet_defect_detection_fp32/model.xml device=CPU ${PDD_INFERENCE_ELEMENTS}
+                    ! gvadetect model=./models/pallet_defect_detection_fp32/deployment/Detection/model/model.xml device=CPU ${PDD_INFERENCE_ELEMENTS}
                     ! queue
                 devices: [cpu]
                 kpi_refs:
@@ -211,7 +210,7 @@ suites:
                 pipeline: |
                   filesrc location=./videos/warehouse_30fps.avi
                     ! ${PDD_DECODE_ELEMENTS}
-                    ! gvadetect model=./models/pallet_defect_detection_fp32/model.xml device=GPU.0 ${PDD_INFERENCE_ELEMENTS}
+                    ! gvadetect model=./models/pallet_defect_detection_fp32/deployment/Detection/model/model.xml device=GPU.0 ${PDD_INFERENCE_ELEMENTS}
                     ! queue
                 devices: [igpu]
                 requirements:
@@ -225,7 +224,7 @@ suites:
                 pipeline: |
                   filesrc location=./videos/warehouse_30fps.avi
                     ! ${PDD_DECODE_ELEMENTS}
-                    ! gvadetect model=./models/pallet_defect_detection_fp32/model.xml device=${DEVICE_ID} ${PDD_INFERENCE_ELEMENTS}
+                    ! gvadetect model=./models/pallet_defect_detection_fp32/deployment/Detection/model/model.xml device=${DEVICE_ID} ${PDD_INFERENCE_ELEMENTS}
                     ! queue
                 devices: [dgpu]
                 requirements:
@@ -239,7 +238,7 @@ suites:
                 pipeline: |
                   filesrc location=./videos/warehouse_30fps.avi
                     ! ${PDD_DECODE_ELEMENTS}
-                    ! gvadetect model=./models/pallet_defect_detection_fp16/model.xml device=CPU ${PDD_INFERENCE_ELEMENTS}
+                    ! gvadetect model=./models/pallet_defect_detection_fp16/deployment/Detection/model/model.xml device=CPU ${PDD_INFERENCE_ELEMENTS}
                     ! queue
                 devices: [cpu]
                 kpi_refs:
@@ -251,7 +250,7 @@ suites:
                 pipeline: |
                   filesrc location=./videos/warehouse_30fps.avi
                     ! ${PDD_DECODE_ELEMENTS}
-                    ! gvadetect model=./models/pallet_defect_detection_fp16/model.xml device=GPU.0 ${PDD_INFERENCE_ELEMENTS}
+                    ! gvadetect model=./models/pallet_defect_detection_fp16/deployment/Detection/model/model.xml device=GPU.0 ${PDD_INFERENCE_ELEMENTS}
                     ! queue
                 devices: [igpu]
                 requirements:
@@ -265,7 +264,7 @@ suites:
                 pipeline: |
                   filesrc location=./videos/warehouse_30fps.avi
                     ! ${PDD_DECODE_ELEMENTS}
-                    ! gvadetect model=./models/pallet_defect_detection_fp16/model.xml device=${DEVICE_ID} ${PDD_INFERENCE_ELEMENTS}
+                    ! gvadetect model=./models/pallet_defect_detection_fp16/deployment/Detection/model/model.xml device=${DEVICE_ID} ${PDD_INFERENCE_ELEMENTS}
                     ! queue
                 devices: [dgpu]
                 requirements:
@@ -279,7 +278,7 @@ suites:
                 pipeline: |
                   filesrc location=./videos/welding_30fps.avi
                     ! ${WELD_DECODE_ELEMENTS}
-                    ! gvaclassify inference-region=full-frame model=./models/weld_porosity_classification_fp16/model.xml device=CPU ${WELD_INFERENCE_ELEMENTS}
+                    ! gvaclassify inference-region=full-frame model=./models/weld_porosity_classification_fp16/deployment/Classification/model/model.xml device=CPU ${WELD_INFERENCE_ELEMENTS}
                     ! queue
                 devices: [cpu]
                 kpi_refs:
@@ -291,7 +290,7 @@ suites:
                 pipeline: |
                   filesrc location=./videos/welding_30fps.avi
                     ! ${WELD_DECODE_ELEMENTS}
-                    ! gvaclassify inference-region=full-frame model=./models/weld_porosity_classification_fp16/model.xml device=GPU.0 ${WELD_INFERENCE_ELEMENTS}
+                    ! gvaclassify inference-region=full-frame model=./models/weld_porosity_classification_fp16/deployment/Classification/model/model.xml device=GPU.0 ${WELD_INFERENCE_ELEMENTS}
                     ! queue
                 devices: [igpu]
                 requirements:
@@ -306,7 +305,7 @@ suites:
                 pipeline: |
                   filesrc location=./videos/welding_30fps.avi
                     ! ${WELD_DECODE_ELEMENTS}
-                    ! gvaclassify model=./models/weld_porosity_classification_fp16/model.xml device=${DEVICE_ID} ${WELD_INFERENCE_ELEMENTS}
+                    ! gvaclassify model=./models/weld_porosity_classification_fp16/deployment/Classification/model/model.xml device=${DEVICE_ID} ${WELD_INFERENCE_ELEMENTS}
                     ! queue
                 devices: [dgpu]
                 requirements:
@@ -321,7 +320,7 @@ suites:
                 pipeline: |
                   filesrc location=./videos/welding_30fps.avi
                     ! ${WELD_DECODE_ELEMENTS}
-                    ! gvaclassify inference-region=full-frame model=./models/weld_porosity_classification_int8/model.xml device=CPU ${WELD_INFERENCE_ELEMENTS}
+                    ! gvaclassify inference-region=full-frame model=./models/weld_porosity_classification_int8/deployment/Classification/model/model.xml device=CPU ${WELD_INFERENCE_ELEMENTS}
                     ! queue
                 devices: [cpu]
                 kpi_refs:
@@ -333,7 +332,7 @@ suites:
                 pipeline: |
                   filesrc location=./videos/welding_30fps.avi
                     ! ${WELD_DECODE_ELEMENTS}
-                    ! gvaclassify inference-region=full-frame model=./models/weld_porosity_classification_int8/model.xml device=GPU.0 ${WELD_INFERENCE_ELEMENTS}
+                    ! gvaclassify inference-region=full-frame model=./models/weld_porosity_classification_int8/deployment/Classification/model/model.xml device=GPU.0 ${WELD_INFERENCE_ELEMENTS}
                     ! queue
                 devices: [igpu]
                 requirements:
@@ -348,7 +347,7 @@ suites:
                 pipeline: |
                   filesrc location=./videos/welding_30fps.avi
                     ! ${WELD_DECODE_ELEMENTS}
-                    ! gvaclassify model=./models/weld_porosity_classification_int8/model.xml device=${DEVICE_ID} ${WELD_INFERENCE_ELEMENTS}
+                    ! gvaclassify model=./models/weld_porosity_classification_int8/deployment/Classification/model/model.xml device=${DEVICE_ID} ${WELD_INFERENCE_ELEMENTS}
                     ! queue
                 devices: [dgpu]
                 requirements:
@@ -363,7 +362,7 @@ suites:
                 pipeline: |
                   filesrc location=./videos/welding_30fps.avi
                     ! ${WELD_DECODE_ELEMENTS}
-                    ! gvaclassify inference-region=full-frame model=./models/weld_porosity_classification_fp32/model.xml device=CPU ${WELD_INFERENCE_ELEMENTS}
+                    ! gvaclassify inference-region=full-frame model=./models/weld_porosity_classification_fp32/deployment/Classification/model/model.xml device=CPU ${WELD_INFERENCE_ELEMENTS}
                     ! queue
                 devices: [cpu]
                 kpi_refs:
@@ -375,7 +374,7 @@ suites:
                 pipeline: |
                   filesrc location=./videos/welding_30fps.avi
                     ! ${WELD_DECODE_ELEMENTS}
-                    ! gvaclassify inference-region=full-frame model=./models/weld_porosity_classification_fp32/model.xml device=GPU.0 ${WELD_INFERENCE_ELEMENTS}
+                    ! gvaclassify inference-region=full-frame model=./models/weld_porosity_classification_fp32/deployment/Classification/model/model.xml device=GPU.0 ${WELD_INFERENCE_ELEMENTS}
                     ! queue
                 devices: [igpu]
                 requirements:
@@ -390,7 +389,7 @@ suites:
                 pipeline: |
                   filesrc location=./videos/welding_30fps.avi
                     ! ${WELD_DECODE_ELEMENTS}
-                    ! gvaclassify model=./models/weld_porosity_classification_fp32/model.xml device=${DEVICE_ID} ${WELD_INFERENCE_ELEMENTS}
+                    ! gvaclassify model=./models/weld_porosity_classification_fp32/deployment/Classification/model/model.xml device=${DEVICE_ID} ${WELD_INFERENCE_ELEMENTS}
                     ! queue
                 devices: [dgpu]
                 requirements:

@@ -13,7 +13,7 @@ import logging
 import os
 import signal
 import sys
-from typing import Any, Dict, List
+from typing import Any
 
 # Import sysagent's low-level execution functions (generic, reusable)
 from sysagent.utils.cli.commands.run import (
@@ -425,13 +425,13 @@ def run_tests(
     suites_dir: str = None,
     skip_system_check: bool = False,
     no_cache: bool = False,
-    filters: List[str] = None,
+    filters: list[str] = None,
     run_all_profiles: bool = False,
     qualification_only: bool = False,
     force: bool = False,
     no_mask: bool = False,
-    set_prompt: List[str] = None,
-    extra_args: List[str] = None,
+    set_prompt: list[str] = None,
+    extra_args: list[str] = None,
     telemetry_interval: int = None,
 ) -> int:
     """
@@ -587,12 +587,12 @@ def run_tests(
 
 def _run_profile_tests_esq(
     profile_name: str,
-    pytest_args: List[str],
+    pytest_args: list[str],
     skip_system_check: bool,
     data_dir: str,
     verbose: bool = False,
     debug: bool = False,
-    filters: Dict[str, Any] = None,
+    filters: dict[str, Any] = None,
     force: bool = False,
 ) -> tuple:
     """
@@ -821,9 +821,12 @@ def _run_all_profiles_esq(
                         # Include qualification profiles that either pass the system compatibility
                         # check or do not opt-in to it
                         requires_sys_compat = labels.get("system_compatibility", False)
-                        if is_qualification and (not skip_qualification or not requires_sys_compat):
-                            requested_profile_names.append(profile_name)
-                        elif is_vertical and not skip_vertical_profiles:
+                        if (
+                            is_qualification
+                            and (not skip_qualification or not requires_sys_compat)
+                            or is_vertical
+                            and not skip_vertical_profiles
+                        ):
                             requested_profile_names.append(profile_name)
 
     if not requested_profile_names:
@@ -888,14 +891,16 @@ def _run_all_profiles_esq(
     valid_profiles, failed_profiles = _validate_all_profiles(all_profile_items, skip_system_check)
 
     if failed_profiles:
-        logger.info("")
-        logger.info("═" * 70)
-        logger.info("Profile Validation Summary")
-        logger.info("═" * 70)
-        logger.info(f"Failed profiles ({len(failed_profiles)}):")
+        # Logged at WARNING level so the summary is visible even in non-verbose
+        # mode, matching the per-profile validation failure details above.
+        logger.warning("")
+        logger.warning("═" * 70)
+        logger.warning("Profile Validation Summary")
+        logger.warning("═" * 70)
+        logger.warning(f"Failed profiles ({len(failed_profiles)}):")
         for name in failed_profiles:
-            logger.info(f"  ✗ {name}")
-        logger.info("")
+            logger.warning(f"  ✗ {name}")
+        logger.warning("")
         logger.error("Some profiles failed validation. Aborting test run.")
         return 1, False
 

@@ -196,6 +196,14 @@ params:
           throughput_tokens_per_sec: 44
           first_token_latency_ms: 238
           perf_per_watt: 0.53
+        - device_sku: "Intel ARC B70"
+          type: "dGPU"
+          model: "Qwen3-32B"
+          precision: "INT4"
+          batch_size: 1
+          throughput_tokens_per_sec: 27
+          first_token_latency_ms: 327
+          perf_per_watt: "N/A"
     vision_ai:
       # Column mappings for CSV headers (human-readable labels)
       columns:

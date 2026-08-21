@@ -9,13 +9,13 @@ across different validation contexts, showing required vs actual values.
 """
 
 import logging
-from typing import Any, Dict, List
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
 def log_failed_requirements(
-    failed_checks: List[Dict[str, Any]], context: str = "validation", deduplicate_by_category: bool = False
+    failed_checks: list[dict[str, Any]], context: str = "validation", deduplicate_by_category: bool = False
 ) -> None:
     """
     Log failed system requirements showing required vs actual values.
@@ -34,14 +34,17 @@ def log_failed_requirements(
         checks_to_process = _deduplicate_checks_by_category(failed_checks)
 
     # Format header based on context type
+    # Logged at WARNING level (rather than INFO) so these details are always
+    # visible on the console, even in non-verbose mode, since they explain
+    # why a profile/test run was aborted.
     if context.startswith("profile:"):
         profile_name = context.split(":", 1)[1].strip()
-        logger.info("")
-        logger.info(f"╭─ Validation Failed: {profile_name}")
-        logger.info(f"│  Missing requirements ({len(checks_to_process)}):")
+        logger.warning("")
+        logger.warning(f"╭─ Validation Failed: {profile_name}")
+        logger.warning(f"│  Missing requirements ({len(checks_to_process)}):")
     else:
-        logger.info("")
-        logger.info(f"Missing requirements ({context}):")
+        logger.warning("")
+        logger.warning(f"Missing requirements ({context}):")
 
     for check in checks_to_process:
         category = check.get("category", "")
@@ -51,10 +54,10 @@ def log_failed_requirements(
 
     # Add bottom border for profile context
     if context.startswith("profile:"):
-        logger.info("╰─")
+        logger.warning("╰─")
 
 
-def _deduplicate_checks_by_category(failed_checks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def _deduplicate_checks_by_category(failed_checks: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """
     Remove duplicate checks based on category to avoid redundant messages.
 
@@ -78,7 +81,7 @@ def _deduplicate_checks_by_category(failed_checks: List[Dict[str, Any]]) -> List
 
 
 def _log_requirement_failure(
-    category: str, name: str, check: Dict[str, Any], is_in_profile_context: bool = False
+    category: str, name: str, check: dict[str, Any], is_in_profile_context: bool = False
 ) -> None:
     """
     Log a single failed requirement showing required vs actual values.
@@ -100,14 +103,14 @@ def _log_requirement_failure(
         "software.python_packages.required",
     }
     if category in _name_only_categories:
-        logger.info(f"{prefix}• {name}")
+        logger.warning(f"{prefix}• {name}")
     else:
         required = check.get("required", "")
         actual = check.get("actual", "")
-        logger.info(f"{prefix}• Required: {required} | Actual: {actual}")
+        logger.warning(f"{prefix}• Required: {required} | Actual: {actual}")
 
 
-def format_requirement_failure(category: str, name: str, check: Dict[str, Any]) -> List[str]:
+def format_requirement_failure(category: str, name: str, check: dict[str, Any]) -> list[str]:
     """
     Format a failed requirement as a list of strings (for testing or other uses).
 

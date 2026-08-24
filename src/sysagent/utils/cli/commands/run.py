@@ -14,7 +14,7 @@ import os
 import signal
 import sys
 import time
-from typing import Any, Dict, List
+from typing import Any
 
 from sysagent.utils.cli.filters import parse_filters
 from sysagent.utils.cli.handlers import handle_interrupt
@@ -45,11 +45,11 @@ def run_tests(
     suites_dir: str = None,
     skip_system_check: bool = False,
     no_cache: bool = False,
-    filters: List[str] = None,
+    filters: list[str] = None,
     force: bool = False,
     no_mask: bool = False,
-    set_prompt: List[str] = None,
-    extra_args: List[str] = None,
+    set_prompt: list[str] = None,
+    extra_args: list[str] = None,
     run_all_profiles: bool = None,
     qualification_only: bool = None,
     telemetry_interval: int = None,
@@ -222,12 +222,12 @@ def run_tests(
 
 def _run_profile_tests(
     profile_name: str,
-    pytest_args: List[str],
+    pytest_args: list[str],
     skip_system_check: bool,
     data_dir: str,
     verbose: bool = False,
     debug: bool = False,
-    filters: Dict[str, Any] = None,
+    filters: dict[str, Any] = None,
     force: bool = False,
 ) -> tuple:
     """Run tests for a specific profile.
@@ -320,12 +320,12 @@ def _run_profile_tests(
 
 def _run_single_profile(
     profile_name: str,
-    pytest_args: List[str],
+    pytest_args: list[str],
     skip_system_check: bool,
     data_dir: str,
     verbose: bool = False,
     debug: bool = False,
-    filters: Dict[str, Any] = None,
+    filters: dict[str, Any] = None,
 ) -> tuple:
     """Run a single profile without dependency resolution.
 
@@ -489,7 +489,7 @@ def _run_single_profile(
     return overall_exit_code, True
 
 
-def _run_suite_tests(suite_name: str, sub_suite_name: str, test_name: str, pytest_args: List[str]) -> tuple:
+def _run_suite_tests(suite_name: str, sub_suite_name: str, test_name: str, pytest_args: list[str]) -> tuple:
     """Run tests for a specific suite, sub-suite, or test.
 
     Returns:
@@ -657,14 +657,16 @@ def _run_all_profiles(
     valid_profiles, failed_profiles = _validate_all_profiles(all_profile_items, skip_system_check)
 
     if failed_profiles:
-        logger.info("")
-        logger.info("═" * 70)
-        logger.info("Profile Validation Summary")
-        logger.info("═" * 70)
-        logger.info(f"Failed profiles ({len(failed_profiles)}):")
+        # Logged at WARNING level so the summary is visible even in non-verbose
+        # mode, matching the per-profile validation failure details above.
+        logger.warning("")
+        logger.warning("═" * 70)
+        logger.warning("Profile Validation Summary")
+        logger.warning("═" * 70)
+        logger.warning(f"Failed profiles ({len(failed_profiles)}):")
         for name in failed_profiles:
-            logger.info(f"  ✗ {name}")
-        logger.info("")
+            logger.warning(f"  ✗ {name}")
+        logger.warning("")
         logger.error("Some profiles failed validation. Aborting test run.")
         return 1, False
 
@@ -869,7 +871,7 @@ def _run_single_profile_in_batch(profile, data_dir: str, verbose: bool, debug: b
     return overall_result
 
 
-def _collect_test_paths_from_suites(suites, profile_venv_config=None) -> Dict[str, tuple]:
+def _collect_test_paths_from_suites(suites, profile_venv_config=None) -> dict[str, tuple]:
     """Collect test file paths from suite configurations, grouped by venv configuration.
 
     Returns:
@@ -926,7 +928,7 @@ def _collect_test_paths_from_suites(suites, profile_venv_config=None) -> Dict[st
     return venv_groups
 
 
-def _get_venv_config_for_subsuite(sub_suite: Dict[str, Any], profile_venv_config: Dict[str, Any]) -> Dict[str, Any]:
+def _get_venv_config_for_subsuite(sub_suite: dict[str, Any], profile_venv_config: dict[str, Any]) -> dict[str, Any]:
     """Get venv configuration for a sub_suite, with fallback to profile-level config.
 
     Args:

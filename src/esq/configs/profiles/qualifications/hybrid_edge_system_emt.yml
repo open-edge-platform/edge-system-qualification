@@ -11,7 +11,8 @@ params:
     type: "qualification"
     display_reference: false
     kpi_enabled: true
-    default_run: false
+    tags:
+      - "hec-emt"
   depends_on:
     - "profile.suite.system.cpu-sku"
     - "profile.suite.system.display"

@@ -69,12 +69,13 @@ Run Intel® Edge System Qualification (ESQ).
 USAGE PATTERNS:
   1. Default run (interactive prompts):
      {cli_name} run
-     • Run qualification and vertical profiles
-     • Options to skip vertical profiles
-     • Exits if system doesn't meet requirements and vertical profile is skipped
+     • Choose ONE qualification profile from a numbered list, or 'n' for none
+     • Then choose whether to include vertical profiles
+     • Exits if the system is unsupported or no valid selection is made
 
-  2. Run all profiles:
+  2. Run all profiles (data collection, not for qualification):
      {cli_name} run --all
+     • Runs every profile type (qualifications, suites, verticals) without prompts
      • Skips qualification profiles if system not supported
 
   3. Run qualification profiles only:
@@ -85,8 +86,13 @@ USAGE PATTERNS:
   4. Run specific profile:
      {cli_name} run -p PROFILE_NAME
      • Runs the specified profile with validation
-     
-  5. Run with filters:
+
+  5. Run by tag (short keyword instead of full profile name):
+     {cli_name} run -t TAG
+     • Resolves TAG to matching qualification profile(s) via labels.tags
+     • Supports multiple: {cli_name} run -t TAG1 -t TAG2
+
+  6. Run with filters:
      {cli_name} run -p PROFILE_NAME --filter test_id=T0069
 
 EXAMPLES:
@@ -94,6 +100,7 @@ EXAMPLES:
   {cli_name} run --all                                              # All profiles
   {cli_name} run --qualification-only                               # Qualification profiles only
   {cli_name} run -p profile.qualification.ai-edge-system            # Specific profile
+  {cli_name} run -t aes                                             # By tag
   {cli_name} run -p profile.suite.ai.vision --filter test_id=T0001  # Filtered test
 
 HARDWARE REQUIREMENTS:
@@ -110,19 +117,37 @@ For available profiles, use: {cli_name} list
         "--all",
         "-a",
         action="store_true",
-        help="Run all profile types after system validation (skips qualification if unsupported)",
+        help=(
+            "Run all profile types (qualifications, suites, verticals) without prompts, e.g., for data "
+            "collection. Not intended for qualifying against a specific profile (skips qualification if unsupported)"
+        ),
     )
     execution_group.add_argument(
         "--qualification-only",
         "-qo",
         action="store_true",
-        help="Run qualification profiles only (exits if system requirements not met)",
+        help=(
+            "Run qualification profiles only (exits if system requirements not met). "
+            "Combined with --profile/--tag, skips that profile's vertical_profiles entirely "
+            "(no prompt, not auto-included even with --force)"
+        ),
     )
     execution_group.add_argument(
         "--profile",
         "-p",
         metavar="PROFILE_NAME",
         help="Run a specific profile (e.g., profile.qualification.ai-edge-system)",
+    )
+    execution_group.add_argument(
+        "--tag",
+        "-t",
+        action="append",
+        metavar="TAG",
+        help=(
+            "Run profile(s) matching a short tag/keyword instead of the full profile name "
+            "(e.g., -t aes). Can be used multiple times to match multiple tags. "
+            "Cannot be combined with --profile."
+        ),
     )
 
     # Individual test selection (grouped together)
@@ -132,7 +157,7 @@ For available profiles, use: {cli_name} list
         "--sub-suite", "-ss", metavar="SUB_SUITE_NAME", help="Test sub-suite name (requires --suite, e.g., 'vision')"
     )
     test_group.add_argument(
-        "--test", "-t", metavar="TEST_NAME", help="Test name (requires --sub-suite, e.g., 'test_dlstreamer')"
+        "--test", "-tn", metavar="TEST_NAME", help="Test name (requires --sub-suite, e.g., 'test_dlstreamer')"
     )
 
     # Advanced options (grouped separately)
@@ -160,7 +185,8 @@ For available profiles, use: {cli_name} list
         metavar="KEY=VALUE",
         help=(
             "Filter tests by parameter values (e.g., --filter test_id=T0069 --filter display_name='CPU Test'). "
-            "Can be used multiple times for multiple filters."
+            "Use --filter tags=<tag> to select tests by test-level tags (comma-separate for multiple). "
+            "Requires --profile or --tag. Can be used multiple times for multiple filters."
         ),
     )
     advanced_group.add_argument(
@@ -183,7 +209,10 @@ For available profiles, use: {cli_name} list
         "--force",
         "-f",
         action="store_true",
-        help="Skip interactive prompts. If system unsupported: continue with suite/vertical profiles (skip qualification)",
+        help=(
+            "Skip interactive prompts. Runs vertical/suite profiles only; use --profile/--tag/"
+            "--qualification-only to also run a specific qualification profile"
+        ),
     )
     run_parser.add_argument(
         "--no-mask",

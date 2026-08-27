@@ -115,12 +115,6 @@ _setup_memlock_session() {
 }
 
 
-# ---------------------------------------------------------------------------
-# NOTE: RT-specific modules (Real-Time Latency Tools, MSR Tools, Kernel Tuning)
-# have been moved to system-setup-rt.sh.
-# ---------------------------------------------------------------------------
-
-
 main() {
     for arg in "$@"; do
         case "$arg" in

@@ -8,6 +8,10 @@ repo_name: open-edge-platform/edge-system-qualification
 repo_url: https://github.com/open-edge-platform/edge-system-qualification
 docs_dir: docs/
 
+# Hooks
+hooks:
+  - docs/hooks/md_import.py
+
 # Copyright
 copyright: Copyright &copy; 2025 Intel Corporation
 
@@ -107,9 +111,6 @@ markdown_extensions:
       repo: mkdocs-material
   - pymdownx.mark
   - pymdownx.smartsymbols
-  - pymdownx.snippets:
-      auto_append:
-        - includes/mkdocs.md
   - pymdownx.superfences:
       custom_fences:
         - name: mermaid
@@ -130,7 +131,22 @@ nav:
   - Home: index.md
   - Getting Started:
     - getting-started/index.md
+    - Requirements: getting-started/requirements.md
     - Quick Start: getting-started/quick-start.md
+    - Qualification:
+      - getting-started/qualifications/index.md
+      - AI Edge System:
+        - Requirements: getting-started/qualifications/ai-edge-system/requirements.md
+        - Quick Start: getting-started/qualifications/ai-edge-system/quick-start.md
+      - HEC - Debian:
+        - Requirements: getting-started/qualifications/hybrid-edge-computing-debian/requirements.md
+        - Quick Start: getting-started/qualifications/hybrid-edge-computing-debian/quick-start.md
+      - HEC - EMT:
+        - Requirements: getting-started/qualifications/hybrid-edge-computing-emt/requirements.md
+        - Quick Start: getting-started/qualifications/hybrid-edge-computing-emt/quick-start.md
+      - Robotics:
+        - Requirements: getting-started/qualifications/robotics/requirements.md
+        - Quick Start: getting-started/qualifications/robotics/quick-start.md
     - Test Suites:
       - getting-started/suites/index.md
     - Telemetry:

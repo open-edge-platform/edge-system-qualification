@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 name: "profile.qualification.robotics"
-description: "Robotics system qualification — real-time determinism, deterministic networking and TCC readiness"
+description: "Robotics system qualification"
 version: "1.0.0"
 params:
   labels:
@@ -11,7 +11,9 @@ params:
     type: "qualification"
     display_reference: false
     kpi_enabled: true
-    default_run: false
+    hidden: true
+    tags:
+      - "robotics"
   depends_on:
     - "profile.suite.realtime.platform"
   requirements:

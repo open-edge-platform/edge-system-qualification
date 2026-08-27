@@ -7,13 +7,15 @@ List command implementation.
 Handles listing all available profiles with their descriptions,
 types, and optionally their test structures.
 """
-import os
+
 import logging
+import os
 from collections import defaultdict
 
-from sysagent.utils.config import list_profiles
-from sysagent.utils.logging import setup_command_logging
 from sysagent.utils.cli.helpers import get_test_names_from_profile
+from sysagent.utils.config import list_profiles
+from sysagent.utils.config.profile_dependencies import get_profile_tags
+from sysagent.utils.logging import setup_command_logging
 
 logger = logging.getLogger(__name__)
 
@@ -49,14 +51,16 @@ def list_available_items(verbose: bool = False, debug: bool = False) -> int:
                 if not configs or not configs.get("name"):
                     logger.warning(f"Missing profile identifier in name field of {path}")
                     continue
-                all_profiles.append({
-                    "name": configs["name"],
-                    "description": configs.get("description", "No description"),
-                    "type": profile_type,
-                    "configs": configs,
-                    "file_path": path,
-                    "filename": os.path.basename(path)
-                })
+                all_profiles.append(
+                    {
+                        "name": configs["name"],
+                        "description": configs.get("description", "No description"),
+                        "type": profile_type,
+                        "configs": configs,
+                        "file_path": path,
+                        "filename": os.path.basename(path),
+                    }
+                )
 
         # Sort profiles by name
         all_profiles.sort(key=lambda x: x["name"])
@@ -68,12 +72,15 @@ def list_available_items(verbose: bool = False, debug: bool = False) -> int:
                 print(f"  Name: {profile['name']}")
                 print(f"  Type: {profile['type']}")
                 print(f"  Description: {profile['description']}")
+                tags = get_profile_tags(profile["configs"])
+                if tags:
+                    print(f"  Tags: {', '.join(tags)}")
 
                 # Extract and display test information - unified for all profile types
                 if verbose:
                     test_names = get_test_names_from_profile(profile["configs"])
                     if test_names:
-                        print(f"  Tests:")
+                        print("  Tests:")
                         suite_map = defaultdict(lambda: defaultdict(list))
                         for suite_name, sub_suite_name, test_name in test_names:
                             suite_map[suite_name][sub_suite_name].append(test_name)

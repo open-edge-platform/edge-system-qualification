@@ -48,6 +48,12 @@ setup_system_packages() {
     fi
 
     local pkgs=(
+        # Essential system utilities
+        curl
+        git
+        libgl1
+        make
+
         # Capabilities tooling — required by Module 3 (Memory DIMM Information)
         libcap2-bin
 

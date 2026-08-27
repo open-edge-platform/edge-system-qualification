@@ -53,6 +53,7 @@ def run_tests(
     run_all_profiles: bool = None,
     qualification_only: bool = None,
     telemetry_interval: int = None,
+    tags: list[str] = None,
 ) -> int:
     """
     Run tests based on profiles, suites, or specific test cases.
@@ -79,6 +80,8 @@ def run_tests(
         extra_args: Additional pytest arguments to pass
         run_all_profiles: Whether to run all profile types. Ignored in generic sysagent.
         qualification_only: Whether to run only qualification profiles. Ignored in generic sysagent.
+        tags: List of tag keywords to resolve to profile(s). Ignored in generic sysagent
+            (package-specific implementations like ESQ resolve tags to profiles).
 
     Returns:
         int: Exit code (0 for success, non-zero for failure)

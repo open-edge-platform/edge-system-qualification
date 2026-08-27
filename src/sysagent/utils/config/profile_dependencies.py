@@ -9,7 +9,7 @@ determine the correct execution order for profiles with prerequisites.
 """
 
 import logging
-from typing import Any, Dict, List
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -17,22 +17,16 @@ logger = logging.getLogger(__name__)
 class ProfileDependencyError(Exception):
     """Exception raised when profile dependency resolution fails."""
 
-    pass
-
 
 class CircularDependencyError(ProfileDependencyError):
     """Exception raised when circular dependencies are detected."""
-
-    pass
 
 
 class MissingDependencyError(ProfileDependencyError):
     """Exception raised when a required dependency profile is not found."""
 
-    pass
 
-
-def get_profile_dependencies(profile_configs: Dict[str, Any]) -> List[str]:
+def get_profile_dependencies(profile_configs: dict[str, Any]) -> list[str]:
     """
     Extract dependency list from profile configuration.
 
@@ -54,9 +48,61 @@ def get_profile_dependencies(profile_configs: Dict[str, Any]) -> List[str]:
     return depends_on
 
 
+def get_profile_tags(profile_configs: dict[str, Any]) -> list[str]:
+    """
+    Extract the short tag/keyword list from a profile's labels.
+
+    Tags are an optional `params.labels.tags` list (or single string) that let a
+    profile be selected via `--tag/-t` using a short keyword instead of its full
+    profile name.
+
+    Args:
+        profile_configs: Profile configuration dictionary
+
+    Returns:
+        List of tags (empty if none defined)
+    """
+    params = profile_configs.get("params", {})
+    labels = params.get("labels", {})
+    tags = labels.get("tags", [])
+
+    if isinstance(tags, str):
+        tags = [tags]
+    elif not isinstance(tags, list):
+        tags = []
+
+    return [str(tag) for tag in tags if tag]
+
+
+def get_profiles_matching_tags(tags: list[str], profiles: dict[str, dict[str, Any]]) -> list[str]:
+    """
+    Find profile names whose `labels.tags` intersect the requested tags.
+
+    Matching is case-insensitive. A profile matches if any of its tags equals
+    any of the requested tags, so a single `--tag` invocation can resolve to
+    multiple profiles (e.g. shared across qualification types).
+
+    Args:
+        tags: List of requested tag keywords
+        profiles: Dictionary mapping profile names to their configurations
+
+    Returns:
+        Sorted list of matching profile names (empty if no tags or no matches)
+    """
+    requested = {tag.strip().lower() for tag in tags if tag and tag.strip()}
+    if not requested:
+        return []
+
+    matched = [
+        name for name, config in profiles.items() if requested & {tag.lower() for tag in get_profile_tags(config)}
+    ]
+
+    return sorted(matched)
+
+
 def resolve_profile_dependencies(
-    profiles: Dict[str, Dict[str, Any]], requested_profiles: List[str] = None
-) -> List[str]:
+    profiles: dict[str, dict[str, Any]], requested_profiles: list[str] = None
+) -> list[str]:
     """
     Resolve profile dependencies and return execution order.
 
@@ -130,7 +176,7 @@ def resolve_profile_dependencies(
     return sorted_profiles
 
 
-def expand_profile_with_dependencies(profile_name: str, all_profiles: Dict[str, Dict[str, Any]]) -> List[str]:
+def expand_profile_with_dependencies(profile_name: str, all_profiles: dict[str, dict[str, Any]]) -> list[str]:
     """
     Expand a single profile to include all its dependencies in execution order.
 
@@ -181,7 +227,7 @@ def expand_profile_with_dependencies(profile_name: str, all_profiles: Dict[str, 
     return execution_order
 
 
-def validate_profile_dependencies(profiles: Dict[str, Dict[str, Any]]) -> List[str]:
+def validate_profile_dependencies(profiles: dict[str, dict[str, Any]]) -> list[str]:
     """
     Validate all profile dependencies and return list of issues.
 
@@ -209,7 +255,7 @@ def validate_profile_dependencies(profiles: Dict[str, Dict[str, Any]]) -> List[s
     return errors
 
 
-def get_dependency_tree(profile_name: str, all_profiles: Dict[str, Dict[str, Any]], indent: int = 0) -> str:
+def get_dependency_tree(profile_name: str, all_profiles: dict[str, dict[str, Any]], indent: int = 0) -> str:
     """
     Generate a text representation of a profile's dependency tree.
 

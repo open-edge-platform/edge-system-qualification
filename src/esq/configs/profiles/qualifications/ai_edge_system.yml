@@ -12,6 +12,16 @@ params:
     display_reference: true
     kpi_enabled: true
     system_compatibility: true
+    tags:
+      - "aes"
+  # Vertical profiles associated with this qualification.
+  vertical_profiles:
+    - "profile.vertical.manufacturing"
+    - "profile.vertical.manufacturing.timeseries-wt"
+    - "profile.vertical.metro"
+    - "profile.vertical.retail-asc"
+    - "profile.vertical.retail-lp"
+    - "profile.vertical.retail-lp-vlm"
   tiers:
     - entry
     - mainstream

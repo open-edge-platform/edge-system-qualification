@@ -50,7 +50,7 @@ suites:
                 devices: [cpu]
                 timeout: 3600  # 60 minutes
                 camera_stream: "camera_to_workload_vlm.json"
-                commit_id: "2205dc9"  # Loss Prevention repository commit to checkout
+                commit_id: "8b67c16"  # Loss Prevention repository commit (tag release 2026.1) to checkout
                 requirements:
                   memory_min_gib: 20.0
                   storage_total_min_gib: 100.0

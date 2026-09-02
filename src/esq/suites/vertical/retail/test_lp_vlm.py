@@ -109,6 +109,14 @@ def test_lp_vlm(
                     os.makedirs(pycache_dir, exist_ok=True)
                     logger.debug(f"Created __pycache__ directory: {pycache_dir}")
 
+                # Pre-create pipeline.sh owned by the host user so the container writes
+                # into it rather than creating a new root-owned file via bind mount
+                pipelines_dir = os.path.join(lp_base_dir, "src", "pipelines")
+                os.makedirs(Path(pipelines_dir).resolve(), exist_ok=True)
+                pipeline_sh = os.path.join(pipelines_dir, "pipeline.sh")
+                if not os.path.exists(Path(pipeline_sh).resolve()):
+                    logger.debug(f"Pre-created pipeline file: {pipeline_sh}")
+
                 checkout_result = run_command(checkout_cmd, cwd=lp_base_dir, check=True, stream_output=True, timeout=30)
                 logger.info(f"Successfully cloned loss-prevention repository to {lp_base_dir}")
                 # Combine clone and checkout outputs for allure attachment

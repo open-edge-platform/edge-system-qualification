@@ -1,0 +1,4 @@
+openvino-genai>=2026.3
+openai-whisper>=20250625
+optimum-intel>=2.1.0
+librosa>=1.0.0

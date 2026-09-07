@@ -1,15 +1,14 @@
 # Copyright (C) 2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-name: "profile.vertical.robotics-pi5"
-display_name: "Robotics"
-description: "Robotics Suites"
+name: "profile.suite.ai.action-pi5"
+description: "Action AI suite profile - PI0.5 RTC Benchmark"
 version: "1.0.0"
 params:
   labels:
-    profile_display_name: "Robotics"
-    group: "robotics"
-    type: "vertical"
+    profile_display_name: "Action AI"
+    group: "ai.action"
+    type: "suite"
     display_status: false
   requirements:
     # Hardware requirements
@@ -65,19 +64,19 @@ params:
 
 
 suites:
-  - name: "vertical"
+  - name: "ai"
     sub_suites:
-      - name: "robotics"
+      - name: "action"
         tests:
           # Key matches the test file (test_pi05_rtc.py) for CLI discovery;
-          # the per-param `test` field routes to the test function (test_robotics_pi_rtc).
+          # the per-param `test` field routes to the test function (test_action_pi_rtc).
           test_pi05_rtc:
             params:
-              - test_id: "PI5-RTC-001"
-                test: "test_robotics_pi_rtc"
+              - test_id: "ACN-PI5-001"
+                test: "test_action_pi_rtc"
                 name: "pi05_rtc_gpu"
                 display_name: "PI0.5 RTC Benchmark (GPU)"
-                description: "PI0.5 RTC robotics inference benchmark running in a Docker container on GPU"
+                description: "PI0.5 RTC inference benchmark running in a Docker container on GPU"
                 operation: "pi05_rtc"
                 device: "GPU"
                 dockerfile_name: "Dockerfile"

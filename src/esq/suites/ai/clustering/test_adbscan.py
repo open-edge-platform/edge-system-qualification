@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-Robotics AI testing using ADBScan Benchmark
+Clustering AI testing using ADBScan Benchmark
 """
 
 import grp
@@ -74,8 +74,8 @@ def _parse_results_file(results_file_path: Path) -> dict:  # type: ignore
     }
 
 
-@allure.title("Robotics - ADBScan Benchmark")
-def test_robotics_adbscan(
+@allure.title("Clustering AI - ADBScan Benchmark")
+def test_clustering_adbscan(
     request,
     configs,
     cached_result,
@@ -120,7 +120,7 @@ def test_robotics_adbscan(
     # Use esq_data folder for results (consistent with other suites)
     core_data_dir_tainted = os.environ.get("CORE_DATA_DIR", os.path.join(os.getcwd(), "esq_data"))
     core_data_dir = "".join(c for c in core_data_dir_tainted)
-    data_dir = os.path.join(core_data_dir, "data", "vertical", "robotics")
+    data_dir = os.path.join(core_data_dir, "data", "ai", "clustering")
     test_results = os.path.join(data_dir, "results", test_id)
     os.makedirs(test_results, exist_ok=True)
 
@@ -470,6 +470,6 @@ def test_robotics_adbscan(
     if test_failed:
         logger.error(f"Test failed with status: {failure_message}")
         logger.info(f"Test summary - ID: {test_id}, Operation: {operation}")
-        pytest.fail(f"Robotics test '{test_name}' failed - {failure_message}")
+        pytest.fail(f"Clustering AI test '{test_name}' failed - {failure_message}")
 
-    logger.info(f"Robotics test '{test_name}' completed successfully")
+    logger.info(f"Clustering AI test '{test_name}' completed successfully")

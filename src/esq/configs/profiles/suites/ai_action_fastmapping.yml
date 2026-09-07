@@ -1,20 +1,19 @@
 # Copyright (C) 2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-name: "profile.vertical.robotics-act"
-display_name: "Robotics"
-description: "Robotics Suites"
+name: "profile.suite.ai.action-fastmapping"
+description: "Action AI suite profile - FastMapping Benchmark"
 version: "1.0.0"
 params:
   labels:
-    profile_display_name: "Robotics"
-    group: "robotics"
-    type: "vertical"
+    profile_display_name: "Action AI"
+    group: "ai.action"
+    type: "suite"
     display_status: false
   requirements:
     # Hardware requirements
     memory_min_gib: 8.0
-    storage_min_gib: 1.7 # Free storage for container build and benchmark output
+    storage_min_gib: 9.0 # Free storage for container build and benchmark output
     # Software requirements
     os_type:
     - "linux"
@@ -64,26 +63,26 @@ params:
       enabled: true
 
 suites:
-- name: "vertical"
+- name: "ai"
   sub_suites:
-  - name: "robotics"
+  - name: "action"
     tests:
-      # Key matches the test file (test_act.py) for CLI discovery;
-      # the per-param `test` field routes to the test function (test_robotics_act).
-      test_act:
+      # Key matches the test file (test_fastmapping.py) for CLI discovery;
+      # the per-param `test` field routes to the test function (test_action_fastmapping).
+      test_fastmapping:
         params:
-        - test_id: "ROB-ACT-001"
-          test: "test_robotics_act"
-          name: "act_gpu"
-          display_name: "ACT Benchmark (GPU)"
-          description: "ACT robotics inference benchmark running in a Docker container on GPU"
-          operation: "act"
-          device: "GPU"
+        - test_id: "ACN-FMP-001"
+          test: "test_action_fastmapping"
+          name: "fastmapping_cpu"
+          display_name: "FastMapping Benchmark (CPU)"
+          description: "FastMapping benchmark running in a Docker container on CPU"
+          operation: "fastmapping"
+          device: "CPU"
           dockerfile_name: "Dockerfile"
-          container_image: "robotics_act_benchmark"
+          container_image: "robotics_fastmapping_benchmark"
           image_tag: "1.0"
-          docker_base_image: "ubuntu:24.04"
+          docker_base_image: "amd64/ros:jazzy-ros-base"
           docker_nocache: false
-          timeout: 600
+          timeout: 900
           requirements:
-            igpu_required: true
+            igpu_required: false

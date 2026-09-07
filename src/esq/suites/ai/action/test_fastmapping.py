@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-Robotics AI testing using PI0.5 RTC Benchmark
+Action AI testing using FastMapping Benchmark
 """
 
 import grp
@@ -19,7 +19,7 @@ from sysagent.utils.infrastructure import DockerClient
 
 logger = logging.getLogger(__name__)
 
-test_directory = "pi05_rtc"
+test_directory = "fastmapping"
 container_path = f"src/containers/{test_directory}/"
 
 
@@ -36,10 +36,11 @@ def _create_metrics(value: str = "N/A", unit: str = None) -> dict:  # type: igno
     """
     return {
         "throughput": Metrics(unit=unit, value=value, is_key_metric=True),
-        "avg_latency": Metrics(unit=unit, value=value, is_key_metric=False),
-        "min_latency": Metrics(unit=unit, value=value, is_key_metric=False),
-        "max_latency": Metrics(unit=unit, value=value, is_key_metric=False),
-        "total_iterations": Metrics(unit=unit, value=value, is_key_metric=False),
+        "mean_latency": Metrics(unit=unit, value=value, is_key_metric=False),
+        "min_jitter": Metrics(unit=unit, value=value, is_key_metric=False),
+        "max_jitter": Metrics(unit=unit, value=value, is_key_metric=False),
+        "mean_jitter": Metrics(unit=unit, value=value, is_key_metric=False),
+        "jitter_stdev": Metrics(unit=unit, value=value, is_key_metric=False),
     }
 
 
@@ -59,20 +60,22 @@ def _parse_results_file(results_file_path: Path) -> dict:  # type: ignore
     execution_results = report.get("execution_results", {})
 
     return {
-        "throughput": Metrics(unit="FPS", value=float(execution_results["throughput"]), is_key_metric=True),
-        "avg_latency": Metrics(unit="ms", value=float(execution_results["avg latency"]), is_key_metric=False),
-        "min_latency": Metrics(unit="ms", value=float(execution_results["min latency"]), is_key_metric=False),
-        "max_latency": Metrics(unit="ms", value=float(execution_results["max latency"]), is_key_metric=False),
+        "throughput": Metrics(unit="Hz", value=float(execution_results["throughput"]), is_key_metric=True),
+        "mean_latency": Metrics(unit="ms", value=float(execution_results["mean_latency"]), is_key_metric=False),
+        "min_jitter": Metrics(unit="ms", value=float(execution_results["min_jitter"]), is_key_metric=False),
+        "max_jitter": Metrics(unit="ms", value=float(execution_results["max_jitter"]), is_key_metric=False),
+        "mean_jitter": Metrics(unit="ms", value=float(execution_results["mean_jitter"]), is_key_metric=False),
+        "jitter_stdev": Metrics(unit="ms", value=float(execution_results["jitter_stdev"]), is_key_metric=False),
         "total_iterations": Metrics(
             unit="iterations",
-            value=int(execution_results["total number of iterations"]),
+            value=int(execution_results["iterations"]),
             is_key_metric=False,
         ),
     }
 
 
-@allure.title("Robotics - PI.05 RTC Benchmark")
-def test_robotics_pi_rtc(
+@allure.title("Action AI - FastMapping Benchmark")
+def test_action_fastmapping(
     request,
     configs,
     cached_result,
@@ -117,7 +120,7 @@ def test_robotics_pi_rtc(
     # Use esq_data folder for results (consistent with other suites)
     core_data_dir_tainted = os.environ.get("CORE_DATA_DIR", os.path.join(os.getcwd(), "esq_data"))
     core_data_dir = "".join(c for c in core_data_dir_tainted)
-    data_dir = os.path.join(core_data_dir, "data", "vertical", "robotics")
+    data_dir = os.path.join(core_data_dir, "data", "ai", "action")
     test_results = os.path.join(data_dir, "results", test_id)
     os.makedirs(test_results, exist_ok=True)
 
@@ -146,7 +149,7 @@ def test_robotics_pi_rtc(
             # Access outer scope variables
             nonlocal docker_image_tag, dockerfile_name, docker_dir, timeout
 
-            docker_base_image = configs.get("docker_base_image", "ubuntu:24.04")
+            docker_base_image = configs.get("docker_base_image", "amd64/ros:jazzy-ros-base")
             docker_nocache = configs.get("docker_nocache", False)
             logger.info(f"Docker build cache setting: nocache={docker_nocache}")
             logger.info(f"Build 2: Building test suite image '{docker_image_tag}'.")
@@ -467,6 +470,6 @@ def test_robotics_pi_rtc(
     if test_failed:
         logger.error(f"Test failed with status: {failure_message}")
         logger.info(f"Test summary - ID: {test_id}, Operation: {operation}")
-        pytest.fail(f"Robotics test '{test_name}' failed - {failure_message}")
+        pytest.fail(f"Action AI test '{test_name}' failed - {failure_message}")
 
-    logger.info(f"Robotics test '{test_name}' completed successfully")
+    logger.info(f"Action AI test '{test_name}' completed successfully")

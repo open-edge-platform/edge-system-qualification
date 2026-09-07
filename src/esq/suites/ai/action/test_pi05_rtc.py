@@ -2,12 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-Robotics AI testing using the FunASR (Paraformer) speech-recognition benchmark.
-
-FunASR is converted to OpenVINO IR at container build time and benchmarked with
-benchmark_app across CPU / GPU / NPU. Two sub-models are available:
-  - eb : contextual embedder (portable across CPU/GPU/NPU) - default
-  - bb : backbone/decoder (representative ASR compute, CPU only currently)
+Action AI testing using PI0.5 RTC Benchmark
 """
 
 import grp
@@ -24,25 +19,8 @@ from sysagent.utils.infrastructure import DockerClient
 
 logger = logging.getLogger(__name__)
 
-test_directory = "funasr"
+test_directory = "pi05_rtc"
 container_path = f"src/containers/{test_directory}/"
-
-# Image tags already built in this pytest session. The CPU/GPU/NPU device params
-# all build the *same* multi-stage image (device is a runtime env var, not a
-# build arg). The framework prunes dangling images after every build, which
-# deletes the multi-stage `build` intermediate and breaks the next device's
-# cached `COPY --from=build`. Building the shared image once per session and
-# reusing it for the remaining devices avoids that; a fresh run (new process)
-# starts empty, so Dockerfile changes are still picked up.
-_BUILT_IMAGE_TAGS: set = set()
-
-
-def _get_image_id(docker_client: DockerClient, tag: str) -> str:
-    """Return the id of a local image tag, or "" if it does not exist."""
-    try:
-        return docker_client.client.images.get(tag).id
-    except Exception:  # noqa: BLE001 - any lookup failure means "not present"
-        return ""
 
 
 def _create_metrics(value: str = "N/A", unit: str = None) -> dict:  # type: ignore
@@ -93,8 +71,8 @@ def _parse_results_file(results_file_path: Path) -> dict:  # type: ignore
     }
 
 
-@allure.title("Robotics - FunASR ASR Benchmark")
-def test_robotics_funasr(
+@allure.title("Action AI - PI.05 RTC Benchmark")
+def test_action_pi_rtc(
     request,
     configs,
     cached_result,
@@ -113,9 +91,7 @@ def test_robotics_funasr(
     test_id = configs.get("test_id", test_name)
     test_display_name = configs.get("display_name", test_name)
     timeout = int(configs.get("timeout", 300))
-    device = configs.get("device", "CPU")
-    # JB: FunASR sub-model to benchmark: "eb" (portable) or "bb" (backbone, CPU only).
-    model = configs.get("model", "eb")
+    device = configs.get("device", "gpu")
     operation = configs.get("operation", test_directory)
     dockerfile_name = configs.get("dockerfile_name", "Dockerfile")
     container_image = configs.get("container_image", f"robotics_{test_directory}_benchmark")
@@ -141,7 +117,7 @@ def test_robotics_funasr(
     # Use esq_data folder for results (consistent with other suites)
     core_data_dir_tainted = os.environ.get("CORE_DATA_DIR", os.path.join(os.getcwd(), "esq_data"))
     core_data_dir = "".join(c for c in core_data_dir_tainted)
-    data_dir = os.path.join(core_data_dir, "data", "vertical", "robotics")
+    data_dir = os.path.join(core_data_dir, "data", "ai", "action")
     test_results = os.path.join(data_dir, "results", test_id)
     os.makedirs(test_results, exist_ok=True)
 
@@ -173,31 +149,19 @@ def test_robotics_funasr(
             docker_base_image = configs.get("docker_base_image", "ubuntu:24.04")
             docker_nocache = configs.get("docker_nocache", False)
             logger.info(f"Docker build cache setting: nocache={docker_nocache}")
+            logger.info(f"Build 2: Building test suite image '{docker_image_tag}'.")
 
             build_args = {
                 "COMMON_BASE_IMAGE": docker_base_image,
             }
 
-            # Reuse the shared image if it was already built earlier in this
-            # session (see _BUILT_IMAGE_TAGS above). --no-cache forces a rebuild.
-            existing_image_id = (
-                _get_image_id(docker_client, docker_image_tag)
-                if not docker_nocache and docker_image_tag in _BUILT_IMAGE_TAGS
-                else ""
+            build_result = docker_client.build_image(
+                path=docker_dir,
+                tag=docker_image_tag,
+                nocache=docker_nocache,
+                dockerfile=dockerfile_name,
+                buildargs=build_args,
             )
-            if existing_image_id:
-                logger.info(f"Reusing image '{docker_image_tag}' built earlier this session.")
-                build_result = {"image_id": existing_image_id, "image_tag": docker_image_tag}
-            else:
-                logger.info(f"Building test suite image '{docker_image_tag}'.")
-                build_result = docker_client.build_image(
-                    path=docker_dir,
-                    tag=docker_image_tag,
-                    nocache=docker_nocache,
-                    dockerfile=dockerfile_name,
-                    buildargs=build_args,
-                )
-                _BUILT_IMAGE_TAGS.add(docker_image_tag)
             container_config = {
                 "image_id": build_result.get("image_id", ""),
                 "image_tag": docker_image_tag,
@@ -243,7 +207,7 @@ def test_robotics_funasr(
         # ============================================================
         def execute_logic():
             # Access outer scope variables
-            nonlocal docker_client, test_results, docker_image_tag, container_name, timeout, operation, device, model
+            nonlocal docker_client, test_results, docker_image_tag, container_name, timeout, operation, device
 
             # Define metrics with N/A as initial values (unit will be set when value is populated)
             metrics = _create_metrics(value="N/A", unit=None)  # type: ignore
@@ -255,7 +219,6 @@ def test_robotics_funasr(
                 parameters={
                     "device": device,
                     "operation_type": operation,
-                    "model": model,
                 },
                 metrics=metrics,
                 metadata={
@@ -264,7 +227,7 @@ def test_robotics_funasr(
             )
 
             try:
-                logger.info(f"Executing {test_display_name} with operation: {operation}, model: {model}")
+                logger.info(f"Executing {test_display_name} with operation: {operation}")
 
                 # Initialize results file
                 results_file_path = Path(f"{test_results}/benchmark_report.json")
@@ -287,7 +250,6 @@ def test_robotics_funasr(
                 volumes = {test_results: {"bind": f"{container_home}/output", "mode": "rw"}}
                 environment = {
                     "DEVICE": str(device),
-                    "MODEL": str(model),
                 }
 
                 # Prepare container devices for GPU access
@@ -417,12 +379,7 @@ def test_robotics_funasr(
             )
 
         # Mark the test failed when the execution reported a non-passing status.
-        # When preparation (e.g. the Docker build) already failed, `results` is
-        # still None and `failure_message` holds the real cause — don't overwrite
-        # it (dereferencing None here would mask the actual error).
-        if results is None:
-            test_failed = True
-        elif not results.metadata.get("status", False):
+        if not results.metadata.get("status", False):
             test_failed = True
             failure_message = results.metadata.get("failure_reason", f"{test_display_name} failed")
 
@@ -456,7 +413,6 @@ def test_robotics_funasr(
             parameters={
                 "device": device,
                 "operation_type": operation,
-                "model": model,
             },
             metrics=metrics,
             metadata={
@@ -511,6 +467,6 @@ def test_robotics_funasr(
     if test_failed:
         logger.error(f"Test failed with status: {failure_message}")
         logger.info(f"Test summary - ID: {test_id}, Operation: {operation}")
-        pytest.fail(f"Robotics test '{test_name}' failed - {failure_message}")
+        pytest.fail(f"Action AI test '{test_name}' failed - {failure_message}")
 
-    logger.info(f"Robotics test '{test_name}' completed successfully")
+    logger.info(f"Action AI test '{test_name}' completed successfully")

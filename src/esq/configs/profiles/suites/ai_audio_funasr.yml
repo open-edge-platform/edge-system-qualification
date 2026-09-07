@@ -1,15 +1,14 @@
 # Copyright (C) 2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-name: "profile.vertical.robotics-funasr"
-display_name: "Robotics"
-description: "Robotics Suites"
+name: "profile.suite.ai.audio-funasr"
+description: "Audio AI suite profile - FunASR Benchmark"
 version: "1.0.0"
 params:
   labels:
-    profile_display_name: "Robotics"
-    group: "robotics"
-    type: "vertical"
+    profile_display_name: "Audio AI"
+    group: "ai.audio"
+    type: "suite"
     display_status: false
   requirements:
     # Hardware requirements
@@ -64,20 +63,20 @@ params:
       enabled: true
 
 suites:
-- name: "vertical"
+- name: "ai"
   sub_suites:
-  - name: "robotics"
+  - name: "audio"
     tests:
       # Key matches the test file (test_funasr.py) for CLI discovery;
-      # the per-param `test` field routes to the test function (test_robotics_funasr).
+      # the per-param `test` field routes to the test function (test_audio_funasr).
       # FunASR (Paraformer) has no published OpenVINO IR, so it is converted from
       # source at container build time. The portable contextual embedder
       # (model: eb) is benchmarked so the same test runs across CPU / GPU / NPU;
       # the backbone (model: bb) is CPU-only in the current conversion.
       test_funasr:
         params:
-        - test_id: "ROB-ASR-001"
-          test: "test_robotics_funasr"
+        - test_id: "AUD-ASR-001"
+          test: "test_audio_funasr"
           name: "funasr_cpu"
           display_name: "FunASR ASR Benchmark (CPU)"
           description: "FunASR speech-recognition inference benchmark running in a Docker container on CPU"
@@ -96,8 +95,8 @@ suites:
           timeout: 1800
           requirements:
             storage_min_gib: 20.0
-        - test_id: "ROB-ASR-002"
-          test: "test_robotics_funasr"
+        - test_id: "AUD-ASR-002"
+          test: "test_audio_funasr"
           name: "funasr_gpu"
           display_name: "FunASR ASR Benchmark (GPU)"
           description: "FunASR speech-recognition inference benchmark running in a Docker container on GPU"
@@ -113,8 +112,8 @@ suites:
           requirements:
             storage_min_gib: 20.0
             igpu_required: true
-        - test_id: "ROB-ASR-003"
-          test: "test_robotics_funasr"
+        - test_id: "AUD-ASR-003"
+          test: "test_audio_funasr"
           name: "funasr_npu"
           display_name: "FunASR ASR Benchmark (NPU)"
           description: "FunASR speech-recognition inference benchmark running in a Docker container on NPU"

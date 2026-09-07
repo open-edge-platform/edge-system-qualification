@@ -1,15 +1,14 @@
 # Copyright (C) 2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-name: "profile.vertical.robotics-adbscan"
-display_name: "Robotics"
-description: "Robotics Suites"
+name: "profile.suite.ai.clustering-adbscan"
+description: "Clustering AI suite profile - ADBScan Benchmark"
 version: "1.0.0"
 params:
   labels:
-    profile_display_name: "Robotics"
-    group: "robotics"
-    type: "vertical"
+    profile_display_name: "Clustering AI"
+    group: "ai.clustering"
+    type: "suite"
     display_status: false
   requirements:
     # Hardware requirements
@@ -64,19 +63,19 @@ params:
       enabled: true
 
 suites:
-- name: "vertical"
+- name: "ai"
   sub_suites:
-  - name: "robotics"
+  - name: "clustering"
     tests:
       # Key matches the test file (test_adbscan.py) for CLI discovery;
-      # the per-param `test` field routes to the test function (test_robotics_adbscan).
+      # the per-param `test` field routes to the test function (test_clustering_adbscan).
       test_adbscan:
         params:
-        - test_id: "ROB-ADB-001"
-          test: "test_robotics_adbscan"
+        - test_id: "CLU-ADB-001"
+          test: "test_clustering_adbscan"
           name: "adbscan_cpu"
           display_name: "ADBScan Benchmark (CPU)"
-          description: "ADBScan robotics benchmark running in a Docker container on CPU"
+          description: "ADBScan benchmark running in a Docker container on CPU"
           operation: "adbscan"
           device: "CPU"
           dockerfile_name: "Dockerfile"

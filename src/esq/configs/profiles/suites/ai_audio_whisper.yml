@@ -1,0 +1,461 @@
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+name: "profile.suite.ai.audio-whisper"
+description: "Whisper ASR Benchmark Suite"
+version: "1.0.0"
+params:
+  labels:
+    profile_display_name: "Audio AI"
+    group: "ai.audio"
+    type: "suite"
+    display_status: false
+  requirements:
+    cpu_min_cores: 4
+    memory_min_gib: 8.0
+    storage_min_gib: 5.0
+    os_type:
+      - "linux"
+    docker_required: true
+  telemetry:
+    enabled: true
+    interval: 10  # seconds between samples
+    prerun:
+      enabled: true
+      duration_s: 10   # idle baseline window before the test
+      interval_s: 1    # sample cadence during the idle window
+    modules:
+      # Title, scales, thresholds and axes are defined as defaults within each module.
+      # Only specify these here to override the module defaults.
+      # --- sysagent core modules ---
+      - name: cpu_usage
+        enabled: true
+
+      - name: cpu_freq
+        enabled: true
+
+      - name: cpu_temp
+        enabled: true
+
+      - name: memory_usage
+        enabled: true
+
+      # --- ESQ package modules ---
+      - name: gpu_usage
+        enabled: true
+
+      - name: gpu_freq
+        enabled: true
+
+      - name: gpu_temp
+        enabled: true
+
+      - name: gpu_power
+        enabled: true
+
+      - name: package_power
+        enabled: true
+
+      - name: npu_usage
+        enabled: true
+
+      - name: npu_freq
+        enabled: true
+
+suites:
+  - name: "ai"
+    sub_suites:
+      - name: "audio"
+        tests:
+          test_whisper:
+            params:
+
+              # ----------------------------------------------------------------
+              # OpenVINO backend — tiny
+              # ----------------------------------------------------------------
+              - test_id: "AUD-WOV-001"
+                display_name: "Whisper Benchmark - tiny model on OpenVINO (CPU)"
+                devices: [cpu]
+                model_size: "tiny"
+                backend: "openvino"
+                timeout: 300
+
+              - test_id: "AUD-WOV-002"
+                display_name: "Whisper Benchmark - tiny model on OpenVINO (iGPU)"
+                devices: [igpu]
+                model_size: "tiny"
+                backend: "openvino"
+                timeout: 300
+                requirements:
+                  igpu_required: true
+
+              - test_id: "AUD-WOV-003"
+                display_name: "Whisper Benchmark - tiny model on OpenVINO (dGPU)"
+                devices: [dgpu]
+                model_size: "tiny"
+                backend: "openvino"
+                timeout: 300
+                requirements:
+                  dgpu_required: true
+
+              - test_id: "AUD-WOV-004"
+                display_name: "Whisper Benchmark - tiny model on OpenVINO (NPU)"
+                devices: [npu]
+                model_size: "tiny"
+                backend: "openvino"
+                timeout: 300
+                requirements:
+                  npu_required: true
+
+              # ----------------------------------------------------------------
+              # OpenVINO backend — base
+              # ----------------------------------------------------------------
+              - test_id: "AUD-WOV-005"
+                display_name: "Whisper Benchmark - base model on OpenVINO (CPU)"
+                devices: [cpu]
+                model_size: "base"
+                backend: "openvino"
+                timeout: 300
+
+              - test_id: "AUD-WOV-006"
+                display_name: "Whisper Benchmark - base model on OpenVINO (iGPU)"
+                devices: [igpu]
+                model_size: "base"
+                backend: "openvino"
+                timeout: 300
+                requirements:
+                  igpu_required: true
+
+              - test_id: "AUD-WOV-007"
+                display_name: "Whisper Benchmark - base model on OpenVINO (dGPU)"
+                devices: [dgpu]
+                model_size: "base"
+                backend: "openvino"
+                timeout: 300
+                requirements:
+                  dgpu_required: true
+
+              - test_id: "AUD-WOV-008"
+                display_name: "Whisper Benchmark - base model on OpenVINO (NPU)"
+                devices: [npu]
+                model_size: "base"
+                backend: "openvino"
+                timeout: 300
+                requirements:
+                  npu_required: true
+
+              # ----------------------------------------------------------------
+              # OpenVINO backend — small
+              # ----------------------------------------------------------------
+              - test_id: "AUD-WOV-009"
+                display_name: "Whisper Benchmark - small model on OpenVINO (CPU)"
+                devices: [cpu]
+                model_size: "small"
+                backend: "openvino"
+                timeout: 300
+
+              - test_id: "AUD-WOV-010"
+                display_name: "Whisper Benchmark - small model on OpenVINO (iGPU)"
+                devices: [igpu]
+                model_size: "small"
+                backend: "openvino"
+                timeout: 300
+                requirements:
+                  igpu_required: true
+
+              - test_id: "AUD-WOV-011"
+                display_name: "Whisper Benchmark - small model on OpenVINO (dGPU)"
+                devices: [dgpu]
+                model_size: "small"
+                backend: "openvino"
+                timeout: 300
+                requirements:
+                  dgpu_required: true
+
+              - test_id: "AUD-WOV-012"
+                display_name: "Whisper Benchmark - small model on OpenVINO (NPU)"
+                devices: [npu]
+                model_size: "small"
+                backend: "openvino"
+                timeout: 300
+                requirements:
+                  npu_required: true
+
+              # ----------------------------------------------------------------
+              # OpenVINO backend — medium
+              # ----------------------------------------------------------------
+              - test_id: "AUD-WOV-013"
+                display_name: "Whisper Benchmark - medium model on OpenVINO (CPU)"
+                devices: [cpu]
+                model_size: "medium"
+                backend: "openvino"
+                timeout: 300
+
+              - test_id: "AUD-WOV-014"
+                display_name: "Whisper Benchmark - medium model on OpenVINO (iGPU)"
+                devices: [igpu]
+                model_size: "medium"
+                backend: "openvino"
+                timeout: 300
+                requirements:
+                  igpu_required: true
+
+              - test_id: "AUD-WOV-015"
+                display_name: "Whisper Benchmark - medium model on OpenVINO (dGPU)"
+                devices: [dgpu]
+                model_size: "medium"
+                backend: "openvino"
+                timeout: 300
+                requirements:
+                  dgpu_required: true
+
+              - test_id: "AUD-WOV-016"
+                display_name: "Whisper Benchmark - medium model on OpenVINO (NPU)"
+                devices: [npu]
+                model_size: "medium"
+                backend: "openvino"
+                timeout: 300
+                requirements:
+                  npu_required: true
+
+              # ----------------------------------------------------------------
+              # OpenVINO backend — large
+              # ----------------------------------------------------------------
+              - test_id: "AUD-WOV-017"
+                display_name: "Whisper Benchmark - large model on OpenVINO (CPU)"
+                devices: [cpu]
+                model_size: "large"
+                backend: "openvino"
+                timeout: 300
+
+              - test_id: "AUD-WOV-018"
+                display_name: "Whisper Benchmark - large model on OpenVINO (iGPU)"
+                devices: [igpu]
+                model_size: "large"
+                backend: "openvino"
+                timeout: 300
+                requirements:
+                  igpu_required: true
+
+              - test_id: "AUD-WOV-019"
+                display_name: "Whisper Benchmark - large model on OpenVINO (dGPU)"
+                devices: [dgpu]
+                model_size: "large"
+                backend: "openvino"
+                timeout: 300
+                requirements:
+                  dgpu_required: true
+
+              - test_id: "AUD-WOV-020"
+                display_name: "Whisper Benchmark - large model on OpenVINO (NPU)"
+                devices: [npu]
+                model_size: "large"
+                backend: "openvino"
+                timeout: 300
+                requirements:
+                  npu_required: true
+
+              # ----------------------------------------------------------------
+              # OpenVINO backend — turbo
+              # ----------------------------------------------------------------
+              - test_id: "AUD-WOV-021"
+                display_name: "Whisper Benchmark - turbo model on OpenVINO (CPU)"
+                devices: [cpu]
+                model_size: "turbo"
+                backend: "openvino"
+                timeout: 300
+
+              - test_id: "AUD-WOV-022"
+                display_name: "Whisper Benchmark - turbo model on OpenVINO (iGPU)"
+                devices: [igpu]
+                model_size: "turbo"
+                backend: "openvino"
+                timeout: 300
+                requirements:
+                  igpu_required: true
+
+              - test_id: "AUD-WOV-023"
+                display_name: "Whisper Benchmark - turbo model on OpenVINO (dGPU)"
+                devices: [dgpu]
+                model_size: "turbo"
+                backend: "openvino"
+                timeout: 300
+                requirements:
+                  dgpu_required: true
+
+              - test_id: "AUD-WOV-024"
+                display_name: "Whisper Benchmark - turbo model on OpenVINO (NPU)"
+                devices: [npu]
+                model_size: "turbo"
+                backend: "openvino"
+                timeout: 300
+                requirements:
+                  npu_required: true
+
+              # ----------------------------------------------------------------
+              # PyTorch backend — tiny
+              # ----------------------------------------------------------------
+              - test_id: "AUD-WPT-001"
+                display_name: "Whisper Benchmark - tiny model on PyTorch (CPU)"
+                devices: [cpu]
+                model_size: "tiny"
+                backend: "pytorch"
+                timeout: 300
+
+              - test_id: "AUD-WPT-002"
+                display_name: "Whisper Benchmark - tiny model on PyTorch (iGPU)"
+                devices: [igpu]
+                model_size: "tiny"
+                backend: "pytorch"
+                timeout: 300
+                requirements:
+                  igpu_required: true
+
+              - test_id: "AUD-WPT-003"
+                display_name: "Whisper Benchmark - tiny model on PyTorch (dGPU)"
+                devices: [dgpu]
+                model_size: "tiny"
+                backend: "pytorch"
+                timeout: 300
+                requirements:
+                  dgpu_required: true
+
+              # ----------------------------------------------------------------
+              # PyTorch backend — base
+              # ----------------------------------------------------------------
+              - test_id: "AUD-WPT-004"
+                display_name: "Whisper Benchmark - base model on PyTorch (CPU)"
+                devices: [cpu]
+                model_size: "base"
+                backend: "pytorch"
+                timeout: 300
+
+              - test_id: "AUD-WPT-005"
+                display_name: "Whisper Benchmark - base model on PyTorch (iGPU)"
+                devices: [igpu]
+                model_size: "base"
+                backend: "pytorch"
+                timeout: 300
+                requirements:
+                  igpu_required: true
+
+              - test_id: "AUD-WPT-006"
+                display_name: "Whisper Benchmark - base model on PyTorch (dGPU)"
+                devices: [dgpu]
+                model_size: "base"
+                backend: "pytorch"
+                timeout: 300
+                requirements:
+                  dgpu_required: true
+
+              # ----------------------------------------------------------------
+              # PyTorch backend — small
+              # ----------------------------------------------------------------
+              - test_id: "AUD-WPT-007"
+                display_name: "Whisper Benchmark - small model on PyTorch (CPU)"
+                devices: [cpu]
+                model_size: "small"
+                backend: "pytorch"
+                timeout: 300
+
+              - test_id: "AUD-WPT-008"
+                display_name: "Whisper Benchmark - small model on PyTorch (iGPU)"
+                devices: [igpu]
+                model_size: "small"
+                backend: "pytorch"
+                timeout: 300
+                requirements:
+                  igpu_required: true
+
+              - test_id: "AUD-WPT-009"
+                display_name: "Whisper Benchmark - small model on PyTorch (dGPU)"
+                devices: [dgpu]
+                model_size: "small"
+                backend: "pytorch"
+                timeout: 300
+                requirements:
+                  dgpu_required: true
+
+              # ----------------------------------------------------------------
+              # PyTorch backend — medium
+              # ----------------------------------------------------------------
+              - test_id: "AUD-WPT-010"
+                display_name: "Whisper Benchmark - medium model on PyTorch (CPU)"
+                devices: [cpu]
+                model_size: "medium"
+                backend: "pytorch"
+                timeout: 300
+
+              - test_id: "AUD-WPT-011"
+                display_name: "Whisper Benchmark - medium model on PyTorch (iGPU)"
+                devices: [igpu]
+                model_size: "medium"
+                backend: "pytorch"
+                timeout: 300
+                requirements:
+                  igpu_required: true
+
+              - test_id: "AUD-WPT-012"
+                display_name: "Whisper Benchmark - medium model on PyTorch (dGPU)"
+                devices: [dgpu]
+                model_size: "medium"
+                backend: "pytorch"
+                timeout: 300
+                requirements:
+                  dgpu_required: true
+
+              # ----------------------------------------------------------------
+              # PyTorch backend — large
+              # ----------------------------------------------------------------
+              - test_id: "AUD-WPT-013"
+                display_name: "Whisper Benchmark - large model on PyTorch (CPU)"
+                devices: [cpu]
+                model_size: "large"
+                backend: "pytorch"
+                timeout: 300
+
+              - test_id: "AUD-WPT-014"
+                display_name: "Whisper Benchmark - large model on PyTorch (iGPU)"
+                devices: [igpu]
+                model_size: "large"
+                backend: "pytorch"
+                timeout: 300
+                requirements:
+                  igpu_required: true
+
+              - test_id: "AUD-WPT-015"
+                display_name: "Whisper Benchmark - large model on PyTorch (dGPU)"
+                devices: [dgpu]
+                model_size: "large"
+                backend: "pytorch"
+                timeout: 300
+                requirements:
+                  dgpu_required: true
+
+              # ----------------------------------------------------------------
+              # PyTorch backend — turbo
+              # ----------------------------------------------------------------
+              - test_id: "AUD-WPT-016"
+                display_name: "Whisper Benchmark - turbo model on PyTorch (CPU)"
+                devices: [cpu]
+                model_size: "turbo"
+                backend: "pytorch"
+                timeout: 300
+
+              - test_id: "AUD-WPT-017"
+                display_name: "Whisper Benchmark - turbo model on PyTorch (iGPU)"
+                devices: [igpu]
+                model_size: "turbo"
+                backend: "pytorch"
+                timeout: 300
+                requirements:
+                  igpu_required: true
+
+              - test_id: "AUD-WPT-018"
+                display_name: "Whisper Benchmark - turbo model on PyTorch (dGPU)"
+                devices: [dgpu]
+                model_size: "turbo"
+                backend: "pytorch"
+                timeout: 300
+                requirements:
+                  dgpu_required: true

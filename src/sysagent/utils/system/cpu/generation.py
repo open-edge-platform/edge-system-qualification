@@ -281,17 +281,16 @@ def compare_generations(gen1: str, gen2: str) -> int:
     if series1_match and series2_match:
         s1 = int(series1_match.group(1))
         s2 = int(series2_match.group(1))
-        # When series numbers are equal, check if one is Ultra
+        ultra1 = "Core Ultra" in g1
+        ultra2 = "Core Ultra" in g2
+        # "Core (Series X)" and "Core Ultra (Series X)" are separate product lines that
+        # happen to share the same series digit (e.g. Core (Series 1)/Raptor Lake Refresh vs
+        # Core Ultra (Series 1)/Meteor Lake) - not a lesser/greater tier of one another, so
+        # they're incomparable regardless of series number, same as Series vs Gen Core below.
+        if ultra1 != ultra2:
+            return 0
         if s1 == s2:
-            # Within same series number, Core Ultra > Core (non-Ultra)
-            ultra1 = "Core Ultra" in g1
-            ultra2 = "Core Ultra" in g2
-            if ultra1 and not ultra2:
-                return 1  # Core Ultra > Core
-            elif not ultra1 and ultra2:
-                return -1  # Core < Core Ultra
-            else:
-                return 0  # Both same (both Ultra or both non-Ultra)
+            return 0
         return -1 if s1 < s2 else 1
 
     # Cross-comparison: Core (Series X) vs traditional "Xth Gen Core"
@@ -786,17 +785,18 @@ def _detect_generation_from_brand(brand: str) -> tuple[str | None, str | None, s
                 return codename, generation, product_collection, segment
 
         # Fallback: Core Ultra detected but couldn't parse model number
-        # Check for explicit series mentions
-        if "series 3" in brand_lower or "series3" in brand_lower:
-            return "Unknown (Series 3)", "Core Ultra (Series 3)", "Core Ultra", "unknown"
-        elif "series 2" in brand_lower or "series2" in brand_lower:
-            return "Unknown (Series 2)", "Core Ultra (Series 2)", "Core", "unknown"
-        elif "series 1" in brand_lower or "series1" in brand_lower:
-            return "Unknown (Series 1)", "Core Ultra (Series 1)", "Core", "unknown"
-        else:
-            # Cannot determine series, return generic
-            logger.debug("Detected 'Core Ultra' but cannot determine series from brand string")
-            return "Unknown (Core Ultra)", "Core Ultra", "Core Ultra", "unknown"
+        # Check for an explicit "series N" mention, for any N (forward compatible)
+        series_mention_match = re.search(r"series\s*(\d+)", brand_lower)
+        if series_mention_match:
+            series_num = int(series_mention_match.group(1))
+            # Product collection is "Core" for Series 1-2 (Meteor/Arrow Lake), "Core Ultra" from
+            # Series 3 onward (Panther Lake and later) - matches the model-number-based paths above
+            product_collection = "Core" if series_num <= 2 else "Core Ultra"
+            return f"Unknown (Series {series_num})", f"Core Ultra (Series {series_num})", product_collection, "unknown"
+
+        # Cannot determine series, return generic
+        logger.debug("Detected 'Core Ultra' but cannot determine series from brand string")
+        return "Unknown (Core Ultra)", "Core Ultra", "Core Ultra", "unknown"
 
     # Detect Core Series 2 (Raptor Lake-based, NO "ultra" keyword)
     # These are distinct from Core Ultra Series 2
@@ -823,19 +823,33 @@ def _detect_generation_from_brand(brand: str) -> tuple[str | None, str | None, s
                     logger.debug(f"Detected Wildcat Lake (Core Series 3) from model: {model_number}{suffix}")
                     return codename, "Core (Series 3)", "Core", segment
 
-                # Bartlett Lake-S: 25X series (embedded processors)
-                # Based on Intel ARK: Core 7 251TE, Core 7 251E
-                if 250 <= model_number <= 259:
-                    codename = "Bartlett Lake-S"
-                    # Detect embedded segment from TE/E suffixes
-                    segment = "embedded" if suffix in ["TE", "E"] else ("mobile" if suffix in ["U", "H"] else "unknown")
-                    return codename, "Core (Series 2)", "Core", segment
+                # Core Series 1 (Raptor Lake-U/H Refresh): 1XX series (100-199) - mobile
+                # Brand examples: Core 7 150U, Core 5 130U, Core 5 120U, Core 3 100U
+                # Also seen with "L" (low-power) suffix variants: 100UL, 120UL, 150HL
+                if 100 <= model_number <= 199:
+                    is_high_power = suffix in ["H", "HL", "HX"]
+                    codename = "Raptor Lake-H Refresh" if is_high_power else "Raptor Lake-U Refresh"
+                    segment = "mobile"
+                    logger.debug(f"Detected Core Series 1 (Raptor Lake Refresh) from model: {model_number}{suffix}")
+                    return codename, "Core (Series 1)", "Core", segment
 
-                # Other Core Series 2 processors (e.g., Raptor Lake-U Re-refresh)
-                # May have model numbers outside 25X range
-                # Examples: Core 7 250U, Core 5 220U (mobile)
-                codename = "Unknown (Core Series 2)"
-                segment = "mobile" if suffix in ["U", "H"] else ("embedded" if suffix in ["TE", "E"] else "unknown")
+                # Core Series 2 (2XX series, 200-299): Raptor Lake-U/H Re-refresh (mobile) or
+                # Bartlett Lake-S (embedded). The embedded/mobile split is determined by suffix
+                # rather than a narrower model-number sub-range, since Bartlett Lake-S embedded
+                # SKUs span the full 2XX range (e.g., Core 5 211E, Core 7 251TE/251E), not just 25X.
+                # Brand examples: Core 7 250U, Core 5 220U (mobile); Core 5 211E, Core 7 251E (embedded)
+                is_high_power = suffix in ["H", "HL", "HX"]
+                is_low_power = suffix in ["U", "UL"]
+                is_embedded = suffix in ["E", "TE"]
+                if is_embedded:
+                    codename = "Bartlett Lake-S"
+                elif is_high_power:
+                    codename = "Raptor Lake-H Re-refresh"
+                elif is_low_power:
+                    codename = "Raptor Lake-U Re-refresh"
+                else:
+                    codename = "Unknown (Core Series 2)"
+                segment = "embedded" if is_embedded else ("mobile" if (is_high_power or is_low_power) else "unknown")
                 return codename, "Core (Series 2)", "Core", segment
 
             # Fallback if no model number found
@@ -1409,6 +1423,7 @@ def detect_cpu_generation_and_segment(
 
     # Override 2: Check for Core Series (non-Ultra)
     # Intel Core Series (non-Ultra) uses model number ranges to indicate series:
+    # - 1XX (100-199) = Series 1 (Raptor Lake-U/H Refresh, e.g., Core 5 120U, Core 5 120UL, Core 7 150HL)
     # - 2XX (200-299) = Series 2 (Raptor Lake-based, e.g., Core 7 250U, Core 5 220U)
     # - 3XX (300-399) = Series 3 (Wildcat Lake, e.g., Core 7 360, Core 5 330, Core 3 304)
     # - 4XX+ = Series 4+ (future platforms, forward compatibility)
@@ -1421,14 +1436,17 @@ def detect_cpu_generation_and_segment(
         # Matches: "Core(TM) 7 251TE" or "Core(TM) 5 330" but NOT "Core(TM) i7-13700K"
         is_n_series_brand = re.search(r"\bN\d{2,3}\b", brand, re.IGNORECASE) is not None
         if re.search(r"core.*?\s+[3579]\s+(?!i)", brand_lower) and not is_n_series_brand:
-            # Derive series from the hundreds digit of the model number:
-            # 2XX -> Series 2, 3XX -> Series 3, 4XX -> Series 4, etc.
-            series_model_match = re.search(r"core.*?[3579]\s+(\d{2,3})", brand, re.IGNORECASE)
+            # Derive series from the hundreds digit of the model number, and capture the
+            # suffix (U/UL/H/HL/HX/etc.) to determine the correct Raptor Lake variant name.
+            # 1XX -> Series 1, 2XX -> Series 2, 3XX -> Series 3, 4XX -> Series 4, etc.
+            series_model_match = re.search(r"core.*?[3579]\s+(\d{2,3})([A-Z]*)", brand, re.IGNORECASE)
             if series_model_match:
                 model_num = int(series_model_match.group(1))
-                series_num = model_num // 100
-                detected_series_gen = f"Core (Series {series_num})" if series_num >= 2 else "Core (Series 2)"
+                suffix = series_model_match.group(2) or ""
+                series_num = max(model_num // 100, 1)
+                detected_series_gen = f"Core (Series {series_num})"
             else:
+                suffix = ""
                 detected_series_gen = "Core (Series 2)"
             logger.debug(
                 f"Detected {detected_series_gen} (non-Ultra) from brand string - overriding generation: "
@@ -1436,9 +1454,20 @@ def detect_cpu_generation_and_segment(
             )
             generation = detected_series_gen
             # Segment will be determined by _detect_segment() based on suffix
-            # Update codename to reflect "Refresh" for Series 2 (Raptor Lake) only
-            if generation == "Core (Series 2)" and "Raptor Lake" in codename:
-                codename = codename.replace("Raptor Lake", "Raptor Lake Refresh")
+            # Update codename to reflect the correct Raptor Lake variant for Series 1/2 (Raptor
+            # Lake-based) only. Determine H vs U power class from the suffix rather than doing
+            # a naive string replace, which previously produced incorrect names such as
+            # "Raptor Lake Refresh-HX" for a low-power "UL" suffixed CPU.
+            if "Raptor Lake" in codename and detected_series_gen in ("Core (Series 1)", "Core (Series 2)"):
+                is_high_power = suffix in ("H", "HL", "HX")
+                is_low_power = suffix in ("U", "UL")
+                refresh_suffix = "Refresh" if detected_series_gen == "Core (Series 1)" else "Re-refresh"
+                if is_high_power:
+                    codename = f"Raptor Lake-H {refresh_suffix}"
+                elif is_low_power:
+                    codename = f"Raptor Lake-U {refresh_suffix}"
+                else:
+                    codename = f"Raptor Lake {refresh_suffix}"
 
     if codename:
         result["codename"] = codename

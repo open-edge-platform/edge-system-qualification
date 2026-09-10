@@ -13,4 +13,4 @@ params:
     kpi_enabled: true
 ```
 
-For profiles without KPI validation, see the `suites` folder.
+For profiles without KPI validation, see the `suites` folder. 

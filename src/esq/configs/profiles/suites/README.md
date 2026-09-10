@@ -12,4 +12,4 @@ params:
     type: "suite"
 ```
 
-For profiles with KPI-based validation, see the `qualifications` folder.
+For profiles with KPI-based validation, see the `qualifications` folder. 

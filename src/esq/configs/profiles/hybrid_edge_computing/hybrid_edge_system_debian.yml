@@ -1,19 +1,20 @@
 # Copyright (C) 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-name: "profile.qualification.hybrid-edge-system-emt"
-description: "Hybrid Edge Computing (HEC) system qualification - Edge Microvisor Toolkit (EMT)"
+name: "profile.qualification.hybrid-edge-system-debian"
+description: "Hybrid Edge Computing (HEC) system qualification - Debian"
 version: "1.0.0"
 params:
   labels:
-    profile_display_name: "Hybrid Edge Computing - EMT"
-    group: "hybrid-edge-system-emt"
+    profile_display_name: "Hybrid Edge Computing - Debian"
+    group: "hybrid-edge-system-debian"
     type: "qualification"
+    report_section: "HEC"
     display_reference: false
     kpi_enabled: true
     hidden: true
     tags:
-      - "hec-emt"
+      - "hec-debian"
   depends_on:
     - "profile.suite.system.cpu-sku"
     - "profile.suite.system.display"
@@ -103,19 +104,13 @@ suites:
                   Verifies the CPU matches a qualified platform
                 timeout: 60
                 # Accepted platforms:
-                #   - 12th Gen Core          +  desktop → Alder Lake S (ADL-S)
                 #   - Core Ultra (Series 1)  +  mobile  → Meteor Lake H (MTL-H)
                 #   - Core Ultra (Series 2)  +  mobile  → Arrow Lake H (ARL-H)
-                #   - Core Ultra (Series 2)  +  desktop → Arrow Lake S (ARL-S)
                 exact_generations:
-                  - generation: "12th Gen Core"
-                    segment: "desktop"
                   - generation: "Core Ultra (Series 1)"
                     segment: "mobile"
                   - generation: "Core Ultra (Series 2)"
                     segment: "mobile"
-                  - generation: "Core Ultra (Series 2)"
-                    segment: "desktop"
                 kpi_refs:
                   - cpu_compatibility
                 kpi_override:

@@ -18,6 +18,11 @@ params:
     profile_display_name: "Example"
     group: "example.group"
     type: "suite"   # "qualification", "suite", or "vertical"
+    # report_section: "HEC"  # optional (any profile type); overrides which report
+    #   section this profile's tests are grouped under. Defaults to each type's
+    #   standard section ("Qualifications", "Suites"/Test Results, or "Vertical")
+    #   when omitted. Keep this short (e.g. an abbreviation) since many profiles
+    #   may each define their own section name.
 
   requirements:
     # Hardware
@@ -51,7 +56,7 @@ suites:
 
 ### Profile Types
 
-Profiles are stored in `src/esq/configs/profiles/` in one of three sub-directories:
+Profiles are stored in `src/esq/configs/profiles/` in one of these sub-directories:
 
 | Directory | Purpose |
 |-----------|---------|

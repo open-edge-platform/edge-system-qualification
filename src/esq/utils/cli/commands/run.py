@@ -62,6 +62,8 @@ logger = logging.getLogger(__name__)
 UNSUPPORTED_GENERATIONS = [
     # Core Ultra - older series
     "Core Ultra (Series 1)",  # Meteor Lake
+    # Core (non-Ultra) - older series
+    "Core (Series 1)",  # Raptor Lake-U/H Refresh
     # Traditional Core - 14th Gen and older
     "14th Gen Core",  # Raptor Lake Refresh (RPL-S Refresh)
     "13th Gen Core",  # Raptor Lake

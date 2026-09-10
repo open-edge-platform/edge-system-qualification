@@ -1153,6 +1153,11 @@ export const Summary = () => {
   const [expandedQualificationProfiles, setExpandedQualificationProfiles] = useState<Set<string>>(new Set());
   const [qualificationSearchTerm, setQualificationSearchTerm] = useState<string>("");
 
+  // State for custom report sections (opt-in via the `report_section` label,
+  // keyed by section name so any number of sections can be supported dynamically)
+  const [expandedCustomSectionProfiles, setExpandedCustomSectionProfiles] = useState<Record<string, Set<string>>>({});
+  const [customSectionSearchTerms, setCustomSectionSearchTerms] = useState<Record<string, string>>({});
+
   // State for vertical profiles
   const [expandedVerticalProfiles, setExpandedVerticalProfiles] = useState<Set<string>>(new Set());
   const [verticalSearchTerm, setVerticalSearchTerm] = useState<string>("");
@@ -1282,6 +1287,38 @@ export const Summary = () => {
     setQualificationSearchTerm(target.value);
   };
 
+  // Custom report-section profile management functions (parameterized by section name
+  // so any number of `report_section` values are supported without new state per section)
+  const toggleCustomSectionProfile = (sectionName: string, profileName: string) => {
+    setExpandedCustomSectionProfiles((prev: Record<string, Set<string>>) => {
+      const newSet = new Set(prev[sectionName] || []);
+      if (newSet.has(profileName)) {
+        newSet.delete(profileName);
+      } else {
+        newSet.add(profileName);
+      }
+      return { ...prev, [sectionName]: newSet };
+    });
+  };
+
+  const expandAllCustomSectionProfiles = (sectionName: string) => {
+    const allNames = (customSectionProfilesData[sectionName] || []).map((profile: any) => profile.profileName);
+    setExpandedCustomSectionProfiles((prev: Record<string, Set<string>>) => ({ ...prev, [sectionName]: new Set(allNames) }));
+  };
+
+  const collapseAllCustomSectionProfiles = (sectionName: string) => {
+    setExpandedCustomSectionProfiles((prev: Record<string, Set<string>>) => ({ ...prev, [sectionName]: new Set() }));
+  };
+
+  const clearCustomSectionSearch = (sectionName: string) => {
+    setCustomSectionSearchTerms((prev: Record<string, string>) => ({ ...prev, [sectionName]: "" }));
+  };
+
+  const handleCustomSectionSearchChange = (sectionName: string, event: Event) => {
+    const target = event.target as HTMLInputElement;
+    setCustomSectionSearchTerms((prev: Record<string, string>) => ({ ...prev, [sectionName]: target.value }));
+  };
+
   // Vertical profile management functions
   const toggleVerticalProfile = (profileName: string) => {
     setExpandedVerticalProfiles((prev: Set<string>) => {
@@ -1383,128 +1420,37 @@ export const Summary = () => {
   };
 
   // Create profile table data for test results (type: "suite")
-  const createTestResultProfilesFromTestResults = (groupBy: "group" | "parentSuite" = "group") => {
+  // Create profile table data for a given profile `type` label, optionally scoped to a
+  // specific `report_section` label value. Passing `null` for typeFilter matches any
+  // type (used for custom sections that mix profile types). Passing `null` for
+  // sectionFilter returns only profiles that do NOT opt into a custom report_section
+  // (i.e. each type's default bucket); passing a section name returns only profiles
+  // that opted into that specific custom section via `report_section`, regardless of
+  // their `type` — this is what lets any profile type (suite, qualification, vertical)
+  // use `report_section` to get its own dedicated report section.
+  const createReportSectionProfilesFromTestResults = (
+    typeFilter: string | null,
+    sectionFilter: string | null,
+    groupBy: "group" | "parentSuite" = "group"
+  ) => {
     if (loadingTests || Object.keys(individualTestResults).length === 0) {
       return [];
     }
 
-    // Group tests by specified grouping method for suite type only
+    // Group tests by specified grouping method, scoped to typeFilter/sectionFilter
     const profileGroups: Record<string, any[]> = {};
     
     Object.values(individualTestResults).forEach((testResult: any) => {
       const parentSuite = testResult.labels?.find((label: any) => label.name === "parentSuite")?.value;
       const groupLabel = testResult.labels?.find((label: any) => label.name === "group")?.value;
       const typeLabel = testResult.labels?.find((label: any) => label.name === "type")?.value;
+      const reportSection = testResult.labels?.find((label: any) => label.name === "report_section")?.value || null;
       
-      // Include only profiles that have "type" label with value "suite" and exclude "core" type
-      if (typeLabel === "suite") {
-        // Determine grouping key based on groupBy parameter
-        let groupingKey: string;
-        if (groupBy === "group") {
-          groupingKey = groupLabel || "unknown group";
-        } else {
-          groupingKey = parentSuite || "unknown suite";
-        }
-        
-        if (groupingKey && (groupBy === "group" || parentSuite)) { // For parentSuite grouping, ensure parentSuite exists
-          if (!profileGroups[groupingKey]) {
-            profileGroups[groupingKey] = [];
-          }
-          profileGroups[groupingKey].push(testResult);
-        }
-      }
-    });
-
-    // Create profile table data
-    return Object.entries(profileGroups).map(([profileName, tests]) => {
-      // Get profile_display_name from the first test in the group
-      const firstTest = tests[0];
-      const profileDisplayName = firstTest?.labels?.find((label: any) => label.name === "profile_display_name")?.value;
-      const displayStatus = firstTest?.labels?.find((label: any) => label.name === "display_status")?.value;
-      const displayReference = firstTest?.labels?.find((label: any) => label.name === "display_reference")?.value;
-      const displayId = firstTest?.labels?.find((label: any) => label.name === "display_id")?.value;
-      
-      // Find tier_display_name from any test in the group (not just the first one)
-      let tierDisplayName: string | undefined;
-      for (const test of tests) {
-        const tierLabel = test.labels?.find((label: any) => label.name === "tier_display_name")?.value;
-        if (tierLabel) {
-          tierDisplayName = tierLabel;
-          break;
-        }
-      }
-      
-      // Check if status column should be hidden
-      const hideStatusColumn = displayStatus === "False" || displayStatus === "false";
-      
-      // Check if reference column should be displayed (must be explicitly set to "True" or "true")
-      const showReferenceColumn = displayReference === "True" || displayReference === "true";
-      
-      // Check if ID column should be hidden (default is hidden unless explicitly set to "True" or "true")
-      const hideIdColumn = displayId !== "True" && displayId !== "true";
-
-      const testsData = tests.map((test: any) => {
-        // Get metrics from cached data
-        const cachedMetrics = testMetrics[test.id] || { metric: "N/A", value: "N/A", unit: "N/A" };
-        const cachedReference = testReferences[test.id] || "N/A";
-        
-        // Calculate history and retries data
-        const historyCount = test.history?.length || 0;
-        const retriesCount = test.retries?.length || 0;
-        const totalDuration = test.duration || 0;
-
-        // Get test title from test_title label, fallback to test name
-        const testTitle = test.labels?.find((label: any) => label.name === "test_title")?.value;
-
-        return {
-          id: test.id.substring(0, 8), // Display ID (shortened)
-          fullId: test.id, // Full ID for accessing individual test results
-          testName: testTitle || test.name, // Use test_title label if available, otherwise use test name
-          metric: cachedMetrics.metric,
-          value: cachedMetrics.value,
-          unit: cachedMetrics.unit,
-          reference: cachedReference,
-          status: test.status,
-          // Additional data for expanded content
-          historyCount,
-          retriesCount,
-          duration: formatDuration(totalDuration / 1000), // Convert from ms to seconds
-          testResult: test // Store full test result for detailed view
-        };
-      });
-
-      // Get the type from the first test in the group to identify profile type
-      const firstTestForType = tests[0];
-      const profileType = firstTestForType?.labels?.find((label: any) => label.name === "type")?.value;
-
-      return {
-        profileName: profileDisplayName || profileName.replace(/^profile\.(suite|qualification)\./, ""), // Use profile_display_name or fallback to processed profileName
-        testsData,
-        hideStatusColumn, // Pass this flag to the table rendering
-        showReferenceColumn, // Pass flag for showing reference column
-        hideIdColumn, // Pass flag for hiding ID column
-        profileType, // Add profile type for conditional rendering
-        tierDisplayName // Add tier display name for badge rendering
-      };
-    });
-  };
-
-  // Create profile table data for qualifications (type: "qualification")
-  const createQualificationProfilesFromTestResults = (groupBy: "group" | "parentSuite" = "group") => {
-    if (loadingTests || Object.keys(individualTestResults).length === 0) {
-      return [];
-    }
-
-    // Group tests by specified grouping method for qualification type only
-    const profileGroups: Record<string, any[]> = {};
-    
-    Object.values(individualTestResults).forEach((testResult: any) => {
-      const parentSuite = testResult.labels?.find((label: any) => label.name === "parentSuite")?.value;
-      const groupLabel = testResult.labels?.find((label: any) => label.name === "group")?.value;
-      const typeLabel = testResult.labels?.find((label: any) => label.name === "type")?.value;
-      
-      // Include only profiles that have "type" label with value "qualification"
-      if (typeLabel === "qualification") {
+      // Include only tests whose "type" matches typeFilter (or any type, if null) and
+      // whose (optional) report_section matches the requested section filter
+      const matchesType = typeFilter === null || typeLabel === typeFilter;
+      const matchesSection = sectionFilter === null ? !reportSection : reportSection === sectionFilter;
+      if (matchesType && matchesSection) {
         // Determine grouping key based on groupBy parameter
         let groupingKey: string;
         if (groupBy === "group") {
@@ -1600,7 +1546,7 @@ export const Summary = () => {
       const profileType = firstTestForType?.labels?.find((label: any) => label.name === "type")?.value;
 
       return {
-        profileName: profileDisplayName || profileName.replace(/^profile\.(suite|qualification)\./, ""), // Use profile_display_name or fallback to processed profileName
+        profileName: profileDisplayName || profileName.replace(/^profile\.(suite|qualification|vertical)\./, ""), // Use profile_display_name or fallback to processed profileName
         testsData,
         hideStatusColumn, // Pass this flag to the table rendering
         showReferenceColumn, // Pass flag for showing reference column
@@ -1631,144 +1577,25 @@ export const Summary = () => {
     });
   };
 
-  const individualProfilesData = createTestResultProfilesFromTestResults();
-  const qualificationProfilesData = createQualificationProfilesFromTestResults();
+  const individualProfilesData = createReportSectionProfilesFromTestResults("suite", null);
+  const qualificationProfilesData = createReportSectionProfilesFromTestResults("qualification", null);
+  const verticalProfilesData = createReportSectionProfilesFromTestResults("vertical", null);
 
-  // Create profile table data for vertical profiles (type: "vertical")
-  const createVerticalProfilesFromTestResults = (groupBy: "group" | "parentSuite" = "group") => {
-    if (loadingTests || Object.keys(individualTestResults).length === 0) {
-      return [];
-    }
+  // Discover custom report sections dynamically from the `report_section` label,
+  // scanning tests of any type, so any profile (suite, qualification, or vertical)
+  // can opt into its own section without further changes to this report component.
+  const customReportSectionNames: string[] = Array.from(
+    new Set(
+      Object.values(individualTestResults)
+        .map((testResult: any) => testResult.labels?.find((label: any) => label.name === "report_section")?.value)
+        .filter((sectionName: any): sectionName is string => Boolean(sectionName))
+    )
+  ).sort();
 
-    // Group tests by specified grouping method for vertical type only
-    const profileGroups: Record<string, any[]> = {};
-    
-    Object.values(individualTestResults).forEach((testResult: any) => {
-      const parentSuite = testResult.labels?.find((label: any) => label.name === "parentSuite")?.value;
-      const groupLabel = testResult.labels?.find((label: any) => label.name === "group")?.value;
-      const typeLabel = testResult.labels?.find((label: any) => label.name === "type")?.value;
-      
-      // Include only profiles that have "type" label with value "vertical"
-      if (typeLabel === "vertical") {
-        // Determine grouping key based on groupBy parameter
-        let groupingKey: string;
-        if (groupBy === "group") {
-          groupingKey = groupLabel || "unknown group";
-        } else {
-          groupingKey = parentSuite || "unknown suite";
-        }
-        
-        if (groupingKey && (groupBy === "group" || parentSuite)) { // For parentSuite grouping, ensure parentSuite exists
-          if (!profileGroups[groupingKey]) {
-            profileGroups[groupingKey] = [];
-          }
-          profileGroups[groupingKey].push(testResult);
-        }
-      }
-    });
-
-    // Create profile table data similar to qualifications
-    const profilesArray = Object.entries(profileGroups).map(([profileName, tests]) => {
-      // Get profile_display_name from the first test in the group
-      const firstTest = tests[0];
-      const profileDisplayName = firstTest?.labels?.find((label: any) => label.name === "profile_display_name")?.value;
-      const displayStatus = firstTest?.labels?.find((label: any) => label.name === "display_status")?.value;
-      const displayReference = firstTest?.labels?.find((label: any) => label.name === "display_reference")?.value;
-      const displayId = firstTest?.labels?.find((label: any) => label.name === "display_id")?.value;
-      
-      // Find tier_display_name from any test in the group (not just the first one)
-      let tierDisplayName: string | undefined;
-      for (const test of tests) {
-        const tierLabel = test.labels?.find((label: any) => label.name === "tier_display_name")?.value;
-        if (tierLabel) {
-          tierDisplayName = tierLabel;
-          break;
-        }
-      }
-      
-      // Check if status column should be hidden
-      const hideStatusColumn = displayStatus === "False" || displayStatus === "false";
-      
-      // Check if reference column should be displayed (must be explicitly set to "True" or "true")
-      const showReferenceColumn = displayReference === "True" || displayReference === "true";
-      
-      // Check if ID column should be hidden (default is hidden unless explicitly set to "True" or "true")
-      const hideIdColumn = displayId !== "True" && displayId !== "true";
-
-      // Calculate overall status and test count for the profile
-      const totalTests = tests.length;
-      const passedTests = tests.filter(test => test.status === "passed").length;
-      const failedTests = tests.filter(test => test.status === "failed").length;
-      const brokenTests = tests.filter(test => test.status === "broken").length;
-      const skippedTests = tests.filter(test => test.status === "skipped").length;
-      const unknownTests = tests.filter(test => test.status === "unknown").length;
-      
-      // Determine overall status
-      let overallStatus = "passed";
-      if (failedTests > 0 || brokenTests > 0 || skippedTests > 0 || unknownTests > 0) {
-        overallStatus = "failed";
-      }
-
-      const testsData = tests.map((test: any) => {
-        // Get metrics from cached data
-        const cachedMetrics = testMetrics[test.id] || { metric: "N/A", value: "N/A", unit: "N/A" };
-        const cachedReference = testReferences[test.id] || "N/A";
-        
-        // Calculate history and retries data
-        const historyCount = test.history?.length || 0;
-        const retriesCount = test.retries?.length || 0;
-        const totalDuration = test.duration || 0;
-
-        // Get test title from test_title label, fallback to test name
-        const testTitle = test.labels?.find((label: any) => label.name === "test_title")?.value;
-
-        return {
-          id: test.id.substring(0, 8), // Display ID (shortened)
-          fullId: test.id, // Full ID for accessing individual test results
-          testName: testTitle || test.name, // Use test_title label if available, otherwise use test name
-          metric: cachedMetrics.metric,
-          value: cachedMetrics.value,
-          unit: cachedMetrics.unit,
-          reference: cachedReference,
-          status: test.status,
-          // Additional data for expanded content
-          historyCount,
-          retriesCount,
-          duration: formatDuration(totalDuration / 1000), // Convert from ms to seconds
-          testResult: test // Store full test result for detailed view
-        };
-      });
-
-      // Get the type from the first test in the group to identify profile type
-      const firstTestForType = tests[0];
-      const profileType = firstTestForType?.labels?.find((label: any) => label.name === "type")?.value;
-
-      return {
-        profileName: profileDisplayName || profileName.replace(/^profile\.(suite|qualification|vertical)\./, ""), // Use profile_display_name or fallback to processed profileName
-        testsData,
-        hideStatusColumn, // Pass this flag to the table rendering
-        showReferenceColumn, // Pass flag for showing reference column
-        hideIdColumn, // Pass flag for hiding ID column
-        profileType, // Add profile type for conditional rendering
-        tierDisplayName, // Add tier display name for badge rendering
-        // Additional data for vertical profiles
-        totalTests,
-        passedTests,
-        failedTests,
-        brokenTests,
-        skippedTests,
-        unknownTests,
-        overallStatus
-      };
-    });
-
-    // Sort profiles by profile name alphabetically
-    return profilesArray.sort((a, b) => {
-      return a.profileName.localeCompare(b.profileName);
-    });
-  };
-
-  const verticalProfilesData = createVerticalProfilesFromTestResults();
+  const customSectionProfilesData: Record<string, any[]> = {};
+  customReportSectionNames.forEach((sectionName) => {
+    customSectionProfilesData[sectionName] = createReportSectionProfilesFromTestResults(null, sectionName);
+  });
 
   // Filter profiles and their tests based on search term
   const filteredProfilesData = individualProfilesData.map(profile => {
@@ -1836,6 +1663,42 @@ export const Summary = () => {
       hasMatches: filteredTests.length > 0 || profileNameMatches
     };
   }).filter(profile => (profile as any).hasMatches || !qualificationSearchTerm.trim());
+
+  // Filter a custom report section's profiles and their tests based on its search term
+  const getFilteredCustomSectionProfiles = (sectionName: string) => {
+    const sectionSearchTerm = customSectionSearchTerms[sectionName] || "";
+    const profiles = customSectionProfilesData[sectionName] || [];
+
+    return profiles.map(profile => {
+      if (!sectionSearchTerm.trim()) {
+        return profile; // No search term, return all data
+      }
+
+      const searchLower = sectionSearchTerm.toLowerCase();
+
+      // Filter tests within this profile
+      const filteredTests = profile.testsData.filter((test: any) => {
+        // Check if any field contains the search term
+        return [
+          test.id,
+          test.testName,
+          test.metric,
+          test.value,
+          test.unit,
+          test.status
+        ].some(field => String(field).toLowerCase().includes(searchLower));
+      });
+
+      // Only include profiles that have matching tests or whose name matches
+      const profileNameMatches = profile.profileName.toLowerCase().includes(searchLower);
+
+      return {
+        ...profile, // Include all original properties (totalTests, overallStatus, etc.)
+        testsData: filteredTests,
+        hasMatches: filteredTests.length > 0 || profileNameMatches
+      };
+    }).filter(profile => (profile as any).hasMatches || !sectionSearchTerm.trim());
+  };
 
   // Filter vertical profiles and their tests based on search term
   const filteredVerticalProfilesData = verticalProfilesData.map(profile => {
@@ -2848,6 +2711,282 @@ export const Summary = () => {
           </div>
         </div>
       )}
+
+      {/* Custom report sections (opt-in via the `report_section` label) */}
+      {customReportSectionNames.map((sectionName) => {
+        const sectionProfiles = customSectionProfilesData[sectionName] || [];
+        const filteredSectionProfiles = getFilteredCustomSectionProfiles(sectionName);
+        const sectionSearchTerm = customSectionSearchTerms[sectionName] || "";
+        const expandedSectionProfiles = expandedCustomSectionProfiles[sectionName] || new Set<string>();
+
+        return sectionProfiles.length > 0 && (
+          <div key={sectionName} className={styles["overview-grid-item"]}>
+            <div className={styles["collapsible-section"]}>
+              <div className={styles["collapsible-header-enhanced"]}>
+                <div className={styles["header-left-enhanced"]}>
+                  <h3 className={styles["section-title"]}>{sectionName}</h3>
+                </div>
+                <div className={styles["header-right-enhanced"]}>
+                  <div className={styles["search-container-inline"]}>
+                    <div className={styles["search-box"]}>
+                      <input
+                        type="text"
+                        className={styles["search-input"]}
+                        placeholder="Search"
+                        value={sectionSearchTerm}
+                        onInput={(event: Event) => handleCustomSectionSearchChange(sectionName, event)}
+                      />
+                      <button
+                        className={styles["clear-button"]}
+                        onClick={() => clearCustomSectionSearch(sectionName)}
+                        type="button"
+                        title="Clear search"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </div>
+                  <div className={styles["expand-collapse-controls"]}>
+                    <button 
+                      className={styles["secondary-button"]}
+                      onClick={() => expandAllCustomSectionProfiles(sectionName)}
+                      type="button"
+                    >
+                      Expand All
+                    </button>
+                    <button 
+                      className={styles["secondary-button"]}
+                      onClick={() => collapseAllCustomSectionProfiles(sectionName)}
+                      type="button"
+                    >
+                      Collapse All
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className={styles["profiles-container"]}>
+                {filteredSectionProfiles.map((profileData, index) => (
+                  profileData.testsData.length > 0 && (
+                    <div key={index} className={styles["profile-section"]}>
+                      <div 
+                        className={`${styles["profile-header"]} ${styles["qualification-profile-header"]}`}
+                        onClick={() => toggleCustomSectionProfile(sectionName, profileData.profileName)}
+                      >
+                        <button 
+                          className={styles["toggle-button"]}
+                          type="button"
+                          aria-expanded={expandedSectionProfiles.has(profileData.profileName)}
+                        >
+                          {expandedSectionProfiles.has(profileData.profileName) ? "−" : "+"}
+                        </button>
+                        <div className={styles["qualification-profile-info"]}>
+                          <h4 className={styles["profile-title"]}>{profileData.profileName}</h4>
+                        </div>
+                        <div className={styles["qualification-profile-summary"]}>
+                          {profileData.profileType === "qualification" && (
+                            <span className={`${styles["status-badge"]} ${styles[`status-${profileData.overallStatus}`]}`}>
+                              {profileData.overallStatus}
+                            </span>
+                          )}
+
+                          <span className={styles["table-test-count"]}>
+                            {profileData.totalTests}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      {expandedSectionProfiles.has(profileData.profileName) && (
+                        <div className={styles["profile-content"]}>
+                          <SortableTable
+                            title=""
+                            headers={(() => {
+                              const baseHeaders = [];
+                              if (!profileData.hideIdColumn) {
+                                baseHeaders.push("ID");
+                              }
+                              baseHeaders.push("Test Name", "Metric");
+                              if (profileData.showReferenceColumn) {
+                                baseHeaders.push("Reference");
+                              }
+                              baseHeaders.push("Value", "Unit");
+                              if (!profileData.hideStatusColumn) {
+                                baseHeaders.push("Status");
+                              }
+                              return baseHeaders;
+                            })()}
+                            data={profileData.testsData.map((test: any) => {
+                              const baseData = [];
+                              if (!profileData.hideIdColumn) {
+                                baseData.push(test.id);
+                              }
+                              baseData.push(test.testName, test.metric);
+                              if (profileData.showReferenceColumn) {
+                                baseData.push(test.reference);
+                              }
+                              baseData.push(test.value, test.unit);
+                              if (!profileData.hideStatusColumn) {
+                                baseData.push(test.status);
+                              }
+                              return baseData;
+                            })}
+                            onRowClick={(rowIndex: number) => {
+                              const test = profileData.testsData[rowIndex];
+                              toggleTestDetails(test.fullId);
+                            }}
+                            expandedRows={profileData.testsData.map((test: any) => 
+                              expandedTestDetails.has(test.fullId)
+                            )}
+                            renderExpandedContent={(rowIndex: number) => {
+                              const test = profileData.testsData[rowIndex];
+                              const testId = test.fullId; // Use the full ID to access individual test results
+                              const testAlias = individualTestResults[testId]?.parameters?.find((p: any) => p.name === "Test Id")?.value?.replace(/^'|'$/g, "").trim();
+                              
+                              return (
+                                <div className={styles["test-details"]}>
+                                  {individualTestResults[testId] ? (
+                                    <div>
+                                      {/* Error Messages for Failed Tests */}
+                                      {test.status === 'failed' && individualTestResults[testId]?.error?.message && (
+                                        <div className={styles["detail-section-error"]}>
+                                          <h4 className={styles["detail-section-title-dark"]}>Error Details</h4>
+                                          <pre className={styles["detail-section-message"]}>
+                                            {individualTestResults[testId].error.message}
+                                          </pre>
+                                        </div>
+                                      )}
+
+                                      {/* Status Details for Skipped and Broken Tests */}
+                                      {(test.status === 'skipped' || test.status === 'broken') && individualTestResults[testId]?.error?.message && (
+                                        <div className={test.status === 'skipped' ? styles["detail-section-skipped"] : styles["detail-section-broken"]}>
+                                          <h4 className={styles["detail-section-title-dark"]}>
+                                            {test.status === 'skipped' ? 'Skip Details' : 'Broken Details'}
+                                          </h4>
+                                          {individualTestResults[testId].error.message && (
+                                            <pre className={styles["detail-section-message"]}>
+                                              {individualTestResults[testId].error.message}
+                                            </pre>
+                                          )}
+                                        </div>
+                                      )}
+
+                                      {/* Overview Section */}
+                                      <div className={styles["detail-section"]}>
+                                        <h4 className={styles["detail-section-title"]}>Overview</h4>
+                                        {(() => { const desc = getTestDescription(testId); return desc ? <DescriptionBlock text={desc} /> : null; })()}
+                                        <div className={styles["detail-grid-3col"]}>
+                                          <div>
+                                            <span className={styles["detail-label"]}>History: </span>
+                                            <span>{individualTestResults[testId]?.history?.length || "1"}</span>
+                                          </div>
+                                          <div>
+                                            <span className={styles["detail-label"]}>Retries: </span>
+                                            <span>{individualTestResults[testId]?.retries?.length || '0'}</span>
+                                          </div>
+                                          <div>
+                                            <span className={styles["detail-label"]}>Duration: </span>
+                                            <span>{individualTestResults[testId]?.duration 
+                                              ? `${(individualTestResults[testId].duration / 1000).toFixed(2)}s`
+                                              : 'N/A'}</span>
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      {/* Metrics Section */}
+                                      <MetadataTable metricsData={testFullMetrics[testId]} include={['metrics']} />
+
+                                      {/* Charts Section */}
+                                      <ChartsSection extendedMetadata={testFullMetrics[testId]?.extended_metadata} summaryMeta={summaryMeta} testId={testAlias} systemInfo={systemInfo} />
+
+                                      {/* Metadata & KPIs Sections */}
+                                      <MetadataTable metricsData={testFullMetrics[testId]} include={['metadata', 'kpis']} />
+
+                                      {/* Telemetry Section */}
+                                      <TelemetrySection extendedMetadata={testFullMetrics[testId]?.extended_metadata} summaryMeta={summaryMeta} testId={testAlias} />
+
+                                      {/* Attachments Section */}
+                                      {(() => {
+                                        const testData = individualTestResults[testId];
+                                        const imageAttachments = testData?.attachments?.filter((attachment: any) => 
+                                          attachment.link?.contentType === "image/png" || 
+                                          attachment.link?.contentType === "image/jpeg"
+                                        ) || [];
+                                        const csvAttachments = testData?.attachments?.filter((attachment: any) => 
+                                          attachment.link?.contentType === "text/csv"
+                                        ) || [];
+                                        
+                                        const hasAttachments = imageAttachments.length > 0 || csvAttachments.length > 0;
+                                        
+                                        return hasAttachments ? (
+                                          <div className={styles["attachment-section"]}>
+                                            {/* Image Attachments */}
+                                            {imageAttachments.length > 0 && (
+                                              <div className={styles["attachment-container"]} style={{ marginBottom: csvAttachments.length > 0 ? '12px' : '0' }}>
+                                                <h4 className={styles["detail-section-title"]}>Image Attachments</h4>
+                                                <div className={styles["attachment-image-grid"]}>
+                                                  {imageAttachments.map((attachment: any, index: number) => {
+                                                    return (
+                                                      <div key={index} className={styles["attachment-image-item"]}>
+                                                        <div className={styles["attachment-image-wrapper"]}>
+                                                          <AttachmentImage 
+                                                            attachment={attachment}
+                                                            onError={() => console.warn('Failed to load attachment:', attachment.link?.id)}
+                                                          />
+                                                        </div>
+                                                        <div className={styles["attachment-image-name"]}>
+                                                          {attachment.name || attachment.link?.name || `Attachment ${index + 1}`}
+                                                        </div>
+                                                      </div>
+                                                    );
+                                                  })}
+                                                </div>
+                                              </div>
+                                            )}
+                                            
+                                            {/* CSV Attachments - Full Width */}
+                                            {csvAttachments.length > 0 && (
+                                              <div className={styles["csv-attachments"]}>
+                                                {csvAttachments.map((attachment: any, index: number) => (
+                                                  <div key={index} className={styles["attachment-container"]} style={{ 
+                                                    marginBottom: index < csvAttachments.length - 1 ? '12px' : '0'
+                                                  }}>
+                                                    <AttachmentCSV 
+                                                      attachment={attachment}
+                                                      onError={() => console.warn('Failed to load CSV attachment:', attachment.link?.id)}
+                                                    />
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            )}
+                                          </div>
+                                        ) : null;
+                                      })()}
+                                    </div>
+                                  ) : (
+                                    <div style={{ padding: '16px', textAlign: 'center', color: '#666' }}>
+                                      Loading test details...
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )
+                ))}
+                
+                {sectionSearchTerm && filteredSectionProfiles.every(profile => profile.testsData.length === 0) && (
+                  <div className={styles["no-results"]}>
+                    <p>No matching profiles or tests found for "{sectionSearchTerm}"</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })}
 
       {/* Vertical Profiles */}
       {verticalProfilesData.length > 0 && (

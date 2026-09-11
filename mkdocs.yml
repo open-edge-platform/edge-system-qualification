@@ -138,15 +138,17 @@ nav:
       - AI Edge System:
         - Requirements: getting-started/qualifications/ai-edge-system/requirements.md
         - Quick Start: getting-started/qualifications/ai-edge-system/quick-start.md
-      - HEC - Debian:
-        - Requirements: getting-started/qualifications/hybrid-edge-computing-debian/requirements.md
-        - Quick Start: getting-started/qualifications/hybrid-edge-computing-debian/quick-start.md
-      - HEC - EMT:
-        - Requirements: getting-started/qualifications/hybrid-edge-computing-emt/requirements.md
-        - Quick Start: getting-started/qualifications/hybrid-edge-computing-emt/quick-start.md
       - Robotics:
         - Requirements: getting-started/qualifications/robotics/requirements.md
         - Quick Start: getting-started/qualifications/robotics/quick-start.md
+    - HEC:
+      - getting-started/hec/index.md
+      - HEC - Debian:
+        - Requirements: getting-started/hec/hybrid-edge-computing-debian/requirements.md
+        - Quick Start: getting-started/hec/hybrid-edge-computing-debian/quick-start.md
+      - HEC - EMT:
+        - Requirements: getting-started/hec/hybrid-edge-computing-emt/requirements.md
+        - Quick Start: getting-started/hec/hybrid-edge-computing-emt/quick-start.md
     - Test Suites:
       - getting-started/suites/index.md
     - Telemetry:

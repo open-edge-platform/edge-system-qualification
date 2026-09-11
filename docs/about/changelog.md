@@ -2,6 +2,46 @@
 
 Intel® ESQ changelog and version history.
 
+## Version 2026.3.0 - September 2026
+
+### Changes
+- Added system peripheral profile with scalable passthrough test
+- Added system network profile with scalable connectivity test
+- Added KVM virtualization profile with scalable system requirement checks
+- Added system display profile with scalable display validation test
+- Added system stress profile with scalable stress test
+- Added QEMU virtualization profile with scalable VM reboot test
+- Integrated GenAI Human Machine Interface (HMI) augmented worker test
+- Fixed an issue where Gen-AI qualification tests failed on systems with dual B60 GPUs
+- Added Intel® Arc™ B70 as a supported qualification dGPU
+- Fixed an issue where Vision-AI qualification tests failed on systems with dual B60 GPUs
+- Added Auxiliary Test - Fast Mapping
+- Added Auxiliary Test - ACT Latency Benchmark
+- Added Auxiliary Test - ASR Whisper (FunASR)
+- Added Pi0.5 with Real-Time Chunking benchmark for Robotics
+- Added verified reference values for B60 with DeepSeek-R1-Distill-Qwen-14B
+- Added verified reference data for B70
+- Added kernel boot parameter check for PREEMPT-RT
+- Added real-time performance cyclic test
+- Moved Timeseries test suite under Manufacturing
+- Updated AI pipeline definitions in ESQ Manufacturing suite from OEP 2026.2
+- Fixed TSN pytest test suite CSV attachment failure on cached reruns
+- Fixed cluttered download progress logs caused by a duplicate download function
+- Deprecated B570 and A770 dGPU support for Metro-related test suites
+- Fixed missing failed requirements details when validation aborts in non-verbose mode
+- Fixed default `esq` run behavior that assumed AI Edge System instead of requiring qualification selection
+- Fixed an issue where Intel® Core™ Ultra Processor (Series 3) reported lower performance due to default Balanced power mode on Ubuntu* 24.04
+
+### Known Issues
+- GPU utilization and Package Power metrics are inconsistent on Linux* kernel 6.14
+- GitHub* resource downloads intermittently fail from the PRC network
+- Intel® DL Streamer pipeline instability causes timeouts and underreports dGPU stream performance
+- Redundant file detection occurs in the Metro Media test case due to file copying during test/build
+- Pexels* video downloads intermittently fail from the PRC network
+- Memory is not released after Vision AI test cases complete on Panther Lake (PTL) systems
+- Qmassa Collector fallback logic incorrectly references a sysfs metric source
+- Intel® Core™ 3 100UL and Intel® Core™ 5 120UL are not properly detected as Raptor Lake
+
 ## Version 2026.2.0 - June 2026
 ### New Platform Support
 - Intel® Core™ Series 3 Processor, Products formerly Wildcat Lake

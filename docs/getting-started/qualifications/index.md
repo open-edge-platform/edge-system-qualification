@@ -5,10 +5,7 @@ Intel® ESQ ships with multiple qualification profiles, each targeting a differe
 | Qualification | Profile | Tag |
 |----------------|---------|-----|
 | [AI Edge System](ai-edge-system/quick-start.md) | `profile.qualification.ai-edge-system` | `aes` |
-| [Hybrid Edge Computing - Debian](hybrid-edge-computing-debian/quick-start.md) | `profile.qualification.hybrid-edge-system-debian` | `hec-debian` |
-| [Hybrid Edge Computing - EMT](hybrid-edge-computing-emt/quick-start.md) | `profile.qualification.hybrid-edge-system-emt` | `hec-emt` |
 | [Robotics](robotics/quick-start.md) | `profile.qualification.robotics` | `robotics` |
-
 
 ---
 

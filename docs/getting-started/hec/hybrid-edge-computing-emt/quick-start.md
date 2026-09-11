@@ -62,4 +62,4 @@ esq run -t hec-emt
 
 ---
 
-Continue to [Qualification Profiles](../index.md) →
+Continue to [HEC Profiles](../index.md) →

@@ -446,7 +446,11 @@ def test_lp_vlm(
 
                             get_latency_cmd = ["make", "consolidate-metrics"]
                             latency_results = run_command(
-                                get_latency_cmd, cwd=lp_base_dir, stream_output=True, timeout=60
+                                get_latency_cmd,
+                                cwd=lp_base_dir,
+                                env={"PWD": lp_base_dir},
+                                stream_output=True,
+                                timeout=60,
                             )
                             allure.attach(
                                 latency_results.stdout + latency_results.stderr,
@@ -464,9 +468,9 @@ def test_lp_vlm(
                                 logger.debug(f"Processing performance metrics file: {metrics_file}")
                                 with open(metrics_file, "r") as f:
                                     for line in f:
-                                        if "vlm_metrics" in line and "Load_Time=" in line:
+                                        if "vlm_metrics" in line:
                                             # Parse metrics from log line
-                                            # Format: timestamp - INFO - application=vlm_metrics ... Load_Time=X Generated_Tokens=Y ...
+                                            # Format: timestamp - INFO - application=vlm_metrics ... Generate_Duration_Mean=Y ...
                                             parts = line.strip().split(" ")
                                             for part in parts:
                                                 if (
@@ -500,27 +504,18 @@ def test_lp_vlm(
                                 avg_value = total_value / count if count > 0 else 0.0
 
                                 # Map metrics to standardized names and units
-                                if key == "Throughput_Mean":
+                                if key == "throughput_mean_sec":
                                     results.metrics["throughput_mean"] = Metrics(
                                         value=round(avg_value, 2) if avg_value > 0 else 0.0,
                                         unit="tokens/sec",
                                         is_key_metric=True,
                                     )
-                                elif key == "TTFT_Mean":
-                                    results.metadata["ttft_mean"] = round(avg_value, 2) if avg_value > 0 else 0.0
-                                    results.metadata["ft_throughput"] = (
-                                        round(1000 / avg_value, 2) if avg_value > 0 else 0.0
-                                    )
-                                elif key == "TPOT_Mean":
-                                    results.metadata["tpot_mean"] = round(avg_value, 2) if avg_value > 0 else 0.0
+                                elif key == "tpot_sec":
+                                    results.metadata["tpot_sec"] = round(avg_value, 2) if avg_value > 0 else 0.0
                                 elif key == "Generate_Duration_Mean":
-                                    results.metadata["generate_duration"] = round(avg_value, 2)
-                                elif key == "Load_Time":
-                                    results.metadata["load_time"] = round(avg_value, 2)
-                                elif key == "Generated_Tokens":
-                                    results.metadata["generated_tokens_avg"] = round(avg_value, 1)
-                                elif key == "Input_Tokens":
-                                    results.metadata["input_tokens_avg"] = round(avg_value, 1)
+                                    results.metadata["generate_duration_mean"] = round(avg_value, 2)
+                                elif key == "generated_tokens":
+                                    results.metadata["generated_tokens"] = round(avg_value, 1)
                             # Add total number of VLM inference calls after processing metrics
                             total_calls = max(metric_counts.values()) if metric_counts else 0
                             results.metadata["total_calls"] = total_calls
@@ -543,7 +538,7 @@ def test_lp_vlm(
                                                     metric_value = float(metric_value_str)
 
                                                     # Extract VLM verification latency
-                                                    if "vlm_verification_latency" in metric_name:
+                                                    if "vlm_verification_latency_retail-default" in metric_name:
                                                         results.metrics["application_latency"] = Metrics(
                                                             value=round(metric_value, 2),
                                                             unit="ms",

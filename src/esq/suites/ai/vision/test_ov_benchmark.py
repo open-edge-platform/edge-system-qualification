@@ -145,7 +145,7 @@ def load_reference_benchmarks(bcmk_ref_path: Path) -> dict:
         bcmk_ref_path: Path to bcmk_ref.csv file
 
     Returns:
-        Dictionary with (model, precision, device) tuples as keys and
+        Dictionary with (model, precision, device, reference_platform) tuples as keys and
         (reference_value, reference_platform, reference_freq, ref_vdbox) tuples as values
     """
     reference_data = {}
@@ -188,8 +188,9 @@ def load_reference_benchmarks(bcmk_ref_path: Path) -> dict:
                     except (ValueError, TypeError):
                         ref_vdbox = None
 
-                # Store using (model, precision, device) as key
-                key = (model, precision, device)
+                # Preserve each platform row. Multiple reference platforms can
+                # share the same model, precision, and device.
+                key = (model, precision, device, ref_platform)
                 reference_data[key] = (ref_value, ref_platform, ref_freq, ref_vdbox)
 
         logger.info(f"Loaded {len(reference_data)} reference benchmark entries from {bcmk_ref_path}")
@@ -239,7 +240,12 @@ def lookup_reference_benchmark(
     candidates = []
 
     for key, value in reference_data.items():
-        ref_model, ref_precision, ref_device = key
+        # Accept legacy three-part keys so callers/tests using pre-platform
+        # reference dictionaries remain compatible.
+        if len(key) == 4:
+            ref_model, ref_precision, ref_device, _ = key
+        else:
+            ref_model, ref_precision, ref_device = key
         if ref_model == model and ref_precision == precision and ref_device == device:
             # Unpack reference data (may have 3 or 4 elements depending on CSV format)
             if len(value) == 4:

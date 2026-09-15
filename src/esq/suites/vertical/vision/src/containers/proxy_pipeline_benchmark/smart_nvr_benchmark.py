@@ -79,10 +79,10 @@ class SmartNVRBenchmark(BaseProxyPipelineBenchmark):
                         # NOTE: ref_* values pending ARL-base standardization.
                         self.config = {
                             "compose_size": 4,
-                            "ref_stream_list": [13, 7, 2],
-                            "ref_gpu_freq_list": [1034.29, 1285.81, 957.05],
-                            "ref_pkg_power_list": [25.85, 26.98, 24.99],
-                            "ref_platform": "MTL 165H (32G Mem)",
+                            "ref_stream_list": [16, 15, 4],
+                            "ref_gpu_freq_list": [1111.60, 1105.54, 1089.11],
+                            "ref_pkg_power_list": [23.49, 25.20, 21.19],
+                            "ref_platform": "PTL Ultra 7 356H (64G Mem)",
                             "output_width": 1920,
                             "output_height": 1080,
                             "models": ["yolov5s-416", "yolov5m-416", "yolov5m-416+efficientnet-b0"],
@@ -92,10 +92,10 @@ class SmartNVRBenchmark(BaseProxyPipelineBenchmark):
                     else:
                         self.config = {
                             "compose_size": 5,
-                            "ref_stream_list": [13, 7, 2],
-                            "ref_gpu_freq_list": [1034.29, 1285.81, 957.05],
-                            "ref_pkg_power_list": [25.85, 26.98, 24.99],
-                            "ref_platform": "MTL 165H (32G Mem)",
+                            "ref_stream_list": [14, 15, 3],
+                            "ref_gpu_freq_list": [1122.97, 1076.21, 1057.12],
+                            "ref_pkg_power_list": [26.98, 23.11, 21.33],
+                            "ref_platform": "ARL Ultra 7 255H (64G Mem)",
                             "output_width": 3840,
                             "output_height": 2160,
                             "models": ["yolov5s-416", "yolov5m-416", "yolov5m-416+efficientnet-b0"],

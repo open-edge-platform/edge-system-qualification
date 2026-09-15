@@ -79,80 +79,80 @@ class MediaBenchmark(BaseDLBenchmark):
             if self.VDBOX == 1:
                 self.config = {
                     "Encode": {
-                        "ref_stream_list": [10, 2, 14, 3],
-                        "ref_gpu_freq_list": [-1, -1, -1, -1],
-                        "ref_pkg_power_list": [-1, -1, -1, -1],
+                        "ref_stream_list": [9, 4, 7, 5],
+                        "ref_gpu_freq_list": [900.00, 1052.18, 1123.50, 1201.13],
+                        "ref_pkg_power_list": [26.78, 26.13, 26.20, 31.27],
                     },
                     "Decode": {
-                        "ref_stream_list": [43, 10, 55, 14],
-                        "ref_gpu_freq_list": [-1, -1, -1, -1],
-                        "ref_pkg_power_list": [-1, -1, -1, -1],
+                        "ref_stream_list": [46, 17, 39, 14],
+                        "ref_gpu_freq_list": [901.15, 900.00, 900.00, 896.8],
+                        "ref_pkg_power_list": [26.82, 23.51, 25.90, 21.56],
                     },
                     "Decode+Compose": {
-                        "ref_stream_list": [10, 9, 16, 8],
-                        "ref_gpu_freq_list": [-1, -1, -1, -1],
-                        "ref_pkg_power_list": [-1, -1, -1, -1],
+                        "ref_stream_list": [14, 13, 16, 12],
+                        "ref_gpu_freq_list": [1112.44, 1080.81, 1034.31, 1099.17],
+                        "ref_pkg_power_list": [26.87, 29.13, 26.26, 28.33],
                         "compose_size": 4,
                     },
-                    "ref_platform": "i5-12400 (16G Mem)",
+                    "ref_platform": "PTL Ultra x7 358H (64G Mem)",
                 }
             else:
                 if self.is_MTL:
                     self.config = {
                         "Encode": {
-                            "ref_stream_list": [24, 8, 26, 6],
-                            "ref_gpu_freq_list": [1038.75, 1046.13, 1018.15, 1039.54],
-                            "ref_pkg_power_list": [2.74, 2.96, 2.82, 2.94],
+                            "ref_stream_list": [33, 8, 31, 7],
+                            "ref_gpu_freq_list": [1743.00, 1255.74, 1884.39, 1122.67],
+                            "ref_pkg_power_list": [22.02, 13.47, 24.39, 15.96],
                         },
                         "Decode": {
-                            "ref_stream_list": [56, 23, 66, 28],
-                            "ref_gpu_freq_list": [1049.57, 1047.67, 1037.63, 1050.03],
-                            "ref_pkg_power_list": [2.76, 2.98, 2.71, 3.0],
+                            "ref_stream_list": [72, 22, 79, 28],
+                            "ref_gpu_freq_list": [1199.80, 1040.25, 1238.47, 994.71],
+                            "ref_pkg_power_list": [15.95, 10.05, 16.99, 11.06],
                         },
                         "Decode+Compose": {
-                            "ref_stream_list": [31, 20, 30, 27],
-                            "ref_gpu_freq_list": [1023.02, 1012.70, 1048.54, 1044.81],
-                            "ref_pkg_power_list": [1.07, 0.93, 1.33, 1.11],
+                            "ref_stream_list": [36, 22, 36, 27],
+                            "ref_gpu_freq_list": [1674.72, 1244.99, 1579.28, 1360.50],
+                            "ref_pkg_power_list": [19.32, 14.22, 18.57, 16.38],
                             "compose_size": 6,
                         },
-                        "ref_platform": "MTL 165H (32G Mem)",
+                        "ref_platform": "ARL Ultra 7 255H (96G Mem)",
                     }
                 else:
                     self.config = {
                         "Encode": {
-                            "ref_stream_list": [15, 4, 27, 6],
-                            "ref_gpu_freq_list": [1492.86, 1486.61, 1496.28, 1499.63],
-                            "ref_pkg_power_list": [1.65, 2.21, 3.1, 3.56],
+                            "ref_stream_list": [17, 3, 24, 5],
+                            "ref_gpu_freq_list": [928.82, 920.77, 902.90, 1059.47],
+                            "ref_pkg_power_list": [20.03, 17.71, 22.52, 19.06],
                         },
                         "Decode": {
-                            "ref_stream_list": [83, 21, 98, 27],
-                            "ref_gpu_freq_list": [1499.53, 2474.42, 1499.75, 1485.9],
-                            "ref_pkg_power_list": [0.92, 0.89, 1.23, 1.21],
+                            "ref_stream_list": [66, 20, 73, 26],
+                            "ref_gpu_freq_list": [1022.23, 976.93, 957.47, 926.41],
+                            "ref_pkg_power_list": [22.58, 19.03, 21.96, 19.67],
                         },
                         "Decode+Compose": {
-                            "ref_stream_list": [28, 22, 27, 30],
-                            "ref_gpu_freq_list": [1830.08, 1537.31, 1448.23, 1448.23],
-                            "ref_pkg_power_list": [2.21, 1.77, 2.85, 1.09],
+                            "ref_stream_list": [12, 4, 12, 3],
+                            "ref_gpu_freq_list": [942.51, 1276.71, 1448.23, 889.27],
+                            "ref_pkg_power_list": [19.06, 29.86, 31.57, 18.49],
                             "compose_size": 6,
                         },
-                        "ref_platform": "i7-1360P (16G Mem)",
+                        "ref_platform": "BTL-S Core 7 251E (64G Mem)",
                     }
         elif device_type == "dGPU":
             self.config = {
                 "Encode": {
-                    "ref_stream_list": [14, 10, 12, 8],
-                    "ref_gpu_freq_list": [-1, -1, -1, -1],
-                    "ref_pkg_power_list": [-1, -1, -1, -1],
+                    "ref_stream_list": [16, 12, 13, 10],
+                    "ref_gpu_freq_list": [2256.28, 2909.33, 2714.12, 2519.72],
+                    "ref_pkg_power_list": [33.17, 36.25, 42.01, 34.52],
                 },
                 "Decode": {
-                    "ref_stream_list": [41, 27, 32, 31],
-                    "ref_gpu_freq_list": [-1, -1, -1, -1],
-                    "ref_pkg_power_list": [-1, -1, -1, -1],
+                    "ref_stream_list": [41, 27, 31, 31],
+                    "ref_gpu_freq_list": [2886.25, 2947.41, 2527.70, 2333.34],
+                    "ref_pkg_power_list": [39.28, 34.41, 31.42, 29.63],
                 },
                 "Decode+Compose": {
-                    "ref_stream_list": [14, 14, 13, 13],
-                    "ref_gpu_freq_list": [-1, -1, -1, -1],
-                    "ref_pkg_power_list": [-1, -1, -1, -1],
+                    "ref_stream_list": [18, 15, 13, 14],
+                    "ref_gpu_freq_list": [2149.59, 2086.53, 2129.84, 2225.05],
+                    "ref_pkg_power_list": [18.80, 19.28, 19.10, 19.25],
                     "compose_size": 6,
                 },
                 "ref_platform": "Arc B580",

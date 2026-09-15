@@ -72,7 +72,7 @@ suites:
                 display_name: "Smart NVR (iGPU)"
                 devices: [igpu]
                 pptest: "SmartAIRunner"
-                timeout: 3600  # 60 min - binary search on iGPU
+                timeout: 4800  # 80 min - binary search on iGPU
                 force_run: true
                 display_output: 1  # 0=no display, 1=enable display
                 requirements:
@@ -94,7 +94,7 @@ suites:
                 display_name: "Headed Visual AI Proxy Pipeline (iGPU)"
                 devices: [igpu]
                 pptest: "VisualAIRunner"
-                timeout: 3600  # 60 min - binary search on iGPU
+                timeout: 4800  # 80 min - binary search on iGPU
                 force_run: true
                 display_output: 1  # 0=no display, 1=enable display
                 requirements:

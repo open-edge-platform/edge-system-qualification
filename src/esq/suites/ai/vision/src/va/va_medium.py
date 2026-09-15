@@ -41,7 +41,6 @@ from esq.utils.media.validation import detect_platform_type, get_unsupported_met
 
 # Import shared VA utilities
 from .va_common import (
-    VA_CONTAINER_PATH,
     attach_va_artifacts,
     create_va_metrics,
     determine_expected_modes,
@@ -50,7 +49,6 @@ from .va_common import (
     extract_metrics_from_csv,
     generate_va_charts,
     initialize_csv_files,
-    prepare_docker_build_context,
     run_va_container,
 )
 
@@ -157,8 +155,10 @@ def test_va_medium(
 
     # Setup
     test_dir = os.path.dirname(os.path.abspath(__file__))
-    docker_dir = os.path.join(test_dir, VA_CONTAINER_PATH)
-    logger.info(f"Docker directory: {docker_dir}")
+    esq_context_dir = Path(test_dir).parents[4]
+    dockerfile_relative_path = Path("suites/ai/vision/src/containers/video_analytics") / dockerfile_name
+    dockerfile_path = esq_context_dir / dockerfile_relative_path
+    logger.info(f"Docker build context: {esq_context_dir}")
 
     # Use CORE_DATA_DIR for results and resources
     core_data_dir_tainted = os.environ.get("CORE_DATA_DIR", os.path.join(os.getcwd(), "esq_data"))
@@ -233,7 +233,7 @@ def test_va_medium(
     try:
         # Step 3: Prepare test environment
         def prepare_assets():
-            nonlocal docker_image_tag, dockerfile_name, docker_dir, timeout
+            nonlocal docker_image_tag, dockerfile_name, timeout
 
             docker_nocache = configs.get("docker_nocache", False)
             logger.info(f"Docker build cache setting: nocache={docker_nocache}")
@@ -249,19 +249,7 @@ def test_va_medium(
                 f"dGPU_count={platform_info['dgpu_count']}, MTL={platform_info['is_mtl']}"
             )
 
-            # Check if Docker directory exists
-            if not os.path.exists(docker_dir):
-                logger.warning(f"Docker directory not found: {docker_dir}")
-                logger.info("Creating minimal Docker structure for VA benchmark...")
-                os.makedirs(docker_dir, exist_ok=True)
-
-            # Copy consolidated utilities into Docker build context
-            logger.info("Preparing Docker build context with consolidated utilities...")
-            test_file_dir = Path(__file__).resolve().parent
-            prepare_docker_build_context(test_file_dir, docker_dir)
-
             # Build Docker image if Dockerfile exists
-            dockerfile_path = os.path.join(docker_dir, dockerfile_name)
             if os.path.exists(dockerfile_path):
                 # Build 1: Get FW custom device-specific images from dlstreamer preparation
                 from esq.suites.ai.vision.src.dlstreamer.preparation import (
@@ -332,10 +320,10 @@ def test_va_medium(
                 }
 
                 build_result = docker_client.build_image(
-                    path=docker_dir,
+                    path=str(esq_context_dir),
                     tag=docker_image_tag,
                     nocache=docker_nocache,
-                    dockerfile=dockerfile_name,
+                    dockerfile=str(dockerfile_relative_path),
                     buildargs=build_args,
                 )
 
@@ -343,8 +331,8 @@ def test_va_medium(
                     "image_id": build_result.get("image_id", ""),
                     "image_tag": docker_image_tag,
                     "timeout": timeout,
-                    "dockerfile": dockerfile_path,
-                    "build_path": docker_dir,
+                    "dockerfile": str(dockerfile_path),
+                    "build_path": str(esq_context_dir),
                 }
             else:
                 logger.warning(f"Dockerfile not found: {dockerfile_path}")

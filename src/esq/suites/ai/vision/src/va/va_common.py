@@ -18,7 +18,6 @@ import grp
 import logging
 import os
 import re
-import shutil
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -159,47 +158,6 @@ def initialize_csv_files(pp_results: str, csvlist: list = None) -> None:
                 logger.info(f"Initialized CSV file: {csv_file}")
             except Exception as e:
                 logger.warning(f"Failed to initialize CSV file {csv_file}: {e}")
-
-
-def prepare_docker_build_context(
-    test_file_dir: Path,
-    docker_dir: str,
-    util_files: list = None,
-) -> None:
-    """
-    Copy consolidated utilities into Docker build context.
-
-    Args:
-        test_file_dir: Path to the test file directory
-        docker_dir: Docker build directory path
-        util_files: List of utility files to copy (default: common utils)
-    """
-    if util_files is None:
-        util_files = [
-            "__init__.py",
-            "pipeline_utils.py",
-            "telemetry.py",
-            "pmu_gpu_collector.py",
-            "validation.py",
-            "container_utils.py",
-            "memory_utils.py",
-        ]
-
-    # Navigate from src/esq/suites/ai/vision/src/va/ to src/esq/utils/media/
-    esq_utils_src = test_file_dir.parent.parent.parent.parent.parent / "utils" / "media"
-
-    docker_build_path = Path(docker_dir)
-    esq_utils_dst = docker_build_path / "esq_utils" / "media"
-    esq_utils_dst.mkdir(parents=True, exist_ok=True)
-
-    for util_file in util_files:
-        src = esq_utils_src / util_file
-        dst = esq_utils_dst / util_file
-        if src.exists():
-            shutil.copy2(src, dst)
-            logger.debug(f"Copied {util_file} to build context")
-        else:
-            logger.warning(f"Utility file not found: {src}")
 
 
 def setup_x11_display(environment: dict, volumes: dict) -> None:

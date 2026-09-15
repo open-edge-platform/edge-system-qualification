@@ -35,19 +35,19 @@ RUN mkdir -p /home/dlstreamer/output \
     && mkdir -p /home/dlstreamer/sample_video \
     && mkdir -p /home/dlstreamer/sink
 
-# Copy benchmark utilities
-COPY esq_utils /home/dlstreamer/esq_utils
+# Copy benchmark utilities from the src/esq build context
+COPY utils/media /home/dlstreamer/esq_utils/media
 
 # Copy model-proc files for YOLO post-processing
-COPY model_proc /home/dlstreamer/model_proc
+COPY suites/ai/vision/src/containers/video_analytics/model_proc /home/dlstreamer/model_proc
 
 # Copy benchmark scripts
-COPY base_benchmark.py /home/dlstreamer/base_benchmark.py
-COPY va_benchmark.py /home/dlstreamer/va_benchmark.py
-COPY va_medium_benchmark.py /home/dlstreamer/va_medium_benchmark.py
-COPY va_heavy_benchmark.py /home/dlstreamer/va_heavy_benchmark.py
-COPY run_video_analytics_benchmark.sh /home/dlstreamer/run_video_analytics_benchmark.sh
-COPY run_pipeline.sh /home/dlstreamer/run_pipeline.sh
+COPY suites/ai/vision/src/containers/video_analytics/base_benchmark.py /home/dlstreamer/base_benchmark.py
+COPY suites/ai/vision/src/containers/video_analytics/va_benchmark.py /home/dlstreamer/va_benchmark.py
+COPY suites/ai/vision/src/containers/video_analytics/va_medium_benchmark.py /home/dlstreamer/va_medium_benchmark.py
+COPY suites/ai/vision/src/containers/video_analytics/va_heavy_benchmark.py /home/dlstreamer/va_heavy_benchmark.py
+COPY suites/ai/vision/src/containers/video_analytics/run_video_analytics_benchmark.sh /home/dlstreamer/run_video_analytics_benchmark.sh
+COPY suites/ai/vision/src/containers/video_analytics/run_pipeline.sh /home/dlstreamer/run_pipeline.sh
 
 # Make scripts executable
 RUN chmod +x /home/dlstreamer/run_video_analytics_benchmark.sh \

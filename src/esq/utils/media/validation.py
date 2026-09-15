@@ -13,7 +13,6 @@ Consolidates shell script functionality from:
 
 import logging
 import re
-from typing import Dict, List, Tuple
 
 # Support both installed package and Docker container usage
 try:
@@ -122,6 +121,8 @@ IGPU_DEV_IDS = [
     "B090",
     "B0A0",
     "B0B0",
+    # Wildcat Lake (Xe3)
+    "FD80",
     # Raptor Lake
     "A720",  # RPL-P (ADDED)
     "A721",  # RPL-P (ADDED)
@@ -197,12 +198,26 @@ DGPU_DEV_IDS = [
     "56BB",
     "E212",
     "E211",
+    # Battlemage (BMG) - Arc B-series discrete GPUs
+    # (Arc B580/B570 and Arc Pro B50/B60 workstation cards)
+    "E202",
+    "E209",
+    "E20D",
+    "E210",
+    "E216",
+    "E220",
+    "E221",
+    "E222",
+    "E223",
 ]
 
+# NPU Platform Device IDs (Meteor Lake, Arrow Lake, Lunar Lake, Panther Lake, Wildcat Lake)
+# These platforms have NPU co-processor support when paired with iGPU.
+# Membership also selects the standard VA encoder (vah264enc/vah265enc) over the
+# low-power variant (vah264lpenc) in get_gst_elements(); the Xe3 iGPUs (Panther/Wildcat
+# Lake) require the standard encoder, so they must be listed here.
 _METRO_UNSUPPORTED_DGPU_IDS = frozenset({"56A0", "E20C"})
 
-# NPU Platform Device IDs (Meteor Lake, Arrow Lake, Lunar Lake)
-# These platforms have NPU co-processor support when paired with iGPU
 NPU_PLATFORM_DEV_IDS = [
     # Meteor Lake iGPU IDs
     "7D55",  # MTL-H
@@ -231,6 +246,8 @@ NPU_PLATFORM_DEV_IDS = [
     "B090",
     "B0A0",
     "B0B0",
+    # Wildcat Lake iGPU IDs (Xe3, NPU-class platform)
+    "FD80",
 ]
 
 logger = logging.getLogger(__name__)
@@ -240,9 +257,7 @@ def get_unsupported_metro_dgpu_ids(device_categories) -> set[str]:
     """Return retired Metro dGPU PCI IDs present for a dGPU test request."""
     if isinstance(device_categories, str):
         device_categories = [device_categories]
-    normalized_categories = {
-        str(category).strip().lower() for category in (device_categories or [])
-    }
+    normalized_categories = {str(category).strip().lower() for category in (device_categories or [])}
     if "dgpu" not in normalized_categories:
         return set()
 
@@ -256,10 +271,7 @@ def get_unsupported_metro_dgpu_ids(device_categories) -> set[str]:
         logger.warning(f"Unable to inspect PCI devices for Metro support: {result.stderr}")
         return set()
 
-    device_ids = {
-        match.group(1).upper()
-        for match in re.finditer(r"\[8086:([0-9a-fA-F]{4})\]", result.stdout)
-    }
+    device_ids = {match.group(1).upper() for match in re.finditer(r"\[8086:([0-9a-fA-F]{4})\]", result.stdout)}
     return device_ids.intersection(_METRO_UNSUPPORTED_DGPU_IDS)
 
 
@@ -331,7 +343,7 @@ def normalize_device_name(device: str, device_type: str = None) -> str:
     return device
 
 
-def detect_platform_type() -> Dict[str, any]:
+def detect_platform_type() -> dict[str, any]:
     """
     Detect available devices and platform characteristics.
 
@@ -427,8 +439,8 @@ def get_render_device(device: str, has_igpu: bool) -> int:
 
 
 def validate_options(
-    devices: List[str] = None, codecs: List[str] = None, allowed_codecs: List[str] = None
-) -> Tuple[List[str], List[str], Dict[str, any]]:
+    devices: list[str] = None, codecs: list[str] = None, allowed_codecs: list[str] = None
+) -> tuple[list[str], list[str], dict[str, any]]:
     """
     Validate and normalize device and codec options.
 

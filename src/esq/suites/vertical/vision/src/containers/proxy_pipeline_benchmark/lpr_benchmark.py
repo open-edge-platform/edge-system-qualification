@@ -197,31 +197,31 @@ class LPRBenchmark(BaseProxyPipelineBenchmark):
             else:
                 if self.is_MTL:
                     self.config = {
-                        "ref_stream_list": [6, 12, 13, 5],
-                        "ref_platform": "MTL 165H (32G Mem)",
-                        "ref_gpu_freq_list": [-1, 1153.45, 1177.11, 243.96],
-                        "ref_pkg_power_list": [-1, 25.41, 26.23, 18.77],
+                        "ref_stream_list": [6, 29, 32, 9],
+                        "ref_platform": "ARL 255H (64G Mem)",
+                        "ref_gpu_freq_list": [-1, 1315.94, 1422.43, 1031.90],
+                        "ref_pkg_power_list": [-1, 26.11, 28.54, 21.02],
                         "models": ["yolov8_license_plate_detector+ch_PP-OCRv4_rec_infer"],
                         "modes": self.get_mode_and_compute_devices(available_devices, lpr_execd_modes),
                         # Mode-specific reference values for graph visualization
                         # MTL 165H has iGPU and NPU support
                         "mode_ref_streams": {
                             "Mode 0": 6,  # CPU/CPU/CPU
-                            "Mode 2": 12,  # iGPU/iGPU/iGPU
-                            "Mode 3": 13,  # iGPU/iGPU/NPU
-                            "Mode 4": 5,  # iGPU/NPU/NPU
+                            "Mode 2": 29,  # iGPU/iGPU/iGPU
+                            "Mode 3": 32,  # iGPU/iGPU/NPU
+                            "Mode 4": 9,  # iGPU/NPU/NPU
                         },
                         "mode_ref_gpu_freq": {
                             "Mode 0": -1,  # CPU/CPU/CPU
-                            "Mode 2": 1153.45,  # iGPU/iGPU/iGPU
-                            "Mode 3": 1177.11,  # iGPU/iGPU/NPU
-                            "Mode 4": 243.96,  # iGPU/NPU/NPU
+                            "Mode 2": 1315.94,  # iGPU/iGPU/iGPU
+                            "Mode 3": 1422.43,  # iGPU/iGPU/NPU
+                            "Mode 4": 1031.90,  # iGPU/NPU/NPU
                         },
                         "mode_ref_pkg_power": {
                             "Mode 0": -1,  # CPU/CPU/CPU
-                            "Mode 2": 25.41,  # iGPU/iGPU/iGPU
-                            "Mode 3": 26.23,  # iGPU/iGPU/NPU
-                            "Mode 4": 18.77,  # iGPU/NPU/NPU
+                            "Mode 2": 26.11,  # iGPU/iGPU/iGPU
+                            "Mode 3": 28.54,  # iGPU/iGPU/NPU
+                            "Mode 4": 21.02,  # iGPU/NPU/NPU
                         },
                     }
                 else:

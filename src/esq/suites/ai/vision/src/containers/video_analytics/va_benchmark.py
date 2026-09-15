@@ -292,45 +292,45 @@ class VABenchmark(BaseVideoAnalyticsBenchmark):
         if device_type == "iGPU":
             if self.VDBOX == 1:
                 self.config = {
-                    "ref_stream_list": [4,7],
-                    "ref_platform": "i5-12400 (16G Mem)",
-                    "ref_gpu_freq": -1,
-                    "ref_pkg_power": -1,
+                    "ref_stream_list": [6,14],
+                    "ref_platform": "PTL ultra 7 358H (64G Mem)",
+                    "ref_gpu_freq": 1821.30,
+                    "ref_pkg_power": 54.54,
                     "models": ["yolov11n+resnet-50-tf"],
                     "modes": self.get_mode_and_compute_devices(available_devices, va_executed_modes),
                     "mode_ref_streams": {
-                        "Mode 0": 4,  # CPU/CPU/CPU
-                        "Mode 2": 7,  # iGPU/iGPU/iGPU
+                        "Mode 0": 6,  # CPU/CPU/CPU
+                        "Mode 2": 14,  # iGPU/iGPU/iGPU
                     },
                 }
             else:
                 if self.is_MTL:
                     self.config = {
-                        "ref_stream_list": [8,9,9,5,6],
-                        "ref_platform": "ARL Ultra 9 285K (32G Mem)",
-                        "ref_gpu_freq": -1,
-                        "ref_pkg_power": -1,
+                        "ref_stream_list": [6,14,10,8,8],
+                        "ref_platform": "PTL ultra 7 358H (64G Mem)",
+                        "ref_gpu_freq": 1821.30,
+                        "ref_pkg_power": 54.54,
                         "models": ["yolov11n+resnet-50-tf"],
                         "modes": self.get_mode_and_compute_devices(available_devices, va_executed_modes),
                         "mode_ref_streams": {
-                            "Mode 0": 8,  # CPU/CPU/CPU
-                            "Mode 2": 9,  # iGPU/iGPU/iGPU
-                            "Mode 3": 9,  # iGPU/iGPU/NPU
-                            "Mode 4": 5,  # iGPU/NPU/NPU
-                            "Mode 7": 6,  # iGPU + NPU concurrent
+                            "Mode 0": 6,  # CPU/CPU/CPU
+                            "Mode 2": 14,  # iGPU/iGPU/iGPU
+                            "Mode 3": 10,  # iGPU/iGPU/NPU
+                            "Mode 4": 8,  # iGPU/NPU/NPU
+                            "Mode 7": 8,  # iGPU + NPU concurrent
                         },
                     }
                 else:
                     self.config = {
-                        "ref_stream_list": [8,9],
+                        "ref_stream_list": [8,10],
                         "ref_platform": "ARL Ultra 9 285 (32G Mem)",
-                        "ref_gpu_freq": -1,
-                        "ref_pkg_power": -1,
+                        "ref_gpu_freq": 755.28,
+                        "ref_pkg_power": 43.93,
                         "models": ["yolov11n+resnet-50-tf"],
                         "modes": self.get_mode_and_compute_devices(available_devices, va_executed_modes),
                         "mode_ref_streams": {
                             "Mode 0": 8,  # CPU/CPU/CPU
-                            "Mode 2": 9,  # iGPU/iGPU/iGPU
+                            "Mode 2": 10,  # iGPU/iGPU/iGPU
                         },
                     }
         elif device_type == "dGPU":

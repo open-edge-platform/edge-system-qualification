@@ -271,19 +271,19 @@ dGPU_Dev_IDs = [
 Ref_Platform_Bcmk_Settings = {
     "1VDBOX": {
         "description": "Platforms with 1VD Box iGPU",
-        "samples": "i5-13600 (32G Mem)",
+        "samples": "PTL Ultra x7 358H (64G Mem)",
     },
     "2VDBOX": {
         "description": "Platforms with 2VD Box iGPU",
-        "samples": "i7-1360P (16G Mem)",
+        "samples": "ARL Ultra 7 265H (64G Mem)",
     },
     "DGPU": {
         "description": "dGPU",
-        "samples": "Arc A380",
+        "samples": "Arc B580",
     },
     "NPU": {
         "description": "MTL NPU device",
-        "samples": "MTL 165H (32G Mem)",
+        "samples": "PTL Ultra x7 358H (64G Mem)",
     },
     "XEON": {
         "description": "Xeon based platform",

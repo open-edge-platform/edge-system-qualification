@@ -9,51 +9,58 @@ clip-vit-base-patch16,INT8,auto,GPU.1,Arc B580,871.47,2.16,29.33,2
 resnet-50-tf,FP16,auto,GPU.0,i7-1360P (16G Mem),195.87,1.45,-1,2
 resnet-50-tf,FP16,auto,CPU,i7-1360P (16G Mem),67.31,2.73,-1,
 resnet-50-tf,FP16,auto,"MULTI:CPU,GPU.0",i7-1360P (16G Mem),190.41,1.21,-1,
-resnet-50-tf,INT8,auto,GPU.0,i7-1360P (16G Mem),484.62,1.32,36.16,2
+resnet-50-tf,INT8,auto,GPU.0,ARL Ultra 7 265H (64G Mem),2087.25,1.2,29.34,2
 resnet-50-tf,INT8,auto,CPU,i7-1360P (16G Mem),243.27,2.84,-1,
 resnet-50-tf,INT8,auto,"MULTI:CPU,GPU.0",i7-1360P (16G Mem),404.22,1.27,-1,
 efficientnet-b0,FP16,auto,GPU.0,i7-1360P (16G Mem),456.16,1.49,-1,2
 efficientnet-b0,FP16,auto,CPU,i7-1360P (16G Mem),343.5,2.86,-1,
 efficientnet-b0,FP16,auto,"MULTI:CPU,GPU.0",i7-1360P (16G Mem),510.44,1.38,-1,
-efficientnet-b0,INT8,auto,GPU.0,i7-1360P (16G Mem),792.13,1.44,34.96,2
+efficientnet-b0,INT8,auto,GPU.0,ARL Ultra 7 265H (64G Mem),2281.35,1.2,31.02,2
 efficientnet-b0,INT8,auto,CPU,i7-1360P (16G Mem),526.54,3,-1,
 efficientnet-b0,INT8,auto,"MULTI:CPU,GPU.0",i7-1360P (16G Mem),668.16,1.37,-1,
 ssdlite_mobilenet_v2,FP16,auto,GPU.0,i7-1360P (16G Mem),405.18,1.49,-1,2
 ssdlite_mobilenet_v2,FP16,auto,CPU,i7-1360P (16G Mem),286.83,3.21,-1,
-ssdlite_mobilenet_v2,INT8,auto,GPU.0,i7-1360P (16G Mem),871.61,1.5,35.96,2
+ssdlite_mobilenet_v2,INT8,auto,GPU.0,ARL Ultra 7 265H (64G Mem),2430.44,1.26,28.94,2
 ssdlite_mobilenet_v2,INT8,auto,CPU,i7-1360P (16G Mem),608.21,2.9,-1,
 ssdlite_mobilenet_v2,INT8,auto,"MULTI:CPU,GPU.0",i7-1360P (16G Mem),749.47,1.37,-1,
 yolo-v5s,FP16,auto,GPU.0,i7-1360P (16G Mem),104.34,1.44,-1,2
 yolo-v5s,FP16,auto,CPU,i7-1360P (16G Mem),28.3,2.74,-1,
 yolo-v5s,FP16,auto,"MULTI:CPU,GPU.0",i7-1360P (16G Mem),92.63,1.38,-1,
-yolo-v5s,INT8,auto,GPU.0,i7-1360P (16G Mem),120.67,1.5,40.42,2
+yolo-v5s,INT8,auto,GPU.0,ARL Ultra 7 265H (64G Mem),482.23,1.13,33.23,2
 yolo-v5s,INT8,auto,CPU,i7-1360P (16G Mem),85.57,1.22,-1,
 yolo-v5s,INT8,auto,"MULTI:CPU,GPU.0",i7-1360P (16G Mem),169.25,1.26,-1,
 yolo-v8s,FP16,auto,GPU.0,i7-1360P (16G Mem),62.57,1.49,-1,2
 yolo-v8s,FP16,auto,CPU,i7-1360P (16G Mem),17.02,2.75,-1,
 yolo-v8s,FP16,auto,"MULTI:CPU,GPU.0",i7-1360P (16G Mem),55.38,1.19,-1,
-yolo-v8s,INT8,auto,GPU.0,i7-1360P (16G Mem),107.14,1.5,39.44,2
+yolo-v8s,INT8,auto,GPU.0,ARL Ultra 7 265H (64G Mem),417.87,0.98,35.21,2
 yolo-v8s,INT8,auto,CPU,i7-1360P (16G Mem),51.98,2.88,-1,
 yolo-v8s,INT8,auto,"MULTI:CPU,GPU.0",i7-1360P (16G Mem),107.73,1.39,-1,
 mobilenet-v2-pytorch,FP16,auto,GPU.0,i7-1360P (16G Mem),854.88,1.49,-1,2
 mobilenet-v2-pytorch,FP16,auto,CPU,i7-1360P (16G Mem),669.29,2.69,-1,
 mobilenet-v2-pytorch,FP16,auto,"MULTI:CPU,GPU.0",i7-1360P (16G Mem),875.41,1.35,-1,
-mobilenet-v2-pytorch,INT8,auto,GPU.0,i7-1360P (16G Mem),1854.1,1.57,36.7,2
+mobilenet-v2-pytorch,INT8,auto,GPU.0,ARL Ultra 7 265H (64G Mem),4246.03,1.14,29.18,2
 mobilenet-v2-pytorch,INT8,auto,CPU,i7-1360P (16G Mem),1296.25,3.25,-1,
 mobilenet-v2-pytorch,INT8,auto,"MULTI:CPU,GPU.0",i7-1360P (16G Mem),1524.22,1.35,-1,
 ssdlite_mobilenet_v2,FP16,auto,"MULTI:CPU,GPU.0",i7-1360P (16G Mem),403.08,1.39,-1,
 resnet-50-tf,FP16,auto,NPU,MTL 165H (32G Mem),352.49,1.12,-1,
-resnet-50-tf,INT8,auto,NPU,ARL u9 285 (64G Mem),747.75,0,48.82,
+resnet-50-tf,INT8,auto,NPU,PTL Ultra x7 358H (64G Mem),2408.86,0,27.8,1
+resnet-50-tf,INT8,auto,GPU.0,PTL Ultra x7 358H (64G Mem),3970.14,2.15,65.4,1
+efficientnet-b0,INT8,auto,GPU.0,PTL Ultra x7 358H (64G Mem),5212.99,2.08,69.03,1
+ssdlite_mobilenet_v2,INT8,auto,GPU.0,PTL Ultra x7 358H (64G Mem),4296.61,2.15,59.98,1
+yolo-v5s,INT8,auto,GPU.0,PTL Ultra x7 358H (64G Mem),817.42,2.15,75.19,1
+yolo-v8s,INT8,auto,GPU.0,PTL Ultra x7 358H (64G Mem),740.47,2.16,76.84,1
+mobilenet-v2-pytorch,INT8,auto,GPU.0,PTL Ultra x7 358H (64G Mem),7712.14,2.16,62.14,1
+clip-vit-base-patch16,INT8,auto,GPU.0,PTL Ultra x7 358H (64G Mem),603.28,2.14,74.63,1
 efficientnet-b0,FP16,auto,NPU,MTL 165H (32G Mem),434.49,1.04,-1,
-efficientnet-b0,INT8,auto,NPU,ARL u9 285 (64G Mem),561.43,0,45.6,
+efficientnet-b0,INT8,auto,NPU,PTL Ultra x7 358H (64G Mem),3396.26,0,18.97,1
 ssdlite_mobilenet_v2,FP16,auto,NPU,MTL 165H (32G Mem),483.53,0.93,-1,
-ssdlite_mobilenet_v2,INT8,auto,NPU,ARL u9 285 (64G Mem),1384.03,0,46.53,
+ssdlite_mobilenet_v2,INT8,auto,NPU,PTL Ultra x7 358H (64G Mem),5737.77,0,21.17,1
 yolo-v5s,FP16,auto,NPU,MTL 165H (32G Mem),106.85,0.75,-1,
-yolo-v5s,INT8,auto,NPU,ARL u9 285 (64G Mem),99.93,0,47.31,
+yolo-v5s,INT8,auto,NPU,PTL Ultra x7 358H (64G Mem),553.63,0,22.28,1
 yolo-v8s,FP16,auto,NPU,MTL 165H (32G Mem),71.07,0.88,-1,
-yolo-v8s,INT8,auto,NPU,ARL u9 285 (64G Mem),0,0,0,
+yolo-v8s,INT8,auto,NPU,PTL Ultra x7 358H (64G Mem),0,0,0,1
 mobilenet-v2-pytorch,FP16,auto,NPU,MTL 165H (32G Mem),1371.21,1.11,-1,
-mobilenet-v2-pytorch,INT8,auto,NPU,ARL u9 285 (64G Mem),2160.54,0,17.2,
+mobilenet-v2-pytorch,INT8,auto,NPU,PTL Ultra x7 358H (64G Mem),10133.46,0,19.82,1
 resnet-50-tf,INT8,auto,GPU.0,N97 (16G Mem),118.37,1.14,11.15,1
 efficientnet-b0,INT8,auto,GPU.0,N97 (16G Mem),338.75,1.1,11.43,1
 ssdlite_mobilenet_v2,INT8,auto,GPU.0,N97 (16G Mem),408.09,1.15,11.5,1
@@ -66,12 +73,6 @@ ssdlite_mobilenet_v2,INT8,auto,CPU,N97 (16G Mem),211.16,2.55,-1,
 yolo-v5s,INT8,auto,CPU,N97 (16G Mem),24.01,2.63,-1,
 yolo-v8s,INT8,auto,CPU,N97 (16G Mem),14.75,2.5,-1,
 mobilenet-v2-pytorch,INT8,auto,CPU,N97 (16G Mem),443.84,2.39,-1,
-resnet-50-tf,INT8,auto,GPU.0,i5-13600 (32G Mem),197.87,1.55,65.19,2
-efficientnet-b0,INT8,auto,GPU.0,i5-13600 (32G Mem),521.69,1.52,67.26,2
-ssdlite_mobilenet_v2,INT8,auto,GPU.0,i5-13600 (32G Mem),694.72,1.53,68.37,2
-yolo-v5s,INT8,auto,GPU.0,i5-13600 (32G Mem),55.34,1.55,68.37,2
-yolo-v8s,INT8,auto,GPU.0,i5-13600 (32G Mem),49.19,1.55,66.22,2
-mobilenet-v2-pytorch,INT8,auto,GPU.0,i5-13600 (32G Mem),1276.09,1.54,68.57,2
 resnet-50-tf,INT8,auto,CPU,i5-12400 (16G Mem),329.23,3.42,-1,
 efficientnet-b0,INT8,auto,CPU,i5-12400 (16G Mem),699.64,3.32,-1,
 ssdlite_mobilenet_v2,INT8,auto,CPU,i5-12400 (16G Mem),801.54,3.21,-1,
@@ -150,13 +151,13 @@ ssdlite_mobilenet_v2,INT8,auto,CPU,MTL 165H (32G Mem),331.25,1.44,-1,
 yolo-v5s,INT8,auto,CPU,MTL 165H (32G Mem),40.73,1.47,-1,
 yolo-v8s,INT8,auto,CPU,MTL 165H (32G Mem),24.67,1.33,-1,
 mobilenet-v2-pytorch,INT8,auto,CPU,MTL 165H (32G Mem),835.51,1.34,-1,
-resnet-50-tf,INT8,auto,GPU.0,ARL u9 285 (64G Mem),559.37,0.99,56.32,2
-efficientnet-b0,INT8,auto,GPU.0,ARL u9 285 (64G Mem),1077.45,0.99,55.62,2
-ssdlite_mobilenet_v2,INT8,auto,GPU.0,ARL u9 285 (64G Mem),1537.39,1,53.93,2
-yolo-v5s,INT8,auto,GPU.0,ARL u9 285 (64G Mem),148.57,1,53.18,2
-yolo-v8s,INT8,auto,GPU.0,ARL u9 285 (64G Mem),130.55,1,53.59,2
-mobilenet-v2-pytorch,INT8,auto,GPU.0,ARL u9 285 (64G Mem),2962.4,1,56.69,2
-clip-vit-base-patch16,INT8,auto,GPU.0,ARL u9 285 (64G Mem),25.83,1,56.08,2
+resnet-50-tf,INT8,auto,GPU.0,ARL u9 285K (64G Mem),578.21,1.2,27.01,2
+efficientnet-b0,INT8,auto,GPU.0,ARL u9 285K (64G Mem),1088.36,0.99,27.94,2
+ssdlite_mobilenet_v2,INT8,auto,GPU.0,ARL u9 285K (64G Mem),1544.11,1.13,28.03,2
+yolo-v5s,INT8,auto,GPU.0,ARL u9 285K (64G Mem),167.63,1.2,27.88,2
+yolo-v8s,INT8,auto,GPU.0,ARL u9 285K (64G Mem),141.07,0.99,28.14,2
+mobilenet-v2-pytorch,INT8,auto,GPU.0,ARL u9 285K (64G Mem),3033.14,1.14,29.32,2
+clip-vit-base-patch16,INT8,auto,GPU.0,ARL Ultra 7 265H (64G Mem),188.46,1.55,36.28,2
 resnet-50-tf,INT8,auto,"MULTI:CPU,GPU.0,NPU",MTL 165H (32G Mem),494.88,0.9,-1,
 efficientnet-b0,INT8,auto,"MULTI:CPU,GPU.0,NPU",MTL 165H (32G Mem),763.18,0.9,-1,
 ssdlite_mobilenet_v2,INT8,auto,"MULTI:CPU,GPU.0,NPU",MTL 165H (32G Mem),695.38,0.26,-1,
@@ -203,5 +204,5 @@ resnet-50-tf,INT8,auto,NPU,MTL 165H (32G Mem),647.04,1.12,22.05,2
 efficientnet-b0,INT8,auto,NPU,MTL 165H (32G Mem),452.35,1.04,18.97,2
 ssdlite_mobilenet_v2,INT8,auto,NPU,MTL 165H (32G Mem),1130.79,0,21.17,2
 yolo-v5s,INT8,auto,NPU,MTL 165H (32G Mem),86.87,0.75,19,2
-yolo-v8s,INT8,auto,NPU,MTL 165H (32G Mem),71.07,0.88,-1,
+yolo-v8s,INT8,auto,NPU,MTL 165H (32G Mem),71.07,0.88,-1,2
 mobilenet-v2-pytorch,INT8,auto,NPU,MTL 165H (32G Mem),1769.01,1.11,20.88,2

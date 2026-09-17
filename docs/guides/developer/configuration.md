@@ -118,7 +118,7 @@ The `kpi` block is **optional**. Omit it entirely for data-collection suites whe
 
 ```yaml
 # src/esq/suites/my_domain/my_feature/config.yml
-# Copyright (C) 2025 Intel Corporation
+# Copyright (C) 2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
 # Optional: define KPI thresholds for qualification tests.

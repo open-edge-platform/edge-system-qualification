@@ -6,6 +6,8 @@
 
 - Refer to [Intel® ESQ for Intel® AI Edge Systems](https://www.intel.com/content/www/us/en/developer/articles/guide/esq-for-ai-edge-systems.html) for official main qualification page.
 
+> **Usage guidance:** This software is intended only for system testing and qualification in isolated or controlled environments.
+
 ## Features
 
 - Extensible collection of test suites
@@ -26,8 +28,14 @@ Read the [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines on submitting issue
 
 Intel® ESQ is licensed under the [Apache-2.0 license](./LICENSE).
 
-## Disclaimer
+## Legal Information
 
-This repository is provided solely for testing in isolated or controlled environments. It is not intended for production deployment or use cases.
+- GStreamer is an open source framework licensed under LGPL.
+See [GStreamer Licensing FAQ](https://gstreamer.freedesktop.org/documentation/frequently-asked-questions/licensing.html).
+You are solely responsible for determining if your use of GStreamer requires any additional licenses.
+Intel is not responsible for obtaining any such licenses, nor liable for any licensing fees due, in connection with your use of GStreamer.
 
-GStreamer* is an open source framework licensed under LGPL. See https://gstreamer.freedesktop.org/documentation/frequently-asked-questions/licensing.html. You are solely responsible for determining if your use of GStreamer requires any additional licenses. Intel is not responsible for obtaining any such licenses, nor liable for any licensing fees due, in connection with your use of GStreamer.
+- FFmpeg is an open source project licensed under LGPL and GPL.
+See [FFmpeg Legal Information](https://www.ffmpeg.org/legal.html).
+You are solely responsible for determining if your use of FFmpeg requires any additional licenses.
+Intel is not responsible for obtaining any such licenses, nor liable for any licensing fees due, in connection with your use of FFmpeg.

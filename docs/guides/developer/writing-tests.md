@@ -118,7 +118,7 @@ time.
 ```yaml
 # src/<package>/suites/my_domain/my_feature/config.yml
 # (e.g., src/esq/suites/my_domain/my_feature/config.yml)
-# Copyright (C) 2025 Intel Corporation
+# Copyright (C) 2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
 # KPI definitions only. Thresholds are disabled by default so the same
@@ -161,7 +161,7 @@ thresholds with `kpi_override`.
 ```yaml
 # src/<package>/configs/profiles/suites/my_feature.yml
 # (e.g., src/esq/configs/profiles/suites/my_feature.yml)
-# Copyright (C) 2025 Intel Corporation
+# Copyright (C) 2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
 name: "profile.suite.my_feature"

@@ -17,7 +17,7 @@ index 3126589..bb984c7 100644
 --- a/allurerc.mjs
 +++ b/allurerc.mjs
 @@ -1,33 +1,19 @@
-+// Copyright (C) 2025 Intel Corporation
++// Copyright (C) 2026 Intel Corporation
 +// SPDX-License-Identifier: Apache-2.0
 +
  import { defineConfig } from "allure";

@@ -13,7 +13,7 @@ hooks:
   - docs/hooks/md_import.py
 
 # Copyright
-copyright: Copyright &copy; 2025 Intel Corporation
+copyright: Copyright &copy; 2026 Intel Corporation
 
 # Configuration
 theme:

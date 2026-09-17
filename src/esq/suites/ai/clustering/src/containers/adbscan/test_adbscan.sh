@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
 # shellcheck disable=SC1090,SC1091 # Script path not available at static analysis time
 source "/opt/ros/${ROS_DISTRO}/setup.bash"
 

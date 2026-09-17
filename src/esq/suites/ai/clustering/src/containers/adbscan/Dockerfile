@@ -1,3 +1,6 @@
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
 ARG COMMON_BASE_IMAGE=amd64/ros:jazzy-ros-base
 
 FROM ${COMMON_BASE_IMAGE} AS build

@@ -214,6 +214,25 @@ def test_lp_vlm(
                 if not os.path.exists(makefile_path):
                     raise FileNotFoundError(f"Makefile not found: {makefile_path}")
 
+                # Download required models (target skips automatically if already present)
+                registry_mode = str(configs.get("registry", "false")).lower()
+                download_models_cmd = ["make", "download-models", f"REGISTRY={registry_mode}"]
+                download_models_timeout = configs.get("download_models_timeout", 1800)
+                logger.info(f"Downloading Loss Prevention models: {' '.join(download_models_cmd)}")
+                download_models_result = run_command(
+                    download_models_cmd,
+                    cwd=lp_base_dir,
+                    check=True,
+                    stream_output=True,
+                    timeout=download_models_timeout,
+                )
+                allure.attach(
+                    download_models_result.stdout + download_models_result.stderr,
+                    name="Download Models Output",
+                    attachment_type=allure.attachment_type.TEXT,
+                )
+                logger.info("Loss Prevention models download step completed")
+
                 preparation_result.metadata["status"] = "completed"
                 preparation_result.metadata["lp_base_dir"] = lp_base_dir
                 preparation_result.metadata["camera_config"] = camera_config_path

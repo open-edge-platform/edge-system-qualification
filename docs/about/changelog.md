@@ -31,16 +31,15 @@ Intel® ESQ changelog and version history.
 - Fixed missing failed requirements details when validation aborts in non-verbose mode
 - Fixed default `esq` run behavior that assumed AI Edge System instead of requiring qualification selection
 - Fixed an issue where Intel® Core™ Ultra Processor (Series 3) reported lower performance due to default Balanced power mode on Ubuntu* 24.04
+- Fixed redundant file detection in the Metro Media test case caused by file copying during test/build
 
 ### Known Issues
 - GPU utilization and Package Power metrics are inconsistent on Linux* kernel 6.14
 - GitHub* resource downloads intermittently fail from the PRC network
 - Intel® DL Streamer pipeline instability causes timeouts and underreports dGPU stream performance
-- Redundant file detection occurs in the Metro Media test case due to file copying during test/build
 - Pexels* video downloads intermittently fail from the PRC network
 - Memory is not released after Vision AI test cases complete on Panther Lake (PTL) systems
 - Qmassa Collector fallback logic incorrectly references a sysfs metric source
-- Intel® Core™ 3 100UL and Intel® Core™ 5 120UL are not properly detected as Raptor Lake
 
 ## Version 2026.2.0 - June 2026
 ### New Platform Support

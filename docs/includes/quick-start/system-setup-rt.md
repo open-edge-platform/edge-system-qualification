@@ -1,11 +1,12 @@
-For RT latency tests, also run the RT setup script:
+For RT latency tests, run the RT setup script:
 
 ```bash
 sudo bash -c "$(wget -qLO - https://raw.githubusercontent.com/open-edge-platform/edge-system-qualification/refs/heads/main/scripts/system-setup-rt.sh)"
 ```
 
 !!! warning "Re-run after reboot"
-    All changes applied by `system-setup-rt.sh` are **current session only** and reset automatically after reboot. Re-run after each reboot before executing RT tests.
+
+    All changes applied by `system-setup-rt.sh` are in **current session only** and resets automatically after reboot. Re-run after each reboot before executing RT tests.
 
 **RT setup modules:**
 

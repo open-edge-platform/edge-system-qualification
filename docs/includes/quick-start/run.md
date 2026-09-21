@@ -1,4 +1,5 @@
 !!! tip "Upgrading Intel® ESQ"
+
     Before running a new version of Intel® ESQ, clean up any previously created `esq_data` folder to prevent leftover data from interfering with the new installation:
 
     ```bash

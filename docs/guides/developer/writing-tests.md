@@ -45,7 +45,7 @@ Every test parameter set carries a `test_id` that uniquely identifies it in repo
 | Segment | Length | Meaning | Examples |
 |---------|--------|---------|----------|
 | `MAIN` | 3 characters | Main domain | `VSN` (vision), `MEM` (memory), `MDA` (media), `NET` (network) |
-| `SUB` | 3 characters | Sub-domain within the main domain | `OBM` (OpenVINO benchmark), `STR` (STREAM), `DEC` (decode) |
+| `SUB` | 3 characters | Sub-domain within the main domain | `OBM` (OpenVINO™ benchmark), `STR` (STREAM), `DEC` (decode) |
 | `NNN` | 3 digits | Sequential number within the sub-domain | `001`, `002`, `003` |
 
 Examples from the existing suites:
@@ -339,10 +339,10 @@ All Intel® ESQ tests follow a standardized 7-step pattern for consistency and r
 
 - a failed test ends with `pytest.fail(...)` and a clear message,
 - an interrupt (Ctrl+C) is surfaced as a proper outcome instead of a broken run,
-- validation and summarization always run so partial results are still reported,
+- validation and summarization is always running so that partial results are still reported,
 - cleanup always runs, even on failure.
 
-Use the example below as the base structure for any new test.
+Use the example shown below as the base structure for any new test.
 
 ### Full Pattern Example
 
@@ -404,7 +404,7 @@ def test_example(
     #       _outcome = pytest.fail if is_qualification else pytest.skip
     #       _outcome("my_tool not found. Install it and re-run.")
 
-    # Outcome tracking — initialized before the try block so the finally and
+    # Outcome tracking — initialized before try block so that the final and
     # post-run blocks can always reference them.
     results = None
     test_failed = False
@@ -464,7 +464,7 @@ def test_example(
             configs=configs,
         )
 
-        # Mark the test failed when the execution reported a non-passing status.
+        # Mark the test as failed when the execution reports a non-passing status.
         if not results.metadata.get("status", False):
             test_failed = True
             failure_message = results.metadata.get("error", f"{test_display_name} failed")

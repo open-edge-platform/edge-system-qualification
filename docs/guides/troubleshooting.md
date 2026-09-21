@@ -48,7 +48,7 @@ Tests may appear as skipped for one of the following reasons:
 
 **Solution:**
 
-- Run without cache to force a fresh execution:
+- Run the command without cache to force a fresh execution:
 
     ```bash
     esq -d run -nc --profile <profile_name>
@@ -86,7 +86,7 @@ Tests that require GPU access may fail with errors like `No available devices fo
     lspci | grep -Ei "DISPLAY|VGA"
     ```
 
-2. Install or update Intel GPU drivers for your platform.
+2. Install or update Intel GPU drivers on your platform.
 
 3. Confirm device access:
 
@@ -104,7 +104,7 @@ NPU-dependent tests may fail if the NPU driver is missing or not loaded.
 
 **Solution:**
 
-1. Install or update Intel NPU drivers.
+1. Install or update Intel® NPU Driver.
 
 2. Verify the NPU is detected:
 
@@ -152,7 +152,7 @@ When a test fails but the CLI output does not show a clear root cause:
     esq_data/reports/allure/index.html
     ```
 
-4. Verify that asset preparation completed without errors.
+4. Verify that asset preparation is completed without errors.
 
 5. For containerized tests, check Docker* container logs.
 
@@ -160,7 +160,7 @@ When a test fails but the CLI output does not show a clear root cause:
 
 ## 8. Stale cache causing unexpected results
 
-Cached results from previous runs may cause tests to return outdated data, especially after code or configuration changes.
+Cached results from the previous runs may cause tests to return outdated data, especially after code or configuration changes.
 
 **Solution:**
 

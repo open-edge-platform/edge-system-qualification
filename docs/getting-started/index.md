@@ -69,14 +69,14 @@ The following table describes each component in the stack, from the application 
 
 ## Next Steps
 
-1. **[Requirements](requirements.md)** – Confirm your system meets the hardware and OS requirements.
-2. **[Quick Start](quick-start.md)** – Install dependencies common to every qualification profile.
+1. **[Requirements](requirements.md)** – Confirm that your system meets the hardware and OS requirements.
+2. **[Quick Start](quick-start.md)** – Install the dependencies that are common to every qualification profile.
 3. **[Qualification](qualifications/index.md)** – Follow the dedicated guide for the qualification you want to run.
 
 
 ## Need Help?
 
-If you encounter issues during setup:
+If you encounter any issues during setup:
 
 1. Refer to the [Optimization](../guides/optimization.md) guide.
 2. Check the [Troubleshooting](../guides/troubleshooting.md) guide.

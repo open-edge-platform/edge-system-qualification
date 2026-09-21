@@ -1,6 +1,6 @@
 # Quick Start
 
-Before you begin, confirm your system meets the [Requirements](requirements.md). Some steps below are optional depending on the profile you run. See [Qualification](qualifications/index.md) for the list of available qualifications and their dedicated quick start guides.
+Before you begin, confirm that your system meets the [Requirements](requirements.md). Some steps shown below are optional depending on the profile you run. See [Qualification](qualifications/index.md) for the list of available qualifications and their dedicated quick start guides.
 
 ## Installation
 
@@ -42,8 +42,8 @@ esq run
 
 By default, this command:
 
-1. Prompts you to select exactly one qualification profile to run.
-2. If the selected qualification profile has associated vertical profiles, prompts you to include them.
+1. Prompts you to select only one qualification profile to run.
+2. If the selected qualification profile has associated vertical profiles, it prompts you to include them.
 3. Collects metrics and generates a test report.
 
 ### 2. Uninstall

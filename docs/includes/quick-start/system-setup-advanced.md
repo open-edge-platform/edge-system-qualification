@@ -5,7 +5,8 @@ sudo bash -c "$(wget -qLO - https://raw.githubusercontent.com/open-edge-platform
 ```
 
 !!! warning "Re-run after reboot"
-    All changes applied by `system-setup-advanced.sh` are **current session only** and reset automatically after reboot. Re-run the script after each reboot before executing tests that depend on it.
+
+    All changes applied by `system-setup-advanced.sh` are in  **current session only** and resets automatically after reboot. Re-run the script after each reboot before executing tests that depend on it.
 
 **Advanced setup modules:**
 

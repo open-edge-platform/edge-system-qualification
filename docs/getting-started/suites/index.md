@@ -106,7 +106,7 @@ esq list
 
 | Test Suite | Purpose | Benefit |
 |------|---------|----------|
-| **Qualifications** | Measuring system performance to qualify against  Intel® AI Edge Systems Qualifications Metrics | Gain Catalog inclusion and other marketing benefits from Intel.  |
+| **Qualifications** | Measuring system performance to qualify against Intel® AI Edge Systems Qualifications Metrics | Gain Catalog inclusion and other marketing benefits from Intel.  |
 | **Vertical** | System benchmarking vertical specific proxy workloads like retail self checkout, smart NVR and manufacturing defect detection | Gain understanding and communicate on system's potential to be used in a variety of verticals and use-cases |
 | **Horizontal** | 	General system benchmarking (includes OpenVINO™ Toolkit, Audio, Memory Performance) | Gain understanding on system's resource utilization and performance like System memory and GPU during select AI workload  |
 
@@ -579,7 +579,7 @@ esq run --profile profile.suite.ai.vision-vrb
 
 ---
 
-#### OpenVINO
+#### OpenVINO™
 
 **Profile**: `profile.suite.ai.vision-ov`
 

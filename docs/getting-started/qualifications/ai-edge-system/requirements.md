@@ -1,6 +1,6 @@
 # Requirements
 
-Confirm your system meets the following requirements before installing Intel® ESQ.
+Ensure that your system meets the following requirements before installing Intel® ESQ.
 
 ## Hardware
 

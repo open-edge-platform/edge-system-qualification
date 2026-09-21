@@ -1,6 +1,6 @@
 # Modular Telemetry
 
-The framework automatically collects system metrics as a background daemon thread during test execution. No test code changes are required — telemetry is enabled entirely through the profile YAML.
+The framework automatically collects system metrics as a background daemon thread during test execution. No test code changes is required — telemetry is enabled entirely through the profile YAML.
 
 ---
 

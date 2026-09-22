@@ -20,13 +20,15 @@ Intel® ESQ provides a comprehensive collection of test suites to assess and qua
     - [Retail](#retail)
         - [Automated Self Checkout](#automated-self-checkout)
         - [Loss Prevention](#loss-prevention)
-    - [Robotics](#robotics)
+- [Horizontal](#horizontal)
+    - [Action AI](#action-ai)
         - [PI0.5 RTC Benchmark](#pi05-rtc-benchmark)
         - [ACT Benchmark](#act-benchmark)
         - [FastMapping Benchmark](#fastmapping-benchmark)
-        - [ADBScan Benchmark](#adbscan-benchmark)
+    - [Audio AI](#audio-ai)
         - [FunASR ASR Benchmark](#funasr-asr-benchmark)
-- [Horizontal](#horizontal)
+    - [Clustering AI](#clustering-ai)
+        - [ADBScan Benchmark](#adbscan-benchmark)
     - [Generative AI](#generative-ai)
         - [LLM Serving Benchmark](#llm-serving-benchmark)
         - [Chat Question and Answer Core](#chat-question-and-answer-core)
@@ -89,11 +91,11 @@ Quick reference of all available test suites and their profile names.
 | `profile.vertical.retail-asc` | Vertical | Retail Automated Self-Checkout | `esq run --profile profile.vertical.retail-asc` |
 | `profile.vertical.retail-lp` | Vertical | Retail Loss Prevention | `esq run --profile profile.vertical.retail-lp` |
 | `profile.vertical.retail-lp-vlm` | Vertical | Retail Loss Prevention Visual Language Model | `esq run --profile profile.vertical.retail-lp-vlm` |
-| `profile.vertical.robotics-act` | Vertical | Robotics ACT inference benchmark | `esq run --profile profile.vertical.robotics-act` |
-| `profile.vertical.robotics-adbscan` | Vertical | Robotics ADBScan point cloud benchmark | `esq run --profile profile.vertical.robotics-adbscan` |
-| `profile.vertical.robotics-fastmapping` | Vertical | Robotics FastMapping SLAM benchmark | `esq run --profile profile.vertical.robotics-fastmapping` |
-| `profile.vertical.robotics-funasr` | Vertical | Robotics FunASR speech-recognition benchmark | `esq run --profile profile.vertical.robotics-funasr` |
-| `profile.vertical.robotics-pi5` | Vertical | Robotics PI0.5 RTC inference benchmark | `esq run --profile profile.vertical.robotics-pi5` |
+| `profile.suite.ai.action-act` | Horizontal | Action AI ACT inference benchmark | `esq run --profile profile.suite.ai.action-act` |
+| `profile.suite.ai.clustering-adbscan` | Horizontal | Clustering AI ADBScan point cloud benchmark | `esq run --profile profile.suite.ai.clustering-adbscan` |
+| `profile.suite.ai.action-fastmapping` | Horizontal | Action AI FastMapping SLAM benchmark | `esq run --profile profile.suite.ai.action-fastmapping` |
+| `profile.suite.ai.audio-funasr` | Horizontal | Audio AI FunASR speech-recognition benchmark | `esq run --profile profile.suite.ai.audio-funasr` |
+| `profile.suite.ai.action-pi5` | Horizontal | Action AI PI0.5 RTC inference benchmark | `esq run --profile profile.suite.ai.action-pi5` |
 
 **List all available profiles**:
 ```bash
@@ -371,96 +373,100 @@ esq run --profile profile.vertical.retail-lp-vlm
 
 ---
 
-### Robotics
+## Horizontal
+
+### Action AI
 
 #### PI0.5 RTC Benchmark
 
-**Profile**: `profile.vertical.robotics-pi5`
+**Profile**: `profile.suite.ai.action-pi5`
 
 **Test Cases**:
 
 | Test ID | Test Case |
 |---------|-----------|
-| PI5-RTC-001 | PI0.5 RTC Benchmark (GPU) |
+| ACN-PI5-001 | PI0.5 RTC Benchmark (GPU) |
 
 **Run this profile**:
 ```bash
-esq run --profile profile.vertical.robotics-pi5
+esq run --profile profile.suite.ai.action-pi5
 ```
 
 ---
 
 #### ACT Benchmark
 
-**Profile**: `profile.vertical.robotics-act`
+**Profile**: `profile.suite.ai.action-act`
 
 **Test Cases**:
 
 | Test ID | Test Case |
 |---------|-----------|
-| ROB-ACT-001 | ACT Benchmark (GPU) |
+| ACN-ACT-001 | ACT Benchmark (GPU) |
 
 **Run this profile**:
 ```bash
-esq run --profile profile.vertical.robotics-act
+esq run --profile profile.suite.ai.action-act
 ```
 
 ---
 
 #### FastMapping Benchmark
 
-**Profile**: `profile.vertical.robotics-fastmapping`
+**Profile**: `profile.suite.ai.action-fastmapping`
 
 **Test Cases**:
 
 | Test ID | Test Case |
 |---------|-----------|
-| ROB-FMP-001 | FastMapping Benchmark (CPU) |
+| ACN-FMP-001 | FastMapping Benchmark (CPU) |
 
 **Run this profile**:
 ```bash
-esq run --profile profile.vertical.robotics-fastmapping
+esq run --profile profile.suite.ai.action-fastmapping
 ```
 
 ---
 
-#### ADBScan Benchmark
-
-**Profile**: `profile.vertical.robotics-adbscan`
-
-**Test Cases**:
-
-| Test ID | Test Case |
-|---------|-----------|
-| ROB-ADB-001 | ADBScan Benchmark (CPU) |
-
-**Run this profile**:
-```bash
-esq run --profile profile.vertical.robotics-adbscan
-```
-
----
+### Audio AI
 
 #### FunASR ASR Benchmark
 
-**Profile**: `profile.vertical.robotics-funasr`
+**Profile**: `profile.suite.ai.audio-funasr`
 
 **Test Cases**:
 
 | Test ID | Test Case |
 |---------|-----------|
-| ROB-ASR-001 | FunASR ASR Benchmark (CPU) |
-| ROB-ASR-002 | FunASR ASR Benchmark (GPU) |
-| ROB-ASR-003 | FunASR ASR Benchmark (NPU) |
+| AUD-ASR-001 | FunASR ASR Benchmark (CPU) |
+| AUD-ASR-002 | FunASR ASR Benchmark (GPU) |
+| AUD-ASR-003 | FunASR ASR Benchmark (NPU) |
 
 **Run this profile**:
 ```bash
-esq run --profile profile.vertical.robotics-funasr
+esq run --profile profile.suite.ai.audio-funasr
 ```
 
 ---
 
-## Horizontal
+### Clustering AI
+
+#### ADBScan Benchmark
+
+**Profile**: `profile.suite.ai.clustering-adbscan`
+
+**Test Cases**:
+
+| Test ID | Test Case |
+|---------|-----------|
+| CLU-ADB-001 | ADBScan Benchmark (CPU) |
+
+**Run this profile**:
+```bash
+esq run --profile profile.suite.ai.clustering-adbscan
+```
+
+---
 
 ### Generative AI
 

@@ -886,6 +886,12 @@ def _get_disk_mapping() -> dict[str, dict[str, str]]:
                     device_name = os.path.basename(real_device)
                     link_name = os.path.basename(disk_link)
 
+                    # Skip device-mapper devices (LVM logical volumes, LUKS, etc.) and
+                    # partitions resolved via LVM PV / other links (e.g. "lvm-pv-uuid-*")
+                    # that don't contain "-part" in the by-id name - these aren't whole disks
+                    if device_name.startswith("dm-") or os.path.exists(f"/sys/class/block/{device_name}/partition"):
+                        continue
+
                     # Skip WWN entries if already have ATA/NVMe entries for same device
                     if link_name.startswith("wwn-") and device_name in disk_mapping:
                         continue
@@ -993,19 +999,59 @@ def _guess_interface_from_device_name(device_name: str) -> str:
         return "Unknown"
 
 
+def _resolve_dm_parent_disk(device_name: str) -> str:
+    """
+    Resolve a device-mapper device (LVM logical volume, LUKS, etc.) to its
+    underlying physical disk by walking /sys/class/block/<dm>/slaves/.
+
+    Args:
+        device_name: Device-mapper block device name (e.g., 'dm-0')
+
+    Returns:
+        Parent disk device name (e.g., 'sda') or None if it cannot be resolved
+    """
+    slaves_path = f"/sys/class/block/{device_name}/slaves"
+    try:
+        if not os.path.isdir(slaves_path):
+            return None
+        for slave in sorted(os.listdir(slaves_path)):
+            parent = _get_parent_disk(f"/dev/{slave}")
+            if parent:
+                return parent
+    except OSError:
+        pass
+    return None
+
+
 def _get_parent_disk(partition_device: str) -> str:
     """
     Get the parent disk device name from a partition device.
 
     Args:
-        partition_device: Partition device path (e.g., '/dev/sda1', '/dev/nvme0n1p1')
+        partition_device: Partition device path (e.g., '/dev/sda1', '/dev/nvme0n1p1',
+            '/dev/mapper/ubuntu--vg-ubuntu--lv')
 
     Returns:
         Parent disk device name (e.g., 'sda', 'nvme0n1') or None
     """
     import re
 
+    if not partition_device:
+        return None
+
     device_name = os.path.basename(partition_device)
+
+    # Resolve /dev/mapper/* symlinks (LVM, LUKS, etc.) to their dm-N device name
+    if partition_device.startswith("/dev/mapper/"):
+        try:
+            device_name = os.path.basename(os.path.realpath(partition_device))
+        except OSError:
+            return None
+
+    # Handle device-mapper devices (LVM logical volumes, LUKS, etc.) by walking
+    # sysfs to find the underlying physical disk(s)
+    if device_name.startswith("dm-"):
+        return _resolve_dm_parent_disk(device_name)
 
     # Handle NVMe devices (nvme0n1p1 -> nvme0n1)
     if device_name.startswith("nvme"):
@@ -1130,28 +1176,20 @@ def collect_storage_info() -> dict[str, Any]:
 
             storage_info["devices"].append(device_obj)
 
-        # Calculate global totals based on root disk only (for system validation)
-        if root_disk_device and root_partition:
+        # Calculate global totals based on root partition usage (for system validation).
+        # Free/used always reflect the root mountpoint; total_size prefers the physical
+        # disk capacity but falls back to the partition size if the underlying disk
+        # cannot be resolved (e.g. LVM/device-mapper layouts without a matching entry).
+        if root_partition:
             try:
-                # Use total disk size for the device containing root partition
-                root_disk_size = _get_disk_size(root_disk_device)
                 root_usage = psutil.disk_usage(root_partition.mountpoint)
-
-                # Global totals should reflect the primary storage (root disk)
-                storage_info["total_size"] = root_disk_size
                 storage_info["total_used"] = root_usage.used
                 storage_info["total_free"] = root_usage.free
+
+                root_disk_size = _get_disk_size(root_disk_device) if root_disk_device else 0
+                storage_info["total_size"] = root_disk_size if root_disk_size > 0 else root_usage.total
             except Exception as e:
                 logger.warning(f"Failed to get root disk usage: {e}")
-                # Fallback: use root partition usage
-                if root_partition:
-                    try:
-                        root_usage = psutil.disk_usage(root_partition.mountpoint)
-                        storage_info["total_size"] = root_usage.total
-                        storage_info["total_used"] = root_usage.used
-                        storage_info["total_free"] = root_usage.free
-                    except Exception:
-                        pass
 
         # Sort devices with root mount disk first
         def sort_storage_devices(device):

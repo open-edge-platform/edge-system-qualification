@@ -188,6 +188,10 @@ def format_system_summary(hardware_info: dict[str, Any], software_info: dict[str
                 device_line += f" ({interface})"
             if size:
                 device_line += f" - {size} GB"
+            if "root_free_gib" in device:
+                device_line += (
+                    f" ({device['root_free_gib']} GB available • {device['root_used_percent']:.0f}% used)"
+                )
             lines.append(device_line)
 
     # OS Information
@@ -405,6 +409,17 @@ def build_display_summary(hardware: dict[str, Any], software: dict[str, Any]) ->
                 "interface": device.get("interface", ""),
                 "size_gib": round(device.get("size", 0) / (1024**3), 1) if device.get("size") else 0,
             }
+
+            # Surface root ('/') partition usage, if present, so callers can show
+            # used/available space alongside total device capacity
+            root_partition = next(
+                (p for p in device.get("partitions", []) if p.get("mountpoint") == "/"), None
+            )
+            if root_partition:
+                device_summary["root_used_gib"] = round(root_partition.get("used", 0) / (1024**3), 1)
+                device_summary["root_free_gib"] = round(root_partition.get("free", 0) / (1024**3), 1)
+                device_summary["root_used_percent"] = round(root_partition.get("percent", 0), 1)
+
             summary_hardware["storage"]["devices"].append(device_summary)
 
     # Convert DMI info (pass through as-is)

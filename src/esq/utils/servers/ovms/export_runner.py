@@ -17,8 +17,8 @@ automatically rebuilt because the venv name incorporates the commit hash.
 
 import logging
 import os
+import shutil
 from pathlib import Path
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -143,7 +143,7 @@ def _download_upstream_file(url: str, dest_path: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-def download_export_script(cache_dir: Optional[str] = None) -> str:
+def download_export_script(cache_dir: str | None = None) -> str:
     """
     Download and cache the upstream OVMS export_model.py script.
 
@@ -169,7 +169,7 @@ def download_export_script(cache_dir: Optional[str] = None) -> str:
     return script_path
 
 
-def download_requirements_file(cache_dir: Optional[str] = None) -> str:
+def download_requirements_file(cache_dir: str | None = None) -> str:
     """
     Download and cache the upstream OVMS requirements.txt.
 
@@ -303,8 +303,8 @@ def _preprocess_requirements(req_file: str, processed_dir: str) -> str:
 
 
 def setup_export_venv(
-    cache_dir: Optional[str] = None,
-    venv_data_dir: Optional[str] = None,
+    cache_dir: str | None = None,
+    venv_data_dir: str | None = None,
     force: bool = False,
 ) -> str:
     """
@@ -397,7 +397,7 @@ def run_export_text_generation(
     max_num_seqs: str,
     dynamic_split_fuse: bool,
     export_timeout: float,
-    data_dir: Optional[str] = None,
+    data_dir: str | None = None,
 ) -> None:
     """
     Run the upstream OVMS ``export_model.py text_generation`` command inside
@@ -449,6 +449,26 @@ def run_export_text_generation(
 
     # Ensure models_dir exists (upstream script validates it)
     os.makedirs(models_dir, exist_ok=True)
+
+    # Dedicated scratch directory for optimum-intel/NNCF temp files, placed on
+    # the same volume as models_dir.
+    # ---------------------------------------------------------------------
+    # optimum-intel's OVQuantizer (immediate_save=True path, used for large
+    # models like Qwen3-32B) writes each quantized sub-model to a Python
+    # ``tempfile.TemporaryDirectory()`` before renaming it into place. That
+    # helper resolves its location from the TMPDIR/TEMP/TMP environment
+    # variables, falling back to ``/tmp`` if none are set. ``/tmp`` can sit on
+    # a different, smaller volume than the main data disk -- e.g. a RAM-backed
+    # tmpfs mount, or (as seen on an LVM-partitioned system) its own separate
+    # logical volume/thin pool that wasn't sized for multi-GB writes -- so a
+    # large model (tens of GB for 32B+ params) fails there with
+    # ``RuntimeError: basic_ios::clear: iostream error`` even though the real
+    # target disk (models_dir) has plenty of room. Pointing TMPDIR at a folder
+    # on the same volume as models_dir removes that dependency on the host's
+    # ``/tmp`` layout entirely.
+    export_tmp_dir = os.path.join(models_dir, ".export_tmp")
+    shutil.rmtree(export_tmp_dir, ignore_errors=True)
+    os.makedirs(export_tmp_dir, exist_ok=True)
 
     # Download script (cached after first call)
     script_path = download_export_script(suite_cache_dir)
@@ -511,17 +531,29 @@ def run_export_text_generation(
     logger.info(f"Running OVMS export_model.py (commit: {OVMS_COMMIT})")
     logger.debug(f"Export command: {' '.join(cmd)}")
 
-    result = manager.run_command_in_venv(
-        venv_name=venv_name,
-        command=cmd,
-        timeout=export_timeout,
-        check=False,
-        stream_output=True,
-    )
+    # Redirect tempfile.* (TMPDIR/TEMP/TMP) to the disk-backed scratch dir
+    # created above so large-model quantization doesn't overflow a
+    # RAM-backed /tmp on the host (see export_tmp_dir comment above).
+    export_env = os.environ.copy()
+    export_env["TMPDIR"] = export_tmp_dir
+    export_env["TEMP"] = export_tmp_dir
+    export_env["TMP"] = export_tmp_dir
 
-    if result.timed_out:
-        raise TimeoutError(f"Model export timed out after {export_timeout}s")
-    if result.returncode != 0:
-        raise ValueError(f"Model export failed with exit code {result.returncode}")
+    try:
+        result = manager.run_command_in_venv(
+            venv_name=venv_name,
+            command=cmd,
+            env=export_env,
+            timeout=export_timeout,
+            check=False,
+            stream_output=True,
+        )
 
-    logger.info("OVMS export_model.py completed successfully")
+        if result.timed_out:
+            raise TimeoutError(f"Model export timed out after {export_timeout}s")
+        if result.returncode != 0:
+            raise ValueError(f"Model export failed with exit code {result.returncode}")
+
+        logger.info("OVMS export_model.py completed successfully")
+    finally:
+        shutil.rmtree(export_tmp_dir, ignore_errors=True)

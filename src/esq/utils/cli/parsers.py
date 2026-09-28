@@ -95,6 +95,22 @@ USAGE PATTERNS:
   6. Run with filters:
      {cli_name} run -p PROFILE_NAME --filter test_id=T0069
 
+  7. Interactively select one or more profiles via checkbox (qualification, suite, or vertical):
+     {cli_name} run --select
+     • Checkbox menu of ALL available profiles (same set as '{cli_name} list')
+     • Up/Down to move, Right/Left to expand/collapse, Space to toggle, 'a' to toggle all,
+       Enter to confirm
+     • Drill into a profile to pick specific test_id(s) instead of the whole profile
+     • CPU validation and associated vertical profile prompts apply automatically
+       for any selected qualification profile(s)
+     • After confirming, optionally save the selection (including any test_id scoping)
+       to a YAML file for reuse
+
+  8. Run profiles listed in a saved YAML template file:
+     {cli_name} run --profiles-file PROFILES_FILE
+     • Runs the profile(s) listed under a top-level 'profiles' key (or a plain list)
+     • Create one by hand, or save one from the --select checkbox prompt
+
 EXAMPLES:
   {cli_name} run                                                    # Interactive mode with prompts
   {cli_name} run --all                                              # All profiles
@@ -102,6 +118,8 @@ EXAMPLES:
   {cli_name} run -p profile.qualification.ai-edge-system            # Specific profile
   {cli_name} run -t aes                                             # By tag
   {cli_name} run -p profile.suite.ai.vision --filter test_id=T0001  # Filtered test
+  {cli_name} run --select                                           # Pick profile(s) via checkbox
+  {cli_name} run --profiles-file custom_profiles.yml                # Run from a saved template
 
 HARDWARE REQUIREMENTS:
   Refer to the documentation for supported hardware and system requirements.
@@ -130,6 +148,22 @@ For available profiles, use: {cli_name} list
             "Run qualification profiles only (exits if system requirements not met). "
             "Combined with --profile/--tag, skips that profile's vertical_profiles entirely "
             "(no prompt, not auto-included even with --force)"
+        ),
+    )
+    execution_group.add_argument(
+        "--select",
+        "-se",
+        action="store_true",
+        help=(
+            "Interactively pick one or more profiles/tests to run via a checkbox menu"
+        ),
+    )
+    execution_group.add_argument(
+        "--profiles-file",
+        "-pf",
+        metavar="FILE",
+        help=(
+            "Run profile(s) listed in a YAML template file"
         ),
     )
     execution_group.add_argument(

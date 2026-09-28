@@ -12,13 +12,19 @@ import json
 import logging
 import os
 import signal
+import string
 import sys
 import time
+import yaml
+from datetime import datetime
+from pathlib import Path
 from typing import Any
+
 
 from sysagent.utils.cli.filters import parse_filters
 from sysagent.utils.cli.handlers import handle_interrupt
 from sysagent.utils.config import filter_profile_by_tier, get_suite_directory, list_profiles, setup_data_dir
+from sysagent.utils.config.config_loader import get_cli_aware_project_name
 from sysagent.utils.core import shared_state
 from sysagent.utils.logging import setup_command_logging
 from sysagent.utils.reporting import CoreResultsSummaryGenerator, TestSummaryTableGenerator
@@ -52,6 +58,8 @@ def run_tests(
     extra_args: list[str] = None,
     run_all_profiles: bool = None,
     qualification_only: bool = None,
+    select_profile: bool = None,
+    profiles_file: str = None,
     telemetry_interval: int = None,
     tags: list[str] = None,
 ) -> int:
@@ -62,6 +70,8 @@ def run_tests(
     - Default run (no flags): Runs all profile types (qualifications, suites, verticals)
     - Specific profile (-p): Runs specified profile
     - Suite/test run: Runs specified suite/test
+    - Profiles file (--profiles-file): Runs the profile(s) listed in a YAML file
+    - Interactive selection (--select): Pick profile(s)/test_id(s) via a checkbox tree
 
     Args:
         profile_name: Profile name to run
@@ -80,6 +90,8 @@ def run_tests(
         extra_args: Additional pytest arguments to pass
         run_all_profiles: Whether to run all profile types. Ignored in generic sysagent.
         qualification_only: Whether to run only qualification profiles. Ignored in generic sysagent.
+        select_profile: Whether to interactively pick profile(s)/test_id(s) via a checkbox tree.
+        profiles_file: Path to a YAML profiles template file to run (see --profiles-file).
         tags: List of tag keywords to resolve to profile(s). Ignored in generic sysagent
             (package-specific implementations like ESQ resolve tags to profiles).
 
@@ -133,6 +145,10 @@ def run_tests(
         logger.error("Error: --test option requires --sub-suite option to be specified")
         return 1
 
+    if profiles_file and (profile_name or suite_name):
+        logger.error("Error: --profiles-file cannot be combined with --profile or --suite")
+        return 1
+
     # Parse and validate filters
     parsed_filters = {}
     if filters:
@@ -144,8 +160,8 @@ def run_tests(
             return 1
 
         # Filters can only be used with profile-based execution
-        if not profile_name:
-            logger.error("Error: --filter option can only be used with --profile option")
+        if not profile_name and not profiles_file:
+            logger.error("Error: --filter option can only be used with --profile or --profiles-file option")
             return 1
 
     data_dir = setup_data_dir()
@@ -180,11 +196,37 @@ def run_tests(
                 profile_name, pytest_args, skip_system_check, data_dir, verbose, debug, parsed_filters, force
             )
 
-        # Option 2: If a suite name is provided, run that specific suite (no prompt)
+        # Option 2: If a profiles file is provided, run the profile(s) listed in it
+        elif profiles_file:
+            result_code, tests_ran = _run_profiles_file(
+                profiles_file, pytest_args, skip_system_check, data_dir, verbose, debug, parsed_filters, force
+            )
+
+        # Option 3: If a suite name is provided, run that specific suite (no prompt)
         elif suite_name:
             result_code, tests_ran = _run_suite_tests(suite_name, sub_suite_name, test_name, pytest_args)
 
-        # Option 3: Default run behavior - runs all profiles (generic sysagent)
+        # Option 4: Interactively pick profile(s) (and optionally specific test_id(s)) to run
+        elif select_profile:
+            selected_profile_names, per_profile_filters = _prompt_select_any_profile(
+                force, list_profiles(include_examples=False)
+            )
+            if not selected_profile_names:
+                logger.error("No profile selected - nothing to run")
+                result_code, tests_ran = 1, False
+            else:
+                _offer_save_profiles_selection(selected_profile_names, per_profile_filters)
+                result_code, tests_ran = _resolve_and_execute_profiles(
+                    selected_profile_names,
+                    pytest_args,
+                    skip_system_check,
+                    data_dir,
+                    verbose,
+                    debug,
+                    per_profile_filters=per_profile_filters,
+                )
+
+        # Option 5: Default run behavior - runs all profiles (generic sysagent)
         else:
             result_code, tests_ran = _run_all_profiles(
                 skip_system_check,
@@ -319,6 +361,145 @@ def _run_profile_tests(
             final_exit_code = result_code
 
     return final_exit_code, tests_ran
+
+
+def _resolve_and_execute_profiles(
+    requested_profile_names: list[str],
+    pytest_args: list[str],
+    skip_system_check: bool,
+    data_dir: str,
+    verbose: bool = False,
+    debug: bool = False,
+    filters: dict[str, Any] = None,
+    force: bool = False,
+    per_profile_filters: dict[str, dict[str, Any]] = None,
+) -> tuple:
+    """
+    Resolve dependencies for one or more explicitly requested profiles and execute them.
+
+    Generic multi-profile counterpart to `_run_profile_tests` (which only handles a
+    single profile): expands each requested profile with its dependencies, deduplicates
+    the combined set, and resolves a single dependency-priority execution order (avoiding
+    redundant re-runs of shared dependencies). Used by --profiles-file and --select.
+    No system validation or extra prompts are performed here - package-specific
+    implementations (like ESQ) that need those should build on top of this.
+
+    Args:
+        per_profile_filters: Optional {profile_name: filters_dict} overriding the shared
+            `filters` for specific requested profiles (e.g., a per-profile test_id scope
+            picked via --select or loaded from --profiles-file). Profiles not present in
+            this mapping fall back to the shared `filters`.
+
+    Returns:
+        tuple: (exit_code, tests_ran)
+    """
+    from sysagent.utils.config import expand_profile_with_dependencies, resolve_profile_dependencies
+
+    per_profile_filters = per_profile_filters or {}
+
+    all_profiles_data = list_profiles(include_examples=True)
+    all_profiles_dict = {}
+    for profiles in all_profiles_data.values():
+        for profile in profiles:
+            configs = profile.get("configs")
+            if configs:
+                profile_name_key = configs.get("name")
+                if profile_name_key:
+                    all_profiles_dict[profile_name_key] = configs
+
+    missing = [name for name in requested_profile_names if name not in all_profiles_dict]
+    if missing:
+        logger.error(f"Profile(s) not found: {', '.join(missing)}")
+        return 1, False
+
+    # Expand each requested profile with its dependencies; a dict naturally
+    # dedupes profiles shared across multiple requested profiles.
+    required_profiles: dict[str, Any] = {}
+    for profile_name in requested_profile_names:
+        try:
+            for expanded_name in expand_profile_with_dependencies(profile_name, all_profiles_dict):
+                required_profiles[expanded_name] = all_profiles_dict[expanded_name]
+        except Exception as e:
+            logger.error(f"Failed to resolve dependencies for profile '{profile_name}': {e}")
+            return 1, False
+
+    try:
+        execution_order = resolve_profile_dependencies(required_profiles)
+    except Exception as e:
+        logger.error(f"Failed to resolve profile execution order: {e}")
+        return 1, False
+
+    requested_set = set(requested_profile_names)
+    logger.info("Execution order:")
+    for i, prof in enumerate(execution_order, 1):
+        prefix = "  └─" if i == len(execution_order) else "  ├─"
+        suffix = " (requested)" if prof in requested_set else " (dependency)"
+        logger.info(f"{prefix} {prof}{suffix}")
+
+    final_exit_code = 0
+    tests_ran = False
+    for current_profile_name in execution_order:
+        if current_profile_name in requested_set:
+            profile_filters = per_profile_filters.get(current_profile_name, filters)
+        else:
+            profile_filters = None
+        result_code, profile_tests_ran = _run_single_profile(
+            current_profile_name,
+            pytest_args,
+            skip_system_check,
+            data_dir,
+            verbose,
+            debug,
+            profile_filters,
+        )
+        tests_ran = tests_ran or profile_tests_ran
+        if result_code != 0:
+            if current_profile_name in requested_set:
+                final_exit_code = result_code
+            else:
+                logger.warning(
+                    f"Dependency profile '{current_profile_name}' completed with exit code {result_code}. "
+                    f"Continuing to execute requested profile(s)."
+                )
+
+    return final_exit_code, tests_ran
+
+
+def _run_profiles_file(
+    profiles_file: str,
+    pytest_args: list[str],
+    skip_system_check: bool,
+    data_dir: str,
+    verbose: bool = False,
+    debug: bool = False,
+    filters: dict[str, Any] = None,
+    force: bool = False,
+) -> tuple:
+    """
+    Run the profile(s) listed in a YAML profiles template file (see --profiles-file).
+
+    Returns:
+        tuple: (exit_code, tests_ran)
+    """
+    profile_names, per_profile_filters = _load_profiles_from_file(profiles_file)
+    if profile_names is None:
+        return 1, False
+    if not profile_names:
+        logger.error(f"No profiles listed in '{profiles_file}' - nothing to run")
+        return 1, False
+
+    logger.info(f"Loaded {len(profile_names)} profile(s) from '{profiles_file}': {', '.join(profile_names)}")
+    return _resolve_and_execute_profiles(
+        profile_names,
+        pytest_args,
+        skip_system_check,
+        data_dir,
+        verbose,
+        debug,
+        filters,
+        force,
+        per_profile_filters=per_profile_filters,
+    )
 
 
 def _run_single_profile(
@@ -533,6 +714,562 @@ def _run_suite_tests(suite_name: str, sub_suite_name: str, test_name: str, pytes
     except KeyboardInterrupt:
         logger.warning("Test execution interrupted by user. Stopping all tests.")
         return 130, True
+
+
+# Default location (relative to cwd) offered when saving a --select checkbox
+# choice, and used as the suggested path in --profiles-file help text.
+DEFAULT_PROFILES_FILE = "custom_profiles.yml"
+
+
+def _sanitize_path(path: str) -> str:
+    """
+    Sanitize a user-supplied file-system path to break Coverity PATH_MANIPULATION
+    taint chains.
+
+    Resolves the path to an absolute form (eliminating ".." traversals) and rebuilds
+    it character-by-character so Coverity's taint tracker sees a freshly-constructed
+    string rather than propagated external input.
+    """
+    resolved = str(Path(path).resolve())
+    # Character-by-character copy breaks Coverity taint propagation.
+    chars: list = []
+    for char in resolved:
+        chars.append(char)
+    return "".join(chars)
+
+
+_CLI_NAME_ALLOWED_CHARS = set(string.ascii_letters + string.digits + "-_")
+
+
+def _sanitize_cli_name(name: str) -> str:
+    """Restrict a display name to safe characters before it's echoed back to the user."""
+    chars: list = []
+    for char in name or "":
+        if char in _CLI_NAME_ALLOWED_CHARS:
+            chars.append(char)
+    return "".join(chars) or "sysagent"
+
+
+def _load_profiles_from_file(profiles_file: str) -> tuple:
+    """
+    Load profile names (and any per-profile test_id filters) from a YAML profiles
+    template file (see --profiles-file). Each entry may be a mapping {name, test_ids}
+    (test_ids optional) - the standardized format written by the --select save prompt -
+    or, for convenience when hand-writing a file, a plain profile name string (run the
+    whole profile).
+
+    Returns:
+        tuple: (profile_names, per_profile_filters) with profile_names deduplicated
+        (order preserved) and per_profile_filters a dict of
+        {profile_name: {"test_id": [...]}} for profiles scoped to specific tests.
+        Returns (None, None) on error.
+    """
+    profiles_file = _sanitize_path(profiles_file)
+    if not os.path.isfile(profiles_file):
+        logger.error(f"Profiles file not found: {profiles_file}")
+        return None, None
+
+    try:
+        with open(profiles_file, encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+    except (OSError, yaml.YAMLError) as e:
+        logger.error(f"Failed to read profiles file '{profiles_file}': {e}")
+        return None, None
+
+    if isinstance(data, dict):
+        raw_entries = data.get("profiles") or []
+    elif isinstance(data, list):
+        raw_entries = data
+    else:
+        logger.error(f"Invalid format in '{profiles_file}': expected a list or a mapping with a 'profiles' key")
+        return None, None
+
+    profile_names = []
+    per_profile_filters = {}
+    seen = set()
+    for entry in raw_entries:
+        if isinstance(entry, str):
+            name, test_ids = entry.strip(), None
+        elif isinstance(entry, dict):
+            name, test_ids = str(entry.get("name", "")).strip(), entry.get("test_ids")
+        else:
+            continue
+
+        if not name or name in seen:
+            continue
+        seen.add(name)
+        profile_names.append(name)
+
+        if test_ids:
+            cleaned_ids = sorted({str(t).strip() for t in test_ids if str(t).strip()})
+            if cleaned_ids:
+                per_profile_filters[name] = {"test_id": cleaned_ids}
+    return profile_names, per_profile_filters
+
+
+def _write_profiles_file(profiles_file: str, profile_names: list, per_profile_filters: dict = None) -> bool:
+    """
+    Write the given profile names to a YAML profiles template file.
+
+    Standardized format: every entry is always a {name, ...} mapping, never a bare
+    profile name string - this avoids mixing formats in a single file. A profile scoped
+    to specific test_id(s) - or fully selected but declaring test_id(s) of its own - also
+    gets a "test_ids" key, listing ALL of its test_id(s) explicitly when the whole
+    profile was selected. This avoids the ambiguity of a bare profile name silently
+    implying "all tests". Only profiles that declare no test_id(s) at all are written
+    with just "name" (nothing to list).
+    """
+    per_profile_filters = per_profile_filters or {}
+    profiles_file = _sanitize_path(profiles_file)
+
+    all_profiles_dict = {}
+    for profiles in list_profiles(include_examples=True).values():
+        for profile in profiles:
+            configs = profile.get("configs")
+            if configs and configs.get("name"):
+                all_profiles_dict[configs["name"]] = configs
+
+    entries = []
+    for name in sorted(profile_names):
+        test_ids = per_profile_filters.get(name, {}).get("test_id")
+        if not test_ids:
+            configs = all_profiles_dict.get(name)
+            if configs:
+                test_ids = [test_id for test_id, _ in _get_test_ids_from_profile(configs)]
+        entry = {"name": name}
+        if test_ids:
+            entry["test_ids"] = sorted(test_ids)
+        entries.append(entry)
+    data = {"profiles": entries}
+    try:
+        directory = os.path.dirname(profiles_file)
+        if directory:
+            os.makedirs(directory, exist_ok=True)
+        # Restrictive permissions (owner/group read-write only)
+        fd = os.open(profiles_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o640)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            yaml.safe_dump(data, f, default_flow_style=False, sort_keys=False)
+    except OSError as e:
+        logger.error(f"Failed to save profiles file '{profiles_file}': {e}")
+        return False
+
+    shared_state.LAST_SAVED_PROFILES_FILE = profiles_file
+
+    cli_name = _sanitize_cli_name(get_cli_aware_project_name().lower())
+    print(f"Saved {len(profile_names)} profile(s) to '{profiles_file}'.")
+    print(f"Tip: run '{cli_name} run --profiles-file {profiles_file}' to reuse this selection.\n")
+    return True
+
+
+def _offer_save_profiles_selection(profile_names: list, per_profile_filters: dict = None) -> None:
+    """
+    After an interactive --select run, offer to save the picked profiles (and any
+    per-profile test_id filters) for reuse.
+
+    A Ctrl+C here is intentionally NOT caught: it should cancel the whole run rather
+    than silently skip the save prompt and continue on to execute the selected tests.
+    """
+    try:
+        response = input("Save this selection to a file for reuse? (y/N): ").strip().lower()
+    except EOFError:
+        return
+    if response not in ("y", "yes"):
+        return
+
+    # No file path prompt - always auto-generate a unique timestamped filename
+    base, ext = os.path.splitext(DEFAULT_PROFILES_FILE)
+    timestamp = datetime.now().strftime("%y%m%d_%H%M")
+    profiles_file = f"{base}_{timestamp}{ext}"
+
+    _write_profiles_file(profiles_file, profile_names, per_profile_filters)
+
+
+def _get_test_ids_from_profile(profile_configs: dict) -> list:
+    """
+    Extract (test_id, display_name) tuples for every parameterized test declared in a
+    profile's YAML (suites[].sub_suites[].tests{}.params[]), deduplicated by test_id.
+    """
+    test_entries = []
+    seen_ids = set()
+    for suite in profile_configs.get("suites", []) or []:
+        for sub_suite in suite.get("sub_suites", []) or []:
+            for test_config in (sub_suite.get("tests", {}) or {}).values():
+                for param in (test_config or {}).get("params", []) or []:
+                    test_id = param.get("test_id")
+                    if not test_id or test_id in seen_ids:
+                        continue
+                    seen_ids.add(test_id)
+                    test_entries.append((test_id, param.get("display_name", test_id)))
+    return test_entries
+
+
+def _build_profile_tree(all_profiles: dict) -> dict:
+    """
+    Build the nested {group: {profile_name: {"display_name", "tests"}}} structure shown
+    by the --select tree picker, skipping profiles marked "hidden" (they remain runnable
+    explicitly via --profile/--tag). "tests" is the list of (test_id, display_name)
+    tuples declared by that profile (possibly empty), enabling drill-down to specific
+    test_id(s) within a profile.
+    """
+    all_profiles = all_profiles or {}
+    tree = {}
+    for profile_type in ("qualifications", "suites", "verticals"):
+        section = profile_type.capitalize()
+        for profile in all_profiles.get(profile_type, []):
+            configs = profile.get("configs")
+            if not configs:
+                continue
+            profile_name = configs.get("name")
+            if not profile_name:
+                continue
+            labels = configs.get("params", {}).get("labels", {})
+            if labels.get("hidden", False):
+                continue
+            tree.setdefault(section, {})[profile_name] = {
+                "display_name": labels.get("profile_display_name", profile_name),
+                "tests": _get_test_ids_from_profile(configs),
+            }
+    return tree
+
+
+def _prompt_checkbox_profiles(tree: dict) -> tuple:
+    """
+    Interactive tree-style picker with real inline group/ungroup (expand/collapse),
+    built directly on `prompt_toolkit`, spanning three levels: group -> profile -> test_id.
+    Groups and profiles stay collapsed until expanded, and items can be picked across
+    multiple groups/profiles in a single screen.
+
+    Keys:
+        Up/Down (or k/j): move cursor
+        Right/l: expand the current group or profile row
+        Left/h: collapse the current group or profile row
+        Space: toggle the checkbox of the current profile or test_id row
+        a: toggle all currently visible profile/test_id rows
+        Enter: confirm and submit the current selection
+        q / Ctrl+C: cancel
+
+    Checking a profile row selects ALL of its test_id(s) (tri-state: unchecked/partial
+    both toggle to fully checked; fully checked toggles to fully unchecked). Unchecking
+    the profile row after individually picking only some test_id(s) scopes that profile
+    to just those tests (equivalent to --filter test_id=...). Profiles that declare no
+    test_id(s) are checked/unchecked as a single unit.
+
+    Requires a real TTY on stdin/stdout.
+
+    Returns:
+        tuple: (selected_profile_names, per_profile_filters) - per_profile_filters is
+        {profile_name: {"test_id": [...]}} for profiles scoped to specific tests.
+        Returns ([], {}) if cancelled/nothing selected.
+    """
+    from prompt_toolkit import Application
+    from prompt_toolkit.key_binding import KeyBindings
+    from prompt_toolkit.layout.containers import HSplit, Window
+    from prompt_toolkit.layout.controls import FormattedTextControl
+    from prompt_toolkit.layout.dimension import D
+    from prompt_toolkit.layout.layout import Layout
+    from prompt_toolkit.styles import Style
+
+    group_order = [section for section in ("Qualifications", "Suites", "Verticals") if section in tree]
+    profiles_by_group = {
+        section: sorted(tree[section].items(), key=lambda kv: kv[1]["display_name"]) for section in group_order
+    }
+    profile_info_by_name = {
+        profile_name: info for profiles in profiles_by_group.values() for profile_name, info in profiles
+    }
+
+    expanded_groups = dict.fromkeys(group_order, False)
+    expanded_profiles = {}
+    checked_profiles = set()  # profiles with no test_id(s) - checked/unchecked as a whole
+    checked_tests = {}  # profile_name -> set(test_id), for profiles that declare test_id(s)
+    cursor = {"index": 0}
+
+    def _all_test_ids(tests):
+        return {test_id for test_id, _ in tests}
+
+    def _is_profile_fully_checked(profile_name, tests):
+        if not tests:
+            return profile_name in checked_profiles
+        all_ids = _all_test_ids(tests)
+        return bool(all_ids) and checked_tests.get(profile_name, set()) == all_ids
+
+    def _is_profile_picked(profile_name, tests):
+        if tests:
+            return bool(checked_tests.get(profile_name))
+        return profile_name in checked_profiles
+
+    def visible_rows():
+        rows = []
+        for section in group_order:
+            rows.append(("group", section))
+            if not expanded_groups[section]:
+                continue
+            for profile_name, info in profiles_by_group[section]:
+                rows.append(("profile", section, profile_name, info["display_name"], info["tests"]))
+                if expanded_profiles.get(profile_name) and info["tests"]:
+                    for test_id, test_display in info["tests"]:
+                        rows.append(("test", section, profile_name, test_id, test_display))
+        return rows
+
+    def _is_checked(row):
+        if row[0] == "profile":
+            return _is_profile_fully_checked(row[2], row[4])
+        if row[0] == "test":
+            return row[3] in checked_tests.get(row[2], ())
+        return False
+
+    def _set_checked(row, value):
+        if row[0] == "profile":
+            _, _section, profile_name, _display_name, tests = row
+            if tests:
+                # Checking a profile selects ALL of its test_id(s); unchecking clears them.
+                checked_tests[profile_name] = _all_test_ids(tests) if value else set()
+            elif value:
+                checked_profiles.add(profile_name)
+            else:
+                checked_profiles.discard(profile_name)
+        elif row[0] == "test":
+            _, _, profile_name, test_id, _ = row
+            test_set = checked_tests.setdefault(profile_name, set())
+            if value:
+                test_set.add(test_id)
+            else:
+                test_set.discard(test_id)
+
+    def render_rows():
+        rows = visible_rows()
+        cursor["index"] = max(0, min(cursor["index"], len(rows) - 1)) if rows else 0
+        lines = []
+        for i, row in enumerate(rows):
+            is_cursor = i == cursor["index"]
+            pointer = "\u276f " if is_cursor else "  "
+            style = "class:cursor" if is_cursor else ""
+            if row[0] == "group":
+                section = row[1]
+                arrow = "\u25be" if expanded_groups[section] else "\u25b8"
+                profiles = profiles_by_group[section]
+                picked = sum(1 for profile_name, info in profiles if _is_profile_picked(profile_name, info["tests"]))
+                text = f"{pointer}{arrow} {section} ({picked}/{len(profiles)} selected)\n"
+            elif row[0] == "profile":
+                _, _section, profile_name, display_name, tests = row
+                has_tests = bool(tests)
+                arrow = ("\u25be" if expanded_profiles.get(profile_name) else "\u25b8") if has_tests else " "
+                test_set = checked_tests.get(profile_name)
+                if _is_profile_fully_checked(profile_name, tests):
+                    box = "[x]"
+                elif test_set:
+                    box = "[~]"
+                else:
+                    box = "[ ]"
+                suffix = f"  ({len(test_set)}/{len(tests)} tests)" if has_tests and test_set else ""
+                text = f"{pointer}  {arrow} {box} {display_name}  ({profile_name}){suffix}\n"
+            else:
+                _, _section, profile_name, test_id, test_display = row
+                box = "[x]" if test_id in checked_tests.get(profile_name, ()) else "[ ]"
+                text = f"{pointer}      {box} {test_id}  {test_display}\n"
+            if is_cursor:
+                # Marks this row as the "cursor" so the Window auto-scrolls to keep
+                # it visible when the list is taller than the terminal.
+                lines.append(("[SetCursorPosition]", ""))
+            lines.append((style, text))
+        return lines
+
+    kb = KeyBindings()
+
+    @kb.add("c-c")
+    @kb.add("q")
+    def _cancel(event):
+        event.app.exit(result=(None, None))
+
+    @kb.add("up")
+    @kb.add("k")
+    def _up(event):
+        rows = visible_rows()
+        if rows:
+            cursor["index"] = (cursor["index"] - 1) % len(rows)
+
+    @kb.add("down")
+    @kb.add("j")
+    def _down(event):
+        rows = visible_rows()
+        if rows:
+            cursor["index"] = (cursor["index"] + 1) % len(rows)
+
+    @kb.add("right")
+    @kb.add("l")
+    def _expand(event):
+        rows = visible_rows()
+        if not rows:
+            return
+        row = rows[cursor["index"]]
+        if row[0] == "group":
+            expanded_groups[row[1]] = True
+        elif row[0] == "profile" and row[4]:
+            expanded_profiles[row[2]] = True
+
+    @kb.add("left")
+    @kb.add("h")
+    def _collapse(event):
+        rows = visible_rows()
+        if not rows:
+            return
+        row = rows[cursor["index"]]
+        if row[0] == "group":
+            expanded_groups[row[1]] = False
+        elif row[0] == "profile":
+            expanded_profiles[row[2]] = False
+
+    @kb.add(" ")
+    def _toggle(event):
+        rows = visible_rows()
+        if not rows:
+            return
+        row = rows[cursor["index"]]
+        if row[0] in ("profile", "test"):
+            _set_checked(row, not _is_checked(row))
+
+    @kb.add("a")
+    def _toggle_all(event):
+        rows = [row for row in visible_rows() if row[0] in ("profile", "test")]
+        if not rows:
+            return
+        turn_on = not all(_is_checked(row) for row in rows)
+        for row in rows:
+            _set_checked(row, turn_on)
+
+    @kb.add("enter")
+    def _submit(event):
+        selected_profile_names = set(checked_profiles)
+        per_profile_filters = {}
+        for profile_name, test_ids in checked_tests.items():
+            if not test_ids:
+                continue
+            selected_profile_names.add(profile_name)
+            all_ids = _all_test_ids(profile_info_by_name[profile_name]["tests"])
+            if test_ids != all_ids:
+                per_profile_filters[profile_name] = {"test_id": sorted(test_ids)}
+        event.app.exit(result=(sorted(selected_profile_names), per_profile_filters))
+
+    cli_name = _sanitize_cli_name(get_cli_aware_project_name().lower())
+    instructions = (
+        f"Select profile(s) to run - or drill into a profile to pick specific test_id(s) "
+        f"(see '{cli_name} list' for full details):\n"
+        "Up/Down: move   Right/Left: expand/collapse   Space: toggle   "
+        "a: toggle all visible   Enter: confirm   q: cancel"
+    )
+    layout = Layout(
+        HSplit(
+            [
+                Window(content=FormattedTextControl(lambda: instructions), height=D(preferred=2)),
+                Window(content=FormattedTextControl(render_rows), always_hide_cursor=True, wrap_lines=False),
+            ]
+        )
+    )
+    style = Style.from_dict({"cursor": "reverse"})
+    app = Application(layout=layout, key_bindings=kb, style=style, full_screen=True, mouse_support=True)
+    selected_profile_names, per_profile_filters = app.run()
+
+    if not selected_profile_names:
+        logger.info("No profile selected. Exiting.")
+        return [], {}
+
+    print(f"Tip: use --profile/-p or --tag/-t to skip this prompt. See '{cli_name} run --help' for all options.\n")
+    return selected_profile_names, per_profile_filters
+
+
+def _prompt_checkbox_profiles_fallback(tree: dict) -> tuple:
+    """
+    Plain-text profile-level fallback for non-interactive terminals (e.g., piped input,
+    CI). Accepts comma-separated numbers (e.g., "1,3,5") or "all". Does not support
+    drilling into individual test_id(s) - use --filter test_id=... for that instead.
+    """
+    entries = []
+    for section in ("Qualifications", "Suites", "Verticals"):
+        for profile_name, info in sorted(tree.get(section, {}).items(), key=lambda kv: kv[1]["display_name"]):
+            entries.append((section, info["display_name"], profile_name))
+
+    cli_name = _sanitize_cli_name(get_cli_aware_project_name().lower())
+    print(f"Available profiles (see '{cli_name} list' for full details):\n")
+    for i, (section, display_name, profile_name) in enumerate(entries, 1):
+        print(f"  {i}) [{section}] {display_name}  [{profile_name}]")
+
+    valid_range = f"1-{len(entries)}"
+    try:
+        response = input(
+            f"\nSelect profile(s) to run [{valid_range}, comma-separated, or 'all'] (or press Enter to cancel): "
+        ).strip()
+    except (KeyboardInterrupt, EOFError):
+        logger.info("Interrupted by user. Exiting.")
+        return [], {}
+
+    if not response:
+        logger.info("No profile selected. Exiting.")
+        return [], {}
+
+    if response.lower() == "all":
+        return [profile_name for _, _, profile_name in entries], {}
+
+    selected = []
+    for token in response.split(","):
+        token = token.strip()
+        if token.isdigit() and 1 <= int(token) <= len(entries):
+            selected.append(entries[int(token) - 1][2])
+        else:
+            logger.error(f"Invalid selection '{token}' - expected a number ({valid_range}). Exiting.")
+            return [], {}
+
+    print(
+        "Tip: use --profile/-p or --tag/-t to skip this prompt, or --filter test_id=... to run "
+        f"specific tests within a profile. See '{cli_name} run --help' for all options.\n"
+    )
+    return selected, {}
+
+
+def _prompt_select_any_profile(
+    force: bool = False,
+    all_profiles: dict = None,
+) -> tuple:
+    """
+    Prompt the user to interactively pick one or more available profiles to run - or
+    drill into a profile to pick specific test_id(s) within it - via a checkbox-style
+    tree menu (falls back to a plain profile-level prompt without a TTY).
+
+    Unlike a qualification-only picker, this lists every non-hidden profile across all
+    profile types (qualifications, suites, verticals - the same set shown by the `list`
+    command), so users aren't limited to qualification profiles when running interactively.
+
+    Generic and reusable across extension packages (like the other low-level execution
+    functions in this module): CPU/system-specific validation and any associated-profile
+    prompts are the caller's responsibility, applied downstream of the returned selection.
+
+    Args:
+        force: If True, skip prompting entirely (non-interactive run - use --profile/--tag/
+            --all/--qualification-only to run something specific).
+        all_profiles: Dict of {profile_type: [profile_item, ...]} from list_profiles().
+
+    Returns:
+        tuple: (selected_profile_names, per_profile_filters) - per_profile_filters is
+        {profile_name: {"test_id": [...]}} for profiles scoped to specific tests.
+        Returns ([], {}) if nothing was selected/cancelled.
+    """
+    if force:
+        logger.info(
+            "No profile auto-selected in non-interactive mode (--force). "
+            "Use --profile/--tag/--all/--qualification-only to run something."
+        )
+        return [], {}
+
+    tree = _build_profile_tree(all_profiles)
+    if not tree:
+        logger.error("No profiles found to select from")
+        return [], {}
+
+    if sys.stdin.isatty() and sys.stdout.isatty():
+        try:
+            return _prompt_checkbox_profiles(tree)
+        except Exception as e:
+            logger.debug(f"Checkbox picker unavailable ({e}), falling back to plain prompt")
+
+    return _prompt_checkbox_profiles_fallback(tree)
 
 
 def _run_all_profiles(

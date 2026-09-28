@@ -102,6 +102,34 @@ Quick reference of all available test suites and their profile names.
 esq list
 ```
 
+**Pick profile(s) interactively** instead of typing a profile name:
+```bash
+esq run --select
+```
+
+**Run from a profiles file** instead of typing `--profile`/`--select` each time:
+```bash
+esq run --profiles-file custom_profiles.yml
+```
+
+A profiles file is a YAML file with a top-level `profiles` list. Each entry is a mapping
+with a required `name` and an optional `test_ids` (when present, runs only those
+`test_id`(s) within that profile instead of the whole profile):
+
+```yaml
+profiles:
+  - name: profile.suite.system.cpu-sku
+  - name: profile.suite.system.display
+    test_ids:
+      - SYS-DISP-001
+      - SYS-DISP-002
+```
+
+See the [Profiles File Reference](../../guides/developer/profiles-file.md) for the full
+template format. The easiest way to find `test_id` values is to run `esq run --select`,
+make a selection, and answer "y" to the save prompt - the generated file lists them for
+you.
+
 ---
 
 ## Test Suite Types

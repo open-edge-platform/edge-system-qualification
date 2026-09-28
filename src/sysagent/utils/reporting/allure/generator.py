@@ -25,6 +25,7 @@ from typing import Optional
 
 # Import secure process execution utilities
 from sysagent.utils.config import get_thirdparty_dir
+from sysagent.utils.core import shared_state
 from sysagent.utils.core.process import run_command
 from sysagent.utils.infrastructure import get_node_binary_paths
 
@@ -402,6 +403,12 @@ def generate_allure_report(
             # Convert to relative path for cleaner CLI output
             fallback_path = os.path.relpath(os.path.join(report_dir, "index.html"), os.getcwd())
             logger.info(f"\nReport available at: {fallback_path}")
+
+        # Display the path to the last saved profiles file, if available.
+        saved_profiles_file = shared_state.LAST_SAVED_PROFILES_FILE
+        if saved_profiles_file:
+            relative_profiles_file = os.path.relpath(saved_profiles_file, os.getcwd())
+            logger.info(f"Saved profile(s) selection available at: {relative_profiles_file}")
 
         return 0
     except Exception as e:

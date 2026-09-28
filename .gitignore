@@ -22,6 +22,9 @@ venv/
 .allure
 *.log
 
+# Auto-generated profile selection files (see --select / --profiles-file)
+custom_profiles_*.yml
+
 # MkDocs build outputs
 site/
 

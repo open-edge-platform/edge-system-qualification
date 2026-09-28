@@ -32,6 +32,7 @@ dependencies = [
     "rich>=14.0.0",
     "tqdm>=4.67.1",
     "tomli>=2.2.1",
+    "prompt_toolkit>=3.0.53",
     "matplotlib>=3.10.3",
     "psutil>=7.0.0",
     "py-cpuinfo>=9.0.0",

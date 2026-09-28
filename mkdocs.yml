@@ -164,6 +164,7 @@ nav:
       - Configuration:
         - Profile & Test Config: guides/developer/configuration.md
         - System Requirements: guides/developer/requirements.md
+        - Profiles File Reference: guides/developer/profiles-file.md
       - Framework API:
         - Fixtures Reference: guides/developer/fixtures.md
         - Results & Metrics: guides/developer/results-metrics.md

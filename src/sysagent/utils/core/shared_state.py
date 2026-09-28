@@ -10,3 +10,6 @@ This module contains global state that needs to be shared across different modul
 INTERRUPT_OCCURRED = False
 INTERRUPT_SIGNAL = None
 INTERRUPT_SIGNAL_NAME = "Unknown"
+
+# Path of the last profiles file written
+LAST_SAVED_PROFILES_FILE = None

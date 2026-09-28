@@ -20,6 +20,9 @@ from sysagent.utils.cli.commands.run import (
     TIER_SKIP_EXIT,
     _determine_final_exit_code,
     _generate_test_reports,
+    _load_profiles_from_file,
+    _offer_save_profiles_selection,
+    _prompt_select_any_profile,
     _run_single_profile,
     _run_single_profile_in_batch,
     _run_suite_tests,
@@ -467,6 +470,8 @@ def run_tests(
     filters: list[str] = None,
     run_all_profiles: bool = False,
     qualification_only: bool = False,
+    select_profile: bool = False,
+    profiles_file: str = None,
     force: bool = False,
     no_mask: bool = False,
     set_prompt: list[str] = None,
@@ -529,6 +534,9 @@ def run_tests(
     if profile_name and tags:
         logger.error("Error: --profile and --tag/-t options cannot be used together")
         return 1
+    if profiles_file and (profile_name or tags or suite_name):
+        logger.error("Error: --profiles-file cannot be combined with --profile, --tag, or --suite")
+        return 1
 
     # Parse filters
     parsed_filters = {}
@@ -539,8 +547,8 @@ def run_tests(
         except ValueError as e:
             logger.error(f"Invalid filter format: {e}")
             return 1
-        if not profile_name and not tags:
-            logger.error("Error: --filter option can only be used with --profile or --tag option")
+        if not profile_name and not tags and not profiles_file:
+            logger.error("Error: --filter option can only be used with --profile, --tag, or --profiles-file option")
             return 1
 
     # Setup directories and logging
@@ -595,6 +603,19 @@ def run_tests(
                 force,
                 qualification_only,
             )
+        elif profiles_file:
+            # Run profile(s) listed in a YAML profiles template file
+            result_code, tests_ran = _run_profiles_file_esq(
+                profiles_file,
+                pytest_args,
+                skip_system_check,
+                data_dir,
+                verbose,
+                debug,
+                parsed_filters,
+                force,
+                qualification_only,
+            )
         elif suite_name:
             # Run suite/test directly (no prompts)
             result_code, tests_ran = _run_suite_tests(suite_name, sub_suite_name, test_name, pytest_args)
@@ -605,8 +626,10 @@ def run_tests(
                 data_dir,
                 verbose,
                 debug,
+                pytest_args,
                 run_all_profiles,
                 qualification_only,
+                select_profile,
                 force,
                 prompt_overrides,
             )
@@ -723,8 +746,8 @@ def _run_tagged_profiles_esq(
     )
 
 
-def _resolve_and_execute_profiles_esq(
-    requested_profile_names: list[str],
+def _run_profiles_file_esq(
+    profiles_file: str,
     pytest_args: list[str],
     skip_system_check: bool,
     data_dir: str,
@@ -735,6 +758,47 @@ def _resolve_and_execute_profiles_esq(
     qualification_only: bool = False,
 ) -> tuple:
     """
+    ESQ-specific execution of profile(s) listed in a YAML profiles template file
+    (see --profiles-file), reusing the same shared executor used for --profile/--tag.
+
+    Returns:
+        tuple: (exit_code, tests_ran)
+    """
+    profile_names, per_profile_filters = _load_profiles_from_file(profiles_file)
+    if profile_names is None:
+        return 1, False
+    if not profile_names:
+        logger.error(f"No profiles listed in '{profiles_file}' - nothing to run")
+        return 1, False
+
+    logger.info(f"Loaded {len(profile_names)} profile(s) from '{profiles_file}': {', '.join(profile_names)}")
+    return _resolve_and_execute_profiles_esq(
+        profile_names,
+        pytest_args,
+        skip_system_check,
+        data_dir,
+        verbose,
+        debug,
+        filters,
+        force,
+        qualification_only,
+        per_profile_filters=per_profile_filters,
+    )
+
+
+def _resolve_and_execute_profiles_esq(
+    requested_profile_names: list[str],
+    pytest_args: list[str],
+    skip_system_check: bool,
+    data_dir: str,
+    verbose: bool = False,
+    debug: bool = False,
+    filters: dict[str, Any] = None,
+    force: bool = False,
+    qualification_only: bool = False,
+    per_profile_filters: dict[str, dict[str, Any]] = None,
+) -> tuple:
+    """
     Resolve dependencies for one or more explicitly requested profiles and execute them.
 
     Shared by --profile and --tag execution: expands each requested profile with its
@@ -742,10 +806,18 @@ def _resolve_and_execute_profiles_esq(
     execution order (avoiding redundant re-runs of shared dependencies). Filters only apply
     to the explicitly requested profiles, not to their dependencies.
 
+    Args:
+        per_profile_filters: Optional {profile_name: filters_dict} overriding the shared
+            `filters` for specific requested profiles (e.g., a per-profile test_id scope
+            picked via --select or loaded from --profiles-file). Profiles not present in
+            this mapping fall back to the shared `filters`.
+
     Returns:
         tuple: (exit_code, tests_ran)
     """
     from sysagent.utils.config import expand_profile_with_dependencies, resolve_profile_dependencies
+
+    per_profile_filters = per_profile_filters or {}
 
     # Get all available profiles
     all_profiles_data = list_profiles(include_examples=True)
@@ -863,6 +935,10 @@ def _resolve_and_execute_profiles_esq(
     final_exit_code = 0
     tests_ran = False
     for current_profile_name in execution_order:
+        if current_profile_name in requested_set:
+            profile_filters = per_profile_filters.get(current_profile_name, filters)
+        else:
+            profile_filters = None
         result_code, profile_tests_ran = _run_single_profile(
             current_profile_name,
             pytest_args,
@@ -870,7 +946,7 @@ def _resolve_and_execute_profiles_esq(
             data_dir,
             verbose,
             debug,
-            filters if current_profile_name in requested_set else None,
+            profile_filters,
         )
         tests_ran = tests_ran or profile_tests_ran
         if result_code != 0:
@@ -890,8 +966,10 @@ def _run_all_profiles_esq(
     data_dir: str,
     verbose: bool,
     debug: bool,
+    pytest_args: list[str],
     run_all_profiles: bool = False,
     qualification_only: bool = False,
+    select_profile: bool = False,
     force: bool = False,
     prompt_overrides: dict = None,
 ) -> tuple:
@@ -998,6 +1076,41 @@ def _run_all_profiles_esq(
         include_all_types = False
         skip_vertical_profiles = True
         logger.info("Running qualification profiles only")
+
+    elif select_profile:
+        # --select flag: let the user pick one or more available profiles (or drill into
+        # a profile to pick specific test_id(s)) via a checkbox tree menu (qualification,
+        # suite, and/or vertical - see 'esq list'), then reuse the same execution path as
+        # --profile/--tag so CPU validation and associated-vertical prompts apply
+        # automatically when relevant.
+        try:
+            selected_profile_names, per_profile_filters = _prompt_select_any_profile(force, all_profiles)
+        except KeyboardInterrupt:
+            logger.info("Interrupted by user")
+            sys.exit(1)
+
+        if not selected_profile_names:
+            logger.error("No profile selected - nothing to run")
+            return 1, False
+
+        try:
+            _offer_save_profiles_selection(selected_profile_names, per_profile_filters)
+        except KeyboardInterrupt:
+            logger.info("Interrupted by user. Exiting.")
+            return 1, False
+
+        return _resolve_and_execute_profiles_esq(
+            selected_profile_names,
+            pytest_args,
+            skip_system_check,
+            data_dir,
+            verbose,
+            debug,
+            {},
+            force,
+            qualification_only=False,
+            per_profile_filters=per_profile_filters,
+        )
 
     else:
         # Default mode: Show ESQ unified prompt

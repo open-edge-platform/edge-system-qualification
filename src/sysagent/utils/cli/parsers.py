@@ -95,7 +95,7 @@ def create_argument_parser() -> argparse.ArgumentParser:
         "run",
         help="Run tests (all profiles by default, or specific profile)",
         description=f"""
-Run tests using one of three main patterns:
+Run tests using one of the following patterns:
 
 USAGE PATTERNS:
   1. Run all profiles (default):
@@ -112,10 +112,23 @@ USAGE PATTERNS:
      {cli_name} run -p PROFILE_NAME --filter display_name="CPU Test"
      {cli_name} run -p PROFILE_NAME --filter test_id=T0069 --filter devices=cpu
 
+  4. Interactively pick profile(s) via checkbox:
+     {cli_name} run --select
+     • Checkbox tree of ALL available profiles (same set as '{cli_name} list')
+     • Drill into a profile to pick specific test_id(s) instead of the whole profile
+     • After confirming, optionally save the selection to a YAML file for reuse
+
+  5. Run profiles listed in a saved YAML template file:
+     {cli_name} run --profiles-file PROFILES_FILE
+     • Runs the profile(s) listed under a top-level 'profiles' key
+     • Create one by hand, or save one from the --select checkbox prompt
+
 EXAMPLES:
   {cli_name} run                                      # All profiles (default)
   {cli_name} run -p profile.suite.ai.vision           # Specific profile
   {cli_name} run -p profile.suite.ai.vision --filter test_id=T0001  # Filtered test
+  {cli_name} run --select                             # Pick profile(s) via checkbox
+  {cli_name} run --profiles-file custom_profiles.yml  # Run from a saved template
 
 For available profiles, use: {cli_name} list
         """,
@@ -126,6 +139,25 @@ For available profiles, use: {cli_name} list
     execution_group = run_parser.add_argument_group("EXECUTION OPTIONS")
     execution_group.add_argument(
         "--profile", "-p", metavar="PROFILE_NAME", help="Run a specific profile (e.g., profile.suite.ai-vision)"
+    )
+    execution_group.add_argument(
+        "--select",
+        "-se",
+        action="store_true",
+        help=(
+            "Interactively pick one or more profiles to run via a checkbox menu (same set as "
+            "'list'), optionally drilling into a profile to pick specific test_id(s). Offers to "
+            "save the selection to a YAML file for reuse"
+        ),
+    )
+    execution_group.add_argument(
+        "--profiles-file",
+        "-pf",
+        metavar="FILE",
+        help=(
+            "Run profile(s) listed in a YAML template file (a plain list of profile names, "
+            "or a mapping with a 'profiles' key). Create one by hand or save one via --select"
+        ),
     )
 
     # Individual test selection (grouped together)

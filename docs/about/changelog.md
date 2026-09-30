@@ -40,6 +40,7 @@ Intel® ESQ changelog and version history.
 - Pexels* video downloads intermittently fail from the PRC network
 - Memory is not released after Vision AI test cases complete on Panther Lake (PTL) systems
 - Qmassa Collector fallback logic incorrectly references a sysfs metric source
+- Gen AI Chat Q&A P95 latency is currently higher than expected
 
 ## Version 2026.2.0 - June 2026
 ### New Platform Support

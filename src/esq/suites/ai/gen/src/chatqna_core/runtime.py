@@ -157,7 +157,7 @@ def harden_compose_port_bindings(compose_file: str) -> None:
         if not isinstance(service_config, dict):
             continue
 
-        # Upstream v2026.1.0 compose changed backend 8888 from host-published
+        # Upstream v2026.2.0 compose changed backend 8888 from host-published
         # ``ports`` to internal-only ``expose``. Our tests intentionally poll
         # localhost:8888, so preserve backward compatibility by publishing 8888
         # to loopback for backend services when it is only exposed.
@@ -332,8 +332,8 @@ def build_runtime_env(configs: Dict[str, object], resolved_paths: Dict[str, str]
             "MODEL_CONFIG_PATH": resolved_paths["model_config_path"],
             "APP_BACKEND_URL": str(configs.get("app_backend_url", "/v1/chatqna")),
             "REGISTRY": str(configs.get("registry", "intel/")),
-            "BACKEND_TAG": str(configs.get("backend_tag", "core_2026.1.0")),
-            "UI_TAG": str(configs.get("ui_tag", "2026.1.0")),
+            "BACKEND_TAG": str(configs.get("backend_tag", "core_2026.2.0")),
+            "UI_TAG": str(configs.get("ui_tag", "core_2026.2.0")),
             "USER_GROUP_ID": str(os.getgid()),
             "BACKEND_HOST": str(
                 configs.get(

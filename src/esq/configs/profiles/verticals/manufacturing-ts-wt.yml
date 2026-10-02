@@ -1,4 +1,4 @@
-# Copyright (C) 2025 Intel Corporation
+# Copyright (C) 2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
 name: "profile.vertical.manufacturing.timeseries-wt"
@@ -19,44 +19,44 @@ params:
     os_type:
       - "linux"
     docker_required: true
-  assets_repo_ref: "2026.1"
+  assets_repo_ref: "7fa07d9068e816b9f9fabe9b95554aa5173b41fe"  # edge-ai-suites 2026.2 tag
   assets:
     - id: "timeseries_env"
       type: "file"
       path: "./.env"
-      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-suites/a6b9af8a1c8f6197b06e7001dc1ae7c6a5e234e7/manufacturing-ai-suite/industrial-edge-insights-time-series/.env"
+      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-suites/7fa07d9068e816b9f9fabe9b95554aa5173b41fe/manufacturing-ai-suite/industrial-edge-insights-time-series/.env"
     - id: "mqtt_broker_conf"
       type: "file"
       path: "./configs/mqtt-broker/mosquitto.conf"
-      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-suites/a6b9af8a1c8f6197b06e7001dc1ae7c6a5e234e7/manufacturing-ai-suite/industrial-edge-insights-time-series/configs/mqtt-broker/mosquitto.conf"
+      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-suites/7fa07d9068e816b9f9fabe9b95554aa5173b41fe/manufacturing-ai-suite/industrial-edge-insights-time-series/configs/mqtt-broker/mosquitto.conf"
     - id: "telegraf_entrypoint"
       type: "file"
       path: "./configs/telegraf/entrypoint.sh"
-      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-suites/a6b9af8a1c8f6197b06e7001dc1ae7c6a5e234e7/manufacturing-ai-suite/industrial-edge-insights-time-series/configs/telegraf/entrypoint.sh"
+      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-suites/7fa07d9068e816b9f9fabe9b95554aa5173b41fe/manufacturing-ai-suite/industrial-edge-insights-time-series/configs/telegraf/entrypoint.sh"
     - id: "wind_turbine_csv"
       type: "file"
       path: "./apps/wind-turbine-anomaly-detection/simulation-data/wind-turbine-anomaly-detection.csv"
-      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-suites/a6b9af8a1c8f6197b06e7001dc1ae7c6a5e234e7/manufacturing-ai-suite/industrial-edge-insights-time-series/apps/wind-turbine-anomaly-detection/simulation-data/wind-turbine-anomaly-detection.csv"
+      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-suites/7fa07d9068e816b9f9fabe9b95554aa5173b41fe/manufacturing-ai-suite/industrial-edge-insights-time-series/apps/wind-turbine-anomaly-detection/simulation-data/wind-turbine-anomaly-detection.csv"
     - id: "telegraf_default_conf"
       type: "file"
       path: "./apps/wind-turbine-anomaly-detection/telegraf-config/Telegraf.conf"
-      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-suites/a6b9af8a1c8f6197b06e7001dc1ae7c6a5e234e7/manufacturing-ai-suite/industrial-edge-insights-time-series/apps/wind-turbine-anomaly-detection/telegraf-config/Telegraf.conf"
+      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-suites/7fa07d9068e816b9f9fabe9b95554aa5173b41fe/manufacturing-ai-suite/industrial-edge-insights-time-series/apps/wind-turbine-anomaly-detection/telegraf-config/Telegraf.conf"
     - id: "ts_config_json"
       type: "file"
       path: "./apps/wind-turbine-anomaly-detection/time-series-analytics-config/config.json"
-      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-suites/a6b9af8a1c8f6197b06e7001dc1ae7c6a5e234e7/manufacturing-ai-suite/industrial-edge-insights-time-series/apps/wind-turbine-anomaly-detection/time-series-analytics-config/config.json"
+      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-suites/7fa07d9068e816b9f9fabe9b95554aa5173b41fe/manufacturing-ai-suite/industrial-edge-insights-time-series/apps/wind-turbine-anomaly-detection/time-series-analytics-config/config.json"
     - id: "ts_model"
       type: "file"
       path: "./apps/wind-turbine-anomaly-detection/time-series-analytics-config/models/windturbine_anomaly_detector.pkl"
-      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-suites/a6b9af8a1c8f6197b06e7001dc1ae7c6a5e234e7/manufacturing-ai-suite/industrial-edge-insights-time-series/apps/wind-turbine-anomaly-detection/time-series-analytics-config/models/windturbine_anomaly_detector.pkl"
+      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-suites/7fa07d9068e816b9f9fabe9b95554aa5173b41fe/manufacturing-ai-suite/industrial-edge-insights-time-series/apps/wind-turbine-anomaly-detection/time-series-analytics-config/models/windturbine_anomaly_detector.pkl"
     - id: "ts_tick_script"
       type: "file"
       path: "./apps/wind-turbine-anomaly-detection/time-series-analytics-config/tick_scripts/windturbine_anomaly_detector.tick"
-      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-suites/a6b9af8a1c8f6197b06e7001dc1ae7c6a5e234e7/manufacturing-ai-suite/industrial-edge-insights-time-series/apps/wind-turbine-anomaly-detection/time-series-analytics-config/tick_scripts/windturbine_anomaly_detector.tick"
+      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-suites/7fa07d9068e816b9f9fabe9b95554aa5173b41fe/manufacturing-ai-suite/industrial-edge-insights-time-series/apps/wind-turbine-anomaly-detection/time-series-analytics-config/tick_scripts/windturbine_anomaly_detector.tick"
     - id: "ts_udf_python"
       type: "file"
       path: "./apps/wind-turbine-anomaly-detection/time-series-analytics-config/udfs/windturbine_anomaly_detector.py"
-      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-suites/a6b9af8a1c8f6197b06e7001dc1ae7c6a5e234e7/manufacturing-ai-suite/industrial-edge-insights-time-series/apps/wind-turbine-anomaly-detection/time-series-analytics-config/udfs/windturbine_anomaly_detector.py"
+      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-suites/7fa07d9068e816b9f9fabe9b95554aa5173b41fe/manufacturing-ai-suite/industrial-edge-insights-time-series/apps/wind-turbine-anomaly-detection/time-series-analytics-config/udfs/windturbine_anomaly_detector.py"
 
 suites:
   - name: "ai"
@@ -137,7 +137,7 @@ suites:
                     metric_source: "influx"
                 timeout: 600
                 compose_project_name: "esq-timeseries"
-                image_suffix: "2026.1.0"
+                image_suffix: "2026.2.0"
                 docker_registry: ""
 
               - test_id: "MFG-WTS-001"
@@ -166,7 +166,7 @@ suites:
                 influx_startup_grace_seconds: 20
                 timeout: 600
                 compose_project_name: "esq-timeseries"
-                image_suffix: "2026.1.0"
+                image_suffix: "2026.2.0"
                 docker_registry: ""
 
               - test_id: "MFG-WTS-002"
@@ -195,7 +195,7 @@ suites:
                 influx_startup_grace_seconds: 20
                 timeout: 600
                 compose_project_name: "esq-timeseries"
-                image_suffix: "2026.1.0"
+                image_suffix: "2026.2.0"
                 docker_registry: ""
 
               - test_id: "MFG-WTS-003"
@@ -229,7 +229,7 @@ suites:
                 influx_startup_grace_seconds: 20
                 timeout: 600
                 compose_project_name: "esq-timeseries"
-                image_suffix: "2026.1.0"
+                image_suffix: "2026.2.0"
                 docker_registry: ""
 
               - test_id: "MFG-WTS-004"
@@ -263,5 +263,5 @@ suites:
                 influx_startup_grace_seconds: 20
                 timeout: 600
                 compose_project_name: "esq-timeseries"
-                image_suffix: "2026.1.0"
+                image_suffix: "2026.2.0"
                 docker_registry: ""

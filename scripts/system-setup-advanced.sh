@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (C) 2025 Intel Corporation
+# Copyright (C) 2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 #
 # Advanced System Setup
@@ -113,12 +113,6 @@ _setup_memlock_session() {
     echo "  [INFO] Limit resets to system default after reboot."
     _MODULE_PASS+=("$MODULE")
 }
-
-
-# ---------------------------------------------------------------------------
-# NOTE: RT-specific modules (Real-Time Latency Tools, MSR Tools, Kernel Tuning)
-# have been moved to system-setup-rt.sh.
-# ---------------------------------------------------------------------------
 
 
 main() {

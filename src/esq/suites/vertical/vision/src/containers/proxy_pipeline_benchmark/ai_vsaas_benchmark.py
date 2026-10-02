@@ -66,14 +66,14 @@ class AIVSaaSBenchmark(BaseProxyPipelineBenchmark):
                 }
             else:
                 if self.is_MTL:
-                    # Reference values from MTL 165H benchmarking (for CSV comparison reports)
+                    # Reference values from ARL 255H benchmarking (for CSV comparison reports)
                     # Note: Binary search uses max_binary_search_start to cap initial high value
                     # to prevent timeout issues, while keeping full ref values for reporting
                     self.config = {
-                        "ref_stream_list": [18, 19, 5],
-                        "ref_gpu_freq_list": [1421.87, 1419.27, 852.81],
-                        "ref_pkg_power_list": [27.80, 28.11, 23.50],
-                        "ref_platform": "MTL 165H (32G Mem)",
+                        "ref_stream_list": [35, 16, 16],
+                        "ref_gpu_freq_list": [1109.12, 1185.60, 1215.11],
+                        "ref_pkg_power_list": [30.03, 27.40, 25.31],
+                        "ref_platform": "ARL 255H (64G Mem)",
                         "models": ["yolov5s-416", "yolov5m-416", "yolov5m-416+efficientnet-b0"],
                         "enc_flag": "rate-control=cbr bitrate=2000 target-usage=7",
                         "preproc_backend": "pre-process-backend=va-surface-sharing scale-method=fast",

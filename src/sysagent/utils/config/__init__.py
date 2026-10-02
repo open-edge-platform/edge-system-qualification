@@ -1,4 +1,4 @@
-# Copyright (C) 2025 Intel Corporation
+# Copyright (C) 2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
 """
@@ -73,6 +73,8 @@ from .profile_dependencies import (
     expand_profile_with_dependencies,
     get_dependency_tree,
     get_profile_dependencies,
+    get_profile_tags,
+    get_profiles_matching_tags,
     resolve_profile_dependencies,
     validate_profile_dependencies,
 )
@@ -140,6 +142,8 @@ __all__ = [
     "expand_profile_with_dependencies",
     "validate_profile_dependencies",
     "get_dependency_tree",
+    "get_profile_tags",
+    "get_profiles_matching_tags",
     "ProfileDependencyError",
     "CircularDependencyError",
     "MissingDependencyError",

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (C) 2025 Intel Corporation
+# Copyright (C) 2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 #
 # System Setup
@@ -48,6 +48,12 @@ setup_system_packages() {
     fi
 
     local pkgs=(
+        # Essential system utilities
+        curl
+        git
+        libgl1
+        make
+
         # Capabilities tooling — required by Module 3 (Memory DIMM Information)
         libcap2-bin
 

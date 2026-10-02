@@ -1,6 +1,9 @@
 {
   "recommendations": [
     "ms-python.python",
-    "charliermarsh.ruff"
+    "charliermarsh.ruff",
+    "analytic-signal.preview-html",
+    "shd101wyy.markdown-preview-enhanced",
+    "yzane.markdown-pdf"
   ]
 }

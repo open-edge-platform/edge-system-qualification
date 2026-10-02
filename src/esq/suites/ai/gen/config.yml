@@ -1,4 +1,4 @@
-# Copyright (C) 2025 Intel Corporation
+# Copyright (C) 2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
 # Configurations for the AI - GenAI tests
@@ -128,8 +128,8 @@ tests:
         keep_documents_after_run: false
         preserve_environment: false
         registry: "intel/"
-        backend_tag: "core_2026.1.0"
-        ui_tag: "2026.1.0"
+        backend_tag: "core_2026.2.0"
+        ui_tag: "core_2026.2.0"
         hf_access_token_env_var: "HUGGINGFACEHUB_API_TOKEN"
 
       - display_name: "Chat Q&A Core - OpenVINO GPU"
@@ -159,6 +159,6 @@ tests:
         keep_documents_after_run: false
         preserve_environment: false
         registry: "intel/"
-        backend_tag: "core_gpu_2026.1.0"
-        ui_tag: "2026.1.0"
+        backend_tag: "core_gpu_2026.2.0"
+        ui_tag: "core_2026.2.0"
         hf_access_token_env_var: "HUGGINGFACEHUB_API_TOKEN"

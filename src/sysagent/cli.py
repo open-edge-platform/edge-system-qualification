@@ -1,4 +1,4 @@
-# Copyright (C) 2025 Intel Corporation
+# Copyright (C) 2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
 """
@@ -110,6 +110,7 @@ def main() -> int:
                 set_prompt=getattr(args, "set_prompt", None),
                 extra_args=[],  # Placeholder for any future extra args
                 telemetry_interval=getattr(args, "telemetry_interval", None),
+                tags=getattr(args, "tag", None),
             )
         elif args.command == "info":
             run_system_info = get_command_function("run_system_info")

@@ -1,6 +1,6 @@
 # Developer Guide
 
-Comprehensive guide for developers integrating their own pytest tests into the Intel® ESQ framework.
+This is a comprehensive guide for developers integrating their own pytest tests into the Intel® ESQ framework.
 
 ---
 
@@ -23,7 +23,7 @@ This guide will help you integrate your own tests into this framework and levera
 
 ## Development Setup
 
-Before writing or modifying tests, set up the repository in editable mode. This differs from the standard user installation, which installs Intel® ESQ as a standalone tool.
+Before writing or modifying tests, set up the repository in editable mode. This differs from the standard user installation, which installs the Intel® ESQ as a standalone tool.
 
 ### User Installation vs. Developer Installation
 
@@ -31,13 +31,13 @@ Before writing or modifying tests, set up the repository in editable mode. This 
 |---|---|---|
 | **Command** | `uv tool install` | `uv pip install -e .` |
 | **Purpose** | Run qualification tests on an edge system | Develop, modify, and extend the framework |
-| **Editable Source** | No — installed as a frozen package | Yes — source changes take effect immediately |
+| **Editable Source** | No — installed as a frozen package | Yes — source changes will take effect immediately |
 | **Virtual environment** | Managed automatically by `uv tool` | Manually created with `uv venv` |
 | **Typical user** | System validator, end user | Framework developer, test author |
 
 ### User Installation (read-only)
 
-End users install Intel® ESQ as a standalone CLI tool:
+End users install the Intel® ESQ as a standalone CLI tool:
 
 ```bash
 uv tool install --force --refresh git+https://github.com/open-edge-platform/edge-system-qualification.git@main
@@ -47,7 +47,7 @@ The `esq` command is available globally. The installed source is not intended to
 
 ### Developer Installation (editable)
 
-Developers working on tests or framework code must install the project in editable mode so that local source changes are reflected immediately without reinstalling.
+Developers working on the tests or framework code must install the project in editable mode so that the local source changes are reflected immediately without reinstalling.
 
 #### Prerequisites
 
@@ -87,7 +87,7 @@ source .venv/bin/activate
 uv pip install -e .
 ```
 
-This installs both the `sysagent` and `esq` packages from `src/` in editable mode. Any changes you make to source files under `src/` are immediately active — no reinstall needed.
+This installs both the `sysagent` and `esq` packages from `src/` in editable mode. Any changes you make to the source files under `src/` are immediately active — no reinstallation required.
 
 **5. Verify the installation:**
 
@@ -98,7 +98,7 @@ esq list
 
 #### Updating After Dependency Changes
 
-If `pyproject.toml` changes (e.g., new dependencies are added), re-run the install command:
+If `pyproject.toml` changes (e.g., new dependencies are added), re-run the installed command:
 
 ```bash
 uv pip install -e .
@@ -111,7 +111,7 @@ deactivate
 ```
 
 !!! tip
-    Run `esq list` after setup to confirm that profiles load correctly and the installation is complete.
+    Run `esq list` after setup to confirm that the profiles load correctly and the installation is completed.
 
 !!! note
     The `uv tool install` approach used in the Quick Start guide is **not** suitable for development. It installs the package outside a project virtual environment and does not reflect local source edits.
@@ -159,7 +159,7 @@ block
     class CONF,SUITES,UTILS,E2_CONF,E2_SUITES,E2_UTILS,C_CONF,C_SUITES,C_UTILS modNode
 ```
 
-The framework is split into two packages: `sysagent`, which provides the core infrastructure, and `esq`, which contains domain-specific test suites and configurations.
+The framework is split into two packages: `sysagent`, which provides the core infrastructure, and `esq`, which contains the domain-specific test suites and configurations.
 
 ```
 src/

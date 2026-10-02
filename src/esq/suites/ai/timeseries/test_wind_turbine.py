@@ -1,4 +1,4 @@
-# Copyright (C) 2025 Intel Corporation
+# Copyright (C) 2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
@@ -394,9 +394,8 @@ def test_wind_turbine(
         ),
         "VISUALIZER_GRAFANA_USER": configs.get("grafana_username", "admin"),
         "VISUALIZER_GRAFANA_PASSWORD": grafana_password,
-        # Reference app defaults to IMAGE_SUFFIX=2026.0.0 in .env, which may not exist publicly.
-        # Keep this configurable from profile and use a stable dockerhub release by default.
-        "IMAGE_SUFFIX": configs.get("image_suffix", "1.1.0"),
+        # Keep the runtime aligned with the verified OEP 2026.2 Docker Hub release by default.
+        "IMAGE_SUFFIX": configs.get("image_suffix", "2026.2.0"),
         "DOCKER_REGISTRY": configs.get("docker_registry", ""),
         "NUM_STREAMS": str(num_streams),
         # Keep publisher process single-stream by default; scale publishers

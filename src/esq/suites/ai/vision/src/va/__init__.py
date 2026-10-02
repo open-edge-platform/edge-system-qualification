@@ -1,4 +1,4 @@
-# Copyright (C) 2025 Intel Corporation
+# Copyright (C) 2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
 """
@@ -20,7 +20,6 @@ from .va_common import (
     extract_metrics_from_csv,
     generate_va_charts,
     initialize_csv_files,
-    prepare_docker_build_context,
     run_va_container,
     setup_x11_display,
 )
@@ -34,7 +33,6 @@ __all__ = [
     "extract_metrics_from_csv",
     "generate_va_charts",
     "initialize_csv_files",
-    "prepare_docker_build_context",
     "run_va_container",
     "setup_x11_display",
 ]

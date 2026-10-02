@@ -1,4 +1,4 @@
-# Copyright (C) 2025 Intel Corporation
+# Copyright (C) 2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
 # Configurations for the AI Timeseries tests
@@ -41,7 +41,7 @@ tests:
         debug_preserve_environment: false
         enforce_ingestion_mode_services: true
         compose_project_name: "esq-timeseries"
-        image_suffix: "1.1.0"
+        image_suffix: "2026.2.0"
         docker_registry: ""
         reference_app_src_path: ""
         simulation_data_dir: ""

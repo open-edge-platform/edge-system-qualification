@@ -8,8 +8,12 @@ repo_name: open-edge-platform/edge-system-qualification
 repo_url: https://github.com/open-edge-platform/edge-system-qualification
 docs_dir: docs/
 
+# Hooks
+hooks:
+  - docs/hooks/md_import.py
+
 # Copyright
-copyright: Copyright &copy; 2025 Intel Corporation
+copyright: Copyright &copy; 2026 Intel Corporation
 
 # Configuration
 theme:
@@ -107,9 +111,6 @@ markdown_extensions:
       repo: mkdocs-material
   - pymdownx.mark
   - pymdownx.smartsymbols
-  - pymdownx.snippets:
-      auto_append:
-        - includes/mkdocs.md
   - pymdownx.superfences:
       custom_fences:
         - name: mermaid
@@ -130,7 +131,10 @@ nav:
   - Home: index.md
   - Getting Started:
     - getting-started/index.md
+    - Requirements: getting-started/requirements.md
     - Quick Start: getting-started/quick-start.md
+    - Qualification:
+      - getting-started/qualifications/index.md
     - Test Suites:
       - getting-started/suites/index.md
     - Telemetry:

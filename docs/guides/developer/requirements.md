@@ -38,7 +38,7 @@ The framework provides reusable requirement validation flags. Add them to a prof
 
 ## Devices (GPU / NPU)
 
-Device detection uses OpenVINO\*. Only Intel® devices detected by OpenVINO are counted. If a device is present but not detected, the error message suggests installing the relevant drivers.
+Device detection uses OpenVINO\*. Only Intel® devices detected by OpenVINO™ are counted. If a device is present but not detected, the error message suggests installing the relevant drivers.
 
 | Flag | Type | Description | Example |
 |------|------|-------------|---------|

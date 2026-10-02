@@ -528,7 +528,7 @@ def test_chatqna_core(
                 "model_config_path": resolved_paths["model_config_path"],
                 "corpus_dir": resolved_paths["corpus_dir"],
                 "prompt_file": resolved_paths["prompt_file"],
-                "backend_tag": configs.get("backend_tag", "core_2026.1.0"),
+                "backend_tag": configs.get("backend_tag", "core_2026.2.0"),
             },
         )
 

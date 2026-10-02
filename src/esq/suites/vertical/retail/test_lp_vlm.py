@@ -1,4 +1,4 @@
-# Copyright (C) 2025 Intel Corporation
+# Copyright (C) 2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
 import glob
@@ -109,6 +109,14 @@ def test_lp_vlm(
                     os.makedirs(pycache_dir, exist_ok=True)
                     logger.debug(f"Created __pycache__ directory: {pycache_dir}")
 
+                # Pre-create pipeline.sh owned by the host user so the container writes
+                # into it rather than creating a new root-owned file via bind mount
+                pipelines_dir = os.path.join(lp_base_dir, "src", "pipelines")
+                os.makedirs(Path(pipelines_dir).resolve(), exist_ok=True)
+                pipeline_sh = os.path.join(pipelines_dir, "pipeline.sh")
+                if not os.path.exists(Path(pipeline_sh).resolve()):
+                    logger.debug(f"Pre-created pipeline file: {pipeline_sh}")
+
                 checkout_result = run_command(checkout_cmd, cwd=lp_base_dir, check=True, stream_output=True, timeout=30)
                 logger.info(f"Successfully cloned loss-prevention repository to {lp_base_dir}")
                 # Combine clone and checkout outputs for allure attachment
@@ -205,6 +213,25 @@ def test_lp_vlm(
                 makefile_path = os.path.join(lp_base_dir, "Makefile")
                 if not os.path.exists(makefile_path):
                     raise FileNotFoundError(f"Makefile not found: {makefile_path}")
+
+                # Download required models (target skips automatically if already present)
+                registry_mode = str(configs.get("registry", "false")).lower()
+                download_models_cmd = ["make", "download-models", f"REGISTRY={registry_mode}"]
+                download_models_timeout = configs.get("download_models_timeout", 1800)
+                logger.info(f"Downloading Loss Prevention models: {' '.join(download_models_cmd)}")
+                download_models_result = run_command(
+                    download_models_cmd,
+                    cwd=lp_base_dir,
+                    check=True,
+                    stream_output=True,
+                    timeout=download_models_timeout,
+                )
+                allure.attach(
+                    download_models_result.stdout + download_models_result.stderr,
+                    name="Download Models Output",
+                    attachment_type=allure.attachment_type.TEXT,
+                )
+                logger.info("Loss Prevention models download step completed")
 
                 preparation_result.metadata["status"] = "completed"
                 preparation_result.metadata["lp_base_dir"] = lp_base_dir
@@ -438,7 +465,11 @@ def test_lp_vlm(
 
                             get_latency_cmd = ["make", "consolidate-metrics"]
                             latency_results = run_command(
-                                get_latency_cmd, cwd=lp_base_dir, stream_output=True, timeout=60
+                                get_latency_cmd,
+                                cwd=lp_base_dir,
+                                env={"PWD": lp_base_dir},
+                                stream_output=True,
+                                timeout=60,
                             )
                             allure.attach(
                                 latency_results.stdout + latency_results.stderr,
@@ -456,9 +487,9 @@ def test_lp_vlm(
                                 logger.debug(f"Processing performance metrics file: {metrics_file}")
                                 with open(metrics_file, "r") as f:
                                     for line in f:
-                                        if "vlm_metrics" in line and "Load_Time=" in line:
+                                        if "vlm_metrics" in line:
                                             # Parse metrics from log line
-                                            # Format: timestamp - INFO - application=vlm_metrics ... Load_Time=X Generated_Tokens=Y ...
+                                            # Format: timestamp - INFO - application=vlm_metrics ... Generate_Duration_Mean=Y ...
                                             parts = line.strip().split(" ")
                                             for part in parts:
                                                 if (
@@ -492,27 +523,18 @@ def test_lp_vlm(
                                 avg_value = total_value / count if count > 0 else 0.0
 
                                 # Map metrics to standardized names and units
-                                if key == "Throughput_Mean":
+                                if key == "throughput_mean_sec":
                                     results.metrics["throughput_mean"] = Metrics(
                                         value=round(avg_value, 2) if avg_value > 0 else 0.0,
                                         unit="tokens/sec",
                                         is_key_metric=True,
                                     )
-                                elif key == "TTFT_Mean":
-                                    results.metadata["ttft_mean"] = round(avg_value, 2) if avg_value > 0 else 0.0
-                                    results.metadata["ft_throughput"] = (
-                                        round(1000 / avg_value, 2) if avg_value > 0 else 0.0
-                                    )
-                                elif key == "TPOT_Mean":
-                                    results.metadata["tpot_mean"] = round(avg_value, 2) if avg_value > 0 else 0.0
+                                elif key == "tpot_sec":
+                                    results.metadata["tpot_sec"] = round(avg_value, 2) if avg_value > 0 else 0.0
                                 elif key == "Generate_Duration_Mean":
-                                    results.metadata["generate_duration"] = round(avg_value, 2)
-                                elif key == "Load_Time":
-                                    results.metadata["load_time"] = round(avg_value, 2)
-                                elif key == "Generated_Tokens":
-                                    results.metadata["generated_tokens_avg"] = round(avg_value, 1)
-                                elif key == "Input_Tokens":
-                                    results.metadata["input_tokens_avg"] = round(avg_value, 1)
+                                    results.metadata["generate_duration_mean"] = round(avg_value, 2)
+                                elif key == "generated_tokens":
+                                    results.metadata["generated_tokens"] = round(avg_value, 1)
                             # Add total number of VLM inference calls after processing metrics
                             total_calls = max(metric_counts.values()) if metric_counts else 0
                             results.metadata["total_calls"] = total_calls
@@ -535,7 +557,7 @@ def test_lp_vlm(
                                                     metric_value = float(metric_value_str)
 
                                                     # Extract VLM verification latency
-                                                    if "vlm_verification_latency" in metric_name:
+                                                    if "vlm_verification_latency_retail-default" in metric_name:
                                                         results.metrics["application_latency"] = Metrics(
                                                             value=round(metric_value, 2),
                                                             unit="ms",

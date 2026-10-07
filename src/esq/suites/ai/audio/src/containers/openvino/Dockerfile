@@ -31,7 +31,7 @@ RUN add-apt-repository -y ppa:kobuk-team/intel-graphics \
     && rm -rf /var/lib/apt/lists/*
 
 # Install NPU userspace drivers (npu_installer.sh requires Ubuntu 24.04)
-RUN curl -O https://raw.githubusercontent.com/open-edge-platform/edge-developer-kit-reference-scripts/49473c01212ee84c53b0cff75581d0c9b6201794/npu_installer.sh 
+RUN curl -O https://raw.githubusercontent.com/open-edge-platform/edge-developer-kit-reference-scripts/8971e61309ad5b22367260d7de2a04e4641c2356/npu_installer.sh 
 RUN chmod +x ./npu_installer.sh 
 # Create udev directory for container environment and run installer (ignore udev reload failures)
 RUN mkdir -p /etc/udev/rules.d && ./npu_installer.sh || true

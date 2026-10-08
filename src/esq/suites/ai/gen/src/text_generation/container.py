@@ -6,7 +6,7 @@
 import logging
 import os
 import time
-from typing import Any, Dict
+from typing import Any
 
 import requests
 from sysagent.utils.infrastructure import DockerClient
@@ -33,7 +33,7 @@ def run_ovms_server_container(
     model_id: str = "text_generation",
     port: int = 8000,
     rest_workers: int = None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Run OVMS server container for text generation.
 
@@ -261,7 +261,7 @@ def wait_for_ovms_model_ready(model_id: str, port: int, timeout: int = 300) -> t
                 # MediaPipe servables don't show in the response keys like traditional models
                 # Instead, we check if mediapipe_config_list exists and is not empty
                 # If the server started without errors and /v1/config is accessible, MediaPipe is ready
-                if "mediapipe_config_list" in server_results and server_results["mediapipe_config_list"]:
+                if server_results.get("mediapipe_config_list"):
                     # MediaPipe graphs don't report status in the same way
                     # If the server is up and the config lists the mediapipe, it's ready
                     mediapipe_names = [mp["name"] for mp in server_results.get("mediapipe_config_list", [])]
@@ -304,7 +304,7 @@ def run_benchmark_container(
     test_max_concurrent_requests: int,
     benchmark_timeout: int = 300,
     models_dir: str = None,  # Add models_dir parameter
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Run benchmark container for performance testing using pre-built image with uv package manager.
 
@@ -365,8 +365,9 @@ def run_benchmark_container(
             # Quantized model: use actual model name with quantization suffix
             tokenizer_path = f"/vllm-workspace/models/{ovms_model_name}"
 
-    # Build benchmark command using vLLM v0.9.2 standalone script approach
-    # Using the original benchmark_serving.py script that supports external OpenAI-compatible servers
+    # Build benchmark command using the vLLM CLI's integrated `vllm bench serve` subcommand
+    # (the modern replacement for the deprecated standalone benchmarks/benchmark_serving.py script),
+    # which supports benchmarking external OpenAI-compatible servers.
     # Note: OVMS uses /v3/chat/completions endpoint (not standard OpenAI /v1/ endpoints)
     # Using 'openai-chat' backend for chat completions format
     # Model name for OVMS: use actual model name (with quantization suffix for quantized models)
@@ -390,7 +391,7 @@ def run_benchmark_container(
     benchmark_cmd = [
         "-c",
         (
-            "python3 /vllm-workspace/benchmarks/benchmark_serving.py "
+            "vllm bench serve "
             f"--host 127.0.0.1 "  # Use localhost to access OVMS server bound to 127.0.0.1
             f"--port {ovms_port} "  # Use OVMS server port (typically 8000)
             "--endpoint /v3/chat/completions "

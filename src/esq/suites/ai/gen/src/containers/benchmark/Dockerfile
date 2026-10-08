@@ -1,7 +1,7 @@
 # Copyright (C) 2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-FROM vllm/vllm-openai:v0.9.2
+FROM vllm/vllm-openai-cpu:v0.31.0
 
 USER root
 
@@ -10,16 +10,9 @@ RUN useradd -m -u 1000 user && \
     mkdir -p /vllm-workspace && \
     chown user:user /vllm-workspace
 
-# Copy requirements file
-COPY requirements.txt /tmp/requirements.txt
-
-# Install Python packages using uv
-RUN uv pip install --system --no-cache -r /tmp/requirements.txt && \
-    rm -f /tmp/requirements.txt
-
 # Set up workspace directory with secure permissions (770 prevents world access)
-# Note: vLLM v0.9.2 uses standalone benchmark_serving.py script
-#       Command: python3 /vllm-workspace/benchmarks/benchmark_serving.py [args]
+# Note: vLLM v0.31.0 uses the integrated `vllm bench serve` CLI subcommand
+#       Command: vllm bench serve [args]
 RUN mkdir -p /vllm-workspace/results && \
     chmod 770 /vllm-workspace/results && \
     chown -R user:user /vllm-workspace

@@ -70,7 +70,7 @@ def test_text_generation(
     ms_dataset_repo = configs.get("ms_dataset_repo", "gliang1001/ShareGPT_V3_unfiltered_cleaned_split")
     dataset_filename = configs.get("dataset_filename", "ShareGPT_V3_unfiltered_cleaned_split.json")
     docker_image_tag = f"{configs.get('container_image_name', 'genai-ovms')}:{configs.get('container_tag', 'latest')}"
-    benchmark_docker_base_image = f"{configs.get('benchmark_container_image', 'vllm/vllm-openai:v0.9.2')}"
+    benchmark_docker_base_image = f"{configs.get('benchmark_container_image', 'vllm/vllm-openai-cpu:v0.31.0')}"
     ovms_docker_base_image = configs.get("ovms_container_image", "openvino/model_server:2026.2.1-gpu")
 
     # Setup
@@ -345,7 +345,7 @@ def test_text_generation(
 
     except Exception as e:
         test_failed = True
-        failure_message = f"Unexpected error during Text Generation test execution: {str(e)}"
+        failure_message = f"Unexpected error during Text Generation test execution: {e!s}"
         logger.error(failure_message, exc_info=True)
 
         # Create a minimal results object if none exists

@@ -666,24 +666,18 @@ def collect_npu_info(pci_devices, openvino_npu=None) -> dict:
 
     # Get NPU devices from PCI (Processing accelerators)
     pci_npus = []
-    # Known Intel NPU kernel drivers. On newer platforms the PCI device_id may not yet
-    # be in the local PCI database, causing device_name to be "Unknown device". In that
-    # case the driver name is a reliable indicator that the device is an Intel NPU.
-    _INTEL_NPU_DRIVERS = {"intel_vpu", "intel_npu"}
     for dev in pci_devices:
         class_name = dev.get("class_name", "").lower()
         device_name = dev.get("device_name", "").lower()
         vendor_id = dev.get("vendor_id", "").lower()
         driver = dev.get("driver", "") or ""
 
-        # NPU devices must be Intel (8086) Processing accelerators AND
-        # either have "npu" in the device name (known devices in PCI DB) OR
-        # use a recognised Intel NPU kernel driver (new/unknown PCI IDs).
-        is_intel_npu = (
-            "processing accelerator" in class_name
-            and vendor_id == "8086"
-            and ("npu" in device_name or driver in _INTEL_NPU_DRIVERS)
-        )
+        # NPU devices are identified by the PCI class "Processing accelerators" (12h)
+        # combined with the Intel vendor ID (8086). The device_name and driver are
+        # NOT used as detection criteria: on newer/unreleased platforms the PCI
+        # device_id may not yet be present in the local PCI database (device_name
+        # shows as "Unknown device"), and the driver may be unbound or renamed.
+        is_intel_npu = "processing accelerator" in class_name and vendor_id == "8086"
 
         if is_intel_npu:
             pci_npus.append(normalize_pci_device(dev))
@@ -692,7 +686,7 @@ def collect_npu_info(pci_devices, openvino_npu=None) -> dict:
             )
         elif "processing accelerator" in class_name:
             logger.debug(
-                f"Skipping non-NPU processing accelerator: {device_name} "
+                f"Skipping non-Intel processing accelerator: {device_name} "
                 f"(vendor: {vendor_id}, driver: {driver}, slot: {dev.get('pci_slot')})"
             )
 
@@ -724,7 +718,7 @@ def collect_npu_info(pci_devices, openvino_npu=None) -> dict:
         all_npus.append(npu_device)
 
         logger.debug(
-            f"✅ NPU mapping: PCI {pci_device.get('pci_address', 'Unknown')} <-> "
+            f"✅ NPU mapping: PCI {pci_device.get('pci_slot', 'Unknown')} <-> "
             f"OpenVINO {ov_device.get('device_name', 'Unknown')}"
         )
 
@@ -843,11 +837,17 @@ def collect_npu_info(pci_devices, openvino_npu=None) -> dict:
             all_npus.append(npu_device)
             logger.debug(f"Added PCI-only NPU device: {pci_npu.get('pci_slot', 'Unknown')}")
 
-    # Add remaining OpenVINO devices (no PCI match)
+    # Add remaining OpenVINO devices (no PCI match). The OpenVINO "NPU" plugin is
+    # Intel-exclusive, so vendor_id/vendor_name are set explicitly here to ensure
+    # system requirement validation (which checks vendor_id == "8086") still
+    # recognises the device even though it could not be matched to a PCI entry.
     for ov_npu in openvino_npus:
         npu_device = {
             "device_name": ov_npu["device_name"],
             "device_type": ov_npu["device_type"],
+            "vendor_id": "8086",
+            "vendor_name": "Intel Corporation",
+            "class_name": "Processing accelerators",
             "source": "openvino",
             "openvino": ov_npu,
         }

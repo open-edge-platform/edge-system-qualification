@@ -21,10 +21,6 @@ Intel® ESQ provides a comprehensive collection of test suites to assess and qua
         - [Automated Self Checkout](#automated-self-checkout)
         - [Loss Prevention](#loss-prevention)
 - [Horizontal](#horizontal)
-    - [Action AI](#action-ai)
-        - [PI0.5 RTC Benchmark](#pi05-rtc-benchmark)
-        - [ACT Benchmark](#act-benchmark)
-        - [FastMapping Benchmark](#fastmapping-benchmark)
     - [Audio AI](#audio-ai)
         - [FunASR ASR Benchmark](#funasr-asr-benchmark)
     - [Clustering AI](#clustering-ai)
@@ -91,11 +87,8 @@ Quick reference of all available test suites and their profile names.
 | `profile.vertical.retail-asc` | Vertical | Retail Automated Self-Checkout | `esq run --profile profile.vertical.retail-asc` |
 | `profile.vertical.retail-lp` | Vertical | Retail Loss Prevention | `esq run --profile profile.vertical.retail-lp` |
 | `profile.vertical.retail-lp-vlm` | Vertical | Retail Loss Prevention Visual Language Model | `esq run --profile profile.vertical.retail-lp-vlm` |
-| `profile.suite.ai.action-act` | Horizontal | Action AI ACT inference benchmark | `esq run --profile profile.suite.ai.action-act` |
 | `profile.suite.ai.clustering-adbscan` | Horizontal | Clustering AI ADBScan point cloud benchmark | `esq run --profile profile.suite.ai.clustering-adbscan` |
-| `profile.suite.ai.action-fastmapping` | Horizontal | Action AI FastMapping SLAM benchmark | `esq run --profile profile.suite.ai.action-fastmapping` |
 | `profile.suite.ai.audio-funasr` | Horizontal | Audio AI FunASR speech-recognition benchmark | `esq run --profile profile.suite.ai.audio-funasr` |
-| `profile.suite.ai.action-pi5` | Horizontal | Action AI PI0.5 RTC inference benchmark | `esq run --profile profile.suite.ai.action-pi5` |
 
 **List all available profiles**:
 ```bash
@@ -402,59 +395,6 @@ esq run --profile profile.vertical.retail-lp-vlm
 ---
 
 ## Horizontal
-
-### Action AI
-
-#### PI0.5 RTC Benchmark
-
-**Profile**: `profile.suite.ai.action-pi5`
-
-**Test Cases**:
-
-| Test ID | Test Case |
-|---------|-----------|
-| ACN-PI5-001 | PI0.5 RTC Benchmark (GPU) |
-
-**Run this profile**:
-```bash
-esq run --profile profile.suite.ai.action-pi5
-```
-
----
-
-#### ACT Benchmark
-
-**Profile**: `profile.suite.ai.action-act`
-
-**Test Cases**:
-
-| Test ID | Test Case |
-|---------|-----------|
-| ACN-ACT-001 | ACT Benchmark (GPU) |
-
-**Run this profile**:
-```bash
-esq run --profile profile.suite.ai.action-act
-```
-
----
-
-#### FastMapping Benchmark
-
-**Profile**: `profile.suite.ai.action-fastmapping`
-
-**Test Cases**:
-
-| Test ID | Test Case |
-|---------|-----------|
-| ACN-FMP-001 | FastMapping Benchmark (CPU) |
-
-**Run this profile**:
-```bash
-esq run --profile profile.suite.ai.action-fastmapping
-```
-
----
 
 ### Audio AI
 

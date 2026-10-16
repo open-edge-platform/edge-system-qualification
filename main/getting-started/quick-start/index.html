@@ -13,7 +13,7 @@
         <link rel="canonical" href="https://open-edge-platform.github.io/edge-system-qualification/main/getting-started/quick-start/">
       
       
-        <link rel="prev" href="../">
+        <link rel="prev" href="../requirements/">
       
       
         <link rel="next" href="../suites/">
@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/logo.svg">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -398,6 +398,8 @@
       
         
       
+        
+      
     
     
     
@@ -453,6 +455,34 @@
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
             
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
               
             
               
@@ -522,45 +552,6 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#requirements" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Requirements
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Requirements">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#1-hardware" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        1. Hardware
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#2-operating-system" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        2. Operating System
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#installation" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -584,10 +575,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#2-system-dependencies" class="md-nav__link">
+  <a href="#2-docker-engine" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2. System Dependencies
+        2. Docker Engine
       
     </span>
   </a>
@@ -595,10 +586,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#3-docker-engine" class="md-nav__link">
+  <a href="#3-python-package-manager" class="md-nav__link">
     <span class="md-ellipsis">
       
-        3. Docker Engine
+        3. Python Package Manager
       
     </span>
   </a>
@@ -606,10 +597,232 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#4-python-package-manager" class="md-nav__link">
+  <a href="#4-system-setup" class="md-nav__link">
     <span class="md-ellipsis">
       
-        4. Python Package Manager
+        4. System Setup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-intel-esq" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Intel® ESQ
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Usage
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Usage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Run
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-uninstall" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Uninstall
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#installation_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Installation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Installation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-system-drivers_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. System Drivers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-docker-engine_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Docker Engine
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-python-package-manager_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Python Package Manager
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-system-setup_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. System Setup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-intel-esq_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Intel® ESQ
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#usage_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Usage
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Usage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-run_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Run
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-uninstall_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Uninstall
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#installation_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Installation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Installation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-system-drivers_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. System Drivers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-docker-engine_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Docker Engine
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-python-package-manager_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Python Package Manager
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-hardware-virtualization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Hardware Virtualization
       
     </span>
   </a>
@@ -644,22 +857,33 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#quick-start_1" class="md-nav__link">
+  <a href="#usage_2" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Quick Start
+        Usage
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Quick Start">
+    <nav class="md-nav" aria-label="Usage">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#1-run-intel-esq" class="md-nav__link">
+  <a href="#1-run_2" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1. Run Intel® ESQ
+        1. Run
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-uninstall_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Uninstall
       
     </span>
   </a>
@@ -668,17 +892,6 @@
         
       </ul>
     </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#uninstall" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Uninstall
-      
-    </span>
-  </a>
   
 </li>
       
@@ -722,7 +935,7 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_3" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_4" >
         
           
           <div class="md-nav__link md-nav__container">
@@ -745,8 +958,8 @@
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_3_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_2_3">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_4">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -797,7 +1010,7 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_4" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_5" >
         
           
           <div class="md-nav__link md-nav__container">
@@ -820,8 +1033,8 @@
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_4_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_2_4">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_5">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1099,6 +1312,8 @@
       
         
       
+        
+      
     
     
     
@@ -1189,6 +1404,34 @@
     
   
     System Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/developer/profiles-file/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profiles File Reference
   
 
     
@@ -1820,45 +2063,6 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#requirements" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Requirements
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Requirements">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#1-hardware" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        1. Hardware
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#2-operating-system" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        2. Operating System
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#installation" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1882,10 +2086,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#2-system-dependencies" class="md-nav__link">
+  <a href="#2-docker-engine" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2. System Dependencies
+        2. Docker Engine
       
     </span>
   </a>
@@ -1893,10 +2097,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#3-docker-engine" class="md-nav__link">
+  <a href="#3-python-package-manager" class="md-nav__link">
     <span class="md-ellipsis">
       
-        3. Docker Engine
+        3. Python Package Manager
       
     </span>
   </a>
@@ -1904,10 +2108,232 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#4-python-package-manager" class="md-nav__link">
+  <a href="#4-system-setup" class="md-nav__link">
     <span class="md-ellipsis">
       
-        4. Python Package Manager
+        4. System Setup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-intel-esq" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Intel® ESQ
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Usage
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Usage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Run
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-uninstall" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Uninstall
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#installation_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Installation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Installation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-system-drivers_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. System Drivers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-docker-engine_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Docker Engine
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-python-package-manager_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Python Package Manager
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-system-setup_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. System Setup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-intel-esq_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Intel® ESQ
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#usage_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Usage
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Usage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-run_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Run
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-uninstall_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Uninstall
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#installation_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Installation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Installation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-system-drivers_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. System Drivers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-docker-engine_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Docker Engine
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-python-package-manager_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Python Package Manager
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-hardware-virtualization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Hardware Virtualization
       
     </span>
   </a>
@@ -1942,22 +2368,33 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#quick-start_1" class="md-nav__link">
+  <a href="#usage_2" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Quick Start
+        Usage
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Quick Start">
+    <nav class="md-nav" aria-label="Usage">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#1-run-intel-esq" class="md-nav__link">
+  <a href="#1-run_2" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1. Run Intel® ESQ
+        1. Run
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-uninstall_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Uninstall
       
     </span>
   </a>
@@ -1966,17 +2403,6 @@
         
       </ul>
     </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#uninstall" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Uninstall
-      
-    </span>
-  </a>
   
 </li>
       
@@ -2014,138 +2440,56 @@
 
 
 <h1 id="quick-start">Quick Start<a class="headerlink" href="#quick-start" title="Permanent link">&para;</a></h1>
-<p>Install all required dependencies to run all tests and evaluate your edge system.</p>
-<div class="admonition info">
-<p class="admonition-title">Info</p>
-<p>Refer to <a href="https://www.intel.com/content/www/us/en/developer/articles/guide/esq-for-ai-edge-systems.html">Intel® ESQ for Intel® AI Edge Systems</a> for official main qualification page.</p>
-</div>
-<h2 id="requirements">Requirements<a class="headerlink" href="#requirements" title="Permanent link">&para;</a></h2>
-<p>Before starting, ensure your system meets the following requirements:</p>
-<h3 id="1-hardware">1. Hardware<a class="headerlink" href="#1-hardware" title="Permanent link">&para;</a></h3>
-<p>Intel® ESQ supports a wide range of Intel® edge systems optimized for various performance and use case requirements.</p>
-<table>
-<thead>
-<tr>
-<th><strong>Category</strong></th>
-<th><strong>Processors</strong></th>
-<th><strong>Specifications</strong></th>
-<th><strong>Storage</strong></th>
-<th><strong>Discrete GPU Options</strong></th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><strong>Scalable Performance Graphics Media</strong></td>
-<td><strong>Xeon-Based</strong>: <br>Intel® Xeon® 6 Processors,<br>5<sup>th</sup> Gen Intel® Xeon® Scalable Processors,<br>Intel® Xeon® W Processors<br><br><strong>Core-Based</strong>: <br>Intel® Core Ultra Processor (Series 2),<br> Intel® Core™ Processor (Series 2)</td>
-<td><strong>Xeon-Based</strong>: <br><strong>SKU</strong>: Dual and Single Socket<br><strong>Minimum System Memory</strong>: 128 GB DDR5 (Dual Channel)<br><br> <strong>Core-Based</strong>:<br> <strong>Minimum System Memory</strong>: 64GB DDR5 (Dual Channel)<br></td>
-<td><strong>Recommended</strong>: 1TB</td>
-<td><strong>Intel® Arc™ B-Series Graphics,</strong><br><strong>Intel® Arc™ Pro B-Series Graphics</strong></td>
-</tr>
-<tr>
-<td><strong>Scalable Performance</strong></td>
-<td>Intel® Xeon® 6 Processors,<br> 5<sup>th</sup> Gen Intel® Xeon® Scalable Processors, <br>Intel® Xeon® W Processors</td>
-<td><strong>SKU</strong>: Dual and Single Socket<br><strong>Minimum System Memory</strong>: 128 GB DDR5 (Dual Channnel) <br></td>
-<td><strong>Recommended</strong>: 1TB</td>
-<td>N/A</td>
-</tr>
-<tr>
-<td><strong>Efficiency Optimized</strong></td>
-<td>Intel® Core™ Ultra Processor (Series 2),<br>Intel® Core™ Ultra Processor (Series 3)</td>
-<td><strong>Graphics</strong>: Integrated GPU with 7 Xe-Cores or more <br> <strong>SKU</strong>: Single Socket <br><strong>Minimum System Memory</strong>: 32 GB DDR5 (Dual Channel)</td>
-<td><strong>Recommended</strong>: 512 GB</td>
-<td>N/A</td>
-</tr>
-<tr>
-<td><strong>Mainstream</strong></td>
-<td>Intel® Core™ (Series 2),<br>Intel® Core™ (Series 3)</td>
-<td><strong>Minimum System Memory</strong>: 32 GB DDR5</td>
-<td><strong>Recommended</strong>: 512 GB</td>
-<td>N/A</td>
-</tr>
-<tr>
-<td><strong>Entry</strong></td>
-<td>Intel® Processor for Desktop,<br>Intel® Processor X-series, <br>Intel® Processor N-series</td>
-<td><strong>Minimum System Memory</strong>: 16 GB DDR5</td>
-<td><strong>Recommended</strong>: 512 GB</td>
-<td>N/A</td>
-</tr>
-</tbody>
-</table>
-<h3 id="2-operating-system">2. Operating System<a class="headerlink" href="#2-operating-system" title="Permanent link">&para;</a></h3>
-<p>Install a supported operating system before proceeding.</p>
-<table>
-<thead>
-<tr>
-<th>OS</th>
-<th>Version</th>
-<th>Notes</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><a href="https://ubuntu.com/download/desktop"><strong>Ubuntu*</strong></a></td>
-<td>24.04 Desktop LTS or newer</td>
-<td>Recommended Linux* distribution</td>
-</tr>
-<tr>
-<td><strong>Windows*</strong></td>
-<td>Coming soon</td>
-<td>Coming soon</td>
-</tr>
-</tbody>
-</table>
+<p>Before you begin, confirm that your system meets all the requirements. See <a href="../requirements/">Requirements</a> for details.</p>
+<section class="program-panel" data-program-panel="generic">
 <h2 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">&para;</a></h2>
 <h3 id="1-system-drivers">1. System Drivers<a class="headerlink" href="#1-system-drivers" title="Permanent link">&para;</a></h3>
 <p>Configure system drivers:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>sudo<span class="w"> </span>bash<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>wget<span class="w"> </span>-qLO<span class="w"> </span>-<span class="w"> </span>https://raw.githubusercontent.com/open-edge-platform/edge-developer-kit-reference-scripts/refs/heads/main/main_installer.sh<span class="k">)</span><span class="s2">&quot;</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>sudo<span class="w"> </span>bash<span class="w"> </span>-c<span class="w"> </span><span class="s2">"</span><span class="k">$(</span>wget<span class="w"> </span>-qLO<span class="w"> </span>-<span class="w"> </span>https://raw.githubusercontent.com/open-edge-platform/edge-developer-kit-reference-scripts/refs/heads/main/main_installer.sh<span class="k">)</span><span class="s2">"</span>
 </span></code></pre></div>
 <div class="admonition info">
 <p class="admonition-title">Additional Reference</p>
 <p>For detailed information about system drivers, see the <a href="https://github.com/open-edge-platform/edge-developer-kit-reference-scripts">Edge Developer Kit Reference Scripts</a> documentation.</p>
 </div>
-<h3 id="2-system-dependencies">2. System Dependencies<a class="headerlink" href="#2-system-dependencies" title="Permanent link">&para;</a></h3>
-<p>Install essential system packages:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>sudo<span class="w"> </span>apt<span class="w"> </span>update<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span>curl<span class="w"> </span>git<span class="w"> </span>libgl1<span class="w"> </span>make
-</span></code></pre></div>
-<h3 id="3-docker-engine">3. Docker Engine<a class="headerlink" href="#3-docker-engine" title="Permanent link">&para;</a></h3>
+<h3 id="2-docker-engine">2. Docker Engine<a class="headerlink" href="#2-docker-engine" title="Permanent link">&para;</a></h3>
 <div class="admonition info">
 <p class="admonition-title">Docker* Engine Download Source</p>
 <p>Intel® ESQ uses download.docker.com* as the default download source. To use a custom download source*, configure it with:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">DOCKER_SOURCE_URL</span><span class="o">=</span>&lt;custom_docker_source_url&gt;
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">DOCKER_SOURCE_URL</span><span class="o">=</span>&lt;custom_docker_source_url&gt;
 </span></code></pre></div>
 </div>
 <p>Install Docker* Engine:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Add Docker&#39;s official GPG key:</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>sudo<span class="w"> </span>apt<span class="w"> </span>update
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>ca-certificates<span class="w"> </span>curl
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>sudo<span class="w"> </span>install<span class="w"> </span>-m<span class="w"> </span><span class="m">0755</span><span class="w"> </span>-d<span class="w"> </span>/etc/apt/keyrings
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>sudo<span class="w"> </span>curl<span class="w"> </span>-fsSL<span class="w"> </span><span class="si">${</span><span class="nv">DOCKER_SOURCE_URL</span><span class="k">:-</span><span class="nv">https</span><span class="p">://download.docker.com/linux/ubuntu</span><span class="si">}</span>/gpg<span class="w"> </span>-o<span class="w"> </span>/etc/apt/keyrings/docker.asc
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>sudo<span class="w"> </span>chmod<span class="w"> </span>a+r<span class="w"> </span>/etc/apt/keyrings/docker.asc
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="c1"># Add the repository to Apt sources:</span>
-</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>sudo<span class="w"> </span>tee<span class="w"> </span>/etc/apt/sources.list.d/docker.sources<span class="w"> </span><span class="s">&lt;&lt;EOF</span>
-</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="s">Types: deb</span>
-</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="s">URIs: ${DOCKER_SOURCE_URL:-https://download.docker.com/linux/ubuntu}</span>
-</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="s">Suites: $(. /etc/os-release &amp;&amp; echo &quot;${UBUNTU_CODENAME:-$VERSION_CODENAME}&quot;)</span>
-</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="s">Components: stable</span>
-</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="s">Architectures: $(dpkg --print-architecture)</span>
-</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="s">Signed-By: /etc/apt/keyrings/docker.asc</span>
-</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a><span class="s">EOF</span>
-</span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>
-</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>sudo<span class="w"> </span>apt<span class="w"> </span>update<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span>docker-ce<span class="w"> </span>docker-ce-cli<span class="w"> </span>containerd.io<span class="w"> </span>docker-buildx-plugin<span class="w"> </span>docker-compose-plugin
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Add Docker's official GPG key:</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>sudo<span class="w"> </span>apt<span class="w"> </span>update
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>ca-certificates<span class="w"> </span>curl
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>sudo<span class="w"> </span>install<span class="w"> </span>-m<span class="w"> </span><span class="m">0755</span><span class="w"> </span>-d<span class="w"> </span>/etc/apt/keyrings
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>sudo<span class="w"> </span>curl<span class="w"> </span>-fsSL<span class="w"> </span><span class="si">${</span><span class="nv">DOCKER_SOURCE_URL</span><span class="k">:-</span><span class="nv">https</span><span class="p">://download.docker.com/linux/ubuntu</span><span class="si">}</span>/gpg<span class="w"> </span>-o<span class="w"> </span>/etc/apt/keyrings/docker.asc
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>sudo<span class="w"> </span>chmod<span class="w"> </span>a+r<span class="w"> </span>/etc/apt/keyrings/docker.asc
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="c1"># Add the repository to Apt sources:</span>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>sudo<span class="w"> </span>tee<span class="w"> </span>/etc/apt/sources.list.d/docker.sources<span class="w"> </span><span class="s">&lt;&lt;EOF</span>
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="s">Types: deb</span>
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="s">URIs: ${DOCKER_SOURCE_URL:-https://download.docker.com/linux/ubuntu}</span>
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="s">Suites: $(. /etc/os-release &amp;&amp; echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")</span>
+</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="s">Components: stable</span>
+</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="s">Architectures: $(dpkg --print-architecture)</span>
+</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="s">Signed-By: /etc/apt/keyrings/docker.asc</span>
+</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="s">EOF</span>
+</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>
+</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>sudo<span class="w"> </span>apt<span class="w"> </span>update<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span>docker-ce<span class="w"> </span>docker-ce-cli<span class="w"> </span>containerd.io<span class="w"> </span>docker-buildx-plugin<span class="w"> </span>docker-compose-plugin
 </span></code></pre></div>
 <p>Add your user to the docker group:</p>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
 <p>Adding your user to the <code>docker</code> group grants root-level access. This should only be done on development or test systems.</p>
 </div>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>sudo<span class="w"> </span>usermod<span class="w"> </span>-aG<span class="w"> </span>docker<span class="w"> </span><span class="nv">$USER</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>sudo<span class="w"> </span>usermod<span class="w"> </span>-aG<span class="w"> </span>docker<span class="w"> </span><span class="nv">$USER</span>
 </span></code></pre></div>
 <p>To activate your new group membership immediately in your current terminal, run:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>newgrp<span class="w"> </span>docker
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>newgrp<span class="w"> </span>docker
 </span></code></pre></div>
 <p>This command starts a new shell session with updated group permissions, allowing you to use Docker* without logging out. You can now verify Docker* installation is successful by running the <code>hello-world</code> image:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>docker pull hello-world
+<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>docker pull hello-world
 </span></code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
@@ -2154,61 +2498,377 @@
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>If you cannot pull the image, your network may be unable to reach the default registry. Configure a mirror registry in the Docker* daemon configuration:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>sudo<span class="w"> </span>mkdir<span class="w"> </span>-p<span class="w"> </span>/etc/docker
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>sudo<span class="w"> </span>tee<span class="w"> </span>/etc/docker/daemon.json<span class="w"> </span>&gt;<span class="w"> </span>/dev/null<span class="w"> </span><span class="s">&lt;&lt;EOF</span>
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="s">{</span>
-</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="s">    &quot;registry-mirrors&quot;: [</span>
-</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="s">        &quot;&lt;mirror-registry-source&gt;&quot;</span>
-</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="s">    ]</span>
-</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="s">}</span>
-</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="s">EOF</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>sudo<span class="w"> </span>mkdir<span class="w"> </span>-p<span class="w"> </span>/etc/docker
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>sudo<span class="w"> </span>tee<span class="w"> </span>/etc/docker/daemon.json<span class="w"> </span>&gt;<span class="w"> </span>/dev/null<span class="w"> </span><span class="s">&lt;&lt;EOF</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="s">{</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="s">    "registry-mirrors": [</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="s">        "&lt;mirror-registry-source&gt;"</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="s">    ]</span>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="s">}</span>
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="s">EOF</span>
 </span></code></pre></div>
 </div>
 <div class="admonition info">
 <p class="admonition-title">Additional Reference</p>
 <p>For detailed Docker* installation instructions, see the official <a href="https://docs.docker.com/engine/install">Docker* Engine installation documentation</a>.</p>
 </div>
-<h3 id="4-python-package-manager">4. Python Package Manager<a class="headerlink" href="#4-python-package-manager" title="Permanent link">&para;</a></h3>
+<h3 id="3-python-package-manager">3. Python Package Manager<a class="headerlink" href="#3-python-package-manager" title="Permanent link">&para;</a></h3>
 <p>Install <a href="https://docs.astral.sh/uv/getting-started/installation/">uv</a> to accelerate Python* package management:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>curl<span class="w"> </span>-LsSf<span class="w"> </span>https://astral.sh/uv/install.sh<span class="w"> </span><span class="p">|</span><span class="w"> </span>sh<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">source</span><span class="w"> </span><span class="nv">$HOME</span>/.local/bin/env
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>curl<span class="w"> </span>-LsSf<span class="w"> </span>https://astral.sh/uv/install.sh<span class="w"> </span><span class="p">|</span><span class="w"> </span>sh<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">source</span><span class="w"> </span><span class="nv">$HOME</span>/.local/bin/env
 </span></code></pre></div>
 <div class="admonition info">
 <p class="admonition-title">Additional Reference</p>
 <p>For detailed <code>uv</code> installation instructions, see the official <a href="https://docs.astral.sh/uv/getting-started/installation/">uv Installation</a> documentation.</p>
 </div>
-<h3 id="5-system-setup">5. System Setup<a class="headerlink" href="#5-system-setup" title="Permanent link">&para;</a></h3>
-<p>Run the setup scripts to configure system settings:</p>
-<table>
-<thead>
-<tr>
-<th>Script</th>
-<th>Purpose</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>system-setup.sh</code></td>
-<td>Installs packages and configures file read permissions (run once after OS installation)</td>
-</tr>
-<tr>
-<td><code>system-setup-advanced.sh</code></td>
-<td>Optional. Applies runtime resource limit settings — current session only, re-run after each reboot. Required for full test coverage</td>
-</tr>
-</tbody>
-</table>
-<p>Run <code>system-setup.sh</code> once after OS installation:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>sudo<span class="w"> </span>bash<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>wget<span class="w"> </span>-qLO<span class="w"> </span>-<span class="w"> </span>https://raw.githubusercontent.com/open-edge-platform/edge-system-qualification/refs/heads/main/scripts/system-setup.sh<span class="k">)</span><span class="s2">&quot;</span>
+<h3 id="4-system-setup">4. System Setup<a class="headerlink" href="#4-system-setup" title="Permanent link">&para;</a></h3>
+<p>Run <code>system-setup.sh</code> once after the OS installation to install required system packages and configure file read permissions:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>sudo<span class="w"> </span>bash<span class="w"> </span>-c<span class="w"> </span><span class="s2">"</span><span class="k">$(</span>wget<span class="w"> </span>-qLO<span class="w"> </span>-<span class="w"> </span>https://raw.githubusercontent.com/open-edge-platform/edge-system-qualification/refs/heads/main/scripts/system-setup.sh<span class="k">)</span><span class="s2">"</span>
 </span></code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Feature Availability</p>
 <p>Some features configured by this script are optional. Intel® ESQ will still run if skipped, but certain metrics and capabilities may be unavailable.</p>
 </div>
 <p>Run the advanced setup script to enable full test coverage:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>sudo<span class="w"> </span>bash<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>wget<span class="w"> </span>-qLO<span class="w"> </span>-<span class="w"> </span>https://raw.githubusercontent.com/open-edge-platform/edge-system-qualification/refs/heads/main/scripts/system-setup-advanced.sh<span class="k">)</span><span class="s2">&quot;</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>sudo<span class="w"> </span>bash<span class="w"> </span>-c<span class="w"> </span><span class="s2">"</span><span class="k">$(</span>wget<span class="w"> </span>-qLO<span class="w"> </span>-<span class="w"> </span>https://raw.githubusercontent.com/open-edge-platform/edge-system-qualification/refs/heads/main/scripts/system-setup-advanced.sh<span class="k">)</span><span class="s2">"</span>
 </span></code></pre></div>
 <div class="admonition warning">
 <p class="admonition-title">Re-run after reboot</p>
-<p>All changes applied by <code>system-setup-advanced.sh</code> are <strong>current session only</strong> and reset automatically after reboot. Re-run the script after each reboot before executing tests that depend on it.</p>
+<p>All changes applied by <code>system-setup-advanced.sh</code> are in  <strong>current session only</strong> and resets automatically after reboot. Re-run the script after each reboot before executing tests that depend on it.</p>
+</div>
+<p><strong>Advanced setup modules:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Module</th>
+<th>What it changes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Locked Memory Limit</strong></td>
+<td>Sets <code>RLIMIT_MEMLOCK</code> to unlimited for the current session so memtester can lock all available RAM pages. Without this, memory-related tests will be limited or fail</td>
+</tr>
+</tbody>
+</table>
+<h3 id="5-intel-esq">5. Intel® ESQ<a class="headerlink" href="#5-intel-esq" title="Permanent link">&para;</a></h3>
+<div class="admonition info">
+<p class="admonition-title">Development Version</p>
+<p>To access the latest features that may not be available in the current release, you can install the development version from the main branch:
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>uv<span class="w"> </span>tool<span class="w"> </span>install<span class="w"> </span>--force<span class="w"> </span>--refresh<span class="w"> </span>git+https://github.com/open-edge-platform/edge-system-qualification.git@main
+</span></code></pre></div></p>
+</div>
+<p>Install Intel® ESQ from GitHub*:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>uv<span class="w"> </span>tool<span class="w"> </span>install<span class="w"> </span>--force<span class="w"> </span>--refresh<span class="w"> </span>git+https://github.com/open-edge-platform/edge-system-qualification.git@main
+</span></code></pre></div>
+<p>Verify that Intel® ESQ is working correctly:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>esq<span class="w"> </span>--version
+</span></code></pre></div>
+<h2 id="usage">Usage<a class="headerlink" href="#usage" title="Permanent link">&para;</a></h2>
+<h3 id="1-run">1. Run<a class="headerlink" href="#1-run" title="Permanent link">&para;</a></h3>
+<p>Run <code>esq run</code> to start the interactive prompt:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>esq<span class="w"> </span>run
+</span></code></pre></div>
+<p>By default, this command:</p>
+<ol>
+<li>Prompts you to select only one qualification profile to run.</li>
+<li>If the selected qualification profile has associated vertical profiles, it prompts you to include them.</li>
+<li>Collects metrics and generates a test report.</li>
+</ol>
+<div class="admonition tip">
+<p class="admonition-title">Upgrading Intel® ESQ</p>
+<p>Before running a new version of Intel® ESQ, clean up any previously created <code>esq_data</code> folder to prevent leftover data from interfering with the new installation:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>esq<span class="w"> </span>clean<span class="w"> </span>--all
+</span></code></pre></div>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Verbose Output</p>
+<p>Use <code>--verbose</code> to show detailed execution logs:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>esq<span class="w"> </span>--verbose<span class="w"> </span>run
+</span></code></pre></div>
+</div>
+<div class="admonition info">
+<p class="admonition-title">Driver Requirements and Hardware Changes</p>
+<p>Intel® GPU and NPU tests require specific drivers. Ensure you have the latest Intel® drivers installed for your hardware configuration. If you run tests on different hardware or swap system components, clean up the cache before rerunning tests:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>esq<span class="w"> </span>--verbose<span class="w"> </span>clean<span class="w"> </span>--cache-only
+</span></code></pre></div>
+</div>
+<div class="admonition info">
+<p class="admonition-title">Download Source</p>
+<p>Intel® ESQ uses HuggingFace* as the default download source. For ModelScope*, configure it with:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">PREFER_MODELSCOPE</span><span class="o">=</span><span class="m">1</span>
+</span></code></pre></div>
+</div>
+<h3 id="2-uninstall">2. Uninstall<a class="headerlink" href="#2-uninstall" title="Permanent link">&para;</a></h3>
+<p>Before uninstalling, clean up all data created by Intel® ESQ, including Docker images built during test execution:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>esq<span class="w"> </span>clean<span class="w"> </span>--all
+</span></code></pre></div>
+<p>Then remove Intel® ESQ:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>uv<span class="w"> </span>tool<span class="w"> </span>uninstall<span class="w"> </span>esq
+</span></code></pre></div>
+</section>
+<section class="program-panel" data-program-panel="ai-edge-system">
+<h2 id="installation_1">Installation<a class="headerlink" href="#installation_1" title="Permanent link">&para;</a></h2>
+<h3 id="1-system-drivers_1">1. System Drivers<a class="headerlink" href="#1-system-drivers_1" title="Permanent link">&para;</a></h3>
+<p>Configure system drivers:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>sudo<span class="w"> </span>bash<span class="w"> </span>-c<span class="w"> </span><span class="s2">"</span><span class="k">$(</span>wget<span class="w"> </span>-qLO<span class="w"> </span>-<span class="w"> </span>https://raw.githubusercontent.com/open-edge-platform/edge-developer-kit-reference-scripts/refs/heads/main/main_installer.sh<span class="k">)</span><span class="s2">"</span>
+</span></code></pre></div>
+<div class="admonition info">
+<p class="admonition-title">Additional Reference</p>
+<p>For detailed information about system drivers, see the <a href="https://github.com/open-edge-platform/edge-developer-kit-reference-scripts">Edge Developer Kit Reference Scripts</a> documentation.</p>
+</div>
+<h3 id="2-docker-engine_1">2. Docker Engine<a class="headerlink" href="#2-docker-engine_1" title="Permanent link">&para;</a></h3>
+<div class="admonition info">
+<p class="admonition-title">Docker* Engine Download Source</p>
+<p>Intel® ESQ uses download.docker.com* as the default download source. To use a custom download source*, configure it with:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">DOCKER_SOURCE_URL</span><span class="o">=</span>&lt;custom_docker_source_url&gt;
+</span></code></pre></div>
+</div>
+<p>Install Docker* Engine:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="c1"># Add Docker's official GPG key:</span>
+</span><span id="__span-22-2"><a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>sudo<span class="w"> </span>apt<span class="w"> </span>update
+</span><span id="__span-22-3"><a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a>sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>ca-certificates<span class="w"> </span>curl
+</span><span id="__span-22-4"><a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a>sudo<span class="w"> </span>install<span class="w"> </span>-m<span class="w"> </span><span class="m">0755</span><span class="w"> </span>-d<span class="w"> </span>/etc/apt/keyrings
+</span><span id="__span-22-5"><a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a>sudo<span class="w"> </span>curl<span class="w"> </span>-fsSL<span class="w"> </span><span class="si">${</span><span class="nv">DOCKER_SOURCE_URL</span><span class="k">:-</span><span class="nv">https</span><span class="p">://download.docker.com/linux/ubuntu</span><span class="si">}</span>/gpg<span class="w"> </span>-o<span class="w"> </span>/etc/apt/keyrings/docker.asc
+</span><span id="__span-22-6"><a id="__codelineno-22-6" name="__codelineno-22-6" href="#__codelineno-22-6"></a>sudo<span class="w"> </span>chmod<span class="w"> </span>a+r<span class="w"> </span>/etc/apt/keyrings/docker.asc
+</span><span id="__span-22-7"><a id="__codelineno-22-7" name="__codelineno-22-7" href="#__codelineno-22-7"></a>
+</span><span id="__span-22-8"><a id="__codelineno-22-8" name="__codelineno-22-8" href="#__codelineno-22-8"></a><span class="c1"># Add the repository to Apt sources:</span>
+</span><span id="__span-22-9"><a id="__codelineno-22-9" name="__codelineno-22-9" href="#__codelineno-22-9"></a>sudo<span class="w"> </span>tee<span class="w"> </span>/etc/apt/sources.list.d/docker.sources<span class="w"> </span><span class="s">&lt;&lt;EOF</span>
+</span><span id="__span-22-10"><a id="__codelineno-22-10" name="__codelineno-22-10" href="#__codelineno-22-10"></a><span class="s">Types: deb</span>
+</span><span id="__span-22-11"><a id="__codelineno-22-11" name="__codelineno-22-11" href="#__codelineno-22-11"></a><span class="s">URIs: ${DOCKER_SOURCE_URL:-https://download.docker.com/linux/ubuntu}</span>
+</span><span id="__span-22-12"><a id="__codelineno-22-12" name="__codelineno-22-12" href="#__codelineno-22-12"></a><span class="s">Suites: $(. /etc/os-release &amp;&amp; echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")</span>
+</span><span id="__span-22-13"><a id="__codelineno-22-13" name="__codelineno-22-13" href="#__codelineno-22-13"></a><span class="s">Components: stable</span>
+</span><span id="__span-22-14"><a id="__codelineno-22-14" name="__codelineno-22-14" href="#__codelineno-22-14"></a><span class="s">Architectures: $(dpkg --print-architecture)</span>
+</span><span id="__span-22-15"><a id="__codelineno-22-15" name="__codelineno-22-15" href="#__codelineno-22-15"></a><span class="s">Signed-By: /etc/apt/keyrings/docker.asc</span>
+</span><span id="__span-22-16"><a id="__codelineno-22-16" name="__codelineno-22-16" href="#__codelineno-22-16"></a><span class="s">EOF</span>
+</span><span id="__span-22-17"><a id="__codelineno-22-17" name="__codelineno-22-17" href="#__codelineno-22-17"></a>
+</span><span id="__span-22-18"><a id="__codelineno-22-18" name="__codelineno-22-18" href="#__codelineno-22-18"></a>sudo<span class="w"> </span>apt<span class="w"> </span>update<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span>docker-ce<span class="w"> </span>docker-ce-cli<span class="w"> </span>containerd.io<span class="w"> </span>docker-buildx-plugin<span class="w"> </span>docker-compose-plugin
+</span></code></pre></div>
+<p>Add your user to the docker group:</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Adding your user to the <code>docker</code> group grants root-level access. This should only be done on development or test systems.</p>
+</div>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>sudo<span class="w"> </span>usermod<span class="w"> </span>-aG<span class="w"> </span>docker<span class="w"> </span><span class="nv">$USER</span>
+</span></code></pre></div>
+<p>To activate your new group membership immediately in your current terminal, run:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>newgrp<span class="w"> </span>docker
+</span></code></pre></div>
+<p>This command starts a new shell session with updated group permissions, allowing you to use Docker* without logging out. You can now verify Docker* installation is successful by running the <code>hello-world</code> image:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>docker pull hello-world
+</span></code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If you see a list of containers (even if empty), your user is correctly added to the <code>docker</code> group. If you get a permission error, ensure you have run <code>newgrp docker</code> in your terminal. For persistent access across all sessions, log out and log back in, or reboot your system.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If you cannot pull the image, your network may be unable to reach the default registry. Configure a mirror registry in the Docker* daemon configuration:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-26-1"><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>sudo<span class="w"> </span>mkdir<span class="w"> </span>-p<span class="w"> </span>/etc/docker
+</span><span id="__span-26-2"><a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a>sudo<span class="w"> </span>tee<span class="w"> </span>/etc/docker/daemon.json<span class="w"> </span>&gt;<span class="w"> </span>/dev/null<span class="w"> </span><span class="s">&lt;&lt;EOF</span>
+</span><span id="__span-26-3"><a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a><span class="s">{</span>
+</span><span id="__span-26-4"><a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a><span class="s">    "registry-mirrors": [</span>
+</span><span id="__span-26-5"><a id="__codelineno-26-5" name="__codelineno-26-5" href="#__codelineno-26-5"></a><span class="s">        "&lt;mirror-registry-source&gt;"</span>
+</span><span id="__span-26-6"><a id="__codelineno-26-6" name="__codelineno-26-6" href="#__codelineno-26-6"></a><span class="s">    ]</span>
+</span><span id="__span-26-7"><a id="__codelineno-26-7" name="__codelineno-26-7" href="#__codelineno-26-7"></a><span class="s">}</span>
+</span><span id="__span-26-8"><a id="__codelineno-26-8" name="__codelineno-26-8" href="#__codelineno-26-8"></a><span class="s">EOF</span>
+</span></code></pre></div>
+</div>
+<div class="admonition info">
+<p class="admonition-title">Additional Reference</p>
+<p>For detailed Docker* installation instructions, see the official <a href="https://docs.docker.com/engine/install">Docker* Engine installation documentation</a>.</p>
+</div>
+<h3 id="3-python-package-manager_1">3. Python Package Manager<a class="headerlink" href="#3-python-package-manager_1" title="Permanent link">&para;</a></h3>
+<p>Install <a href="https://docs.astral.sh/uv/getting-started/installation/">uv</a> to accelerate Python* package management:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-27-1"><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a>curl<span class="w"> </span>-LsSf<span class="w"> </span>https://astral.sh/uv/install.sh<span class="w"> </span><span class="p">|</span><span class="w"> </span>sh<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">source</span><span class="w"> </span><span class="nv">$HOME</span>/.local/bin/env
+</span></code></pre></div>
+<div class="admonition info">
+<p class="admonition-title">Additional Reference</p>
+<p>For detailed <code>uv</code> installation instructions, see the official <a href="https://docs.astral.sh/uv/getting-started/installation/">uv Installation</a> documentation.</p>
+</div>
+<h3 id="4-system-setup_1">4. System Setup<a class="headerlink" href="#4-system-setup_1" title="Permanent link">&para;</a></h3>
+<p>Run <code>system-setup.sh</code> once after the OS installation to install required system packages and configure file read permissions:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-28-1"><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a>sudo<span class="w"> </span>bash<span class="w"> </span>-c<span class="w"> </span><span class="s2">"</span><span class="k">$(</span>wget<span class="w"> </span>-qLO<span class="w"> </span>-<span class="w"> </span>https://raw.githubusercontent.com/open-edge-platform/edge-system-qualification/refs/heads/main/scripts/system-setup.sh<span class="k">)</span><span class="s2">"</span>
+</span></code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Feature Availability</p>
+<p>Some features configured by this script are optional. Intel® ESQ will still run if skipped, but certain metrics and capabilities may be unavailable.</p>
+</div>
+<p>Run the advanced setup script to enable full test coverage:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-29-1"><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a>sudo<span class="w"> </span>bash<span class="w"> </span>-c<span class="w"> </span><span class="s2">"</span><span class="k">$(</span>wget<span class="w"> </span>-qLO<span class="w"> </span>-<span class="w"> </span>https://raw.githubusercontent.com/open-edge-platform/edge-system-qualification/refs/heads/main/scripts/system-setup-advanced.sh<span class="k">)</span><span class="s2">"</span>
+</span></code></pre></div>
+<div class="admonition warning">
+<p class="admonition-title">Re-run after reboot</p>
+<p>All changes applied by <code>system-setup-advanced.sh</code> are in  <strong>current session only</strong> and resets automatically after reboot. Re-run the script after each reboot before executing tests that depend on it.</p>
+</div>
+<p><strong>Advanced setup modules:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Module</th>
+<th>What it changes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Locked Memory Limit</strong></td>
+<td>Sets <code>RLIMIT_MEMLOCK</code> to unlimited for the current session so memtester can lock all available RAM pages. Without this, memory-related tests will be limited or fail</td>
+</tr>
+</tbody>
+</table>
+<h3 id="5-intel-esq_1">5. Intel® ESQ<a class="headerlink" href="#5-intel-esq_1" title="Permanent link">&para;</a></h3>
+<div class="admonition info">
+<p class="admonition-title">Development Version</p>
+<p>To access the latest features that may not be available in the current release, you can install the development version from the main branch:
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-30-1"><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a>uv<span class="w"> </span>tool<span class="w"> </span>install<span class="w"> </span>--force<span class="w"> </span>--refresh<span class="w"> </span>git+https://github.com/open-edge-platform/edge-system-qualification.git@main
+</span></code></pre></div></p>
+</div>
+<p>Install Intel® ESQ from GitHub*:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-31-1"><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a>uv<span class="w"> </span>tool<span class="w"> </span>install<span class="w"> </span>--force<span class="w"> </span>--refresh<span class="w"> </span>git+https://github.com/open-edge-platform/edge-system-qualification.git@main
+</span></code></pre></div>
+<p>Verify that Intel® ESQ is working correctly:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-32-1"><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a>esq<span class="w"> </span>--version
+</span></code></pre></div>
+<h2 id="usage_1">Usage<a class="headerlink" href="#usage_1" title="Permanent link">&para;</a></h2>
+<h3 id="1-run_1">1. Run<a class="headerlink" href="#1-run_1" title="Permanent link">&para;</a></h3>
+<p>Run the AI Edge System qualification with its tag:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-33-1"><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a>esq<span class="w"> </span>run<span class="w"> </span>-t<span class="w"> </span>aes
+</span></code></pre></div>
+<div class="admonition tip">
+<p class="admonition-title">Upgrading Intel® ESQ</p>
+<p>Before running a new version of Intel® ESQ, clean up any previously created <code>esq_data</code> folder to prevent leftover data from interfering with the new installation:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-34-1"><a id="__codelineno-34-1" name="__codelineno-34-1" href="#__codelineno-34-1"></a>esq<span class="w"> </span>clean<span class="w"> </span>--all
+</span></code></pre></div>
+</div>
+<div class="admonition tip">
+<p class="admonition-title">Verbose Output</p>
+<p>Use <code>--verbose</code> to show detailed execution logs:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-35-1"><a id="__codelineno-35-1" name="__codelineno-35-1" href="#__codelineno-35-1"></a>esq<span class="w"> </span>--verbose<span class="w"> </span>run
+</span></code></pre></div>
+</div>
+<div class="admonition info">
+<p class="admonition-title">Driver Requirements and Hardware Changes</p>
+<p>Intel® GPU and NPU tests require specific drivers. Ensure you have the latest Intel® drivers installed for your hardware configuration. If you run tests on different hardware or swap system components, clean up the cache before rerunning tests:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-36-1"><a id="__codelineno-36-1" name="__codelineno-36-1" href="#__codelineno-36-1"></a>esq<span class="w"> </span>--verbose<span class="w"> </span>clean<span class="w"> </span>--cache-only
+</span></code></pre></div>
+</div>
+<div class="admonition info">
+<p class="admonition-title">Download Source</p>
+<p>Intel® ESQ uses HuggingFace* as the default download source. For ModelScope*, configure it with:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-37-1"><a id="__codelineno-37-1" name="__codelineno-37-1" href="#__codelineno-37-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">PREFER_MODELSCOPE</span><span class="o">=</span><span class="m">1</span>
+</span></code></pre></div>
+</div>
+<h3 id="2-uninstall_1">2. Uninstall<a class="headerlink" href="#2-uninstall_1" title="Permanent link">&para;</a></h3>
+<p>Before uninstalling, clean up all data created by Intel® ESQ, including Docker images built during test execution:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-38-1"><a id="__codelineno-38-1" name="__codelineno-38-1" href="#__codelineno-38-1"></a>esq<span class="w"> </span>clean<span class="w"> </span>--all
+</span></code></pre></div>
+<p>Then remove Intel® ESQ:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-39-1"><a id="__codelineno-39-1" name="__codelineno-39-1" href="#__codelineno-39-1"></a>uv<span class="w"> </span>tool<span class="w"> </span>uninstall<span class="w"> </span>esq
+</span></code></pre></div>
+</section>
+<section class="program-panel" data-program-panel="hec" hidden="hidden">
+<h2 id="installation_2">Installation<a class="headerlink" href="#installation_2" title="Permanent link">&para;</a></h2>
+<h3 id="1-system-drivers_2">1. System Drivers<a class="headerlink" href="#1-system-drivers_2" title="Permanent link">&para;</a></h3>
+<p>Configure system drivers:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-40-1"><a id="__codelineno-40-1" name="__codelineno-40-1" href="#__codelineno-40-1"></a>sudo<span class="w"> </span>bash<span class="w"> </span>-c<span class="w"> </span><span class="s2">"</span><span class="k">$(</span>wget<span class="w"> </span>-qLO<span class="w"> </span>-<span class="w"> </span>https://raw.githubusercontent.com/open-edge-platform/edge-developer-kit-reference-scripts/refs/heads/main/main_installer.sh<span class="k">)</span><span class="s2">"</span>
+</span></code></pre></div>
+<div class="admonition info">
+<p class="admonition-title">Additional Reference</p>
+<p>For detailed information about system drivers, see the <a href="https://github.com/open-edge-platform/edge-developer-kit-reference-scripts">Edge Developer Kit Reference Scripts</a> documentation.</p>
+</div>
+<h3 id="2-docker-engine_2">2. Docker Engine<a class="headerlink" href="#2-docker-engine_2" title="Permanent link">&para;</a></h3>
+<div class="admonition info">
+<p class="admonition-title">Docker* Engine Download Source</p>
+<p>Intel® ESQ uses download.docker.com* as the default download source. To use a custom download source*, configure it with:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-41-1"><a id="__codelineno-41-1" name="__codelineno-41-1" href="#__codelineno-41-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">DOCKER_SOURCE_URL</span><span class="o">=</span>&lt;custom_docker_source_url&gt;
+</span></code></pre></div>
+</div>
+<p>Install Docker* Engine:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-42-1"><a id="__codelineno-42-1" name="__codelineno-42-1" href="#__codelineno-42-1"></a><span class="c1"># Add Docker's official GPG key:</span>
+</span><span id="__span-42-2"><a id="__codelineno-42-2" name="__codelineno-42-2" href="#__codelineno-42-2"></a>sudo<span class="w"> </span>apt<span class="w"> </span>update
+</span><span id="__span-42-3"><a id="__codelineno-42-3" name="__codelineno-42-3" href="#__codelineno-42-3"></a>sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>ca-certificates<span class="w"> </span>curl
+</span><span id="__span-42-4"><a id="__codelineno-42-4" name="__codelineno-42-4" href="#__codelineno-42-4"></a>sudo<span class="w"> </span>install<span class="w"> </span>-m<span class="w"> </span><span class="m">0755</span><span class="w"> </span>-d<span class="w"> </span>/etc/apt/keyrings
+</span><span id="__span-42-5"><a id="__codelineno-42-5" name="__codelineno-42-5" href="#__codelineno-42-5"></a>sudo<span class="w"> </span>curl<span class="w"> </span>-fsSL<span class="w"> </span><span class="si">${</span><span class="nv">DOCKER_SOURCE_URL</span><span class="k">:-</span><span class="nv">https</span><span class="p">://download.docker.com/linux/ubuntu</span><span class="si">}</span>/gpg<span class="w"> </span>-o<span class="w"> </span>/etc/apt/keyrings/docker.asc
+</span><span id="__span-42-6"><a id="__codelineno-42-6" name="__codelineno-42-6" href="#__codelineno-42-6"></a>sudo<span class="w"> </span>chmod<span class="w"> </span>a+r<span class="w"> </span>/etc/apt/keyrings/docker.asc
+</span><span id="__span-42-7"><a id="__codelineno-42-7" name="__codelineno-42-7" href="#__codelineno-42-7"></a>
+</span><span id="__span-42-8"><a id="__codelineno-42-8" name="__codelineno-42-8" href="#__codelineno-42-8"></a><span class="c1"># Add the repository to Apt sources:</span>
+</span><span id="__span-42-9"><a id="__codelineno-42-9" name="__codelineno-42-9" href="#__codelineno-42-9"></a>sudo<span class="w"> </span>tee<span class="w"> </span>/etc/apt/sources.list.d/docker.sources<span class="w"> </span><span class="s">&lt;&lt;EOF</span>
+</span><span id="__span-42-10"><a id="__codelineno-42-10" name="__codelineno-42-10" href="#__codelineno-42-10"></a><span class="s">Types: deb</span>
+</span><span id="__span-42-11"><a id="__codelineno-42-11" name="__codelineno-42-11" href="#__codelineno-42-11"></a><span class="s">URIs: ${DOCKER_SOURCE_URL:-https://download.docker.com/linux/ubuntu}</span>
+</span><span id="__span-42-12"><a id="__codelineno-42-12" name="__codelineno-42-12" href="#__codelineno-42-12"></a><span class="s">Suites: $(. /etc/os-release &amp;&amp; echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")</span>
+</span><span id="__span-42-13"><a id="__codelineno-42-13" name="__codelineno-42-13" href="#__codelineno-42-13"></a><span class="s">Components: stable</span>
+</span><span id="__span-42-14"><a id="__codelineno-42-14" name="__codelineno-42-14" href="#__codelineno-42-14"></a><span class="s">Architectures: $(dpkg --print-architecture)</span>
+</span><span id="__span-42-15"><a id="__codelineno-42-15" name="__codelineno-42-15" href="#__codelineno-42-15"></a><span class="s">Signed-By: /etc/apt/keyrings/docker.asc</span>
+</span><span id="__span-42-16"><a id="__codelineno-42-16" name="__codelineno-42-16" href="#__codelineno-42-16"></a><span class="s">EOF</span>
+</span><span id="__span-42-17"><a id="__codelineno-42-17" name="__codelineno-42-17" href="#__codelineno-42-17"></a>
+</span><span id="__span-42-18"><a id="__codelineno-42-18" name="__codelineno-42-18" href="#__codelineno-42-18"></a>sudo<span class="w"> </span>apt<span class="w"> </span>update<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span>docker-ce<span class="w"> </span>docker-ce-cli<span class="w"> </span>containerd.io<span class="w"> </span>docker-buildx-plugin<span class="w"> </span>docker-compose-plugin
+</span></code></pre></div>
+<p>Add your user to the docker group:</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Adding your user to the <code>docker</code> group grants root-level access. This should only be done on development or test systems.</p>
+</div>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-43-1"><a id="__codelineno-43-1" name="__codelineno-43-1" href="#__codelineno-43-1"></a>sudo<span class="w"> </span>usermod<span class="w"> </span>-aG<span class="w"> </span>docker<span class="w"> </span><span class="nv">$USER</span>
+</span></code></pre></div>
+<p>To activate your new group membership immediately in your current terminal, run:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-44-1"><a id="__codelineno-44-1" name="__codelineno-44-1" href="#__codelineno-44-1"></a>newgrp<span class="w"> </span>docker
+</span></code></pre></div>
+<p>This command starts a new shell session with updated group permissions, allowing you to use Docker* without logging out. You can now verify Docker* installation is successful by running the <code>hello-world</code> image:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-45-1"><a id="__codelineno-45-1" name="__codelineno-45-1" href="#__codelineno-45-1"></a>docker pull hello-world
+</span></code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If you see a list of containers (even if empty), your user is correctly added to the <code>docker</code> group. If you get a permission error, ensure you have run <code>newgrp docker</code> in your terminal. For persistent access across all sessions, log out and log back in, or reboot your system.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If you cannot pull the image, your network may be unable to reach the default registry. Configure a mirror registry in the Docker* daemon configuration:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-46-1"><a id="__codelineno-46-1" name="__codelineno-46-1" href="#__codelineno-46-1"></a>sudo<span class="w"> </span>mkdir<span class="w"> </span>-p<span class="w"> </span>/etc/docker
+</span><span id="__span-46-2"><a id="__codelineno-46-2" name="__codelineno-46-2" href="#__codelineno-46-2"></a>sudo<span class="w"> </span>tee<span class="w"> </span>/etc/docker/daemon.json<span class="w"> </span>&gt;<span class="w"> </span>/dev/null<span class="w"> </span><span class="s">&lt;&lt;EOF</span>
+</span><span id="__span-46-3"><a id="__codelineno-46-3" name="__codelineno-46-3" href="#__codelineno-46-3"></a><span class="s">{</span>
+</span><span id="__span-46-4"><a id="__codelineno-46-4" name="__codelineno-46-4" href="#__codelineno-46-4"></a><span class="s">    "registry-mirrors": [</span>
+</span><span id="__span-46-5"><a id="__codelineno-46-5" name="__codelineno-46-5" href="#__codelineno-46-5"></a><span class="s">        "&lt;mirror-registry-source&gt;"</span>
+</span><span id="__span-46-6"><a id="__codelineno-46-6" name="__codelineno-46-6" href="#__codelineno-46-6"></a><span class="s">    ]</span>
+</span><span id="__span-46-7"><a id="__codelineno-46-7" name="__codelineno-46-7" href="#__codelineno-46-7"></a><span class="s">}</span>
+</span><span id="__span-46-8"><a id="__codelineno-46-8" name="__codelineno-46-8" href="#__codelineno-46-8"></a><span class="s">EOF</span>
+</span></code></pre></div>
+</div>
+<div class="admonition info">
+<p class="admonition-title">Additional Reference</p>
+<p>For detailed Docker* installation instructions, see the official <a href="https://docs.docker.com/engine/install">Docker* Engine installation documentation</a>.</p>
+</div>
+<h3 id="3-python-package-manager_2">3. Python Package Manager<a class="headerlink" href="#3-python-package-manager_2" title="Permanent link">&para;</a></h3>
+<p>Install <a href="https://docs.astral.sh/uv/getting-started/installation/">uv</a> to accelerate Python* package management:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-47-1"><a id="__codelineno-47-1" name="__codelineno-47-1" href="#__codelineno-47-1"></a>curl<span class="w"> </span>-LsSf<span class="w"> </span>https://astral.sh/uv/install.sh<span class="w"> </span><span class="p">|</span><span class="w"> </span>sh<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">source</span><span class="w"> </span><span class="nv">$HOME</span>/.local/bin/env
+</span></code></pre></div>
+<div class="admonition info">
+<p class="admonition-title">Additional Reference</p>
+<p>For detailed <code>uv</code> installation instructions, see the official <a href="https://docs.astral.sh/uv/getting-started/installation/">uv Installation</a> documentation.</p>
+</div>
+<h3 id="4-hardware-virtualization">4. Hardware Virtualization<a class="headerlink" href="#4-hardware-virtualization" title="Permanent link">&para;</a></h3>
+<p>This qualification runs KVM*/QEMU* virtualization tests, so hardware virtualization must be turned on:</p>
+<ol>
+<li>Restart the system and enter the BIOS/UEFI setup.</li>
+<li>Enable <strong>Intel® VT-x</strong> and <strong>Intel® VT-d</strong> (names vary by vendor).</li>
+<li>Save changes and reboot.</li>
+</ol>
+<p>Verify virtualization is enabled:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-48-1"><a id="__codelineno-48-1" name="__codelineno-48-1" href="#__codelineno-48-1"></a>egrep<span class="w"> </span>-c<span class="w"> </span><span class="s1">'(vmx|svm)'</span><span class="w"> </span>/proc/cpuinfo
+</span></code></pre></div>
+<p>A result greater than <code>0</code> confirms virtualization is available.</p>
+<h3 id="5-system-setup">5. System Setup<a class="headerlink" href="#5-system-setup" title="Permanent link">&para;</a></h3>
+<p>Run <code>system-setup.sh</code> once after the OS installation to install required system packages and configure file read permissions:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-49-1"><a id="__codelineno-49-1" name="__codelineno-49-1" href="#__codelineno-49-1"></a>sudo<span class="w"> </span>bash<span class="w"> </span>-c<span class="w"> </span><span class="s2">"</span><span class="k">$(</span>wget<span class="w"> </span>-qLO<span class="w"> </span>-<span class="w"> </span>https://raw.githubusercontent.com/open-edge-platform/edge-system-qualification/refs/heads/main/scripts/system-setup.sh<span class="k">)</span><span class="s2">"</span>
+</span></code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Feature Availability</p>
+<p>Some features configured by this script are optional. Intel® ESQ will still run if skipped, but certain metrics and capabilities may be unavailable.</p>
+</div>
+<p>Run the advanced setup script to enable full test coverage:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-50-1"><a id="__codelineno-50-1" name="__codelineno-50-1" href="#__codelineno-50-1"></a>sudo<span class="w"> </span>bash<span class="w"> </span>-c<span class="w"> </span><span class="s2">"</span><span class="k">$(</span>wget<span class="w"> </span>-qLO<span class="w"> </span>-<span class="w"> </span>https://raw.githubusercontent.com/open-edge-platform/edge-system-qualification/refs/heads/main/scripts/system-setup-advanced.sh<span class="k">)</span><span class="s2">"</span>
+</span></code></pre></div>
+<div class="admonition warning">
+<p class="admonition-title">Re-run after reboot</p>
+<p>All changes applied by <code>system-setup-advanced.sh</code> are in  <strong>current session only</strong> and resets automatically after reboot. Re-run the script after each reboot before executing tests that depend on it.</p>
 </div>
 <p><strong>Advanced setup modules:</strong></p>
 <table>
@@ -2229,70 +2889,55 @@
 <div class="admonition info">
 <p class="admonition-title">Development Version</p>
 <p>To access the latest features that may not be available in the current release, you can install the development version from the main branch:
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>uv<span class="w"> </span>tool<span class="w"> </span>install<span class="w"> </span>--force<span class="w"> </span>--refresh<span class="w"> </span>git+https://github.com/open-edge-platform/edge-system-qualification.git@main
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-51-1"><a id="__codelineno-51-1" name="__codelineno-51-1" href="#__codelineno-51-1"></a>uv<span class="w"> </span>tool<span class="w"> </span>install<span class="w"> </span>--force<span class="w"> </span>--refresh<span class="w"> </span>git+https://github.com/open-edge-platform/edge-system-qualification.git@main
 </span></code></pre></div></p>
 </div>
 <p>Install Intel® ESQ from GitHub*:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>uv<span class="w"> </span>tool<span class="w"> </span>install<span class="w"> </span>--force<span class="w"> </span>--refresh<span class="w"> </span>git+https://github.com/open-edge-platform/edge-system-qualification.git@main
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-52-1"><a id="__codelineno-52-1" name="__codelineno-52-1" href="#__codelineno-52-1"></a>uv<span class="w"> </span>tool<span class="w"> </span>install<span class="w"> </span>--force<span class="w"> </span>--refresh<span class="w"> </span>git+https://github.com/open-edge-platform/edge-system-qualification.git@main
 </span></code></pre></div>
 <p>Verify that Intel® ESQ is working correctly:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>esq<span class="w"> </span>--version
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-53-1"><a id="__codelineno-53-1" name="__codelineno-53-1" href="#__codelineno-53-1"></a>esq<span class="w"> </span>--version
 </span></code></pre></div>
-<h2 id="quick-start_1">Quick Start<a class="headerlink" href="#quick-start_1" title="Permanent link">&para;</a></h2>
-<p>Run all tests and review the generated test report:</p>
+<h2 id="usage_2">Usage<a class="headerlink" href="#usage_2" title="Permanent link">&para;</a></h2>
+<h3 id="1-run_2">1. Run<a class="headerlink" href="#1-run_2" title="Permanent link">&para;</a></h3>
+<p>Run the HEC profile for your platform:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-54-1"><a id="__codelineno-54-1" name="__codelineno-54-1" href="#__codelineno-54-1"></a>esq<span class="w"> </span>run<span class="w"> </span>-t<span class="w"> </span>hec-debian
+</span></code></pre></div>
+<p>For HEC EMT, run:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-55-1"><a id="__codelineno-55-1" name="__codelineno-55-1" href="#__codelineno-55-1"></a>esq<span class="w"> </span>run<span class="w"> </span>-t<span class="w"> </span>hec-emt
+</span></code></pre></div>
 <div class="admonition tip">
 <p class="admonition-title">Upgrading Intel® ESQ</p>
-<p>before running a new version of Intel® ESQ, clean up any previously created <code>esq_data</code> folder to prevent leftover data from interfering with the new installation:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>esq<span class="w"> </span>clean<span class="w"> </span>--all
+<p>Before running a new version of Intel® ESQ, clean up any previously created <code>esq_data</code> folder to prevent leftover data from interfering with the new installation:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-56-1"><a id="__codelineno-56-1" name="__codelineno-56-1" href="#__codelineno-56-1"></a>esq<span class="w"> </span>clean<span class="w"> </span>--all
 </span></code></pre></div>
 </div>
-<div class="admonition info">
-<p class="admonition-title">Download Source</p>
-<p>Intel® ESQ uses HuggingFace* as the default download source. For ModelScope*, you can configure it with:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">PREFER_MODELSCOPE</span><span class="o">=</span><span class="m">1</span>
-</span></code></pre></div>
-</div>
-<h3 id="1-run-intel-esq">1. Run Intel® ESQ<a class="headerlink" href="#1-run-intel-esq" title="Permanent link">&para;</a></h3>
-<p>Run qualification and vertical (recommended) test profiles to generate a test report:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>esq<span class="w"> </span>run
-</span></code></pre></div>
-<p>By default, this command will:</p>
-<ol>
-<li>Run qualification profiles (always included)</li>
-<li>Run vertical profiles (unless you choose to skip them at the prompt)</li>
-<li>Collect metrics and generate a test report</li>
-</ol>
 <div class="admonition tip">
-<p class="admonition-title">Verbose Output and Profile Types</p>
-<p>Use <code>--verbose</code> to show detailed execution logs. Add <code>--all</code> to include all profile types (qualification, vertical, and suite).</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="c1"># Verbose output with default profile selection</span>
-</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>esq<span class="w"> </span>--verbose<span class="w"> </span>run
-</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>
-</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="c1"># Verbose output with all profile types</span>
-</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>esq<span class="w"> </span>--verbose<span class="w"> </span>run<span class="w"> </span>--all
+<p class="admonition-title">Verbose Output</p>
+<p>Use <code>--verbose</code> to show detailed execution logs:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-57-1"><a id="__codelineno-57-1" name="__codelineno-57-1" href="#__codelineno-57-1"></a>esq<span class="w"> </span>--verbose<span class="w"> </span>run
 </span></code></pre></div>
 </div>
 <div class="admonition info">
 <p class="admonition-title">Driver Requirements and Hardware Changes</p>
-<p>Intel® GPU and NPU tests require specific drivers. Ensure you have the latest Intel® drivers installed for your hardware configuration.</p>
-<p>If you run tests on different hardware or swap system components (such as different CPUs), clean up the cache before rerunning tests:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>esq<span class="w"> </span>--verbose<span class="w"> </span>clean<span class="w"> </span>--cache-only
+<p>Intel® GPU and NPU tests require specific drivers. Ensure you have the latest Intel® drivers installed for your hardware configuration. If you run tests on different hardware or swap system components, clean up the cache before rerunning tests:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-58-1"><a id="__codelineno-58-1" name="__codelineno-58-1" href="#__codelineno-58-1"></a>esq<span class="w"> </span>--verbose<span class="w"> </span>clean<span class="w"> </span>--cache-only
 </span></code></pre></div>
 </div>
-<div class="admonition note">
-<p class="admonition-title">Virtualization</p>
-<p>Running in virtual machines may impact performance and hardware acceleration capabilities. Bare metal installation is recommended for accurate testing results.</p>
+<div class="admonition info">
+<p class="admonition-title">Download Source</p>
+<p>Intel® ESQ uses HuggingFace* as the default download source. For ModelScope*, configure it with:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-59-1"><a id="__codelineno-59-1" name="__codelineno-59-1" href="#__codelineno-59-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">PREFER_MODELSCOPE</span><span class="o">=</span><span class="m">1</span>
+</span></code></pre></div>
 </div>
-<hr />
-<h2 id="uninstall">Uninstall<a class="headerlink" href="#uninstall" title="Permanent link">&para;</a></h2>
+<h3 id="2-uninstall_2">2. Uninstall<a class="headerlink" href="#2-uninstall_2" title="Permanent link">&para;</a></h3>
 <p>Before uninstalling, clean up all data created by Intel® ESQ, including Docker images built during test execution:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>esq<span class="w"> </span>clean<span class="w"> </span>--all
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-60-1"><a id="__codelineno-60-1" name="__codelineno-60-1" href="#__codelineno-60-1"></a>esq<span class="w"> </span>clean<span class="w"> </span>--all
 </span></code></pre></div>
 <p>Then remove Intel® ESQ:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>uv<span class="w"> </span>tool<span class="w"> </span>uninstall<span class="w"> </span>esq
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-61-1"><a id="__codelineno-61-1" name="__codelineno-61-1" href="#__codelineno-61-1"></a>uv<span class="w"> </span>tool<span class="w"> </span>uninstall<span class="w"> </span>esq
 </span></code></pre></div>
-<hr />
-<p>Ready to explore all test suites? Continue to the <a href="../suites/">Test Suites</a> →</p>
+</section>
 
 
 
@@ -2330,7 +2975,7 @@
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../" class="md-footer__link md-footer__link--prev" aria-label="Previous: Getting Started">
+          <a href="../requirements/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Requirements">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -2340,7 +2985,7 @@
                 Previous
               </span>
               <div class="md-ellipsis">
-                Getting Started
+                Requirements
               </div>
             </div>
           </a>
@@ -2370,7 +3015,7 @@
       <div class="md-copyright">
   
     <div class="md-copyright__highlight">
-      Copyright &copy; 2025 Intel Corporation
+      Copyright &copy; 2026 Intel Corporation
     </div>
   
   
@@ -2408,7 +3053,9 @@
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["announce.dismiss", "content.action.edit", "content.action.view", "content.code.annotate", "content.code.copy", "content.tabs.link", "content.tooltips", "navigation.expand", "navigation.footer", "navigation.indexes", "navigation.instant", "navigation.instant.prefetch", "navigation.sections", "navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.tracking", "search.highlight", "search.share", "search.suggest", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../../javascripts/program-selector.js"></script>
       
     
   </body>

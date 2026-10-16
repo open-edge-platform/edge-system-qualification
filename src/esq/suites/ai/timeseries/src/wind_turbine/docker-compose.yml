@@ -43,7 +43,7 @@ services:
       - ${REFERENCE_APP_SRC_PATH:-${CORE_DATA_DIR:-./esq_data}/data/manufacturing/timeseries/wt/assets}/configs/mqtt-broker/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
 
   ia-opcua-server:
-    image: ${DOCKER_REGISTRY:-}intel/ia-opcua-server:${IMAGE_SUFFIX:-1.1.0}
+    image: ${DOCKER_REGISTRY:-}intel/ia-opcua-server:${IMAGE_SUFFIX:-2026.2.0}
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -70,7 +70,7 @@ services:
     restart: "no"
 
   ia-mqtt-publisher:
-    image: ${DOCKER_REGISTRY:-}intel/ia-mqtt-publisher:${IMAGE_SUFFIX:-1.1.0}
+    image: ${DOCKER_REGISTRY:-}intel/ia-mqtt-publisher:${IMAGE_SUFFIX:-2026.2.0}
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -111,7 +111,7 @@ services:
 
   ia-time-series-analytics-microservice:
     container_name: ia-time-series-analytics-microservice
-    image: ${DOCKER_REGISTRY:-}intel/ia-time-series-analytics-microservice:${IMAGE_SUFFIX:-1.1.0}
+    image: ${DOCKER_REGISTRY:-}intel/ia-time-series-analytics-microservice:${IMAGE_SUFFIX:-2026.2.0}
     security_opt:
       - no-new-privileges:true
     cap_drop:

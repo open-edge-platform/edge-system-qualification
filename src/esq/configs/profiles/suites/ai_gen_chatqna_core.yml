@@ -18,44 +18,44 @@ params:
     os_type:
       - "linux"
     docker_required: true
-  assets_repo_ref: "release-2026.1.0"  # Pinned edge-ai-libraries release branch
+  assets_repo_ref: "90eb7f5055d77d38463a5ddc97549312c6ac88c0"  # edge-ai-libraries OEP 2026.2 commit
   assets:
     - id: "chatqna_compose"
       type: "file"
       path: "./docker/compose.yaml"
-      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-libraries/release-2026.1.0/sample-applications/chat-question-and-answer-core/docker/compose.yaml"
+      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-libraries/90eb7f5055d77d38463a5ddc97549312c6ac88c0/sample-applications/chat-question-and-answer-core/docker/compose.yaml"
     - id: "chatqna_nginx_template"
       type: "file"
       path: "./nginx_config/nginx.conf.template"
-      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-libraries/release-2026.1.0/sample-applications/chat-question-and-answer-core/nginx_config/nginx.conf.template"
+      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-libraries/90eb7f5055d77d38463a5ddc97549312c6ac88c0/sample-applications/chat-question-and-answer-core/nginx_config/nginx.conf.template"
     - id: "chatqna_openvino_template"
       type: "file"
       path: "./model_config/sample/openvino_template.yaml"
-      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-libraries/release-2026.1.0/sample-applications/chat-question-and-answer-core/model_config/sample/openvino_template.yaml"
+      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-libraries/90eb7f5055d77d38463a5ddc97549312c6ac88c0/sample-applications/chat-question-and-answer-core/model_config/sample/openvino_template.yaml"
     - id: "chatqna_ollama_template"
       type: "file"
       path: "./model_config/sample/ollama_template.yaml"
-      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-libraries/release-2026.1.0/sample-applications/chat-question-and-answer-core/model_config/sample/ollama_template.yaml"
+      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-libraries/90eb7f5055d77d38463a5ddc97549312c6ac88c0/sample-applications/chat-question-and-answer-core/model_config/sample/ollama_template.yaml"
     - id: "chatqna_phi35_config"
       type: "file"
       path: "./model_config/openvino/microsoft-phi-3.5-config.yaml"
-      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-libraries/release-2026.1.0/sample-applications/chat-question-and-answer-core/model_config/openvino/microsoft-phi-3.5-config.yaml"
+      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-libraries/90eb7f5055d77d38463a5ddc97549312c6ac88c0/sample-applications/chat-question-and-answer-core/model_config/openvino/microsoft-phi-3.5-config.yaml"
     - id: "chatqna_sizing_core_config"
       type: "file"
       path: "./tools/genai-applications-sizing/profiles/chatqna-core-config.yaml"
-      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-libraries/release-2026.1.0/tools/genai-applications-sizing/profiles/chatqna-core-config.yaml"
+      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-libraries/90eb7f5055d77d38463a5ddc97549312c6ac88c0/tools/genai-applications-sizing/profiles/chatqna-core-config.yaml"
     - id: "chatqna_sizing_profiles"
       type: "file"
       path: "./tools/genai-applications-sizing/profiles/profiles.yaml"
-      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-libraries/release-2026.1.0/tools/genai-applications-sizing/profiles/profiles.yaml"
+      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-libraries/90eb7f5055d77d38463a5ddc97549312c6ac88c0/tools/genai-applications-sizing/profiles/profiles.yaml"
     - id: "chatqna_sizing_sample_doc"
       type: "file"
       path: "./tools/genai-applications-sizing/data/file.txt"
-      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-libraries/release-2026.1.0/tools/genai-applications-sizing/data/file.txt"
+      url: "https://raw.githubusercontent.com/open-edge-platform/edge-ai-libraries/90eb7f5055d77d38463a5ddc97549312c6ac88c0/tools/genai-applications-sizing/data/file.txt"
   # ChatQnA Core defaults applied to all test params in this profile.
   include_ui: false
   registry: "intel/"
-  ui_tag: "2026.1.0"
+  ui_tag: "core_2026.2.0"
   reference_app_src_path: ""
   model_config_path: ""
   corpus_dir: ""
@@ -70,7 +70,7 @@ params:
   compose_profile: "OPENVINO"
   backend_service: "chatqna-core-ov-cpu"
   compute_device: "cpu"
-  backend_tag: "core_2026.1.0"
+  backend_tag: "core_2026.2.0"
   startup_timeout_seconds: 300
   startup_attempts: 1
   timeout: 1800
@@ -93,7 +93,7 @@ suites:
                     compose_profile: "OPENVINO-GPU"
                     backend_service: "chatqna-core-ov-gpu"
                     compute_device: "gpu"
-                    backend_tag: "core_gpu_2026.1.0"
+                    backend_tag: "core_gpu_2026.2.0"
                     requirements:
                       igpu_required: true
                   - test_id: "GEN-CHAT-003"
@@ -101,7 +101,7 @@ suites:
                     backend_runtime: "ollama"
                     compose_profile: "OLLAMA"
                     backend_service: "chatqna-core-ollama"
-                    backend_tag: "core_ollama_2026.1.0"
+                    backend_tag: "core_ollama_2026.2.0"
                     startup_timeout_seconds: 1800
                     timeout: 2700
                   - test_id: "GEN-CHAT-004"
@@ -109,7 +109,7 @@ suites:
                     backend_runtime: "ollama"
                     compose_profile: "OLLAMA"
                     backend_service: "chatqna-core-ollama"
-                    backend_tag: "core_ollama_2026.1.0"
+                    backend_tag: "core_ollama_2026.2.0"
                     startup_timeout_seconds: 1800
                     timeout: 2700
                     prompt_file: "src/esq/suites/ai/gen/src/chatqna_core/prompts/chatqna_multi_prompts_5.txt"
@@ -122,7 +122,7 @@ suites:
                 compose_profile: "OPENVINO-GPU"
                 backend_service: "chatqna-core-ov-gpu"
                 compute_device: "gpu"
-                backend_tag: "core_gpu_2026.1.0"
+                backend_tag: "core_gpu_2026.2.0"
                 requirements:
                   igpu_required: true
 
@@ -131,7 +131,7 @@ suites:
                 backend_runtime: "ollama"
                 compose_profile: "OLLAMA"
                 backend_service: "chatqna-core-ollama"
-                backend_tag: "core_ollama_2026.1.0"
+                backend_tag: "core_ollama_2026.2.0"
                 startup_timeout_seconds: 1800
                 timeout: 2700
 
@@ -140,7 +140,7 @@ suites:
                 backend_runtime: "ollama"
                 compose_profile: "OLLAMA"
                 backend_service: "chatqna-core-ollama"
-                backend_tag: "core_ollama_2026.1.0"
+                backend_tag: "core_ollama_2026.2.0"
                 startup_timeout_seconds: 1800
                 timeout: 2700
                 prompt_file: "src/esq/suites/ai/gen/src/chatqna_core/prompts/chatqna_multi_prompts_5.txt"

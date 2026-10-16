@@ -1,55 +1,18 @@
 # Quick Start
 
-Before you begin, confirm that your system meets the [Requirements](requirements.md). Some steps shown below are optional depending on the profile you run. See [Qualification](qualifications/index.md) for the list of available qualifications and their dedicated quick start guides.
+Before you begin, confirm that your system meets all the requirements. See [Requirements](requirements.md) for details.
 
-## Installation
+<section class="program-panel" data-program-panel="generic" markdown="1">
 
-### 1. System Drivers
+@import "../includes/quick-start/generic.md"
+</section>
 
-@import "../includes/quick-start/system-drivers.md"
+<section class="program-panel" data-program-panel="ai-edge-system" markdown="1">
 
-### 2. Docker Engine
+@import "../includes/quick-start/ai-edge-system.md"
+</section>
 
-@import "../includes/quick-start/docker-engine.md"
+<section class="program-panel" data-program-panel="hec" hidden markdown="1">
 
-### 3. Python Package Manager
-
-@import "../includes/quick-start/python-package-manager.md"
-
-### 4. System Setup
-
-@import "../includes/quick-start/system-setup.md"
-
-@import "../includes/quick-start/system-setup-advanced.md"
-
-@import "../includes/quick-start/system-setup-rt.md"
-
-### 5. Intel® ESQ
-
-@import "../includes/quick-start/esq-install.md"
-
-## Usage
-
-### 1. Run
-
-@import "../includes/quick-start/run.md"
-
-Run `esq run` to start the interactive prompt:
-
-```bash
-esq run
-```
-
-By default, this command:
-
-1. Prompts you to select only one qualification profile to run.
-2. If the selected qualification profile has associated vertical profiles, it prompts you to include them.
-3. Collects metrics and generates a test report.
-
-### 2. Uninstall
-
-@import "../includes/quick-start/uninstall.md"
-
----
-
-Ready to run a qualification? Continue to [Qualification Profiles](qualifications/index.md) →
+@import "../includes/quick-start/hec.md"
+</section>

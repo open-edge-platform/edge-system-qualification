@@ -5,9 +5,9 @@
 
 Why this exists
 ----------------
-Quick-start pages under ``docs/getting-started/`` reuse a set of shared
-snippet files (``docs/includes/quick-start/*.md``) via a file-transclusion
-directive. MkDocs needs some mechanism to expand that directive at build
+Quick-start pages under ``docs/getting-started/`` reuse program fragments
+and shared snippet files under ``docs/includes/common/`` via a
+file-transclusion directive. MkDocs needs some mechanism to expand that directive at build
 time, but authors also open these ``.md`` files directly in VS Code for
 single-page preview and Markdown-to-PDF export, which does not run through
 MkDocs at all.
@@ -32,7 +32,7 @@ Directive rules
 ----------------
 The directive must be alone on its own line (optionally indented), e.g.::
 
-    @import "../../../includes/quick-start/system-drivers.md"
+    @import "../includes/common/quick-start/system-drivers.md"
 
 If the referenced file cannot be found, the directive is left untouched
 (rather than silently dropped) so a broken reference stays visible in the

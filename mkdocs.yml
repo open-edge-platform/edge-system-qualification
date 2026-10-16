@@ -57,6 +57,9 @@ theme:
 extra_css:
 - stylesheets/extra.css
 
+extra_javascript:
+  - javascripts/program-selector.js
+
 # Plugins
 plugins:
   - search:
@@ -133,22 +136,6 @@ nav:
     - getting-started/index.md
     - Requirements: getting-started/requirements.md
     - Quick Start: getting-started/quick-start.md
-    - Qualification:
-      - getting-started/qualifications/index.md
-      - AI Edge System:
-        - Requirements: getting-started/qualifications/ai-edge-system/requirements.md
-        - Quick Start: getting-started/qualifications/ai-edge-system/quick-start.md
-      - Robotics:
-        - Requirements: getting-started/qualifications/robotics/requirements.md
-        - Quick Start: getting-started/qualifications/robotics/quick-start.md
-    - HEC:
-      - getting-started/hec/index.md
-      - HEC - Debian:
-        - Requirements: getting-started/hec/hybrid-edge-computing-debian/requirements.md
-        - Quick Start: getting-started/hec/hybrid-edge-computing-debian/quick-start.md
-      - HEC - EMT:
-        - Requirements: getting-started/hec/hybrid-edge-computing-emt/requirements.md
-        - Quick Start: getting-started/hec/hybrid-edge-computing-emt/quick-start.md
     - Test Suites:
       - getting-started/suites/index.md
     - Telemetry:

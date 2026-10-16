@@ -1,6 +1,6 @@
-# Requirements
+## Operating System
 
-Ensure that your system meets the following requirements before installing Intel® ESQ.
+@import "../common/requirements/operating-system.md"
 
 ## Hardware
 
@@ -13,12 +13,3 @@ To qualify as an Intel® AI Edge System under the ESQ program, platforms must me
 | **Efficiency Optimized** | Intel® Core™ Ultra Processor (Series 2),<br>Intel® Core™ Ultra Processor (Series 3) | **Graphics**: Integrated GPU with 7 Xe-Cores or more <br> **SKU**: Single Socket <br>**Minimum System Memory**: 32 GB DDR5 (Dual Channel)| **Recommended**: 512 GB | N/A |
 | **Mainstream** | Intel® Core™ (Series 2),<br>Intel® Core™ (Series 3) | **Minimum System Memory**: 32 GB DDR5 | **Recommended**: 512 GB | N/A |
 | **Entry** | Intel® Processor for Desktop,<br>Intel® Processor X-series, <br>Intel® Processor N-series | **Minimum System Memory**: 16 GB DDR5 | **Recommended**: 512 GB | N/A |
-
-
-## Operating System
-
-@import "../../../includes/requirements/operating-system.md"
-
----
-
-Continue to [Quick Start](quick-start.md) →

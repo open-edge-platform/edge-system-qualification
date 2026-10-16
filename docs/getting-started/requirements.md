@@ -1,11 +1,20 @@
 # Requirements
 
-Confirm that your system meets the operating system requirement shown below before installing Intel® ESQ. The hardware and the other requirements are specific to each qualification profile — see [Qualification](qualifications/index.md) for the dedicated requirements page of the selected qualification you want to run.
+Confirm that your system meets the operating system and hardware requirements listed below.
 
-## Operating System
+<section class="program-panel" data-program-panel="generic" markdown="1">
 
-@import "../includes/requirements/operating-system.md"
+@import "../includes/requirements/generic.md"
+</section>
 
----
+<section class="program-panel" data-program-panel="ai-edge-system" markdown="1">
+
+@import "../includes/requirements/ai-edge-system.md"
+</section>
+
+<section class="program-panel" data-program-panel="hec" hidden markdown="1">
+
+@import "../includes/requirements/hec.md"
+</section>
 
 Ready to install? Continue to the [Quick Start](quick-start.md) →

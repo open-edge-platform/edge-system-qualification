@@ -8,7 +8,6 @@ Intel® ESQ provides a comprehensive collection of test suites to assess and qua
 - [Test Suite Types](#test-suite-types)
 - [Qualifications](#qualifications)
     - [AI Edge System Qualification](#intel-ai-edge-systems-qualification)
-    - [Robotics](#robotics-system-qualification)
 - [HEC](#hec)
     - [Hybrid Edge Computing - Debian](#intel-hybrid-edge-computing-system-qualification-debian)
     - [Hybrid Edge Computing - EMT](#intel-hybrid-edge-computing-system-qualification-edge-microvisor-toolkit-emt)
@@ -61,7 +60,6 @@ Quick reference of all available test suites and their profile names.
 | `profile.qualification.ai-edge-system` | Qualification | Intel® AI Edge Systems qualification | `esq run --profile profile.qualification.ai-edge-system` |
 | `profile.qualification.hybrid-edge-system-debian` | HEC | Intel® Hybrid Edge Computing system qualification - Debian | `esq run --profile profile.qualification.hybrid-edge-system-debian` |
 | `profile.qualification.hybrid-edge-system-emt` | HEC | Intel® Hybrid Edge Computing system qualification - Edge Microvisor Toolkit (EMT) | `esq run --profile profile.qualification.hybrid-edge-system-emt` |
-| `profile.qualification.robotics` | Qualification | Robotics system qualification | `esq run --profile profile.qualification.robotics` |
 | `profile.suite.ai.gen-chatqna-core` | Horizontal | Gen AI Chat QnA Core profile | `esq run --profile profile.suite.ai.gen-chatqna-core` |
 | `profile.suite.ai.gen-llm` | Horizontal | Gen AI LLM serving benchmark profile | `esq run --profile profile.suite.ai.gen-llm` |
 | `profile.suite.ai.vision-light` | Horizontal | DL Streamer Analysis - Multi-Stream Pipelines With Multiple AI Stages | `esq run --profile profile.suite.ai.vision-light` |
@@ -167,33 +165,6 @@ Vision AI test using Intel® DL Streamer
 **Run this profile**:
 ```bash
 esq run --profile profile.qualification.ai-edge-system
-```
-
----
-
-### Robotics System Qualification
-
-**Profile**: `profile.qualification.robotics`
-
-**Test Cases**:
-
-| Test ID | Test Case | Qualification Criteria |
-|---------|-----------|------------------------|
-| ROB-RT-001 | PREEMPT-RT Kernel Check | PREEMPT_RT kernel active with required RT boot parameters configured |
-| ROB-TSN-001 | TSN Detection | >= 1 TSN-capable Intel® igc NIC with PTP hardware clock detected |
-| ROB-TCC-001 | TCC Detection | TCC-capable hardware detected (invariant TSC flags present) |
-| ROB-CYC-001 | RT Wakeup Latency (Robotics) | Data collection (max_latency_us in µs, lower is better) |
-| ROB-RTC-001 | PI0.5 RTC Benchmark (GPU) | Benchmark completes without error |
-| ROB-ACT-001 | ACT Benchmark (GPU) | Benchmark completes without error |
-| ROB-FMP-001 | FastMapping Benchmark (CPU) | Benchmark completes without error |
-| ROB-ADB-001 | ADBScan Benchmark (CPU) | Benchmark completes without error |
-| ROB-ASR-001 | FunASR ASR Benchmark (CPU) | Benchmark completes without error |
-| ROB-ASR-002 | FunASR ASR Benchmark (GPU) | Benchmark completes without error |
-| ROB-ASR-003 | FunASR ASR Benchmark (NPU) | Benchmark completes without error |
-
-**Run this profile**:
-```bash
-esq run --profile profile.qualification.robotics
 ```
 
 ---

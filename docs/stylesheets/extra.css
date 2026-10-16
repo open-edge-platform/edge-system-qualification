@@ -127,3 +127,116 @@ footer svg {
 .md-version__item:hover {
   background-color: rgba(134, 134, 134, 0.1); 
 }
+
+.program-menu {
+  position: relative;
+  display: flex;
+  /* centers the trigger vertically to match the release selector, which sits in a header row that centers its content differently */
+  align-items: center;
+  flex: 0 0 auto;
+  /* sized for the longest label so the title's flex-grow doesn't shift this control when a shorter program is selected */
+  min-width: 7.5rem;
+  margin-left: 0.75rem;
+  margin-right: 1rem;
+  height: 2.4rem;
+  font-size: 0.8rem;
+}
+
+.program-menu__trigger {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.7rem;
+  cursor: pointer;
+  outline: none;
+  position: relative;
+  top: 0.05rem;
+  white-space: nowrap;
+}
+
+.program-menu__trigger::after {
+  display: inline-block;
+  width: 0.4rem;
+  height: 0.6rem;
+  margin-left: 0.4rem;
+  background-color: currentcolor;
+  /* reuse the theme's own chevron icon so it matches the release selector exactly */
+  mask-image: var(--md-version-icon);
+  mask-position: center center;
+  mask-repeat: no-repeat;
+  mask-size: contain;
+  content: "";
+}
+
+.program-menu__trigger:focus-visible {
+  outline: 2px solid var(--md-accent-fg-color);
+  outline-offset: 2px;
+}
+
+.program-menu__list {
+  position: absolute;
+  /* top + margin-top centers the first option on the trigger, like the release selector's list */
+  top: 0.15rem;
+  left: 0;
+  z-index: 3;
+  width: max-content;
+  min-width: 100%;
+  max-width: calc(100vw - 1rem);
+  max-height: 0;
+  margin: 0.2rem 0;
+  padding: 0;
+  overflow: auto;
+  border-radius: 0.1rem;
+  background: var(--md-default-bg-color);
+  box-shadow: var(--md-shadow-z2);
+  color: var(--md-default-fg-color);
+  font-size: 0.7rem;
+  font-weight: 500;
+  opacity: 0;
+  transition: max-height 0.5s, opacity 0.25s 0.25s;
+}
+
+.program-menu:hover .program-menu__list,
+.program-menu:focus-within .program-menu__list {
+  max-height: 10rem;
+  opacity: 1;
+  transition: max-height 0.25s, opacity 0.25s;
+}
+
+/* keeps the list closed right after a selection, even while still hovered, until the pointer leaves */
+/* matches ".program-menu:hover .program-menu__list" specificity so it reliably wins by source order */
+.program-menu.program-menu--closed .program-menu__list {
+  max-height: 0;
+  opacity: 0;
+}
+
+.program-menu__option {
+  display: block;
+  width: 100%;
+  padding: 0 1.2rem 0 0.6rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: 1.8rem;
+  text-align: left;
+  cursor: pointer;
+  transition: color 0.25s, background-color 0.25s;
+  white-space: nowrap;
+}
+
+.program-menu__option:hover {
+  background: rgba(134, 134, 134, 0.1);
+}
+
+.program-menu__option:focus-visible {
+  color: var(--md-accent-fg-color);
+  background: var(--md-default-fg-color--lightest);
+}
+
+.program-panel[hidden],
+.md-nav--secondary li[hidden] {
+  display: none !important;
+}

@@ -1900,15 +1900,26 @@ def match_cpu_generations(system_generation: str, target_sku: str) -> bool:
                 return sys_gen_num == target_gen_from_model
 
     # === CORE SERIES (NON-i) MATCHING ===
-    # Supports: Core 7 250U, Core 5 220U (Series 2)
+    # Supports: Core 7 250U, Core 5 220U (Series 2), Core 5 330 (Series 3), Core 9 273PQE (Series 2), etc.
     if "core (series" in sys_gen_norm or "core series" in sys_gen_norm:
         import re
 
         sys_match = re.search(r"series\s*(\d+)", sys_gen_norm)
         if sys_match:
-            # Match target with "Core 7" or "Core 5" pattern (without "i")
-            if re.search(r"core\s+[3579]\s+", target_lower) and "core i" not in target_lower:
-                return True
+            sys_series = sys_match.group(1)
+
+            # Check if target explicitly mentions "Series X"
+            target_series_match = re.search(r"series\s*(\d+)", target_lower)
+            if target_series_match:
+                return sys_series == target_series_match.group(1)
+
+            # Match target with "Core 7"/"Core 5" pattern (without "i") and derive its
+            # series from the model number (e.g., 330 -> Series 3, 250 -> Series 2)
+            # instead of accepting any non-"i" Core SKU regardless of series.
+            model_match = re.search(r"core\s+[3579]\s+(\d{3})", target_lower)
+            if model_match and "core i" not in target_lower:
+                target_series_from_model = str(int(model_match.group(1)) // 100)
+                return sys_series == target_series_from_model
 
     # === XEON 6 MATCHING (2024+ NAMING) ===
     # Supports: Xeon 6XXX (Xeon 6730P, 6761P, 6787P, etc.)

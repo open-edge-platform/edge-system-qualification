@@ -602,7 +602,7 @@ def prepare_estimate_num_streams_for_device(
             data_dir=data_dir,
             container_mnt_dir=container_mnt_dir,
             render_gid=grp.getgrnam("render").gr_gid,
-            user_gid=os.getuid(),
+            user_gid=os.getgid(),
             # Use batch mode so container logs are collected synchronously within the
             # current Allure step for this device. Server mode uses async log streaming
             # which causes logs to be attached to whichever Allure step is active when

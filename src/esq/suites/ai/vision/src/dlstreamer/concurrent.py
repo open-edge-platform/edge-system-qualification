@@ -123,7 +123,7 @@ def run_benchmark_container(
     Helper to run a Docker container for benchmarking.
     Uses modular run_dlstreamer_analyzer_container with server mode for streaming analysis.
     """
-    user_gid = os.getuid()
+    user_gid = os.getgid()
     render_gid = grp.getgrnam("render").gr_gid
 
     # Select device-specific Docker image

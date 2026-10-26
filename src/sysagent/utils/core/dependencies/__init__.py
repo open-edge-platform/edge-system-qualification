@@ -9,24 +9,32 @@ This package provides a comprehensive dependency management system that supports
 - Proper status reporting for different dependency types
 - Modular validation and installation management
 """
+
+from .loader import DependencyConfigLoader
 from .manager import DependencyManager, get_dependency_manager
+from .prerun import run_prerun_checks
 from .schema import (
-    DependencyConfig, Dependency, DependencyInstallation,
-    DependencyType, OSType, DependencyStatus, DependencyCheckResult
+    Dependency,
+    DependencyCheckResult,
+    DependencyConfig,
+    DependencyInstallation,
+    DependencyStatus,
+    DependencyType,
+    OSType,
 )
 from .validator import DependencyValidator
-from .loader import DependencyConfigLoader
 
 __all__ = [
-    'DependencyManager',
-    'get_dependency_manager', 
-    'DependencyConfig',
-    'Dependency',
-    'DependencyInstallation',
-    'DependencyType',
-    'OSType',
-    'DependencyStatus',
-    'DependencyCheckResult',
-    'DependencyValidator',
-    'DependencyConfigLoader'
+    "Dependency",
+    "DependencyCheckResult",
+    "DependencyConfig",
+    "DependencyConfigLoader",
+    "DependencyInstallation",
+    "DependencyManager",
+    "DependencyStatus",
+    "DependencyType",
+    "DependencyValidator",
+    "OSType",
+    "get_dependency_manager",
+    "run_prerun_checks",
 ]

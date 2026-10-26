@@ -154,17 +154,13 @@ For available profiles, use: {cli_name} list
         "--select",
         "-se",
         action="store_true",
-        help=(
-            "Interactively pick one or more profiles/tests to run via a checkbox menu"
-        ),
+        help=("Interactively pick one or more profiles/tests to run via a checkbox menu"),
     )
     execution_group.add_argument(
         "--profiles-file",
         "-pf",
         metavar="FILE",
-        help=(
-            "Run profile(s) listed in a YAML template file"
-        ),
+        help=("Run profile(s) listed in a YAML template file"),
     )
     execution_group.add_argument(
         "--profile",
@@ -198,9 +194,6 @@ For available profiles, use: {cli_name} list
     advanced_group = run_parser.add_argument_group("ADVANCED OPTIONS")
     advanced_group.add_argument(
         "--suites-dir", metavar="DIRECTORY", help="Custom directory containing test suites (overrides default)"
-    )
-    advanced_group.add_argument(
-        "--skip-system-check", "-ssc", action="store_true", help="Skip system validation before running tests"
     )
     advanced_group.add_argument("--no-cache", "-nc", action="store_true", help="Run tests without using cached results")
     advanced_group.add_argument(

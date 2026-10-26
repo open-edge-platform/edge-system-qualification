@@ -175,9 +175,6 @@ For available profiles, use: {cli_name} list
     advanced_group.add_argument(
         "--suites-dir", metavar="DIRECTORY", help="Custom directory containing test suites (overrides default)"
     )
-    advanced_group.add_argument(
-        "--skip-system-check", "-ssc", action="store_true", help="Skip system validation before running tests"
-    )
     advanced_group.add_argument("--no-cache", "-nc", action="store_true", help="Run tests without using cached results")
     advanced_group.add_argument(
         "--telemetry-interval",

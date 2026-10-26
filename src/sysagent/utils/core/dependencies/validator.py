@@ -7,27 +7,25 @@ Dependency validator with improved status reporting.
 This module provides validation logic for dependencies with proper
 status classification, especially for manual setup dependencies.
 """
+
+import logging
 import os
 import platform
 import shutil
-import logging
-from typing import Tuple, List, Optional
 
 from sysagent.utils.core.process import run_command
-from .schema import (
-    Dependency, DependencyInstallation, DependencyType, 
-    OSType, DependencyStatus, DependencyCheckResult
-)
+
+from .schema import Dependency, DependencyCheckResult, DependencyInstallation, DependencyStatus, DependencyType, OSType
 
 logger = logging.getLogger(__name__)
 
 
 class DependencyValidator:
     """Validates dependency installation status with improved reporting."""
-    
+
     def __init__(self):
         self.current_os = self._detect_os()
-    
+
     def _detect_os(self) -> OSType:
         """Detect the current operating system."""
         system = platform.system().lower()
@@ -40,14 +38,14 @@ class DependencyValidator:
         else:
             logger.warning(f"Unsupported OS: {system}, defaulting to Linux")
             return OSType.LINUX
-    
+
     def validate_dependency(self, dependency: Dependency) -> DependencyCheckResult:
         """
         Validate a dependency and return detailed status.
-        
+
         Args:
             dependency: Dependency to validate
-            
+
         Returns:
             DependencyCheckResult with detailed status information
         """
@@ -57,9 +55,9 @@ class DependencyValidator:
             return DependencyCheckResult(
                 name=dependency.name,
                 status=DependencyStatus.ERROR,
-                message=f"No installation instructions available for {self.current_os.value}"
+                message=f"No installation instructions available for {self.current_os.value}",
             )
-        
+
         # Handle different installation methods
         if installation.install_method == DependencyType.MANUAL_SETUP:
             return self._validate_manual_setup(dependency, installation)
@@ -67,88 +65,165 @@ class DependencyValidator:
             return self._validate_system_packages(dependency, installation)
         elif installation.install_method == DependencyType.DOCKER_SETUP:
             return self._validate_docker_setup(dependency, installation)
+        elif installation.install_method == DependencyType.FUNCTIONAL_CHECK:
+            return self._validate_functional_check(dependency, installation)
         else:
             return self._validate_generic(dependency, installation)
-    
-    def _get_installation_for_os(self, dependency: Dependency) -> Optional[DependencyInstallation]:
+
+    def _validate_functional_check(
+        self, dependency: Dependency, installation: DependencyInstallation
+    ) -> DependencyCheckResult:
+        """Validate a runtime sanity/smoke check (devices, network, etc. are actually functional)."""
+        from .functional_checks import (
+            DEFAULT_DOCKER_SMOKE_IMAGE,
+            DEFAULT_DOCKER_SMOKE_TIMEOUT,
+            DEFAULT_NETWORK_PORT,
+            DEFAULT_NETWORK_TIMEOUT,
+            DEFAULT_OV_SMOKE_TIMEOUT,
+            check_docker_runtime,
+            check_network_connectivity,
+            check_openvino_devices,
+            resolve_network_hosts,
+        )
+
+        validation = installation.validation
+        if validation is None:
+            return DependencyCheckResult(
+                name=dependency.name,
+                status=DependencyStatus.ERROR,
+                message="No validation configured for functional check",
+            )
+        check_method = validation.check_method
+
+        try:
+            if check_method == "openvino_device_smoke":
+                timeout = validation.timeout or DEFAULT_OV_SMOKE_TIMEOUT
+                ok, messages = check_openvino_devices(validation.devices, timeout=timeout)
+            elif check_method == "network":
+                timeout = validation.timeout or DEFAULT_NETWORK_TIMEOUT
+                port = validation.port or DEFAULT_NETWORK_PORT
+                hosts = resolve_network_hosts(validation.hosts, validation.host_alternatives)
+                ok, messages = check_network_connectivity(hosts, timeout=timeout, port=port)
+            elif check_method == "docker_runtime_smoke":
+                timeout = validation.timeout or DEFAULT_DOCKER_SMOKE_TIMEOUT
+                image = validation.image or DEFAULT_DOCKER_SMOKE_IMAGE
+                # A single fixed canary host is enough here: this check only cares whether
+                # a *container's* own network path works at all, not full endpoint coverage
+                # (that's what the "network" check_method/host_alternatives already do).
+                ok, messages = check_docker_runtime(image=image, hosts=validation.hosts, timeout=timeout)
+            else:
+                return DependencyCheckResult(
+                    name=dependency.name,
+                    status=DependencyStatus.ERROR,
+                    message=f"Unknown functional check method: {check_method}",
+                )
+        except Exception as e:
+            return DependencyCheckResult(
+                name=dependency.name,
+                status=DependencyStatus.ERROR,
+                message=f"Error running functional check: {e}",
+            )
+
+        status = DependencyStatus.FUNCTIONAL if ok else DependencyStatus.ERROR
+        return DependencyCheckResult(
+            name=dependency.name,
+            status=status,
+            message="; ".join(messages) if messages else "No checks performed",
+            # Newline-joined per-component (per-host/per-device) messages, so
+            # callers can render one line per component instead of a single
+            # long semicolon-joined line.
+            details="\n".join(messages) if messages else None,
+        )
+
+    def _get_installation_for_os(self, dependency: Dependency) -> DependencyInstallation | None:
         """Get installation instructions for the current OS."""
         for installation in dependency.installations:
             if installation.os_type == self.current_os:
                 return installation
         return None
-    
-    def _validate_manual_setup(self, dependency: Dependency, installation: DependencyInstallation) -> DependencyCheckResult:
+
+    def _validate_manual_setup(
+        self, dependency: Dependency, installation: DependencyInstallation
+    ) -> DependencyCheckResult:
         """Validate manual setup dependencies with proper status."""
         # For manual setup, we can't automatically validate installation
         # Check if there's any validation defined, otherwise mark as needing manual setup
-        
+
         if installation.validation:
             # Try to run validation if provided
             try:
                 is_valid, message = self._run_validation(installation.validation)
                 if is_valid:
                     return DependencyCheckResult(
-                        name=dependency.name,
-                        status=DependencyStatus.INSTALLED,
-                        message=message
+                        name=dependency.name, status=DependencyStatus.INSTALLED, message=message
                     )
                 else:
                     return DependencyCheckResult(
                         name=dependency.name,
                         status=DependencyStatus.MANUAL_REQUIRED,
                         message=f"Manual setup required - {message}",
-                        details=f"See documentation: {installation.documentation_url}" if installation.documentation_url else None
+                        details=f"See documentation: {installation.documentation_url}"
+                        if installation.documentation_url
+                        else None,
                     )
             except Exception as e:
                 logger.debug(f"Validation failed for {dependency.name}: {e}")
-        
+
         # No validation available - this is a manual setup dependency
         return DependencyCheckResult(
             name=dependency.name,
             status=DependencyStatus.MANUAL_REQUIRED,
             message="Manual setup required (cannot auto-validate)",
-            details=f"See documentation: {installation.documentation_url}" if installation.documentation_url else None
+            details=f"See documentation: {installation.documentation_url}" if installation.documentation_url else None,
         )
-    
-    def _validate_system_packages(self, dependency: Dependency, installation: DependencyInstallation) -> DependencyCheckResult:
+
+    def _validate_system_packages(
+        self, dependency: Dependency, installation: DependencyInstallation
+    ) -> DependencyCheckResult:
         """Validate system package dependencies."""
         if not installation.packages:
             return DependencyCheckResult(
                 name=dependency.name,
                 status=DependencyStatus.ERROR,
-                message="No packages defined for system package dependency"
+                message="No packages defined for system package dependency",
             )
-        
+
         # Use dpkg validation for Debian/Ubuntu systems
-        if installation.validation and hasattr(installation.validation, 'check_method') and installation.validation.check_method == "dpkg":
+        if (
+            installation.validation
+            and hasattr(installation.validation, "check_method")
+            and installation.validation.check_method == "dpkg"
+        ):
             return self._validate_dpkg_packages(dependency, installation)
-        
+
         # Fallback to generic package validation
         return self._validate_packages_generic(dependency, installation)
-    
-    def _validate_dpkg_packages(self, dependency: Dependency, installation: DependencyInstallation) -> DependencyCheckResult:
+
+    def _validate_dpkg_packages(
+        self, dependency: Dependency, installation: DependencyInstallation
+    ) -> DependencyCheckResult:
         """Validate packages using dpkg (Debian/Ubuntu)."""
         packages_to_check = installation.packages
         missing_packages = []
         installed_packages = []
-        
+
         for package in packages_to_check:
             if self._check_system_package(package):
                 installed_packages.append(package)
             else:
                 missing_packages.append(package)
-        
+
         total_packages = len(packages_to_check)
         installed_count = len(installed_packages)
         missing_count = len(missing_packages)
-        
+
         if missing_count == 0:
             return DependencyCheckResult(
                 name=dependency.name,
                 status=DependencyStatus.INSTALLED,
                 message=f"All {installed_count}/{total_packages} system packages installed",
                 total_packages=total_packages,
-                installed_packages=installed_count
+                installed_packages=installed_count,
             )
         else:
             return DependencyCheckResult(
@@ -157,35 +232,34 @@ class DependencyValidator:
                 message=f"Missing {missing_count}/{total_packages} system packages",
                 missing_packages=missing_packages,
                 total_packages=total_packages,
-                installed_packages=installed_count
+                installed_packages=installed_count,
             )
 
     def _check_system_package(self, package_name: str) -> bool:
         """
         Check if a single system package is installed.
-        
+
         Args:
             package_name: Name of the package to check
-            
+
         Returns:
             bool: True if package is installed, False otherwise
         """
         try:
-            result = run_command(
-                f"dpkg-query -W -f='${{Status}}' {package_name}",
-                timeout=10
-            )
+            result = run_command(f"dpkg-query -W -f='${{Status}}' {package_name}", timeout=10)
             # Check if package is installed and configured
             return result.success and "install ok installed" in result.stdout
         except Exception:
             return False
-    
-    def _validate_packages_generic(self, dependency: Dependency, installation: DependencyInstallation) -> DependencyCheckResult:
+
+    def _validate_packages_generic(
+        self, dependency: Dependency, installation: DependencyInstallation
+    ) -> DependencyCheckResult:
         """Generic package validation using command availability."""
         if installation.validation and installation.validation.check_commands:
             missing_packages = []
             installed_packages = []
-            
+
             for check_cmd in installation.validation.check_commands:
                 try:
                     result = run_command(check_cmd, timeout=10)
@@ -198,18 +272,18 @@ class DependencyValidator:
                 except Exception:
                     pkg_name = check_cmd.split()[0]
                     missing_packages.append(pkg_name)
-            
+
             total_packages = len(installation.validation.check_commands)
             installed_count = len(installed_packages)
             missing_count = len(missing_packages)
-            
+
             if missing_count == 0:
                 return DependencyCheckResult(
                     name=dependency.name,
                     status=DependencyStatus.INSTALLED,
                     message=f"All {installed_count}/{total_packages} packages available",
                     total_packages=total_packages,
-                    installed_packages=installed_count
+                    installed_packages=installed_count,
                 )
             else:
                 return DependencyCheckResult(
@@ -218,89 +292,73 @@ class DependencyValidator:
                     message=f"Missing {missing_count}/{total_packages} packages",
                     missing_packages=missing_packages,
                     total_packages=total_packages,
-                    installed_packages=installed_count
+                    installed_packages=installed_count,
                 )
-        
+
         # No validation available - try basic command check
         if shutil.which(dependency.name):
             return DependencyCheckResult(
                 name=dependency.name,
                 status=DependencyStatus.INSTALLED,
-                message=f"{dependency.name} is available in PATH"
+                message=f"{dependency.name} is available in PATH",
             )
         else:
             return DependencyCheckResult(
-                name=dependency.name,
-                status=DependencyStatus.MISSING,
-                message=f"{dependency.name} not found in PATH"
+                name=dependency.name, status=DependencyStatus.MISSING, message=f"{dependency.name} not found in PATH"
             )
-    
-    def _validate_docker_setup(self, dependency: Dependency, installation: DependencyInstallation) -> DependencyCheckResult:
+
+    def _validate_docker_setup(
+        self, dependency: Dependency, installation: DependencyInstallation
+    ) -> DependencyCheckResult:
         """Validate Docker setup dependency."""
         # Check if docker command is available
         if not shutil.which("docker"):
             return DependencyCheckResult(
-                name=dependency.name,
-                status=DependencyStatus.MISSING,
-                message="Docker command not found in PATH"
+                name=dependency.name, status=DependencyStatus.MISSING, message="Docker command not found in PATH"
             )
-        
+
         # Try to run docker version to check if daemon is running
         try:
             result = run_command("docker version", timeout=10)
             if result.success:
                 return DependencyCheckResult(
-                    name=dependency.name,
-                    status=DependencyStatus.INSTALLED,
-                    message="Docker is installed and running"
+                    name=dependency.name, status=DependencyStatus.INSTALLED, message="Docker is installed and running"
                 )
             else:
                 return DependencyCheckResult(
                     name=dependency.name,
                     status=DependencyStatus.NEEDS_CONFIGURATION,
                     message="Docker installed but daemon not accessible",
-                    details="Check if Docker daemon is running and user has permissions"
+                    details="Check if Docker daemon is running and user has permissions",
                 )
         except Exception as e:
             return DependencyCheckResult(
-                name=dependency.name,
-                status=DependencyStatus.ERROR,
-                message=f"Error checking Docker status: {e}"
+                name=dependency.name, status=DependencyStatus.ERROR, message=f"Error checking Docker status: {e}"
             )
-    
+
     def _validate_generic(self, dependency: Dependency, installation: DependencyInstallation) -> DependencyCheckResult:
         """Generic validation for other dependency types."""
         if installation.validation:
             try:
                 is_valid, message = self._run_validation(installation.validation)
                 status = DependencyStatus.INSTALLED if is_valid else DependencyStatus.MISSING
-                return DependencyCheckResult(
-                    name=dependency.name,
-                    status=status,
-                    message=message
-                )
+                return DependencyCheckResult(name=dependency.name, status=status, message=message)
             except Exception as e:
                 return DependencyCheckResult(
-                    name=dependency.name,
-                    status=DependencyStatus.ERROR,
-                    message=f"Validation error: {e}"
+                    name=dependency.name, status=DependencyStatus.ERROR, message=f"Validation error: {e}"
                 )
-        
+
         # No validation - try basic command check
         if shutil.which(dependency.name):
             return DependencyCheckResult(
-                name=dependency.name,
-                status=DependencyStatus.INSTALLED,
-                message=f"{dependency.name} is available"
+                name=dependency.name, status=DependencyStatus.INSTALLED, message=f"{dependency.name} is available"
             )
         else:
             return DependencyCheckResult(
-                name=dependency.name,
-                status=DependencyStatus.MISSING,
-                message=f"{dependency.name} not found"
+                name=dependency.name, status=DependencyStatus.MISSING, message=f"{dependency.name} not found"
             )
-    
-    def _run_validation(self, validation) -> Tuple[bool, str]:
+
+    def _run_validation(self, validation) -> tuple[bool, str]:
         """Run validation check and return result."""
         # Check file exists
         if validation.check_file_exists:
@@ -308,7 +366,7 @@ class DependencyValidator:
                 return True, f"Required file exists: {validation.check_file_exists}"
             else:
                 return False, f"Required file missing: {validation.check_file_exists}"
-        
+
         # Check service running
         if validation.check_service_running:
             try:
@@ -319,22 +377,22 @@ class DependencyValidator:
                     return False, f"Service {validation.check_service_running} is not running"
             except Exception:
                 return False, f"Cannot check service {validation.check_service_running}"
-        
+
         # Run check command
         if validation.check_command:
             try:
                 result = run_command(validation.check_command, timeout=10)
-                
+
                 if result.returncode != validation.expected_return_code:
                     return False, f"Command failed: {validation.check_command}"
-                
+
                 if validation.expected_output_contains:
                     if validation.expected_output_contains not in result.stdout:
                         return False, f"Expected output not found in command: {validation.check_command}"
-                
+
                 return True, "Validation command passed"
-                
+
             except Exception as e:
                 return False, f"Validation command error: {e}"
-        
+
         return False, "No validation method defined"

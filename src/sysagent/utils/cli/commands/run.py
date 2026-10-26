@@ -15,17 +15,18 @@ import signal
 import string
 import sys
 import time
-import yaml
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+import yaml
 
 from sysagent.utils.cli.filters import parse_filters
 from sysagent.utils.cli.handlers import handle_interrupt
 from sysagent.utils.config import filter_profile_by_tier, get_suite_directory, list_profiles, setup_data_dir
 from sysagent.utils.config.config_loader import get_cli_aware_project_name
 from sysagent.utils.core import shared_state
+from sysagent.utils.core.dependencies import run_prerun_checks
 from sysagent.utils.logging import setup_command_logging
 from sysagent.utils.reporting import CoreResultsSummaryGenerator, TestSummaryTableGenerator
 from sysagent.utils.testing import (
@@ -41,6 +42,56 @@ from sysagent.utils.testing import (
 logger = logging.getLogger(__name__)
 
 
+def _format_filters_for_display(parsed_filters: dict) -> str:
+    """Render parsed filters as a readable "key=value, key=value" string for log output."""
+    return ", ".join(f"{key}={value}" for key, value in parsed_filters.items())
+
+
+def _extract_requirement_flags_from_profile(profile_configs: dict) -> set:
+    """Collect truthy boolean requirement flag names (e.g. "docker_required") declared
+    anywhere in a profile: its profile-level params.requirements, and any per-test
+    requirements overrides (suites[].sub_suites[].tests{}.params[].requirements).
+    """
+    flags = set()
+
+    def _collect(requirements):
+        if isinstance(requirements, dict):
+            for key, value in requirements.items():
+                if value is True:
+                    flags.add(key)
+
+    _collect((profile_configs.get("params") or {}).get("requirements"))
+    for suite in profile_configs.get("suites", []) or []:
+        for sub_suite in suite.get("sub_suites", []) or []:
+            for test_config in (sub_suite.get("tests", {}) or {}).values():
+                for param in (test_config or {}).get("params", []) or []:
+                    _collect(param.get("requirements"))
+    return flags
+
+
+def _collect_requirement_flags_from_profiles(profile_names: list) -> set:
+    """Aggregate requirement flags (see `_extract_requirement_flags_from_profile`) across
+    the named profiles - used to decide which flag-gated readiness checks (e.g. Docker
+    runtime) are actually relevant to the profile(s) about to run.
+    """
+    if not profile_names:
+        return set()
+
+    configs_by_name = {}
+    for profiles in list_profiles(include_examples=True).values():
+        for profile in profiles:
+            configs = profile.get("configs")
+            if configs and configs.get("name"):
+                configs_by_name[configs["name"]] = configs
+
+    flags = set()
+    for name in profile_names:
+        configs = configs_by_name.get(name)
+        if configs:
+            flags |= _extract_requirement_flags_from_profile(configs)
+    return flags
+
+
 def run_tests(
     profile_name: str = None,
     suite_name: str = None,
@@ -49,7 +100,6 @@ def run_tests(
     verbose: bool = False,
     debug: bool = False,
     suites_dir: str = None,
-    skip_system_check: bool = False,
     no_cache: bool = False,
     filters: list[str] = None,
     force: bool = False,
@@ -81,7 +131,6 @@ def run_tests(
         verbose: Whether to enable medium traceback (--tb=short)
         debug: Whether to enable full traceback and debug logs (--tb=long)
         suites_dir: Custom directory containing test suites (overrides default location)
-        skip_system_check: Whether to skip system requirement validation
         no_cache: Whether to run tests without using cached results
         filters: List of filter expressions in format "key=value" to filter tests
         force: Whether to skip interactive prompts (ignored in generic sysagent)
@@ -154,7 +203,7 @@ def run_tests(
     if filters:
         try:
             parsed_filters = parse_filters(filters)
-            logger.info(f"Applying test filters: {parsed_filters}")
+            logger.info(f"Applying test filters: {_format_filters_for_display(parsed_filters)}")
         except ValueError as e:
             logger.error(f"Invalid filter format: {e}")
             return 1
@@ -180,6 +229,24 @@ def run_tests(
         os.environ["CORE_NO_CACHE"] = "1"
         logger.info("Running tests with no cache enabled")
 
+    # Only the profile(s) actually about to run are known at this point for explicit
+    # --profile/--profiles-file invocations - resolve their requirement flags (e.g.
+    # docker_required) so flag-gated readiness checks (e.g. Docker runtime) are
+    # skipped when nothing being run actually needs them. Left as None (meaning "run
+    # every check") for --suite, --select, and the default "run all profiles" modes,
+    # since the exact profile(s) that will run aren't resolved yet at this point.
+    active_flags = None
+    if profile_name:
+        active_flags = _collect_requirement_flags_from_profiles([profile_name])
+    elif profiles_file:
+        file_profile_names, _ = _load_profiles_from_file(profiles_file)
+        active_flags = _collect_requirement_flags_from_profiles(file_profile_names or [])
+
+    prerun_ok, _ = run_prerun_checks(verbose=verbose, debug=debug, active_flags=active_flags)
+    if not prerun_ok:
+        logger.error("Readiness checks failed - aborting before test execution")
+        return 1
+
     if extra_args is None:
         extra_args = []
 
@@ -193,13 +260,13 @@ def run_tests(
         # Option 1: If a profile name is provided, run that specific profile (no prompt)
         if profile_name:
             result_code, tests_ran = _run_profile_tests(
-                profile_name, pytest_args, skip_system_check, data_dir, verbose, debug, parsed_filters, force
+                profile_name, pytest_args, data_dir, verbose, debug, parsed_filters, force
             )
 
         # Option 2: If a profiles file is provided, run the profile(s) listed in it
         elif profiles_file:
             result_code, tests_ran = _run_profiles_file(
-                profiles_file, pytest_args, skip_system_check, data_dir, verbose, debug, parsed_filters, force
+                profiles_file, pytest_args, data_dir, verbose, debug, parsed_filters, force
             )
 
         # Option 3: If a suite name is provided, run that specific suite (no prompt)
@@ -219,7 +286,6 @@ def run_tests(
                 result_code, tests_ran = _resolve_and_execute_profiles(
                     selected_profile_names,
                     pytest_args,
-                    skip_system_check,
                     data_dir,
                     verbose,
                     debug,
@@ -229,7 +295,6 @@ def run_tests(
         # Option 5: Default run behavior - runs all profiles (generic sysagent)
         else:
             result_code, tests_ran = _run_all_profiles(
-                skip_system_check,
                 data_dir,
                 verbose,
                 debug,
@@ -268,7 +333,6 @@ def run_tests(
 def _run_profile_tests(
     profile_name: str,
     pytest_args: list[str],
-    skip_system_check: bool,
     data_dir: str,
     verbose: bool = False,
     debug: bool = False,
@@ -338,7 +402,6 @@ def _run_profile_tests(
         result_code, profile_tests_ran = _run_single_profile(
             current_profile_name,
             pytest_args,
-            skip_system_check,
             data_dir,
             verbose,
             debug,
@@ -366,7 +429,6 @@ def _run_profile_tests(
 def _resolve_and_execute_profiles(
     requested_profile_names: list[str],
     pytest_args: list[str],
-    skip_system_check: bool,
     data_dir: str,
     verbose: bool = False,
     debug: bool = False,
@@ -446,7 +508,6 @@ def _resolve_and_execute_profiles(
         result_code, profile_tests_ran = _run_single_profile(
             current_profile_name,
             pytest_args,
-            skip_system_check,
             data_dir,
             verbose,
             debug,
@@ -468,7 +529,6 @@ def _resolve_and_execute_profiles(
 def _run_profiles_file(
     profiles_file: str,
     pytest_args: list[str],
-    skip_system_check: bool,
     data_dir: str,
     verbose: bool = False,
     debug: bool = False,
@@ -492,7 +552,6 @@ def _run_profiles_file(
     return _resolve_and_execute_profiles(
         profile_names,
         pytest_args,
-        skip_system_check,
         data_dir,
         verbose,
         debug,
@@ -505,7 +564,6 @@ def _run_profiles_file(
 def _run_single_profile(
     profile_name: str,
     pytest_args: list[str],
-    skip_system_check: bool,
     data_dir: str,
     verbose: bool = False,
     debug: bool = False,
@@ -543,22 +601,19 @@ def _run_single_profile(
         logger.error(f"Profile not found: {profile_name}")
         return 1, False
 
-    # Validate profile requirements if not explicitly skipped
-    if not skip_system_check:
-        from sysagent.utils.testing.profile_validator import (
-            validate_filtered_profile_requirements,
-            validate_profile_requirements,
-        )
+    # Validate profile requirements
+    from sysagent.utils.testing.profile_validator import (
+        validate_filtered_profile_requirements,
+        validate_profile_requirements,
+    )
 
-        if filters:
-            validation_result = validate_filtered_profile_requirements(
-                profile_configs, filters, profile_name=profile_name
-            )
-        else:
-            validation_result = validate_profile_requirements(profile_configs, profile_name=profile_name)
+    if filters:
+        validation_result = validate_filtered_profile_requirements(profile_configs, filters, profile_name=profile_name)
+    else:
+        validation_result = validate_profile_requirements(profile_configs, profile_name=profile_name)
 
-        if not validation_result.get("passed", False):
-            return 1, False
+    if not validation_result.get("passed", False):
+        return 1, False
 
     # Get the profile tier and filter configuration
     from sysagent.utils.testing.tier_validator import get_highest_matching_tier, validate_profile_tiers
@@ -1273,7 +1328,6 @@ def _prompt_select_any_profile(
 
 
 def _run_all_profiles(
-    skip_system_check: bool,
     data_dir: str,
     verbose: bool,
     debug: bool,
@@ -1287,7 +1341,6 @@ def _run_all_profiles(
     Package-specific implementations (e.g., ESQ) should override the entire run command.
 
     Args:
-        skip_system_check: Whether to skip system requirement validation (ignored - always skipped)
         data_dir: Data directory path
         verbose: Whether to enable verbose output
         debug: Whether to enable debug output
@@ -1393,8 +1446,8 @@ def _run_all_profiles(
         logger.info("Falling back to alphabetical order")
         execution_order = sorted(all_profiles_dict.keys())
 
-    # Validate all profiles if not explicitly skipped
-    valid_profiles, failed_profiles = _validate_all_profiles(all_profile_items, skip_system_check)
+    # Validate all profiles
+    valid_profiles, failed_profiles = _validate_all_profiles(all_profile_items)
 
     if failed_profiles:
         # Logged at WARNING level so the summary is visible even in non-verbose
@@ -1443,7 +1496,7 @@ def _run_all_profiles(
     return result, True
 
 
-def _validate_all_profiles(all_profile_items, skip_system_check: bool):
+def _validate_all_profiles(all_profile_items):
     """Validate all profiles and return valid and failed lists."""
     from sysagent.utils.testing.profile_validator import validate_profile_requirements
 
@@ -1460,12 +1513,11 @@ def _validate_all_profiles(all_profile_items, skip_system_check: bool):
             failed_profiles.append(profile_path or "Unknown")
             continue
 
-        if not skip_system_check:
-            # Pass profile name for better context in validation messages
-            validation_result = validate_profile_requirements(profile_configs, profile_name=profile_name)
-            if not validation_result.get("passed", False):
-                failed_profiles.append(profile_name)
-                continue
+        # Pass profile name for better context in validation messages
+        validation_result = validate_profile_requirements(profile_configs, profile_name=profile_name)
+        if not validation_result.get("passed", False):
+            failed_profiles.append(profile_name)
+            continue
 
         valid_profiles.append((profile_type, profile))
 

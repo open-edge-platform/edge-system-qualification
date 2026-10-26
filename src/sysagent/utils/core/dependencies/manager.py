@@ -10,7 +10,6 @@ status reporting and package-level configuration support.
 """
 
 import logging
-from typing import Dict, List, Optional
 
 from .loader import DependencyConfigLoader
 from .schema import Dependency, DependencyCheckResult, DependencyStatus, DependencyType
@@ -30,7 +29,7 @@ class DependencyManager:
     - Under 500 lines of code per file
     """
 
-    def __init__(self, config_loader: Optional[DependencyConfigLoader] = None):
+    def __init__(self, config_loader: DependencyConfigLoader | None = None):
         """
         Initialize the dependency manager.
 
@@ -59,9 +58,18 @@ class DependencyManager:
         dependency = self.config.dependencies[name]
         return self.validator.validate_dependency(dependency)
 
-    def check_all_dependencies(self) -> Dict[str, DependencyCheckResult]:
+    def check_all_dependencies(self, include_functional: bool = False) -> dict[str, DependencyCheckResult]:
         """
         Check all dependencies and return their detailed status.
+
+        Args:
+            include_functional: Whether to also run functional_check (runtime
+                sanity/smoke test) dependencies. These are excluded by default
+                because they run real (if lightweight) workloads - e.g. an
+                OpenVINO device compile/inference smoke test - and should not
+                slow down every CLI command. Use ``check_functional_dependencies``
+                or the prerun check module to run them explicitly (e.g. before
+                the CLI's run command executes profiles/tests).
 
         Returns:
             Dictionary mapping dependency name to DependencyCheckResult
@@ -75,11 +83,64 @@ class DependencyManager:
 
         for name in check_order:
             if name in self.config.dependencies:
+                dependency = self.config.dependencies[name]
+                if not include_functional and self._is_functional_only(dependency):
+                    continue
                 results[name] = self.check_dependency(name)
 
         return results
 
-    def get_missing_dependencies(self) -> List[str]:
+    def _is_functional_only(self, dependency: Dependency) -> bool:
+        """Whether this dependency's current-OS installation is a functional_check (runtime smoke test)."""
+        installation = self.validator._get_installation_for_os(dependency)
+        return bool(installation and installation.install_method == DependencyType.FUNCTIONAL_CHECK)
+
+    def get_functional_dependency_names(self, active_flags: set[str] | None = None) -> list[str]:
+        """Get names of dependencies configured as functional_check (runtime sanity/smoke tests).
+
+        Returns names in install_order (if defined), with any remaining
+        functional dependencies appended alphabetically.
+
+        Args:
+            active_flags: Profile requirement flags (e.g. {"docker_required"}) known
+                to be relevant to the profile(s)/test(s) about to run. A dependency
+                whose ``requires_flag`` isn't in this set is excluded. Pass None (the
+                default) when the relevant profile(s) aren't known ahead of time -
+                every functional check is then included, same as before flag-gating
+                existed. Dependencies with no ``requires_flag`` are always included.
+        """
+        ordered_names = (
+            list(self.config.install_order) if self.config.install_order else sorted(self.config.dependencies.keys())
+        )
+        remaining = sorted(n for n in self.config.dependencies if n not in ordered_names)
+        ordered_names.extend(remaining)
+
+        names = [
+            name
+            for name in ordered_names
+            if name in self.config.dependencies and self._is_functional_only(self.config.dependencies[name])
+        ]
+        if active_flags is None:
+            return names
+        return [
+            name
+            for name in names
+            if not self.config.dependencies[name].requires_flag
+            or self.config.dependencies[name].requires_flag in active_flags
+        ]
+
+    def check_functional_dependencies(self, active_flags: set[str] | None = None) -> dict[str, DependencyCheckResult]:
+        """Check only functional_check (runtime sanity/smoke test) dependencies.
+
+        Args:
+            active_flags: See ``get_functional_dependency_names``.
+
+        Returns:
+            Dictionary mapping dependency name to DependencyCheckResult
+        """
+        return {name: self.check_dependency(name) for name in self.get_functional_dependency_names(active_flags)}
+
+    def get_missing_dependencies(self) -> list[str]:
         """Get list of missing required dependencies."""
         results = self.check_all_dependencies()
         missing = []
@@ -95,7 +156,7 @@ class DependencyManager:
 
         return missing
 
-    def get_manual_setup_dependencies(self) -> List[str]:
+    def get_manual_setup_dependencies(self) -> list[str]:
         """Get list of dependencies requiring manual setup."""
         results = self.check_all_dependencies()
         manual = []
@@ -106,7 +167,7 @@ class DependencyManager:
 
         return manual
 
-    def generate_installation_instructions(self, dependency_names: Optional[List[str]] = None) -> str:
+    def generate_installation_instructions(self, dependency_names: list[str] | None = None) -> str:
         """
         Generate installation instructions for dependencies.
 
@@ -216,7 +277,7 @@ class DependencyManager:
 
         return True
 
-    def _get_missing_packages(self, dependency: Dependency) -> List[str]:
+    def _get_missing_packages(self, dependency: Dependency) -> list[str]:
         """
         Get list of missing packages for a dependency.
 
@@ -237,7 +298,7 @@ class DependencyManager:
 
         return missing_packages
 
-    def _generate_simplified_instructions(self, dependencies: List[Dependency]) -> str:
+    def _generate_simplified_instructions(self, dependencies: list[Dependency]) -> str:
         """
         Generate simplified, actionable installation instructions.
 
@@ -283,11 +344,11 @@ class DependencyManager:
                 instructions.append("Refer to project documentation to install the required system packages.\n")
 
         # Handle other dependency types (manual setup, etc.) - but skip them for CLI simplicity
-        # They can be shown in `esq deps` command for full details
+        # They can be shown via the CLI's `deps` command for full details
 
         return "\n".join(instructions)
 
-    def _group_dependencies_by_method(self, dependency_names: List[str]) -> Dict:
+    def _group_dependencies_by_method(self, dependency_names: list[str]) -> dict:
         """Group dependencies by their installation method."""
         from .schema import DependencyType
 
@@ -325,7 +386,7 @@ class DependencyManager:
         """Reload dependency configuration from files."""
         self.config = self.config_loader.load_default_config()
 
-    def add_package_config(self, package_name: str, config_path: Optional[str] = None):
+    def add_package_config(self, package_name: str, config_path: str | None = None):
         """
         Add or reload configuration for a specific package.
 

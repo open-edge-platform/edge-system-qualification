@@ -11,6 +11,9 @@ version: "1.0"
 install_order:
   - "system_drivers"
   - "docker"
+  - "network_connectivity"
+  - "docker_runtime"
+  - "openvino_devices"
 
 # Dependency groups for logical organization
 groups:
@@ -25,6 +28,15 @@ groups:
     description: "Docker container platform for edge workloads"
     dependencies: ["docker"]
     optional: false
+
+  readiness_checks:
+    name: "Readiness Checks"
+    description: >-
+      Quick functional smoke tests executed by 'esq run' right before
+      profiles/tests execute, to catch system setup issues (network, device
+      firmware/BIOS incompatibility, etc.) early instead of via test timeouts
+    dependencies: ["network_connectivity", "docker_runtime", "openvino_devices"]
+    optional: true
 
 # Individual dependency definitions
 dependencies:
@@ -99,3 +111,104 @@ dependencies:
         validation:
           check_command: "docker --version"
           expected_return_code: 0
+
+  # --------------------------------------------------------------------------
+  # Readiness checks (functional_check) - NOT installable dependencies.
+  # These verify already-detected components actually work, and are only run
+  # by 'esq run' right before profiles/tests execute (see "esq run" readiness
+  # check step), never on every CLI command. Set required: true/false below
+  # to control whether a failure blocks the run or only logs a warning.
+  # --------------------------------------------------------------------------
+  network_connectivity:
+    name: "network_connectivity"
+    description: "Outbound network connectivity required to download models, containers, and datasets"
+    required: true
+    priority: 15
+    installations:
+      - os_type: "linux"
+        install_method: "functional_check"
+        validation:
+          check_method: "network"
+          hosts: ["github.com", "registry-1.docker.io"]
+          # Only the host(s) for the actually-preferred model/dataset download
+          # source are checked (see PREFER_MODELSCOPE in docs/includes/quick-start/run.md),
+          # so huggingface.co isn't reported as a false failure when the user
+          # has configured ModelScope as their download source, and vice versa.
+          # www.modelscope.cn is the modelscope package's DEFAULT_MODELSCOPE_DOMAIN
+          # (its actual default API/download host), not the bare apex domain.
+          host_alternatives:
+            model_download:
+              huggingface: ["huggingface.co"]
+              modelscope: ["www.modelscope.cn"]
+          port: 443
+          timeout: 5
+        notes:
+          - "Attempts a TCP connection to common hosts used to download models/containers/datasets"
+          - "A failure usually means proxy, firewall, or DNS issues that would otherwise cause test asset downloads to fail or hang"
+      - os_type: "windows"
+        install_method: "functional_check"
+        validation:
+          check_method: "network"
+          hosts: ["github.com", "registry-1.docker.io"]
+          host_alternatives:
+            model_download:
+              huggingface: ["huggingface.co"]
+              modelscope: ["www.modelscope.cn"]
+          port: 443
+          timeout: 5
+
+  docker_runtime:
+    name: "docker_runtime"
+    description: "Docker is usable by the current user (no sudo), can pull images, and containers can reach the network"
+    required: true
+    priority: 16
+    # Only run this check for profiles/tests that actually declare
+    # params.requirements.docker_required: true - skips it entirely (and the
+    # time it takes) for profile(s)/test(s) that don't use Docker at all.
+    requires_flag: "docker_required"
+    installations:
+      - os_type: "linux"
+        install_method: "functional_check"
+        validation:
+          check_method: "docker_runtime_smoke"
+          image: "curlimages/curl:latest"
+          # A single fixed host is enough: this only checks whether a *container's*
+          # own network path works at all. Full endpoint coverage (huggingface.co,
+          # modelscope, etc.) is already handled by the network_connectivity check.
+          hosts: ["github.com"]
+          timeout: 60
+        notes:
+          - "Runs 'docker version' (no sudo), pulls a small canary image, then runs it to confirm the container itself can reach the network"
+      - os_type: "windows"
+        install_method: "functional_check"
+        validation:
+          check_method: "docker_runtime_smoke"
+          image: "curlimages/curl:latest"
+          hosts: ["github.com"]
+          timeout: 60
+
+  openvino_devices:
+    name: "openvino_devices"
+    description: "OpenVINO-detected compute devices (CPU/iGPU/dGPU/NPU) can actually compile and run inference"
+    # Not required by default: a single non-functional device (e.g. dGPU) shouldn't
+    # block an entire run when other devices (e.g. CPU) work fine. Set to true to
+    # make any device failure block the run.
+    required: false
+    priority: 16
+    installations:
+      - os_type: "linux"
+        install_method: "functional_check"
+        validation:
+          check_method: "openvino_device_smoke"
+          devices: []  # empty = auto-detect every device OpenVINO reports as available
+          timeout: 30
+        notes:
+          - "Compiles and runs a tiny dummy model on each OpenVINO-detected device"
+          - "A hang/timeout here usually indicates an incompatible BIOS version, missing firmware, or a driver issue for the detected silicon"
+          - "Catches this in seconds instead of discovering it via a full test timeout later"
+      - os_type: "windows"
+        install_method: "functional_check"
+        validation:
+          check_method: "openvino_device_smoke"
+          devices: []
+          timeout: 30

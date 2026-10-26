@@ -18,7 +18,9 @@ from typing import Any
 # Import sysagent's low-level execution functions (generic, reusable)
 from sysagent.utils.cli.commands.run import (
     TIER_SKIP_EXIT,
+    _collect_requirement_flags_from_profiles,
     _determine_final_exit_code,
+    _format_filters_for_display,
     _generate_test_reports,
     _load_profiles_from_file,
     _offer_save_profiles_selection,
@@ -34,6 +36,7 @@ from sysagent.utils.cli.filters import parse_filters
 from sysagent.utils.cli.handlers import handle_interrupt
 from sysagent.utils.config import list_profiles, setup_data_dir
 from sysagent.utils.core import shared_state
+from sysagent.utils.core.dependencies import run_prerun_checks
 from sysagent.utils.logging import setup_command_logging
 
 # Import system info for CPU validation
@@ -175,6 +178,20 @@ UNSUPPORTED_GENERATIONS = [
     # Example of most specific format (currently not used, but available):
     # ("4th Gen", "Xeon Scalable", "server")  # Only blocks 4th Gen Xeon Scalable servers
 ]
+
+
+def _resolve_tags_to_profile_names(tags: list[str]) -> list[str]:
+    """Resolve tag/keyword(s) to matching profile name(s), without executing anything."""
+    from sysagent.utils.config import get_profiles_matching_tags
+
+    all_profiles_dict = {}
+    for profiles in list_profiles(include_examples=True).values():
+        for profile in profiles:
+            configs = profile.get("configs")
+            if configs and configs.get("name"):
+                all_profiles_dict[configs["name"]] = configs
+
+    return get_profiles_matching_tags(tags, all_profiles_dict)
 
 
 def _check_system_validation_esq(force: bool = False, mode: str = "qualification") -> tuple:
@@ -415,7 +432,7 @@ def _prompt_run_configuration_esq(
             for i, q in enumerate(qualification_profiles, 1):
                 print(f"  {i}) {q['display_name']}")
 
-            valid_range = f"1-{len(qualification_profiles)}"
+            valid_range = "1" if len(qualification_profiles) == 1 else f"1-{len(qualification_profiles)}"
             try:
                 response = input(f"\nSelect a qualification profile [{valid_range}]: ").strip().lower()
             except (KeyboardInterrupt, EOFError):
@@ -465,7 +482,6 @@ def run_tests(
     verbose: bool = False,
     debug: bool = False,
     suites_dir: str = None,
-    skip_system_check: bool = False,
     no_cache: bool = False,
     filters: list[str] = None,
     run_all_profiles: bool = False,
@@ -543,7 +559,7 @@ def run_tests(
     if filters:
         try:
             parsed_filters = parse_filters(filters)
-            logger.info(f"Applying test filters: {parsed_filters}")
+            logger.info(f"Applying test filters: {_format_filters_for_display(parsed_filters)}")
         except ValueError as e:
             logger.error(f"Invalid filter format: {e}")
             return 1
@@ -567,6 +583,26 @@ def run_tests(
         os.environ["CORE_NO_CACHE"] = "1"
         logger.info("Running tests with no cache enabled")
 
+    # Only the profile(s) actually about to run are known at this point for explicit
+    # --profile/--tag/--profiles-file invocations - resolve their requirement flags
+    # (e.g. docker_required) so flag-gated readiness checks (e.g. Docker runtime) are
+    # skipped when nothing being run actually needs them. Left as None (meaning "run
+    # every check") for --suite, --select, and the default "run all profiles" modes,
+    # since the exact profile(s) that will run aren't resolved yet at this point.
+    active_flags = None
+    if profile_name:
+        active_flags = _collect_requirement_flags_from_profiles([profile_name])
+    elif tags:
+        active_flags = _collect_requirement_flags_from_profiles(_resolve_tags_to_profile_names(tags))
+    elif profiles_file:
+        file_profile_names, _ = _load_profiles_from_file(profiles_file)
+        active_flags = _collect_requirement_flags_from_profiles(file_profile_names or [])
+
+    prerun_ok, _ = run_prerun_checks(verbose=verbose, debug=debug, active_flags=active_flags)
+    if not prerun_ok:
+        logger.error("Readiness checks failed - aborting before test execution")
+        return 1
+
     if extra_args is None:
         extra_args = []
     pytest_args = create_pytest_args(data_dir, verbose, debug, extra_args)
@@ -582,7 +618,6 @@ def run_tests(
             result_code, tests_ran = _run_profile_tests_esq(
                 profile_name,
                 pytest_args,
-                skip_system_check,
                 data_dir,
                 verbose,
                 debug,
@@ -595,7 +630,6 @@ def run_tests(
             result_code, tests_ran = _run_tagged_profiles_esq(
                 tags,
                 pytest_args,
-                skip_system_check,
                 data_dir,
                 verbose,
                 debug,
@@ -608,7 +642,6 @@ def run_tests(
             result_code, tests_ran = _run_profiles_file_esq(
                 profiles_file,
                 pytest_args,
-                skip_system_check,
                 data_dir,
                 verbose,
                 debug,
@@ -622,7 +655,6 @@ def run_tests(
         else:
             # Run all profiles with ESQ prompts
             result_code, tests_ran = _run_all_profiles_esq(
-                skip_system_check,
                 data_dir,
                 verbose,
                 debug,
@@ -675,7 +707,6 @@ def run_tests(
 def _run_profile_tests_esq(
     profile_name: str,
     pytest_args: list[str],
-    skip_system_check: bool,
     data_dir: str,
     verbose: bool = False,
     debug: bool = False,
@@ -690,14 +721,13 @@ def _run_profile_tests_esq(
         tuple: (exit_code, tests_ran)
     """
     return _resolve_and_execute_profiles_esq(
-        [profile_name], pytest_args, skip_system_check, data_dir, verbose, debug, filters, force, qualification_only
+        [profile_name], pytest_args, data_dir, verbose, debug, filters, force, qualification_only
     )
 
 
 def _run_tagged_profiles_esq(
     tags: list[str],
     pytest_args: list[str],
-    skip_system_check: bool,
     data_dir: str,
     verbose: bool = False,
     debug: bool = False,
@@ -715,19 +745,7 @@ def _run_tagged_profiles_esq(
     Returns:
         tuple: (exit_code, tests_ran)
     """
-    from sysagent.utils.config import get_profiles_matching_tags
-
-    all_profiles_data = list_profiles(include_examples=True)
-    all_profiles_dict = {}
-    for profile_type, profiles in all_profiles_data.items():
-        for profile in profiles:
-            configs = profile.get("configs")
-            if configs:
-                profile_name_key = configs.get("name")
-                if profile_name_key:
-                    all_profiles_dict[profile_name_key] = configs
-
-    matched_profiles = get_profiles_matching_tags(tags, all_profiles_dict)
+    matched_profiles = _resolve_tags_to_profile_names(tags)
     if not matched_profiles:
         logger.error(f"No profiles found matching tag(s): {', '.join(tags)}")
         return 1, False
@@ -736,7 +754,6 @@ def _run_tagged_profiles_esq(
     return _resolve_and_execute_profiles_esq(
         matched_profiles,
         pytest_args,
-        skip_system_check,
         data_dir,
         verbose,
         debug,
@@ -749,7 +766,6 @@ def _run_tagged_profiles_esq(
 def _run_profiles_file_esq(
     profiles_file: str,
     pytest_args: list[str],
-    skip_system_check: bool,
     data_dir: str,
     verbose: bool = False,
     debug: bool = False,
@@ -775,7 +791,6 @@ def _run_profiles_file_esq(
     return _resolve_and_execute_profiles_esq(
         profile_names,
         pytest_args,
-        skip_system_check,
         data_dir,
         verbose,
         debug,
@@ -789,7 +804,6 @@ def _run_profiles_file_esq(
 def _resolve_and_execute_profiles_esq(
     requested_profile_names: list[str],
     pytest_args: list[str],
-    skip_system_check: bool,
     data_dir: str,
     verbose: bool = False,
     debug: bool = False,
@@ -843,7 +857,7 @@ def _resolve_and_execute_profiles_esq(
         and all_profiles_dict[name].get("params", {}).get("labels", {}).get("system_compatibility", False)
         for name in requested_profile_names
     )
-    if requires_system_compatibility_check and not skip_system_check:
+    if requires_system_compatibility_check:
         is_cpu_supported, should_continue, skip_qual = _check_system_validation_esq(force, mode="qualification")
         if not should_continue:
             return 1, False
@@ -851,25 +865,21 @@ def _resolve_and_execute_profiles_esq(
     # Pre-validate each requested profile's own system requirements before expanding
     # dependencies, so a dependency profile doesn't run pointlessly when the profile
     # that actually needs it can't meet its own requirements.
-    viable_requested_names = requested_profile_names
-    if not skip_system_check:
-        from sysagent.utils.testing.profile_validator import validate_profile_requirements
+    from sysagent.utils.testing.profile_validator import validate_profile_requirements
 
-        viable_requested_names = []
-        for profile_name in requested_profile_names:
-            validation_result = validate_profile_requirements(
-                all_profiles_dict[profile_name], profile_name=profile_name
+    viable_requested_names = []
+    for profile_name in requested_profile_names:
+        validation_result = validate_profile_requirements(all_profiles_dict[profile_name], profile_name=profile_name)
+        if validation_result.get("passed", False):
+            viable_requested_names.append(profile_name)
+        else:
+            logger.error(
+                f"Profile '{profile_name}' does not meet system requirements - skipping it and its dependencies"
             )
-            if validation_result.get("passed", False):
-                viable_requested_names.append(profile_name)
-            else:
-                logger.error(
-                    f"Profile '{profile_name}' does not meet system requirements - skipping it and its dependencies"
-                )
 
-        if not viable_requested_names:
-            logger.error("No requested profile(s) meet system requirements - nothing to run")
-            return 1, False
+    if not viable_requested_names:
+        logger.error("No requested profile(s) meet system requirements - nothing to run")
+        return 1, False
 
     for profile_name in list(viable_requested_names):
         labels = all_profiles_dict[profile_name].get("params", {}).get("labels", {})
@@ -942,7 +952,6 @@ def _resolve_and_execute_profiles_esq(
         result_code, profile_tests_ran = _run_single_profile(
             current_profile_name,
             pytest_args,
-            skip_system_check,
             data_dir,
             verbose,
             debug,
@@ -962,7 +971,6 @@ def _resolve_and_execute_profiles_esq(
 
 
 def _run_all_profiles_esq(
-    skip_system_check: bool,
     data_dir: str,
     verbose: bool,
     debug: bool,
@@ -1052,11 +1060,10 @@ def _run_all_profiles_esq(
     # ESQ-specific prompt handling
     if run_all_profiles:
         # --all flag: Run all profile types with ESQ validation
-        if not skip_system_check:
-            is_cpu_supported, should_continue, skip_qual = _check_system_validation_esq(force, mode="all")
-            if not should_continue:
-                return 1, False
-            skip_qualification = skip_qual
+        is_cpu_supported, should_continue, skip_qual = _check_system_validation_esq(force, mode="all")
+        if not should_continue:
+            return 1, False
+        skip_qualification = skip_qual
 
         include_all_types = True
         skip_vertical_profiles = False
@@ -1067,11 +1074,10 @@ def _run_all_profiles_esq(
         # Use mode="all" so that on an unsupported CPU the user is offered the
         # chance to continue running qualification profiles that do NOT require
         # the ESQ-level system compatibility check.
-        if not skip_system_check:
-            is_cpu_supported, should_continue, skip_qual = _check_system_validation_esq(force, mode="all")
-            if not should_continue:
-                return 1, False
-            skip_qualification = skip_qual
+        is_cpu_supported, should_continue, skip_qual = _check_system_validation_esq(force, mode="all")
+        if not should_continue:
+            return 1, False
+        skip_qualification = skip_qual
 
         include_all_types = False
         skip_vertical_profiles = True
@@ -1102,7 +1108,6 @@ def _run_all_profiles_esq(
         return _resolve_and_execute_profiles_esq(
             selected_profile_names,
             pytest_args,
-            skip_system_check,
             data_dir,
             verbose,
             debug,
@@ -1256,7 +1261,7 @@ def _run_all_profiles_esq(
         execution_order = sorted(all_profiles_dict.keys())
 
     # Validate all profiles (reuse sysagent's generic validator)
-    valid_profiles, failed_profiles = _validate_all_profiles(all_profile_items, skip_system_check)
+    valid_profiles, failed_profiles = _validate_all_profiles(all_profile_items)
 
     if failed_profiles:
         # Logged at WARNING level so the summary is visible even in non-verbose

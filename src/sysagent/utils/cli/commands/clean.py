@@ -92,7 +92,7 @@ def clean_data_dir(
                 cleaned_items.append("virtual environments")
 
             if docker_only:
-                logger.info("Removing only ESQ-built Docker images")
+                logger.info("Removing only Docker images built by this CLI")
                 _clean_docker_images()
                 cleaned_items.append("Docker images")
 
@@ -106,7 +106,9 @@ def clean_data_dir(
                 clean_data = True
                 clean_venvs = True
                 clean_docker = True
-                logger.info("Cleaning all directories (cache, thirdparty, data, venvs, and Docker images built by this CLI)")
+                logger.info(
+                    "Cleaning all directories (cache, thirdparty, data, venvs, and Docker images built by this CLI)"
+                )
 
             # Clean standard directories (results, logs, reports)
             _clean_logs_directory(data_dir)

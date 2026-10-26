@@ -100,7 +100,6 @@ def main() -> int:
                 verbose=verbose,
                 debug=debug,
                 suites_dir=args.suites_dir,
-                skip_system_check=args.skip_system_check,
                 no_cache=args.no_cache,
                 filters=args.filter,
                 run_all_profiles=getattr(args, "all", False),

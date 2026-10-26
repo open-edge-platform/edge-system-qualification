@@ -12,7 +12,7 @@ software.yml configurations for system information tracking.
 import logging
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import yaml
 
@@ -33,9 +33,9 @@ class DependencyConfigLoader:
     """Loads and merges dependency configurations from multiple packages dynamically."""
 
     def __init__(self):
-        self.loaded_configs: Dict[str, DependencyConfig] = {}
+        self.loaded_configs: dict[str, DependencyConfig] = {}
 
-    def _discover_dependency_configs(self) -> List[Path]:
+    def _discover_dependency_configs(self) -> list[Path]:
         """
         Discover dependency configuration files using the same approach as software.yml.
 
@@ -71,7 +71,7 @@ class DependencyConfigLoader:
 
         return dependency_config_paths
 
-    def _fallback_discovery(self) -> List[Path]:
+    def _fallback_discovery(self) -> list[Path]:
         """Fallback discovery method when entrypoint discovery fails."""
         paths = []
 
@@ -92,7 +92,7 @@ class DependencyConfigLoader:
 
         return paths
 
-    def load_all_package_configs(self) -> Dict[str, DependencyConfig]:
+    def load_all_package_configs(self) -> dict[str, DependencyConfig]:
         """
         Load dependency configurations from all discovered packages.
 
@@ -133,7 +133,7 @@ class DependencyConfigLoader:
         # Fallback: use parent directory name
         return config_path.parent.parent.name if config_path.parent.name == "core" else config_path.parent.name
 
-    def load_package_config(self, package_name: str, config_path: Optional[str] = None) -> Optional[DependencyConfig]:
+    def load_package_config(self, package_name: str, config_path: str | None = None) -> DependencyConfig | None:
         """
         Load dependency configuration for a specific package.
 
@@ -178,7 +178,7 @@ class DependencyConfigLoader:
             logger.error(f"Failed to load dependency config for {package_name} from {config_path}: {e}")
             return None
 
-    def _discover_config_path(self, package_name: str) -> Optional[str]:
+    def _discover_config_path(self, package_name: str) -> str | None:
         """Discover the dependency config path for a package."""
         # Try multiple possible locations
         possible_paths = [
@@ -194,7 +194,7 @@ class DependencyConfigLoader:
 
         return None
 
-    def _parse_config(self, raw_config: Dict[str, Any], package_name: str) -> DependencyConfig:
+    def _parse_config(self, raw_config: dict[str, Any], package_name: str) -> DependencyConfig:
         """Parse raw YAML config into structured objects."""
         config = DependencyConfig()
         config.version = raw_config.get("version", "1.0")
@@ -218,7 +218,7 @@ class DependencyConfigLoader:
 
         return config
 
-    def _parse_dependency(self, name: str, data: Dict[str, Any], package_name: str) -> Dependency:
+    def _parse_dependency(self, name: str, data: dict[str, Any], package_name: str) -> Dependency:
         """Parse a single dependency from configuration data."""
         dependency = Dependency(
             name=name,
@@ -230,6 +230,7 @@ class DependencyConfigLoader:
             min_version=data.get("min_version"),
             max_version=data.get("max_version"),
             package_source=package_name,
+            requires_flag=data.get("requires_flag"),
         )
 
         # Parse installations
@@ -239,7 +240,7 @@ class DependencyConfigLoader:
 
         return dependency
 
-    def _parse_installation(self, data: Dict[str, Any]) -> DependencyInstallation:
+    def _parse_installation(self, data: dict[str, Any]) -> DependencyInstallation:
         """Parse installation instructions from configuration data."""
         installation = DependencyInstallation(
             os_type=OSType(data["os_type"]),
@@ -260,6 +261,12 @@ class DependencyConfigLoader:
                 check_service_running=validation_data.get("check_service_running"),
                 check_method=validation_data.get("check_method"),
                 packages_check=validation_data.get("packages_check", []),
+                devices=validation_data.get("devices", []),
+                hosts=validation_data.get("hosts", []),
+                host_alternatives=validation_data.get("host_alternatives", {}),
+                image=validation_data.get("image"),
+                port=validation_data.get("port"),
+                timeout=validation_data.get("timeout"),
             )
 
             if "check_commands" in validation_data:
@@ -269,7 +276,7 @@ class DependencyConfigLoader:
 
         return installation
 
-    def merge_configs(self, package_names: Optional[List[str]] = None) -> DependencyConfig:
+    def merge_configs(self, package_names: list[str] | None = None) -> DependencyConfig:
         """
         Merge dependency configurations from multiple packages.
 
@@ -428,7 +435,7 @@ class DependencyConfigLoader:
 
         return merged_installation
 
-    def _sort_packages_for_merging(self, package_names: List[str]) -> List[str]:
+    def _sort_packages_for_merging(self, package_names: list[str]) -> list[str]:
         """Sort packages for consistent merging order, prioritizing core packages."""
         # Put sysagent first as it's the core package
         sorted_packages = []
@@ -448,7 +455,7 @@ class DependencyConfigLoader:
         # Use dynamic discovery instead of hardcoded packages
         return self.merge_configs()  # None means discover all packages
 
-    def _discover_packages(self) -> List[str]:
+    def _discover_packages(self) -> list[str]:
         """
         Discover packages that have dependency configurations.
 

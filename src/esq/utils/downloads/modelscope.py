@@ -113,20 +113,16 @@ def download_model(
         logger.error(error_msg)
         raise RuntimeError(error_msg)
 
-    # Determine model path using known cache structure
+    # The cache layout differs across modelscope versions (hub/models/<id> vs
+    # models/<owner>--<name>/snapshots/<rev>), so ask modelscope to resolve the
+    # already-downloaded path instead of reconstructing it.
     if local_dir:
-        # Model downloaded to specified local directory
         model_path = local_dir
-        logger.debug(f"Model downloaded to local_dir: {model_path}")
     else:
-        # Model downloaded to cache - construct path based on ModelScope cache structure
-        # ModelScope cache structure: {cache_dir}/hub/models/{model_id}/
-        cache_location = cache_dir if cache_dir else os.path.expanduser("~/.cache/modelscope/hub/models")
-        # ModelScope uses model_id as-is in the path
-        model_path = os.path.join(cache_location, model_id)
-        logger.debug(f"Model located in cache: {model_path}")
+        from modelscope import snapshot_download
 
-    # Verify the path exists
+        model_path = snapshot_download(model_id, revision=revision, cache_dir=cache_dir, local_files_only=True)
+
     if not os.path.exists(model_path):
         raise RuntimeError(f"Model path does not exist: {model_path}")
 

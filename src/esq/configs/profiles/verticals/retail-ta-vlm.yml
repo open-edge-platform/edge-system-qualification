@@ -1,0 +1,96 @@
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+name: "profile.vertical.retail-ta-vlm"
+description: "Take-Away Order Accuracy VLM Benchmark Test Suite"
+version: "1.0.0"
+params:
+  labels:
+    profile_display_name: "Retail"
+    group: "retail"
+    type: "vertical"
+    display_status: false
+  requirements:
+    memory_min_gib: 16.0
+    storage_min_gib: 30.0
+    os_type:
+      - "linux"
+    docker_required: true
+  telemetry:
+    enabled: true
+    interval: 10  # seconds between samples
+    modules:
+      - name: cpu_usage
+        enabled: true
+
+      - name: cpu_freq
+        enabled: true
+
+      - name: cpu_temp
+        enabled: true
+
+      - name: memory_usage
+        enabled: true
+
+      - name: package_power
+        enabled: true
+
+      - name: gpu_temp
+        enabled: true
+
+      - name: gpu_freq
+        enabled: true
+
+      - name: gpu_power
+        enabled: true
+
+      - name: gpu_usage
+        enabled: true
+
+      - name: npu_usage
+        enabled: true
+        
+      - name: npu_freq
+        enabled: true
+
+suites:
+  - name: "vertical"
+    sub_suites:
+      - name: "retail"
+        tests:
+          test_ta_vlm:
+            params:
+              # CPU fixed-workers benchmark
+              - test_id: "TAO-BNK-001"
+                display_name: "Take-Away Order Accuracy VLM - CPU"
+                devices: [cpu]
+                timeout: 1800  # 30 minutes
+                benchmark_workers: 1
+                benchmark_duration: 200
+                benchmark_init_duration: 10
+                commit_id: "65d1959"  # Order Accuracy repository commit (tag release v2026.2.3) to checkout
+
+              # iGPU fixed-workers benchmark
+              - test_id: "TAO-BNK-002"
+                display_name: "Take-Away Order Accuracy VLM - iGPU"
+                devices: [igpu]
+                timeout: 1800  # 30 minutes
+                benchmark_workers: 1
+                benchmark_duration: 200
+                benchmark_init_duration: 10
+                commit_id: "65d1959"  # Order Accuracy repository commit (tag release v2026.2.3) to checkout
+                requirements:
+                  igpu_required: true
+
+              # dGPU fixed-workers benchmark
+              - test_id: "TAO-BNK-003"
+                display_name: "Take-Away Order Accuracy VLM - dGPU"
+                devices: [dgpu]
+                timeout: 1800  # 30 minutes
+                benchmark_workers: 1
+                benchmark_duration: 200
+                benchmark_init_duration: 10
+                commit_id: "65d1959"  # Order Accuracy repository commit (tag release v2026.2.3) to checkout
+                requirements:
+                  dgpu_required: true
+

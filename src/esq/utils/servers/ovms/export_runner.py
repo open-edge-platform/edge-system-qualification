@@ -34,6 +34,21 @@ OVMS_EXPORT_SCRIPT_URL = f"{_OVMS_BASE_URL}/export_model.py"
 OVMS_REQUIREMENTS_URL = f"{_OVMS_BASE_URL}/requirements.txt"
 
 # ---------------------------------------------------------------------------
+# Export venv Python version
+# ---------------------------------------------------------------------------
+# optimum (2.3.0) builds ``NormalizedConfig.with_args(...)`` as a
+# ``functools.partial`` used as a class attribute.  Python 3.14 made ``partial``
+# a method descriptor, so the config object is bound as an extra positional
+# argument and the export of several architectures (e.g. phi3 ->
+# microsoft/Phi-4-mini-reasoning) fails with:
+#   "TypeError: NormalizedConfig.__init__() got multiple values for argument
+#    'allow_new'".
+# Without an explicit version, uv picks the host's default interpreter (3.14 on
+# Ubuntu 26.04), so pin a version known to work with the upstream requirements.
+# https://github.com/huggingface/optimum/pull/2496
+_EXPORT_VENV_PYTHON_VERSION = "3.12"
+
+# ---------------------------------------------------------------------------
 # Forced export task
 # ---------------------------------------------------------------------------
 # OVMS continuous-batching LLM serving requires a *stateful* model that exposes
@@ -114,7 +129,7 @@ def get_export_venv_name() -> str:
     recreation.  Both the script and requirements.txt are pinned to the same
     commit, so the commit hash alone uniquely identifies the environment.
     """
-    return f"ovms_export_{OVMS_COMMIT[:8]}"
+    return f"ovms_export_{OVMS_COMMIT[:8]}_py{_EXPORT_VENV_PYTHON_VERSION.replace('.', '')}"
 
 
 def _download_upstream_file(url: str, dest_path: str) -> None:
@@ -367,6 +382,7 @@ def setup_export_venv(
     success, message = manager.setup_named_venv(
         venv_name=venv_name,
         requirements_file=req_file,
+        python_version=_EXPORT_VENV_PYTHON_VERSION,
         force=force,
         install_timeout=1800.0,
         install_pip_args=extra_pip_args,

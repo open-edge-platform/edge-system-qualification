@@ -1101,7 +1101,7 @@ requires-dist = [
     { name = "jinja2", specifier = ">=3.1.6" },
     { name = "kagglehub", specifier = ">=0.3.13" },
     { name = "matplotlib", specifier = ">=3.10.3" },
-    { name = "modelscope", specifier = ">=1.33.0" },
+    { name = "modelscope", specifier = ">=1.40.2" },
     { name = "nncf", specifier = ">=2.17.0" },
     { name = "openvino", specifier = ">=2025.4.1" },
     { name = "openvino-tokenizers", specifier = ">=2025.2.0.1" },
@@ -2038,7 +2038,7 @@ wheels = [
 
 [[package]]
 name = "modelscope"
-version = "1.40.1"
+version = "1.40.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "filelock" },
@@ -2049,14 +2049,14 @@ dependencies = [
     { name = "tqdm" },
     { name = "urllib3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/e1/c5/5e5e04377c3522b589b940393673a12a571340fef7e646ffe80d61150e58/modelscope-1.40.1.tar.gz", hash = "sha256:7b46d74fc3905a0a34a60bdefe774677d709d9ee2ada8cf85401a50ea533f9ae", size = 4564297, upload-time = "2026-09-15T12:11:49.467Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d7/af/f92c9824db46757dd1b0b5cbf3778daf54e7e44f0e1e6934d0b1bedfb286/modelscope-1.40.2.tar.gz", hash = "sha256:7a642cef8c144c28c4ddcc37db5fd803f5481f0d78a7f26c2b9e0e2a225b528c", size = 4566951, upload-time = "2026-10-09T09:09:10.747Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f8/ea/78b33ab6fe73db1eeedc5df229450d7ff481ec9050f4bcc46e44ef1c00fb/modelscope-1.40.1-py3-none-any.whl", hash = "sha256:6f135fe80903e7bfcd6ccc707f4f6f85c8e445cf497b624bd07299582486e2c1", size = 6061167, upload-time = "2026-09-15T12:11:46.323Z" },
+    { url = "https://files.pythonhosted.org/packages/b9/8a/e85b79ee1c541f7bbf208fd7a6185c9b11e50c192b1071b0750db26b09e9/modelscope-1.40.2-py3-none-any.whl", hash = "sha256:ea03e0ec4a73398a488d3d240cda4f0c5b62390377a134756d4074a3036cb909", size = 6062299, upload-time = "2026-10-09T09:09:07.486Z" },
 ]
 
 [[package]]
 name = "modelscope-hub"
-version = "0.4.5"
+version = "0.5.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cryptography" },
@@ -2065,9 +2065,9 @@ dependencies = [
     { name = "tqdm" },
     { name = "urllib3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/9c/82/b0df11ec6ee9de33c9bda59755cd377ae3d7bb2535fa0deee4500d08ba95/modelscope_hub-0.4.5.tar.gz", hash = "sha256:b8606176af5be9b6437e2dcb119bd3de9f25862b32e56ff71096af99e545aaaf", size = 297797, upload-time = "2026-09-21T08:26:43.409Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/6e/97/603c34c63b82d127784867f2d4a5e62ce4eab6f777634e92603212e2c8f5/modelscope_hub-0.5.1.tar.gz", hash = "sha256:5e6b8f4dd3df73a942f0b017b14aaff7080c5dbce1b0b0c61117a4334ac535c3", size = 349908, upload-time = "2026-10-26T11:48:19.753Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5a/bc/8c1aa12b4abc094a4c1e2b3cd28686c750b4fad610eb1aa7acfe5d8c521e/modelscope_hub-0.4.5-py3-none-any.whl", hash = "sha256:9157bbc34d93a70d099c8ab87a113fc9a4149e31ab79e8eb8f7563884043f082", size = 236385, upload-time = "2026-09-21T08:26:41.885Z" },
+    { url = "https://files.pythonhosted.org/packages/0f/10/c8f71d82b237fe063fcf3d504f33af5bd4a805412a4de24d12ef04cd2d5d/modelscope_hub-0.5.1-py3-none-any.whl", hash = "sha256:4df7508c17359017cd85a5fb15155c048d29ade64790322acb64134a299c53b1", size = 268412, upload-time = "2026-10-26T11:48:18.309Z" },
 ]
 
 [[package]]

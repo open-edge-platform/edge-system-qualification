@@ -225,11 +225,34 @@ where `<TEST_FILENAME>` is the test file name with `test_` and `.py` removed, up
 | `ENV_SUITE_MEMORY_HEALTH_MEMTESTER_SIZE_MB` | `test_memory_health.py` | `memtester_size_mb` | Integer MB or `auto` for dynamic sizing |
 | `ENV_SUITE_MEMORY_HEALTH_MEMTESTER_ITERATIONS` | `test_memory_health.py` | `memtester_iterations` | Positive integer, e.g. `1`, `3` |
 
+### Framework variables
+
+Framework-level settings use the `CORE_` prefix and apply to every run, not to a single test file.
+
+| Variable | Overrides | Accepted values |
+|---|---|---|
+| `CORE_NETWORK_TIMEOUT_SECONDS` | Per-host timeout of the network readiness check (default `10`) | Positive number of seconds, e.g. `10` or `2.5` |
+| `CORE_NETWORK_RETRY_ATTEMPTS` | Attempts per host in the network readiness check, and attempts per download for tool/dependency archives, files, Node.js, the PCI IDs database, the OVMS export script, test images, Hugging Face/ModelScope, Kaggle Hub and Ultralytics model downloads, Docker image pulls (`docker pull`, compose pulls and the Docker SDK) and the rustup installer download (default `10`). Timeouts are not retried, and Docker CLI pulls are only retried for transient network/registry errors | Positive integer; `1` disables retries |
+
+An invalid value (non-numeric, or not greater than `0`/`1` respectively) is logged once as a warning and ignored.
+
+!!! danger "Debugging and troubleshooting only"
+    `CORE_SKIP_PRERUN_CHECKS=1` skips the pre-run readiness checks (network connectivity, device smoke tests, ...). It is **not** an officially supported option or configuration: it exists for advanced users isolating a problem, and a warning is logged whenever it is set. Skipping the checks means network or device problems surface later as download errors or test timeouts, and results from such runs should not be used for qualification.
+
 ### Usage examples
 
 ```bash
 # Run cyclictest for 60 seconds instead of the profile default (24 h)
 ENV_SUITE_CYCLICTEST_DURATION=60s esq -v run --profile profile.suite.realtime.performance
+
+# Try 10 attempts (instead of the default 5) for the network readiness check and downloads
+CORE_NETWORK_RETRY_ATTEMPTS=10 esq -v run --profile profile.suite.system.cpu-sku
+
+# Allow slow networks up to 15 seconds per host in the network readiness check
+CORE_NETWORK_TIMEOUT_SECONDS=15 esq -v run --profile profile.suite.system.cpu-sku
+
+# Fail fast: a single attempt, no retries
+CORE_NETWORK_RETRY_ATTEMPTS=1 esq -v run --profile profile.suite.system.cpu-sku
 ```
 
 ### Priority rules

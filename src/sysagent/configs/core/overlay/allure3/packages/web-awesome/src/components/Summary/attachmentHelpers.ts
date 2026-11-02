@@ -181,6 +181,25 @@ export async function getReferenceFromAttachment(
   return "N/A";
 }
 
+/**
+ * Matches a test result against a test module name regardless of how the
+ * "package" label is formatted. Depending on the Python / allure-pytest
+ * version it is either the bare module (`test_system`) or the dotted path
+ * (`suites.core.cli.test_system`), so compare the last dotted segment and
+ * fall back to `fullName` (`suites.core.cli.test_system#test_system`).
+ */
+function matchesTestModule(testResult: any, moduleName: string): boolean {
+  const packageLabel = testResult?.labels?.find((l: any) => l.name === "package")?.value;
+  if (typeof packageLabel === "string" && packageLabel.split(/[./\\]/).pop() === moduleName) {
+    return true;
+  }
+  const fullName = testResult?.fullName;
+  if (typeof fullName === "string") {
+    return fullName.split("#")[0].split(/[./\\]/).pop() === moduleName;
+  }
+  return false;
+}
+
 // ─── System information ───────────────────────────────────────────────────────
 
 /**
@@ -199,10 +218,7 @@ export async function getSystemInfoFromAttachment(
       const suiteLabel = testResult.labels?.find(
         (label: any) => label.name === "suite",
       )?.value;
-      const packageLabel = testResult.labels?.find(
-        (label: any) => label.name === "package",
-      )?.value;
-      return suiteLabel === "core" && packageLabel === "test_system";
+      return suiteLabel === "core" && matchesTestModule(testResult, "test_system");
     },
   );
 
@@ -251,7 +267,7 @@ export async function getTestDescriptionsFromSummary(
 ): Promise<Record<string, string>> {
   const summaryTest = Object.values(individualTestResults).find(
     (testResult: any) =>
-      testResult.labels?.find((l: any) => l.name === "package")?.value === "test_summary",
+      matchesTestModule(testResult, "test_summary"),
   );
 
   if (!summaryTest) return {};
@@ -305,10 +321,7 @@ export async function getSummaryMetaFromAttachment(
 
   const summaryTest = Object.values(individualTestResults).find(
     (testResult: any) => {
-      const packageLabel = testResult.labels?.find(
-        (label: any) => label.name === "package",
-      )?.value;
-      return packageLabel === "test_summary";
+      return matchesTestModule(testResult, "test_summary");
     },
   );
 

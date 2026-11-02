@@ -56,13 +56,7 @@ except ImportError:
     pass
 
 try:
-    from .network import (
-        check_internet_connectivity,
-        check_network_restrictions,
-        get_cached_network_restrictions,
-        get_preferred_download_source,
-        test_connectivity,
-    )
+    from .network import get_preferred_download_source
 except ImportError:
     # Network utilities might have dependencies
     pass
@@ -100,11 +94,7 @@ __all__ = [
     "get_dependency_info",
     "download_github_repo",
     # Network utilities
-    "check_internet_connectivity",
-    "check_network_restrictions",
-    "get_cached_network_restrictions",
     "get_preferred_download_source",
-    "test_connectivity",
     # Dependency system
     "get_dependency_manager",
 ]

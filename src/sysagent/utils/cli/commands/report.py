@@ -15,12 +15,17 @@ from sysagent.utils.config import get_dist_version, setup_data_dir
 from sysagent.utils.infrastructure import NODE_VERSION, setup_node
 from sysagent.utils.logging import setup_command_logging
 from sysagent.utils.reporting import ALLURE_DIR_NAME, ALLURE_VERSION, generate_allure_report
+from sysagent.utils.spinner import status_spinner
 
 logger = logging.getLogger(__name__)
 
 
 def generate_report(
-    report_name: str = None, report_version: str = None, force: bool = False, debug: bool = False
+    report_name: str = None,
+    report_version: str = None,
+    force: bool = False,
+    debug: bool = False,
+    verbose: bool = False,
 ) -> int:
     """
     Generate an Allure report from test results.
@@ -30,6 +35,8 @@ def generate_report(
         report_version: Version string to use for allureVersion in config (if provided)
         force: Force reinstallation of Allure CLI even if it's already installed
         debug: Whether to show debug level logs
+        verbose: Whether verbose output was requested. Without verbose/debug, a status
+            spinner is shown while the report is generated instead of log lines.
 
     Returns:
         int: Exit code (0 for success, non-zero for failure)
@@ -37,9 +44,23 @@ def generate_report(
     try:
         # Set up logging for this operation
         setup_command_logging("report", verbose=True, debug=debug)
+    except Exception as e:
+        logger.error(f"Error generating report: {e}")
+        return 1
 
+    quiet = not (verbose or debug)
+    if not quiet:
         logger.info("Generating report")
 
+    # Log lines emitted meanwhile (e.g. the final "Report available at" path) are
+    # written above the spinner line.
+    with status_spinner("Generating report", enabled=quiet):
+        return _generate_report(report_name, report_version, force, debug)
+
+
+def _generate_report(report_name: str | None, report_version: str | None, force: bool, debug: bool) -> int:
+    """Install Node.js/Allure if needed and generate the report (see ``generate_report``)."""
+    try:
         # Setup data directory
         data_dir = setup_data_dir()
 

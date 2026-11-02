@@ -7,9 +7,9 @@ import logging
 import re
 import shutil
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 
 from sysagent.utils.core import run_command
+from sysagent.utils.infrastructure.retry import run_command_with_retry
 
 logger = logging.getLogger(__name__)
 
@@ -17,9 +17,9 @@ logger = logging.getLogger(__name__)
 _VALID_ENV_KEY = re.compile(r"^[A-Z_][A-Z0-9_]*$")
 
 
-def _sanitize_env_overrides(values: Dict[str, str]) -> Dict[str, str]:
+def _sanitize_env_overrides(values: dict[str, str]) -> dict[str, str]:
     """Validate and sanitize env-file key-value overrides."""
-    sanitized: Dict[str, str] = {}
+    sanitized: dict[str, str] = {}
     for key, value in values.items():
         if not _VALID_ENV_KEY.fullmatch(key):
             raise ValueError(f"Invalid env key: {key}")
@@ -34,7 +34,7 @@ class ReferenceTimeseriesAppManager:
         self.app_root = Path(app_root).resolve()
         self.timeout = timeout
         self.env_path = self.app_root / ".env"
-        self._backup_path: Optional[Path] = None
+        self._backup_path: Path | None = None
 
     def validate_paths(self, get_started_rel_path: str = "docs/user-guide/get-started.md") -> None:
         """Validate required reference application files exist."""
@@ -57,8 +57,9 @@ class ReferenceTimeseriesAppManager:
     def pull_images(self, sample_app: str = "wind-turbine-anomaly-detection") -> None:
         """Pull container images used by docker compose deployment."""
         env = {"SAMPLE_APP": sample_app}
-        result = run_command(
+        result = run_command_with_retry(
             ["docker", "compose", "pull", "--ignore-buildable"],
+            description="docker compose pull",
             cwd=str(self.app_root),
             env=env,
             timeout=self.timeout,
@@ -66,8 +67,9 @@ class ReferenceTimeseriesAppManager:
         if result.success:
             return
 
-        fallback = run_command(
+        fallback = run_command_with_retry(
             ["docker", "compose", "pull"],
+            description="docker compose pull",
             cwd=str(self.app_root),
             env=env,
             timeout=self.timeout,
@@ -75,7 +77,7 @@ class ReferenceTimeseriesAppManager:
         if not fallback.success:
             raise RuntimeError(f"Failed to pull compose images: {fallback.stderr or result.stderr}")
 
-    def apply_env_overrides(self, env_overrides: Dict[str, str]) -> None:
+    def apply_env_overrides(self, env_overrides: dict[str, str]) -> None:
         """Patch reference app .env with test-safe runtime values."""
         sanitized = _sanitize_env_overrides(env_overrides)
 
@@ -84,8 +86,8 @@ class ReferenceTimeseriesAppManager:
             self._backup_path = self.env_path.with_suffix(".env.esq.backup")
             shutil.copy2(self.env_path, self._backup_path)
 
-        updates_applied: Dict[str, bool] = {key: False for key in sanitized}
-        updated_lines: List[str] = []
+        updates_applied: dict[str, bool] = {key: False for key in sanitized}
+        updated_lines: list[str] = []
         for line in original_content.splitlines(keepends=True):
             replaced = False
             for key, value in sanitized.items():
@@ -114,9 +116,9 @@ class ReferenceTimeseriesAppManager:
     def run_make_target(
         self,
         target: str,
-        args: Optional[List[str]] = None,
+        args: list[str] | None = None,
         sample_app: str = "wind-turbine-anomaly-detection",
-    ) -> Tuple[bool, str, str]:
+    ) -> tuple[bool, str, str]:
         """Execute a make target in the reference app directory."""
         command = ["make", target]
         if args:
@@ -135,7 +137,7 @@ class ReferenceTimeseriesAppManager:
         ingestion_mode: str,
         sample_app: str,
         num_streams: int,
-        number_of_data_points_per_stream: Optional[int],
+        number_of_data_points_per_stream: int | None,
         ingestion_interval: str,
     ) -> None:
         """Deploy reference app using documented make targets."""
@@ -163,7 +165,7 @@ class ReferenceTimeseriesAppManager:
             raise RuntimeError(f"Deployment status check failed: {stderr or stdout}")
         return stdout
 
-    def get_running_services(self, sample_app: str = "wind-turbine-anomaly-detection") -> List[str]:
+    def get_running_services(self, sample_app: str = "wind-turbine-anomaly-detection") -> list[str]:
         """Collect list of running compose services for metrics and reporting."""
         result = run_command(
             ["docker", "compose", "ps", "--services", "--status", "running"],

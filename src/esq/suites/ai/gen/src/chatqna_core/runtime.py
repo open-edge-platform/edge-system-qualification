@@ -5,10 +5,10 @@ import logging
 import os
 import time
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 
 import yaml
 from sysagent.utils.core import check_command_available, run_command
+from sysagent.utils.infrastructure.retry import DEFAULT_MAX_ATTEMPTS, run_command_with_retry
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +18,7 @@ _LOOPBACK_HOST_IPS = ("127.0.0.1", "localhost", "::1")
 _LOOPBACK_BIND = "127.0.0.1"
 
 
-def _normalize_port_entry(entry: object) -> Tuple[object, bool, str]:
+def _normalize_port_entry(entry: object) -> tuple[object, bool, str]:
     """Normalize a single compose ``ports:`` entry to bind to loopback.
 
     Returns ``(new_entry, modified, reason)``. Container-only entries (no published
@@ -179,7 +179,7 @@ def harden_compose_port_bindings(compose_file: str) -> None:
         ports = service_config.get("ports", [])
         if not isinstance(ports, list) or not ports:
             continue
-        new_ports: List[object] = []
+        new_ports: list[object] = []
         for entry in ports:
             new_entry, modified, reason = _normalize_port_entry(entry)
             if modified:
@@ -318,7 +318,7 @@ def _ensure_render_gid() -> str:
         return ""
 
 
-def build_runtime_env(configs: Dict[str, object], resolved_paths: Dict[str, str]) -> Dict[str, str]:
+def build_runtime_env(configs: dict[str, object], resolved_paths: dict[str, str]) -> dict[str, str]:
     runtime = str(configs.get("backend_runtime", "openvino")).strip().lower()
     compose_profile = str(configs.get("compose_profile", "")).strip()
     if not compose_profile:
@@ -371,7 +371,7 @@ def build_runtime_env(configs: Dict[str, object], resolved_paths: Dict[str, str]
     return env
 
 
-def render_nginx_config(resolved_paths: Dict[str, str], env: Dict[str, str]) -> Optional[str]:
+def render_nginx_config(resolved_paths: dict[str, str], env: dict[str, str]) -> str | None:
     template_path = Path(resolved_paths["nginx_template_path"]).expanduser().resolve()
     if not template_path.is_file():
         logger.warning("Skipping nginx config generation because the template is missing: %s", template_path)
@@ -386,7 +386,7 @@ def render_nginx_config(resolved_paths: Dict[str, str], env: Dict[str, str]) -> 
     return str(output_path)
 
 
-def get_selected_services(configs: Dict[str, object]) -> List[str]:
+def get_selected_services(configs: dict[str, object]) -> list[str]:
     backend_service = str(configs.get("backend_service", "chatqna-core-ov-cpu")).strip()
     include_ui = bool(configs.get("include_ui", False))
     services = [backend_service]
@@ -431,45 +431,39 @@ class ChatQnAComposeManager:
         harden_compose_port_bindings(self.compose_file)
         validate_compose_port_bindings(self.compose_file)
 
-    def _compose_cmd(self, sub_cmd: List[str]) -> List[str]:
+    def _compose_cmd(self, sub_cmd: list[str]) -> list[str]:
         return ["docker", "compose", "-f", self.compose_file, "-p", self.project_name, *sub_cmd]
 
     def pull_images(
         self,
-        env: Optional[Dict[str, str]] = None,
-        retries: int = 3,
+        env: dict[str, str] | None = None,
+        retries: int = DEFAULT_MAX_ATTEMPTS,
         retry_delay_seconds: int = 30,
     ) -> None:
-        """Pull compose images with retry for transient network errors (e.g. Docker Hub TLS timeouts)."""
-        last_error: Optional[str] = None
-        for attempt in range(1, retries + 1):
-            result = run_command(self._compose_cmd(["pull"]), cwd=self.working_dir, env=env, timeout=self.timeout)
-            if result.success:
-                return
-            last_error = result.stderr or result.stdout
-            # Transient network conditions worth retrying: TLS timeouts, connection resets, temporary DNS failures
-            transient_markers = ("tls handshake timeout", "connection reset", "eof", "i/o timeout", "temporary failure")
-            is_transient = any(m in last_error.lower() for m in transient_markers)
-            if is_transient and attempt < retries:
-                logger.warning(
-                    "docker compose pull failed (attempt %d/%d, transient network error); retrying in %ds.\n%s",
-                    attempt,
-                    retries,
-                    retry_delay_seconds,
-                    last_error,
-                )
-                time.sleep(retry_delay_seconds)
-            else:
-                break
-        raise RuntimeError(f"Failed to pull compose images: {last_error}")
+        """Pull compose images with retry for transient network errors (e.g. Docker Hub TLS timeouts).
 
-    def bring_up(self, services: List[str], env: Optional[Dict[str, str]] = None) -> None:
+        ``retries`` is the default attempt count; ``CORE_NETWORK_RETRY_ATTEMPTS`` overrides it.
+        """
+        result = run_command_with_retry(
+            self._compose_cmd(["pull"]),
+            retries=retries,
+            delay=retry_delay_seconds,
+            description="docker compose pull",
+            cwd=self.working_dir,
+            env=env,
+            timeout=self.timeout,
+        )
+        if result.success:
+            return
+        raise RuntimeError(f"Failed to pull compose images: {result.stderr or result.stdout}")
+
+    def bring_up(self, services: list[str], env: dict[str, str] | None = None) -> None:
         sub_cmd = ["up", "-d", *services]
         result = run_command(self._compose_cmd(sub_cmd), cwd=self.working_dir, env=env, timeout=self.timeout)
         if not result.success:
             raise RuntimeError(f"Failed to start compose services: {result.stderr or result.stdout}")
 
-    def bring_down(self, env: Optional[Dict[str, str]] = None) -> None:
+    def bring_down(self, env: dict[str, str] | None = None) -> None:
         result = run_command(
             self._compose_cmd(["down", "-v"]),
             cwd=self.working_dir,
@@ -479,7 +473,7 @@ class ChatQnAComposeManager:
         if not result.success:
             logger.warning("Compose down reported issues: %s", result.stderr or result.stdout)
 
-    def get_running_services(self, env: Optional[Dict[str, str]] = None) -> List[str]:
+    def get_running_services(self, env: dict[str, str] | None = None) -> list[str]:
         result = run_command(
             self._compose_cmd(["ps", "--services", "--status", "running"]),
             cwd=self.working_dir,
@@ -490,7 +484,7 @@ class ChatQnAComposeManager:
             raise RuntimeError(f"Failed to get running services: {result.stderr or result.stdout}")
         return [line.strip() for line in result.stdout.splitlines() if line.strip()]
 
-    def get_container_id(self, service_name: str, env: Optional[Dict[str, str]] = None) -> Optional[str]:
+    def get_container_id(self, service_name: str, env: dict[str, str] | None = None) -> str | None:
         """Return the first container ID for a compose service, including stopped containers."""
         ps_result = run_command(
             self._compose_cmd(["ps", "-q", "--all", service_name]),
@@ -503,7 +497,7 @@ class ChatQnAComposeManager:
         ids = [line.strip() for line in ps_result.stdout.splitlines() if line.strip()]
         return ids[0] if ids else None
 
-    def get_container_state(self, container_id: str) -> Optional[Tuple[str, str, str]]:
+    def get_container_state(self, container_id: str) -> tuple[str, str, str] | None:
         """Return container state as (status, exit_code, error), or None on failure."""
         inspect_result = run_command(
             [
@@ -523,7 +517,7 @@ class ChatQnAComposeManager:
         return parts[0], parts[1], parts[2]
 
     @staticmethod
-    def _detect_fatal_bootstrap_error(log_text: str) -> Optional[str]:
+    def _detect_fatal_bootstrap_error(log_text: str) -> str | None:
         # Only match unambiguous startup failures. Generic tracebacks are
         # excluded since benign ones are common during startup; crashed
         # containers are caught via exit-status inspection.
@@ -544,7 +538,7 @@ class ChatQnAComposeManager:
         self,
         service_name: str,
         ready_log_marker: str,
-        env: Optional[Dict[str, str]] = None,
+        env: dict[str, str] | None = None,
         timeout_seconds: int = 2700,
         poll_interval_seconds: int = 15,
     ) -> bool:
@@ -622,8 +616,8 @@ class ChatQnAComposeManager:
 
     def wait_for_services_ready(
         self,
-        services: List[str],
-        env: Optional[Dict[str, str]] = None,
+        services: list[str],
+        env: dict[str, str] | None = None,
         timeout_seconds: int = 300,
         poll_interval_seconds: int = 5,
     ) -> bool:

@@ -22,11 +22,12 @@ import signal
 import shutil
 import threading
 from pathlib import Path
-from typing import Optional, Union
 
 import numpy as np
 import openvino as ov
 import requests
+
+from sysagent.utils.infrastructure.retry import with_retry
 
 from .common import save_openvino_model
 
@@ -89,7 +90,7 @@ YOLO_MODELS = {
 }
 
 
-def download_yolo_model(model_id: str, models_dir: Optional[str] = None) -> Optional[Path]:
+def download_yolo_model(model_id: str, models_dir: str | None = None) -> Path | None:
     """
     Download YOLO model weights using Ultralytics.
 
@@ -211,11 +212,11 @@ def download_yolo_model(model_id: str, models_dir: Optional[str] = None) -> Opti
 
 def export_yolo_model(
     model_id: str,
-    models_dir: Optional[Union[str, Path]] = None,
+    models_dir: str | Path | None = None,
     model_precision: str = "fp16",
-    weights_path: Optional[Path] = None,
-    export_args: Optional[dict] = None,
-) -> Optional[Path]:
+    weights_path: Path | None = None,
+    export_args: dict | None = None,
+) -> Path | None:
     """
     Convert YOLO model weights to OpenVINO IR format.
 
@@ -456,7 +457,20 @@ def export_yolo_model(
             logger.warning(f"Failed to clean up temp export files: {cleanup_err}")
 
 
-def download_test_image(image_name: str = "car.png", output_dir: Optional[Union[str, Path]] = None) -> Optional[Path]:
+@with_retry()
+def _fetch_test_image(image_url: str) -> bytes:
+    """GET an image; transient network failures are retried (see ``with_retry``)."""
+    response = requests.get(image_url, timeout=300)
+    response.raise_for_status()
+    content = response.content
+
+    # Validate we got image data, not an HTML error page (not retried)
+    if len(content) < 1000 and b"<!DOCTYPE html>" in content[:500]:
+        raise RuntimeError(f"Received HTML page instead of image from {image_url}")
+    return content
+
+
+def download_test_image(image_name: str = "car.png", output_dir: str | Path | None = None) -> Path | None:
     """
     Download test image from OpenVINO storage.
 
@@ -490,52 +504,17 @@ def download_test_image(image_name: str = "car.png", output_dir: Optional[Union[
 
     logger.info(f"Downloading test image: {image_name}")
 
-    # Use retry mechanism for transient network failures
-    import time
+    try:
+        content = _fetch_test_image(image_url)
+        with open(image_path, "wb") as out_file:
+            out_file.write(content)
 
-    max_retries = 3
-    delay = 2.0
+        logger.info(f"Successfully downloaded {image_name} to: {image_path}")
+        return image_path
 
-    for attempt in range(1, max_retries + 1):
-        try:
-            logger.debug(f"Download attempt {attempt}/{max_retries}")
-            response = requests.get(image_url, timeout=300)
-            response.raise_for_status()
-            content = response.content
-
-            # Validate we got image data, not HTML error page
-            if len(content) < 1000 and b"<!DOCTYPE html>" in content[:500]:
-                raise RuntimeError(f"Received HTML page instead of image from {image_url}")
-
-            with open(image_path, "wb") as out_file:
-                out_file.write(content)
-
-            logger.info(f"Successfully downloaded {image_name} to: {image_path}")
-            return image_path
-
-        except (requests.exceptions.RequestException, ConnectionError, TimeoutError, OSError) as e:
-            # Don't retry non-transient HTTP errors
-            if isinstance(e, requests.exceptions.HTTPError):
-                if hasattr(e, 'response') and e.response is not None:
-                    status_code = e.response.status_code
-                    if 400 <= status_code < 500 and status_code != 429:
-                        logger.error(f"Download failed with HTTP {status_code} (non-retryable): {e}")
-                        return None
-
-            # Clean up partial download
-            if image_path.exists():
-                image_path.unlink()
-
-            if attempt < max_retries:
-                logger.warning(f"Download failed: {e}. Retrying in {delay:.1f}s...")
-                time.sleep(delay)
-                delay *= 2.0  # Exponential backoff
-            else:
-                logger.error(f"Failed to download test image {image_name} after {max_retries} attempts: {e}")
-                return None
-
-        except Exception as e:
-            logger.error(f"Unexpected error downloading {image_name}: {e}", exc_info=True)
-            return None
+    except Exception as e:
+        # Includes non-transient HTTP errors (4xx), which the shared retry does not retry
+        logger.error(f"Failed to download test image {image_name}: {e}")
+        return None
 
     return None

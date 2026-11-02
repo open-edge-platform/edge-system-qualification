@@ -1802,7 +1802,7 @@ export const Summary = () => {
       
       if (dmi.system) {
         productDetails.push(`${dmi.system.vendor} ${dmi.system.product_name}`);
-        if (dmi.motherboard) {
+        if (dmi.motherboard?.name) {
           productDetails.push(`${dmi.motherboard.name} motherboard`);
         }
       }

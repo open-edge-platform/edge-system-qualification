@@ -43,6 +43,7 @@ params:
     os_type:
       - "linux"
     docker_required: true
+    pexels_required: true
   # Modular telemetry configuration
   # Telemetry runs as a lightweight background thread during test execution.
   # Set enabled: false (or remove this block) to disable entirely.

@@ -8,11 +8,8 @@ This module provides a unified interface for downloading models and datasets
 from multiple sources (HuggingFace, ModelScope, etc.), with configurable source
 selection via PREFER_* environment variable flags.
 
-Also provides retry utilities for robust download operations with automatic
-retry and exponential backoff for transient network failures.
-
 Usage:
-    from esq.utils.downloads import download_model, download_dataset_file, with_retry
+    from esq.utils.downloads import download_model, download_dataset_file
 
     # Download model (defaults to HuggingFace unless PREFER_* flag set)
     model_path = download_model("microsoft/Phi-4-mini-instruct")
@@ -20,12 +17,6 @@ Usage:
     # Download dataset file
     download_dataset_file("anon8231489123/ShareGPT_Vicuna_unfiltered",
                          "file.json", "/path/to/target.json")
-
-    # Use retry decorator for custom download functions
-    @with_retry(max_attempts=3, initial_delay=2.0)
-    def my_download_function():
-        # Download logic here
-        pass
 
     # Configure preferred sources:
     # export PREFER_MODELSCOPE=1              # Global preference
@@ -35,21 +26,17 @@ Usage:
 import logging
 import os
 import time
-from typing import Optional
-
-# Export retry utilities for use in other modules
-from .retry_utils import RETRYABLE_EXCEPTIONS, retry_download, with_retry
 
 logger = logging.getLogger(__name__)
 
 
 def download_model(
     model_id: str,
-    cache_dir: Optional[str] = None,
-    local_dir: Optional[str] = None,
-    revision: Optional[str] = None,
+    cache_dir: str | None = None,
+    local_dir: str | None = None,
+    revision: str | None = None,
     timeout: float = 1800,
-    source: Optional[str] = None,
+    source: str | None = None,
 ) -> str:
     """
     Download a model from HuggingFace or ModelScope using CLI commands.
@@ -140,7 +127,7 @@ def download_dataset_file(
     filename: str,
     target_path: str,
     timeout: float = 300,
-    source: Optional[str] = None,
+    source: str | None = None,
 ) -> None:
     """
     Download a dataset file using HuggingFace or ModelScope CLI commands.

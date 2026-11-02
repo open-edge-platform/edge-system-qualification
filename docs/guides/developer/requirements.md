@@ -61,6 +61,8 @@ Device detection uses OpenVINO\*. Only Intel® devices detected by OpenVINO™ a
 |------|------|-------------|---------|
 | `os_type` | `list[str]` | Allowed OS types (`"linux"`, `"windows"`) | `os_type: ["linux"]` |
 | `docker_required` | `bool` | Requires Docker\* daemon to be available | `docker_required: true` |
+| `kaggle_required` | `bool` | Needs Kaggle\* Hub access; adds `www.kaggle.com` to the pre-run network readiness check | `kaggle_required: true` |
+| `pexels_required` | `bool` | Downloads videos from Pexels\*; adds `www.pexels.com` and `videos.pexels.com` to the pre-run network readiness check | `pexels_required: true` |
 | `min_python_version` | `str` | Minimum Python\* version | `min_python_version: "3.10"` |
 | `required_system_packages` | `list[str]` | System packages that must be installed | `required_system_packages: ["ffmpeg"]` |
 | `required_python_packages` | `list[str]` | Python\* packages that must be installed | `required_python_packages: ["torch"]` |

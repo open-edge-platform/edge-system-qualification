@@ -13,9 +13,10 @@ import logging
 import os
 import time
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 from sysagent.utils.config import setup_data_dir
+from sysagent.utils.spinner import console_is_quiet, status_spinner
 
 logger = logging.getLogger(__name__)
 
@@ -33,13 +34,13 @@ class SystemInfoCache:
     """
 
     _instance = None
-    _info: Dict[str, Any] = {}
+    _info: dict[str, Any] = {}
     _cache_dir = None
     _hardware_cache_file = None
     _software_cache_file = None
     _cache_ttl = 3600  # Cache valid for 1 hour by default
 
-    def __new__(cls, cache_dir: Optional[str] = None, ttl: int = 3600):
+    def __new__(cls, cache_dir: str | None = None, ttl: int = 3600):
         """
         Create a new SystemInfoCache instance or return the existing one.
 
@@ -52,7 +53,7 @@ class SystemInfoCache:
             cls._instance._setup(cache_dir, ttl)
         return cls._instance
 
-    def _setup(self, cache_dir: Optional[str], ttl: int) -> None:
+    def _setup(self, cache_dir: str | None, ttl: int) -> None:
         """
         Setup cache directory and TTL.
 
@@ -85,7 +86,7 @@ class SystemInfoCache:
         # Try to load hardware info
         if self._hardware_cache_file and self._hardware_cache_file.exists():
             try:
-                hardware_data = json.loads(self._hardware_cache_file.read_text())
+                hardware_data = json.loads(self._hardware_cache_file.read_text(encoding="utf-8"))
                 if time.time() - hardware_data.get("timestamp", 0) < self._cache_ttl:
                     logger.debug(f"Using cached hardware info from {self._hardware_cache_file}")
                     self._info["hardware"] = hardware_data.get("hardware", {})
@@ -97,7 +98,7 @@ class SystemInfoCache:
         # Try to load software info
         if self._software_cache_file and self._software_cache_file.exists():
             try:
-                software_data = json.loads(self._software_cache_file.read_text())
+                software_data = json.loads(self._software_cache_file.read_text(encoding="utf-8"))
                 if time.time() - software_data.get("timestamp", 0) < self._cache_ttl:
                     logger.debug(f"Using cached software info from {self._software_cache_file}")
                     self._info["software"] = software_data.get("software", {})
@@ -110,11 +111,21 @@ class SystemInfoCache:
         # Collect missing info
         if not hardware_loaded:
             logger.debug("Collecting hardware system information")
-            self._info["hardware"] = collect_hardware_info()
+            with status_spinner("Collecting hardware system information", enabled=console_is_quiet()):
+                self._info["hardware"] = collect_hardware_info()
 
         if not software_loaded:
             logger.debug("Collecting software system information")
-            self._info["software"] = collect_software_info()
+            with status_spinner("Collecting software system information", enabled=console_is_quiet()):
+                self._info["software"] = collect_software_info()
+
+        # Readiness results describe THIS process's pre-run checks, so they must not be
+        # served from a cached (possibly hours-old) hardware snapshot.
+        from .hardware import collect_prerun_info
+
+        prerun = collect_prerun_info()
+        if prerun or hardware_loaded:
+            self._info.setdefault("hardware", {})["prerun"] = prerun
 
         # Set timestamp if not already set
         if "timestamp" not in self._info:
@@ -137,7 +148,9 @@ class SystemInfoCache:
                 "hardware": self._info.get("hardware", {}),
                 "timestamp": self._info.get("timestamp", time.time()),
             }
-            self._hardware_cache_file.write_text(json.dumps(hardware_data, indent=2))
+            self._hardware_cache_file.write_text(
+                json.dumps(hardware_data, indent=2, ensure_ascii=False), encoding="utf-8"
+            )
             logger.debug(f"Saved hardware info to cache: {self._hardware_cache_file}")
         except Exception as e:
             logger.warning(f"Failed to save hardware info cache: {e}")
@@ -148,20 +161,22 @@ class SystemInfoCache:
                 "software": self._info.get("software", {}),
                 "timestamp": self._info.get("timestamp", time.time()),
             }
-            self._software_cache_file.write_text(json.dumps(software_data, indent=2))
+            self._software_cache_file.write_text(
+                json.dumps(software_data, indent=2, ensure_ascii=False), encoding="utf-8"
+            )
             logger.debug(f"Saved software info to cache: {self._software_cache_file}")
         except Exception as e:
             logger.warning(f"Failed to save software info cache: {e}")
 
-    def get_hardware_info(self) -> Dict[str, Any]:
+    def get_hardware_info(self) -> dict[str, Any]:
         """Get hardware information."""
         return self._info.get("hardware", {})
 
-    def get_software_info(self) -> Dict[str, Any]:
+    def get_software_info(self) -> dict[str, Any]:
         """Get software information."""
         return self._info.get("software", {})
 
-    def get_info(self) -> Dict[str, Any]:
+    def get_info(self) -> dict[str, Any]:
         """Get all system information."""
         return self._info.copy()
 
@@ -170,8 +185,10 @@ class SystemInfoCache:
         from .info import collect_hardware_info, collect_software_info
 
         logger.debug("Refreshing system information cache")
-        self._info["hardware"] = collect_hardware_info()
-        self._info["software"] = collect_software_info()
+        with status_spinner("Collecting hardware system information", enabled=console_is_quiet()):
+            self._info["hardware"] = collect_hardware_info()
+        with status_spinner("Collecting software system information", enabled=console_is_quiet()):
+            self._info["software"] = collect_software_info()
         self._info["timestamp"] = time.time()
         self._save_to_cache()
 

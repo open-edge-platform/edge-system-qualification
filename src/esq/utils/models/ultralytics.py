@@ -12,10 +12,11 @@ import logging
 import os
 import shutil
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 import openvino as ov
+
+from sysagent.utils.infrastructure.retry import with_retry
 
 from .common import construct_export_path_components, save_openvino_model
 
@@ -61,7 +62,19 @@ YOLO_MODELS = {
 }
 
 
-def download_yolo_model(model_id: str, models_dir: Optional[str] = None) -> Optional[Path]:
+@with_retry()
+def _load_yolo_with_retry(model_id: str):
+    """``YOLO(model_id)``, which downloads the weights if missing.
+
+    Ultralytics raises ``ConnectionError`` when its own download retries are exhausted;
+    the shared retry policy (``CORE_NETWORK_RETRY_ATTEMPTS``) is applied on top.
+    """
+    from ultralytics import YOLO
+
+    return YOLO(model_id)
+
+
+def download_yolo_model(model_id: str, models_dir: str | None = None) -> Path | None:
     """
     Download YOLO model weights using Ultralytics.
 
@@ -88,9 +101,7 @@ def download_yolo_model(model_id: str, models_dir: Optional[str] = None) -> Opti
 
     logger.debug(f"Downloading YOLO weights for: {model_id}")
     try:
-        from ultralytics import YOLO
-
-        model = YOLO(model_id)
+        model = _load_yolo_with_retry(model_id)
         model.info()
 
         # Find where Ultralytics saved the weights
@@ -113,7 +124,7 @@ def export_yolo_model(
     model_id: str,
     models_dir: str = "models",
     model_precision: str = "fp16",
-    export_args: Optional[dict] = None,
+    export_args: dict | None = None,
 ) -> bool:
     """
     Convert YOLO model weights to OpenVINO format.

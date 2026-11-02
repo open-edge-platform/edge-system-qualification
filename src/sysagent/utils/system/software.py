@@ -299,26 +299,35 @@ def _collect_linux_info() -> dict[str, Any]:
     """
     linux_info = {}
 
-    # Try to get distribution information
-    try:
-        with open("/etc/os-release", "r") as f:
-            lines = f.readlines()
+    # Try to get distribution information (/etc/os-release may be a missing
+    # or dangling symlink on newer releases; fall back to /usr/lib/os-release)
+    os_release = {}
+    for os_release_path in ("/etc/os-release", "/usr/lib/os-release"):
+        try:
+            with open(os_release_path, "r") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith("#") or "=" not in line:
+                        continue
+                    key, value = line.split("=", 1)
+                    os_release[key.strip()] = value.strip().strip('"').strip("'")
+            if os_release:
+                break
+        except Exception:
+            continue
 
-        os_release = {}
-        for line in lines:
-            if "=" in line:
-                key, value = line.strip().split("=", 1)
-                os_release[key] = value.strip('"')
-
+    if os_release:
+        name = os_release.get("NAME", "Unknown")
+        version = os_release.get("VERSION", os_release.get("VERSION_ID", "Unknown"))
         linux_info["distribution"] = {
-            "name": os_release.get("NAME", "Unknown"),
-            "version": os_release.get("VERSION", "Unknown"),
+            "name": name,
+            "version": version,
             "id": os_release.get("ID", "Unknown"),
             "version_id": os_release.get("VERSION_ID", "Unknown"),
-            "pretty_name": os_release.get("PRETTY_NAME", "Unknown"),
+            "pretty_name": os_release.get("PRETTY_NAME") or f"{name} {version}".strip(),
             "home_url": os_release.get("HOME_URL", "Unknown"),
         }
-    except Exception:
+    else:
         linux_info["distribution"] = {"error": "Could not read /etc/os-release"}
 
     # Get kernel information

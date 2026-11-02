@@ -36,8 +36,10 @@ from sysagent.utils.cli.filters import parse_filters
 from sysagent.utils.cli.handlers import handle_interrupt
 from sysagent.utils.config import list_profiles, setup_data_dir
 from sysagent.utils.core import shared_state
-from sysagent.utils.core.dependencies import run_prerun_checks
+from sysagent.utils.core.dependencies import NETWORK_CHECK_NAME, reset_prerun_state, run_prerun_checks
+from sysagent.utils.infrastructure import download_github_repo
 from sysagent.utils.logging import setup_command_logging
+from sysagent.utils.spinner import status_spinner
 
 # Import system info for CPU validation
 from sysagent.utils.system.cache import SystemInfoCache
@@ -597,6 +599,23 @@ def run_tests(
     elif profiles_file:
         file_profile_names, _ = _load_profiles_from_file(profiles_file)
         active_flags = _collect_requirement_flags_from_profiles(file_profile_names or [])
+
+    # Readiness is always re-verified for each run, never reused from an earlier one.
+    reset_prerun_state()
+
+    # Network reachability goes first: everything downloaded below (allure, GitHub
+    # dependencies from pyproject.toml) and by the tests themselves depends on it.
+    network_ok, _ = run_prerun_checks(
+        verbose=verbose, debug=debug, active_flags=active_flags, names=[NETWORK_CHECK_NAME]
+    )
+    if not network_ok:
+        logger.error("Readiness checks failed - aborting before test execution")
+        return 1
+
+    # Same spinner as the readiness checks so this (potentially slow, first-run only)
+    # download doesn't look hung when verbose/debug log lines aren't shown.
+    with status_spinner("Downloading dependencies", enabled=not (verbose or debug)):
+        download_github_repo()
 
     prerun_ok, _ = run_prerun_checks(verbose=verbose, debug=debug, active_flags=active_flags)
     if not prerun_ok:

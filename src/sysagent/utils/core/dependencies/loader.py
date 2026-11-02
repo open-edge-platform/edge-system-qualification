@@ -9,6 +9,7 @@ multiple packages dynamic        return installationme discovery mechanism as
 software.yml configurations for system information tracking.
 """
 
+import dataclasses
 import logging
 import os
 from pathlib import Path
@@ -264,9 +265,11 @@ class DependencyConfigLoader:
                 devices=validation_data.get("devices", []),
                 hosts=validation_data.get("hosts", []),
                 host_alternatives=validation_data.get("host_alternatives", {}),
+                flagged_hosts=validation_data.get("flagged_hosts", {}),
                 image=validation_data.get("image"),
                 port=validation_data.get("port"),
                 timeout=validation_data.get("timeout"),
+                retries=validation_data.get("retries"),
             )
 
             if "check_commands" in validation_data:
@@ -351,6 +354,7 @@ class DependencyConfigLoader:
             conflicts_with=list(set(base_dependency.conflicts_with + extension_dependency.conflicts_with)),
             min_version=extension_dependency.min_version or base_dependency.min_version,
             max_version=extension_dependency.max_version or base_dependency.max_version,
+            requires_flag=extension_dependency.requires_flag or base_dependency.requires_flag,
             package_source=f"{base_dependency.package_source or 'unknown'}+{extension_dependency.package_source or 'unknown'}",
         )
 
@@ -421,19 +425,55 @@ class DependencyConfigLoader:
             if note not in merged_notes:
                 merged_notes.append(note)
 
+        merged_validation = self._merge_validations(base_installation.validation, extension_installation.validation)
+
         # Create merged installation
         merged_installation = DependencyInstallation(
             os_type=base_installation.os_type,
             install_method=base_installation.install_method,
             commands=merged_commands,
             post_install_steps=merged_post_install,
-            validation=extension_installation.validation or base_installation.validation,  # Prefer extension validation
+            validation=merged_validation,
             notes=merged_notes,
             documentation_url=extension_installation.documentation_url or base_installation.documentation_url,
             packages=merged_packages,
         )
 
         return merged_installation
+
+    @staticmethod
+    def _merge_validations(base, extension):
+        """Prefer the extension validation, but union network ``hosts``/``host_alternatives``.
+
+        Lets a core package declare generic hosts (e.g. GitHub) while extensions append
+        their own use-case-specific ones instead of replacing the whole list.
+        """
+        if base is None or extension is None:
+            return extension or base
+        if base.check_method != extension.check_method or not (
+            base.hosts or base.host_alternatives or base.flagged_hosts
+        ):
+            return extension
+
+        merged = dataclasses.replace(extension)
+        # Settings the extension leaves unset fall back to the core package's.
+        merged.port = extension.port or base.port
+        merged.timeout = extension.timeout or base.timeout
+        merged.retries = extension.retries or base.retries
+        merged.hosts = list(dict.fromkeys(base.hosts + extension.hosts))
+        alternatives = {
+            group: {src: list(h) for src, h in srcs.items()} for group, srcs in base.host_alternatives.items()
+        }
+        for group, srcs in extension.host_alternatives.items():
+            target = alternatives.setdefault(group, {})
+            for src, hosts in srcs.items():
+                target[src] = list(dict.fromkeys(target.get(src, []) + hosts))
+        merged.host_alternatives = alternatives
+        flagged = {flag: list(h) for flag, h in base.flagged_hosts.items()}
+        for flag, hosts in extension.flagged_hosts.items():
+            flagged[flag] = list(dict.fromkeys(flagged.get(flag, []) + hosts))
+        merged.flagged_hosts = flagged
+        return merged
 
     def _sort_packages_for_merging(self, package_names: list[str]) -> list[str]:
         """Sort packages for consistent merging order, prioritizing core packages."""

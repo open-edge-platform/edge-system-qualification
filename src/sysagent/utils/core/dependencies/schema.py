@@ -97,9 +97,14 @@ class DependencyValidation:
     # Only the host(s) for whichever source is actually preferred (see
     # get_preferred_download_source) are checked, alongside the static `hosts` above.
     host_alternatives: dict[str, dict[str, list[str]]] = field(default_factory=dict)
+    # Hosts only checked when the named profile requirement flag is active (e.g.
+    # {"kaggle_required": ["www.kaggle.com"]}); always checked when the active
+    # flags aren't known ahead of time.
+    flagged_hosts: dict[str, list[str]] = field(default_factory=dict)
     image: str | None = None  # e.g. container image pulled/run by "docker_runtime_smoke"
     port: int | None = None
     timeout: float | None = None
+    retries: int | None = None  # attempts per host for the "network" check_method (default: shared retry default)
 
 
 @dataclass

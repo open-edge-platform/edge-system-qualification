@@ -17,10 +17,12 @@ import tarfile
 import tempfile
 import zipfile
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 import requests
 from tqdm import tqdm
+
+from .retry import RETRYABLE_EXCEPTIONS, with_retry
 
 logger = logging.getLogger(__name__)
 
@@ -42,10 +44,17 @@ def _validate_url_scheme(url: str) -> None:
         raise ValueError(f"Unsafe URL scheme '{parsed.scheme}'. Only http/https are allowed.")
 
 
+# A truncated/corrupt archive (connection dropped mid-transfer) is as transient as a failed request.
+_ARCHIVE_RETRYABLE_EXCEPTIONS = RETRYABLE_EXCEPTIONS + (zipfile.BadZipFile, tarfile.ReadError, EOFError)
+
+
+@with_retry(retryable_exceptions=_ARCHIVE_RETRYABLE_EXCEPTIONS)
 def _download_and_extract(url: str, dest_dir: Path):
     """
     Download a tar.gz or zip archive from a URL and extract it to dest_dir.
     The contents will be moved up if the archive contains a single top-level folder.
+
+    Transient network failures are retried (see ``with_retry``).
     """
     logger.info(f"Downloading: {url}")
     _validate_url_scheme(url)
@@ -55,7 +64,10 @@ def _download_and_extract(url: str, dest_dir: Path):
 
     # Download to temp file - file auto-deleted when context exits
     with tempfile.NamedTemporaryFile(delete=True) as tmp_file:
-        shutil.copyfileobj(response.raw, tmp_file)
+        # iter_content (not response.raw) so dropped connections surface as requests
+        # exceptions that the retry handles, instead of a silently truncated archive.
+        for chunk in response.iter_content(chunk_size=1024 * 1024):
+            tmp_file.write(chunk)
         tmp_file.flush()  # Ensure data is written
         tmp_path = tmp_file.name
 
@@ -76,11 +88,12 @@ def _download_and_extract(url: str, dest_dir: Path):
             items[0].rmdir()
 
 
+@with_retry()
 def _download_with_progress(url: str, dest_path: Path):
     """
-    Download a file with progress bar.
+    Download a file with progress bar. Transient network failures are retried.
     """
-    response = requests.get(url, stream=True)
+    response = requests.get(url, stream=True, timeout=60)
     response.raise_for_status()
 
     total_size = int(response.headers.get("content-length", 0))
@@ -117,7 +130,7 @@ def _verify_checksum(file_path: Path, expected_checksum: str) -> bool:
     return actual_checksum == expected_checksum
 
 
-def load_tool_config() -> Dict[str, Any]:
+def load_tool_config() -> dict[str, Any]:
     """
     Load merged tool configuration from all packages.
     """
@@ -263,12 +276,12 @@ def setup_dependency(dependency_name: str) -> str:
     return setup_func()
 
 
-def setup_all_dependencies() -> Dict[str, str]:
+def setup_all_dependencies() -> dict[str, str]:
     """
     Set up all configured dependencies.
 
     Returns:
-        Dict[str, str]: Mapping of dependency names to installation paths
+        dict[str, str]: Mapping of dependency names to installation paths
     """
     results = {}
 
@@ -364,12 +377,12 @@ def cleanup_dependency(dependency_name: str) -> bool:
         return False
 
 
-def list_installed_dependencies() -> Dict[str, Optional[str]]:
+def list_installed_dependencies() -> dict[str, str | None]:
     """
     List all installed dependencies and their paths.
 
     Returns:
-        Dict[str, Optional[str]]: Mapping of dependency names to paths
+        dict[str, str | None]: Mapping of dependency names to paths
     """
     thirdparty_dir = Path(get_thirdparty_dir())
 
@@ -389,7 +402,7 @@ def list_installed_dependencies() -> Dict[str, Optional[str]]:
     return results
 
 
-def get_dependency_info(dependency_name: str) -> Dict[str, Any]:
+def get_dependency_info(dependency_name: str) -> dict[str, Any]:
     """
     Get information about a dependency.
 
@@ -397,7 +410,7 @@ def get_dependency_info(dependency_name: str) -> Dict[str, Any]:
         dependency_name: Name of the dependency
 
     Returns:
-        Dict[str, Any]: Information about the dependency
+        dict[str, Any]: Information about the dependency
     """
     tool_config = load_tool_config()
     thirdparty_dir = Path(get_thirdparty_dir())
@@ -489,7 +502,23 @@ def extract_zip_file(zip_path: str, dest_dir: str):
     return str(dest_dir)
 
 
-def download_file(url: str, target_path: str, sha256sum: str = "") -> Dict[str, Any]:
+@with_retry()
+def _stream_to_file(url: str, dest_path: Path, label: str) -> None:
+    """Stream ``url`` into ``dest_path`` with a progress bar; transient failures are retried."""
+    resp = requests.get(url, stream=True, timeout=60)
+    resp.raise_for_status()
+    total = int(resp.headers.get("content-length", 0))
+    with (
+        open(dest_path, "wb") as f,
+        tqdm(total=total, unit="B", unit_scale=True, desc=label, ncols=80) as bar,
+    ):
+        for chunk in resp.iter_content(chunk_size=8192):
+            if chunk:
+                f.write(chunk)
+                bar.update(len(chunk))
+
+
+def download_file(url: str, target_path: str, sha256sum: str = "") -> dict[str, Any]:
     """
     Download a file from a URL to the specified target path.
 
@@ -521,23 +550,7 @@ def download_file(url: str, target_path: str, sha256sum: str = "") -> Dict[str, 
         if file_exists and (file_size == 0 or (sha256sum and not is_valid_file(dest_path, sha256sum))):
             logger.warning(f"File exists but is empty or checksum mismatch, re-downloading: {dest_path}")
         try:
-            resp = requests.get(url, stream=True, timeout=60)
-            resp.raise_for_status()
-            total = int(resp.headers.get("content-length", 0))
-            with (
-                open(dest_path, "wb") as f,
-                tqdm(
-                    total=total,
-                    unit="B",
-                    unit_scale=True,
-                    desc=os.path.basename(target_path),
-                    ncols=80,
-                ) as bar,
-            ):
-                for chunk in resp.iter_content(chunk_size=8192):
-                    if chunk:
-                        f.write(chunk)
-                        bar.update(len(chunk))
+            _stream_to_file(url, dest_path, os.path.basename(target_path))
             logger.info(f"Downloaded file to: {dest_path}")
         except Exception as e:
             if dest_path.exists():
@@ -563,6 +576,14 @@ def download_file(url: str, target_path: str, sha256sum: str = "") -> Dict[str, 
     return {"path": str(dest_path), "file_size_bytes": file_size, "url": url}
 
 
+@with_retry()
+def _fetch_bytes(url: str) -> bytes:
+    """GET ``url`` and return its body; transient network failures are retried."""
+    response = requests.get(url, timeout=60)
+    response.raise_for_status()
+    return response.content
+
+
 def download_and_prepare_audio(
     url: str,
     download_dir: str,
@@ -580,12 +601,12 @@ def download_and_prepare_audio(
 
     if not os.path.exists(wav_path):
         logger.info(f"Downloading audio from {url} to {wav_path}")
-        r = requests.get(url)
-        if r.status_code == 200:
-            with open(wav_path, "wb") as f:
-                f.write(r.content)
-        else:
-            raise RuntimeError(f"Failed to download audio: {url}")
+        try:
+            content = _fetch_bytes(url)
+        except Exception as exc:
+            raise RuntimeError(f"Failed to download audio: {url}: {exc}") from exc
+        with open(wav_path, "wb") as f:
+            f.write(content)
 
     from pydub import AudioSegment
 

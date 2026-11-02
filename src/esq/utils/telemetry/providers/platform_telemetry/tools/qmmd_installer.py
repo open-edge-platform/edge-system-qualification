@@ -38,12 +38,13 @@ import subprocess  # nosec B404 # For runtime cargo install + qmmd daemon lifecy
 import time
 import urllib.parse
 from pathlib import Path
-from typing import Optional
+
+from sysagent.utils.infrastructure.retry import with_retry
 
 logger = logging.getLogger(__name__)
 
 # Per-process handle to a qmmd subprocess started by ensure_qmmd_running.
-_qmmd_proc: Optional[subprocess.Popen] = None
+_qmmd_proc: subprocess.Popen | None = None
 
 _DEFAULT_PORT = 9000
 _RUNTIME_SUBDIR = ("system", "platform_telemetry", "qmassa")
@@ -77,7 +78,7 @@ def _cargo_target_dir() -> Path:
 # ── qmmd discovery ───────────────────────────────────────────────────────────
 
 
-def _find_existing_qmmd() -> Optional[Path]:
+def _find_existing_qmmd() -> Path | None:
     """Locate a usable ``qmmd`` binary without installing.
 
     Search order: ESQ-managed install root → user's cargo bin → PATH.
@@ -123,7 +124,7 @@ def _is_reachable(port: int, timeout_s: float = 1.0) -> bool:
 _RUSTUP_URL = "https://sh.rustup.rs"
 
 
-def _resolve_cargo() -> Optional[Path]:
+def _resolve_cargo() -> Path | None:
     """Locate a usable ``cargo`` binary on PATH or under ``~/.cargo/bin``."""
     on_path = shutil.which("cargo")
     if on_path:
@@ -134,7 +135,21 @@ def _resolve_cargo() -> Optional[Path]:
     return None
 
 
-def _install_rustup(timeout_s: float = 600.0) -> Optional[Path]:
+@with_retry()
+def _download_rustup_script(curl: str) -> bytes:
+    """Fetch the rustup installer script with curl; transient failures are retried."""
+    dl = subprocess.run(
+        [curl, "--proto", "=https", "--tlsv1.2", "-sSf", _RUSTUP_URL],
+        capture_output=True,
+        timeout=60,
+        check=False,
+    )
+    if dl.returncode != 0 or not dl.stdout:
+        raise ConnectionError(f"rustup download failed (rc={dl.returncode})")
+    return dl.stdout
+
+
+def _install_rustup(timeout_s: float = 600.0) -> Path | None:
     """Bootstrap a per-user rustup toolchain and return the cargo path.
 
     Uses the official ``sh.rustup.rs`` installer with ``-y --default-toolchain
@@ -155,25 +170,16 @@ def _install_rustup(timeout_s: float = 600.0) -> Optional[Path]:
     )
     try:
         # Pipe rustup-init.sh into sh -s -- -y for non-interactive install.
-        dl = subprocess.run(
-            [curl, "--proto", "=https", "--tlsv1.2", "-sSf", _RUSTUP_URL],
-            capture_output=True,
-            timeout=60,
-            check=False,
-        )
-        if dl.returncode != 0 or not dl.stdout:
-            logger.info(
-                "[platform_telemetry] rustup download failed (rc=%d)", dl.returncode
-            )
-            return None
+        script = _download_rustup_script(curl)
         proc = subprocess.run(
             ["sh", "-s", "--", "-y", "--default-toolchain", "stable", "--profile", "minimal", "--no-modify-path"],
-            input=dl.stdout,
+            input=script,
             capture_output=True,
             timeout=timeout_s,
             check=False,
         )
     except (subprocess.TimeoutExpired, OSError) as exc:
+        # OSError includes ConnectionError from _download_rustup_script once retries are exhausted
         logger.info("[platform_telemetry] rustup install failed: %s", exc)
         return None
 
@@ -194,7 +200,7 @@ def _install_rustup(timeout_s: float = 600.0) -> Optional[Path]:
     return cargo
 
 
-def _install_via_cargo(timeout_s: float, install_cargo_if_missing: bool = True) -> Optional[Path]:
+def _install_via_cargo(timeout_s: float, install_cargo_if_missing: bool = True) -> Path | None:
     """Run ``cargo install --locked qmmd`` into our managed install root."""
     cargo = _resolve_cargo()
     if cargo is None and install_cargo_if_missing:
@@ -253,7 +259,7 @@ def _install_via_cargo(timeout_s: float, install_cargo_if_missing: bool = True) 
 
 # Port this module spawned qmmd on (set by _start_daemon, read by stop_qmmd
 # so we can issue a precise pkill match for the qmmd command line).
-_qmmd_port: Optional[int] = None
+_qmmd_port: int | None = None
 
 
 def _start_daemon(binary: Path, port: int, log_dir: Path, ready_timeout_s: float) -> bool:
@@ -372,7 +378,7 @@ def ensure_qmmd_running(
     start_timeout_s: float = 6.0,
     install_if_missing: bool = True,
     install_cargo_if_missing: bool = True,
-) -> Optional[str]:
+) -> str | None:
     """Ensure qmmd is reachable on ``port`` and return its scrape URL.
 
     Returns ``None`` (and logs at INFO) when neither an existing endpoint

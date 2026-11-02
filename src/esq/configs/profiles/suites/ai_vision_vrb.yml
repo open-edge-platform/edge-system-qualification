@@ -20,6 +20,7 @@ params:
     os_type:
       - "linux"
     docker_required: true
+    pexels_required: true
   # Optional: Isolated virtual environment configuration
   # When enabled, tests will run in an isolated venv with specific dependencies
   venv:

@@ -21,7 +21,6 @@ including setup, installation, an    # Verify 'yarn allure' command works
 import logging
 import os
 import shutil
-from typing import Optional
 
 # Import secure process execution utilities
 from sysagent.utils.config import get_thirdparty_dir
@@ -139,6 +138,10 @@ def install_allure_cli_from_repo(node_dir: str, force_reinstall: bool = False) -
         if _verify_allure_installation(allure_repo_dir, node_dir):
             logger.debug("Allure CLI is already installed and functional")
             return allure_cmd
+        elif os.path.exists(package_json_path) and not os.path.exists(os.path.join(cli_dist_path, "index.js")):
+            # Source archive already downloaded at CLI startup (download_github_repo) but
+            # not built yet - build it in place instead of deleting and re-downloading it.
+            logger.debug("Allure3 source present but not built yet, building without re-download")
         else:
             logger.debug("Existing Allure installation is corrupted or incomplete")
             _cleanup_corrupted_allure(allure_repo_dir)
@@ -304,8 +307,8 @@ def generate_allure_report(
     node_dir: str,
     results_dir: str,
     report_dir: str,
-    report_name: Optional[str] = None,
-    report_version: Optional[str] = None,
+    report_name: str | None = None,
+    report_version: str | None = None,
     force_reinstall: bool = False,
     debug: bool = False,
 ) -> int:
@@ -416,7 +419,7 @@ def generate_allure_report(
         return 1
 
 
-def generate_final_report_copy(report_dir: str, debug: bool = False) -> Optional[str]:
+def generate_final_report_copy(report_dir: str, debug: bool = False) -> str | None:
     """
     Generate a timestamped final copy of the Allure report.
     Format: <appname>_report_<system_and_productname>_<normalize_cpu_brand>

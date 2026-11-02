@@ -2,156 +2,22 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-Network utilities for connectivity checks and restriction detection.
+Network utilities for download source selection.
 
-This module provides utilities to:
-- Check internet connectivity
-- Detect network restrictions (e.g., blocked services like HuggingFace)
-- Automatically fallback to alternative services like ModelScope
+Reachability checks live in the pre-run readiness checks
+(``sysagent.utils.core.dependencies.prerun``), not here.
 """
 
 import logging
 import os
-from typing import Optional, Tuple
-
-import requests
 
 logger = logging.getLogger(__name__)
 
 
-def check_internet_connectivity() -> bool:
-    """
-    Check if the system has internet connectivity using HTTPS requests.
-
-    Uses multiple endpoints to handle different network environments,
-    including regions where certain services may be blocked.
-
-    Returns:
-        True if internet is accessible, False otherwise
-    """
-    # List of reliable endpoints to test connectivity
-    test_endpoints = [
-        "https://example.com",  # Global, minimal probe
-        "https://www.cloudflare.com/cdn-cgi/trace",  # Global, lightweight
-        "https://www.baidu.com",  # China-accessible
-    ]
-
-    for endpoint in test_endpoints:
-        try:
-            # Use HTTPS with proper TLS verification and short timeout
-            response = requests.get(
-                endpoint,
-                timeout=5,
-                verify=True,  # Enable TLS certificate verification
-                allow_redirects=True,
-            )
-            if response.status_code == 200:
-                logger.debug(f"Internet connectivity confirmed via {endpoint}")
-                return True
-        except requests.exceptions.RequestException:
-            # Continue to next endpoint if this one fails
-            continue
-
-    logger.debug("No internet connectivity detected from any test endpoint")
-    return False
-
-
-def check_network_restrictions(timeout: float = 3.0) -> Tuple[bool, dict]:
-    """
-    Check network accessibility to common services.
-
-    Tests connectivity to multiple services to determine if any are blocked or
-    inaccessible from the current network. If any of these services cannot be
-    reached, the network is considered to have restrictions.
-
-    Tested services:
-    - HuggingFace: AI model hosting
-    - GitHub: Code hosting
-    - Kaggle: Data science platform
-    - Google: Search and services
-
-    Args:
-        timeout: Timeout in seconds for connectivity check
-
-    Returns:
-        Tuple of (is_restricted, details_dict)
-        - is_restricted: True if network restrictions detected
-        - details_dict: Dictionary with accessibility status for each service
-                       and list of blocked services
-    """
-    # Services to test
-    test_services = {
-        "huggingface": "https://huggingface.co",
-        "github": "https://github.com",
-        "kaggle": "https://www.kaggle.com",
-        "google": "https://www.google.com",
-    }
-
-    details = {
-        "huggingface_accessible": False,
-        "github_accessible": False,
-        "kaggle_accessible": False,
-        "google_accessible": False,
-    }
-
-    for service_name, url in test_services.items():
-        try:
-            response = requests.head(url, timeout=timeout, allow_redirects=True)
-
-            if response.status_code < 500:  # Any non-server-error is considered accessible
-                details[f"{service_name}_accessible"] = True
-                logger.debug(f"{service_name.capitalize()} is accessible")
-            else:
-                logger.debug(f"{service_name.capitalize()} returned server error: {response.status_code}")
-
-        except Exception as e:
-            logger.debug(f"{service_name.capitalize()} is not accessible: {e}")
-
-    # Derive blocked services from boolean flags
-    blocked_services = [
-        service_name.capitalize() for service_name in test_services.keys() if not details[f"{service_name}_accessible"]
-    ]
-
-    # Network is restricted if ANY of the services are not accessible
-    is_restricted = len(blocked_services) > 0
-
-    if is_restricted:
-        blocked_list = ", ".join(blocked_services)
-        logger.info(f"Network restrictions detected (blocked: {blocked_list}) - will use alternative download sources")
-    else:
-        logger.debug("No network restrictions detected - all services accessible")
-
-    return is_restricted, details
-
-
-def get_cached_network_restrictions() -> Optional[bool]:
-    """
-    Get cached network restriction status from system info cache.
-
-    Returns:
-        None if not cached, True if restricted, False if not restricted
-    """
-    try:
-        from sysagent.utils.system import SystemInfoCache
-
-        system_info = SystemInfoCache()
-        hardware_info = system_info.get_hardware_info()
-
-        if hardware_info and "network" in hardware_info:
-            network_info = hardware_info["network"]
-            if "restricted_access" in network_info:
-                return network_info["restricted_access"]
-
-    except Exception as e:
-        logger.debug(f"Could not get cached network restriction status: {e}")
-
-    return None
-
-
 def get_preferred_download_source(
-    source_type: Optional[str] = None,
+    source_type: str | None = None,
     default: str = "huggingface",
-    valid_sources: Optional[list] = None,
+    valid_sources: list | None = None,
 ) -> str:
     """
     Determine which download source to use based on preference flags in environment variables.
@@ -247,21 +113,3 @@ def get_preferred_download_source(
     logger.debug(f"Using '{source}' as download source{type_label} (from {source_origin})")
 
     return source
-
-
-def test_connectivity(url: str, timeout: float = 5.0) -> bool:
-    """
-    Test if a URL is accessible.
-
-    Args:
-        url: URL to test
-        timeout: Timeout in seconds
-
-    Returns:
-        True if accessible, False otherwise
-    """
-    try:
-        response = requests.head(url, timeout=timeout, allow_redirects=True)
-        return response.status_code < 500
-    except Exception:
-        return False

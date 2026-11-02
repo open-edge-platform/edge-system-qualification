@@ -17,9 +17,8 @@ import os
 import shutil
 import sys
 import time
-from typing import Optional
 
-from sysagent.utils.core import run_command
+from .cli_download import run_download_command
 
 logger = logging.getLogger(__name__)
 
@@ -47,9 +46,9 @@ def get_modelscope_cli_path() -> str:
 
 def download_model(
     model_id: str,
-    cache_dir: Optional[str] = None,
-    local_dir: Optional[str] = None,
-    revision: Optional[str] = None,
+    cache_dir: str | None = None,
+    local_dir: str | None = None,
+    revision: str | None = None,
     timeout: float = 1800,
     max_workers: int = 4,
 ) -> str:
@@ -96,22 +95,8 @@ def download_model(
 
     logger.debug(f"Running command: {' '.join(cmd)}")
 
-    # Run the command with timeout
-    result = run_command(
-        command=cmd,
-        timeout=timeout,
-        stream_output=True,
-    )
-
-    # Check if command timed out
-    if result.timed_out:
-        raise TimeoutError(f"Model download timed out after {timeout}s")
-
-    # Check return code
-    if result.returncode != 0:
-        error_msg = f"ModelScope download failed with return code {result.returncode}"
-        logger.error(error_msg)
-        raise RuntimeError(error_msg)
+    # Run the command with timeout (transient failures are retried, see run_download_command)
+    run_download_command(cmd, timeout, "ModelScope model download")
 
     # The cache layout differs across modelscope versions (hub/models/<id> vs
     # models/<owner>--<name>/snapshots/<rev>), so ask modelscope to resolve the
@@ -171,24 +156,7 @@ def download_dataset(
     if filename:
         cmd.append(filename)
 
-    result = run_command(
-        command=cmd,
-        timeout=timeout,
-        stream_output=True,
-    )
-
-    if result.returncode != 0:
-        # Check if the failure was due to timeout
-        if result.timed_out:
-            error_msg = f"ModelScope dataset download timed out after {timeout}s"
-            logger.error(error_msg)
-            raise TimeoutError(error_msg)
-        else:
-            error_msg = f"ModelScope dataset download failed with return code {result.returncode}"
-            if result.stderr:
-                error_msg += f": {result.stderr}"
-            logger.error(error_msg)
-            raise RuntimeError(error_msg)
+    run_download_command(cmd, timeout, "ModelScope dataset download")
 
     logger.debug(f"Dataset downloaded to: {local_dir}")
     return local_dir

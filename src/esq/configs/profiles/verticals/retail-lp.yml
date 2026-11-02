@@ -15,6 +15,7 @@ params:
     os_type:
       - "linux"
     docker_required: true
+    pexels_required: true
   assets:
     - id: "items-in-basket-32658421"
       type: "video"

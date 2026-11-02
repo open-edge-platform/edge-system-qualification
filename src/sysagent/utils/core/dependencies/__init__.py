@@ -12,7 +12,7 @@ This package provides a comprehensive dependency management system that supports
 
 from .loader import DependencyConfigLoader
 from .manager import DependencyManager, get_dependency_manager
-from .prerun import run_prerun_checks
+from .prerun import NETWORK_CHECK_NAME, get_prerun_report, reset_prerun_state, run_prerun_checks
 from .schema import (
     Dependency,
     DependencyCheckResult,
@@ -36,5 +36,8 @@ __all__ = [
     "DependencyValidator",
     "OSType",
     "get_dependency_manager",
+    "NETWORK_CHECK_NAME",
+    "get_prerun_report",
+    "reset_prerun_state",
     "run_prerun_checks",
 ]

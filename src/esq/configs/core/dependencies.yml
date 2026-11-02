@@ -129,7 +129,15 @@ dependencies:
         install_method: "functional_check"
         validation:
           check_method: "network"
-          hosts: ["github.com", "registry-1.docker.io"]
+          # Merged with the generic sysagent hosts (GitHub, PCI IDs). A Docker registry host is
+          # deliberately NOT listed: image pulls go through the Docker daemon, which may use
+          # a registry mirror, proxy or private registry that a direct connection from here
+          # can't see. The docker_runtime check (docker_required) exercises the daemon's real
+          # pull path instead.
+          flagged_hosts:
+            kaggle_required: ["www.kaggle.com"]
+            # www.pexels.com/download/... redirects to videos.pexels.com
+            pexels_required: ["www.pexels.com", "videos.pexels.com"]
           # Only the host(s) for the actually-preferred model/dataset download
           # source are checked (see PREFER_MODELSCOPE in docs/includes/quick-start/run.md),
           # so huggingface.co isn't reported as a false failure when the user
@@ -141,7 +149,7 @@ dependencies:
               huggingface: ["huggingface.co"]
               modelscope: ["www.modelscope.cn"]
           port: 443
-          timeout: 5
+          timeout: 10
         notes:
           - "Attempts a TCP connection to common hosts used to download models/containers/datasets"
           - "A failure usually means proxy, firewall, or DNS issues that would otherwise cause test asset downloads to fail or hang"
@@ -149,13 +157,16 @@ dependencies:
         install_method: "functional_check"
         validation:
           check_method: "network"
-          hosts: ["github.com", "registry-1.docker.io"]
+          flagged_hosts:
+            kaggle_required: ["www.kaggle.com"]
+            # www.pexels.com/download/... redirects to videos.pexels.com
+            pexels_required: ["www.pexels.com", "videos.pexels.com"]
           host_alternatives:
             model_download:
               huggingface: ["huggingface.co"]
               modelscope: ["www.modelscope.cn"]
           port: 443
-          timeout: 5
+          timeout: 10
 
   docker_runtime:
     name: "docker_runtime"

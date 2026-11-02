@@ -7,9 +7,14 @@ import json
 import logging
 import time
 from pathlib import Path
-from typing import Dict, List, Optional
 
 from sysagent.utils.core import run_command
+from sysagent.utils.infrastructure.retry import (
+    DEFAULT_MAX_ATTEMPTS,
+    get_retry_attempts,
+    is_transient_error_text,
+    run_command_with_retry,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +34,7 @@ class DockerHubTimeseriesAppManager:
         if not compose_path.is_file():
             raise FileNotFoundError(f"Compose file was not found: {compose_path}")
 
-    def _compose_cmd(self, sub_cmd: List[str]) -> List[str]:
+    def _compose_cmd(self, sub_cmd: list[str]) -> list[str]:
         return [
             "docker",
             "compose",
@@ -47,7 +52,7 @@ class DockerHubTimeseriesAppManager:
         # Common file-like pattern used by bind-mounted configs/scripts.
         return "." in name and not name.startswith(".")
 
-    def precreate_bind_sources(self, env: Optional[Dict[str, str]] = None) -> None:
+    def precreate_bind_sources(self, env: dict[str, str] | None = None) -> None:
         """Pre-create bind-mount sources from active compose configuration.
 
         This protects against root-owned host paths when compose definitions drift
@@ -117,7 +122,7 @@ class DockerHubTimeseriesAppManager:
                         create_error,
                     )
 
-    def _list_project_container_ids(self) -> List[str]:
+    def _list_project_container_ids(self) -> list[str]:
         """List container IDs for this compose project via docker labels."""
         label = f"com.docker.compose.project={self.project_name}"
         result = run_command(["docker", "ps", "-aq", "--filter", f"label={label}"], timeout=120)
@@ -169,35 +174,18 @@ class DockerHubTimeseriesAppManager:
 
         return selected[:max_chars]
 
-    @staticmethod
-    def _is_transient_pull_error(error_text: str) -> bool:
-        """Detect transient network/registry failures that are worth retrying."""
-        lowered = str(error_text).lower()
-        transient_markers = (
-            "tls handshake timeout",
-            "i/o timeout",
-            "timeout",
-            "context deadline exceeded",
-            "temporary failure",
-            "connection reset",
-            "connection refused",
-            "unexpected eof",
-            "no route to host",
-            "service unavailable",
-            "too many requests",
-        )
-        return any(marker in lowered for marker in transient_markers)
-
     def pull_images(
         self,
-        env: Optional[Dict[str, str]] = None,
-        retries: int = 3,
+        env: dict[str, str] | None = None,
+        retries: int = DEFAULT_MAX_ATTEMPTS,
         retry_delay_seconds: int = 8,
         retry_backoff: float = 2.0,
         quiet: bool = True,
     ) -> None:
-        """Pull all images defined in compose file with retry on transient network failures."""
-        attempts = max(1, int(retries))
+        """Pull all images defined in compose file with retry on transient network failures.
+
+        ``retries`` is the default attempt count; ``CORE_NETWORK_RETRY_ATTEMPTS`` overrides it.
+        """
         delay_seconds = max(1, int(retry_delay_seconds))
         backoff = retry_backoff if retry_backoff and retry_backoff > 1.0 else 1.0
 
@@ -205,44 +193,32 @@ class DockerHubTimeseriesAppManager:
         if quiet:
             sub_cmd.append("--quiet")
 
-        for attempt in range(1, attempts + 1):
-            result = run_command(
-                self._compose_cmd(sub_cmd),
-                cwd=self.working_dir,
-                env=env,
-                timeout=self.timeout,
-            )
-            if result.success:
-                return
+        result = run_command_with_retry(
+            self._compose_cmd(sub_cmd),
+            retries=max(1, int(retries)),
+            delay=delay_seconds,
+            backoff=backoff,
+            description="Compose pull",
+            cwd=self.working_dir,
+            env=env,
+            timeout=self.timeout,
+        )
+        if result.success:
+            return
 
-            raw_error = result.stderr or result.stdout or ""
-            compact_error = self._sanitize_error_text(raw_error)
-            is_transient = self._is_transient_pull_error(raw_error)
+        raw_error = result.stderr or result.stdout or ""
+        compact_error = self._sanitize_error_text(raw_error)
+        if is_transient_error_text(raw_error):
+            attempts = get_retry_attempts(max(1, int(retries)))
+            raise RuntimeError(f"Failed to pull compose images after {attempts} attempts: {compact_error}")
 
-            if is_transient and attempt < attempts:
-                logger.warning(
-                    "Compose pull failed on attempt %s/%s: %s. Retrying in %ss",
-                    attempt,
-                    attempts,
-                    compact_error,
-                    delay_seconds,
-                )
-                time.sleep(delay_seconds)
-                delay_seconds = int(delay_seconds * backoff)
-                continue
-
-            if is_transient:
-                raise RuntimeError(
-                    f"Failed to pull compose images after {attempts} attempts: {compact_error}"
-                )
-
-            raise RuntimeError(f"Failed to pull compose images: {compact_error}")
+        raise RuntimeError(f"Failed to pull compose images: {compact_error}")
 
     def bring_up(
         self,
-        services: Optional[List[str]] = None,
-        env: Optional[Dict[str, str]] = None,
-        scale: Optional[Dict[str, int]] = None,
+        services: list[str] | None = None,
+        env: dict[str, str] | None = None,
+        scale: dict[str, int] | None = None,
     ) -> None:
         """Bring up compose services in detached mode."""
         sub_cmd = ["up", "-d"]
@@ -266,7 +242,7 @@ class DockerHubTimeseriesAppManager:
         self,
         remove_volumes: bool = True,
         remove_orphans: bool = True,
-        env: Optional[Dict[str, str]] = None,
+        env: dict[str, str] | None = None,
     ) -> None:
         """Bring down compose services."""
         sub_cmd = ["down"]
@@ -286,7 +262,7 @@ class DockerHubTimeseriesAppManager:
 
     def stop_services(
         self,
-        env: Optional[Dict[str, str]] = None,
+        env: dict[str, str] | None = None,
         timeout_seconds: int = 30,
     ) -> None:
         """Stop compose services using the configured compose project."""
@@ -302,7 +278,7 @@ class DockerHubTimeseriesAppManager:
 
     def remove_services(
         self,
-        env: Optional[Dict[str, str]] = None,
+        env: dict[str, str] | None = None,
         remove_volumes: bool = True,
         force: bool = True,
         stop: bool = True,
@@ -327,7 +303,7 @@ class DockerHubTimeseriesAppManager:
 
     def interrupt_cleanup(
         self,
-        env: Optional[Dict[str, str]] = None,
+        env: dict[str, str] | None = None,
         stop_timeout_seconds: int = 30,
     ) -> None:
         """Best-effort cleanup for interrupted/cancelled runs.
@@ -342,7 +318,7 @@ class DockerHubTimeseriesAppManager:
         # interpolation/format drift under cancellation timing).
         self.force_remove_project_containers()
 
-    def status(self, env: Optional[Dict[str, str]] = None) -> str:
+    def status(self, env: dict[str, str] | None = None) -> str:
         """Return compose ps status output."""
         result = run_command(
             self._compose_cmd(["ps"]),
@@ -354,7 +330,7 @@ class DockerHubTimeseriesAppManager:
             raise RuntimeError(f"Deployment status check failed: {result.stderr or result.stdout}")
         return result.stdout
 
-    def get_running_services(self, env: Optional[Dict[str, str]] = None) -> List[str]:
+    def get_running_services(self, env: dict[str, str] | None = None) -> list[str]:
         """Return list of currently running service names."""
         result = run_command(
             self._compose_cmd(["ps", "--services", "--status", "running"]),
@@ -369,8 +345,8 @@ class DockerHubTimeseriesAppManager:
 
     def wait_for_services_ready(
         self,
-        services: Optional[List[str]] = None,
-        env: Optional[Dict[str, str]] = None,
+        services: list[str] | None = None,
+        env: dict[str, str] | None = None,
         timeout_seconds: int = 300,
         poll_interval_seconds: int = 5,
     ) -> bool:

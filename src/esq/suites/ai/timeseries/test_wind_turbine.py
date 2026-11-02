@@ -15,6 +15,7 @@ from pathlib import Path
 
 from sysagent.utils.core import Metrics, Result
 from sysagent.utils.infrastructure import download_file
+from sysagent.utils.infrastructure.retry import DEFAULT_MAX_ATTEMPTS
 
 from esq.utils.services import (
     DockerHubTimeseriesAppManager,
@@ -596,7 +597,7 @@ def test_wind_turbine(
         app_manager.validate_paths()
         app_manager.pull_images(
             env=env_overrides,
-            retries=int(configs.get("compose_pull_retries", 3)),
+            retries=int(configs.get("compose_pull_retries", DEFAULT_MAX_ATTEMPTS)),
             retry_delay_seconds=int(configs.get("compose_pull_retry_delay_seconds", 8)),
             retry_backoff=float(configs.get("compose_pull_retry_backoff", 2.0)),
             quiet=_to_bool(configs.get("compose_pull_quiet", True), default=True),

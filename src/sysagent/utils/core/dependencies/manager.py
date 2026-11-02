@@ -40,12 +40,14 @@ class DependencyManager:
         self.validator = DependencyValidator()
         self.config = self.config_loader.load_default_config()
 
-    def check_dependency(self, name: str) -> DependencyCheckResult:
+    def check_dependency(self, name: str, active_flags: set[str] | None = None) -> DependencyCheckResult:
         """
         Check if a specific dependency is installed and working.
 
         Args:
             name: Name of the dependency to check
+            active_flags: Profile requirement flags known to be active; narrows
+                flag-gated parts of functional checks (e.g. network hosts)
 
         Returns:
             DependencyCheckResult with detailed status information
@@ -56,7 +58,7 @@ class DependencyManager:
             )
 
         dependency = self.config.dependencies[name]
-        return self.validator.validate_dependency(dependency)
+        return self.validator.validate_dependency(dependency, active_flags)
 
     def check_all_dependencies(self, include_functional: bool = False) -> dict[str, DependencyCheckResult]:
         """

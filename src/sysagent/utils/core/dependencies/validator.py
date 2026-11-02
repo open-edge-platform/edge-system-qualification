@@ -39,12 +39,16 @@ class DependencyValidator:
             logger.warning(f"Unsupported OS: {system}, defaulting to Linux")
             return OSType.LINUX
 
-    def validate_dependency(self, dependency: Dependency) -> DependencyCheckResult:
+    def validate_dependency(
+        self, dependency: Dependency, active_flags: set[str] | None = None
+    ) -> DependencyCheckResult:
         """
         Validate a dependency and return detailed status.
 
         Args:
             dependency: Dependency to validate
+            active_flags: Profile requirement flags known to be active (see
+                ``resolve_network_hosts``); None when not known ahead of time
 
         Returns:
             DependencyCheckResult with detailed status information
@@ -66,12 +70,15 @@ class DependencyValidator:
         elif installation.install_method == DependencyType.DOCKER_SETUP:
             return self._validate_docker_setup(dependency, installation)
         elif installation.install_method == DependencyType.FUNCTIONAL_CHECK:
-            return self._validate_functional_check(dependency, installation)
+            return self._validate_functional_check(dependency, installation, active_flags)
         else:
             return self._validate_generic(dependency, installation)
 
     def _validate_functional_check(
-        self, dependency: Dependency, installation: DependencyInstallation
+        self,
+        dependency: Dependency,
+        installation: DependencyInstallation,
+        active_flags: set[str] | None = None,
     ) -> DependencyCheckResult:
         """Validate a runtime sanity/smoke check (devices, network, etc. are actually functional)."""
         from .functional_checks import (
@@ -83,6 +90,7 @@ class DependencyValidator:
             check_docker_runtime,
             check_network_connectivity,
             check_openvino_devices,
+            get_network_timeout,
             resolve_network_hosts,
         )
 
@@ -100,10 +108,15 @@ class DependencyValidator:
                 timeout = validation.timeout or DEFAULT_OV_SMOKE_TIMEOUT
                 ok, messages = check_openvino_devices(validation.devices, timeout=timeout)
             elif check_method == "network":
-                timeout = validation.timeout or DEFAULT_NETWORK_TIMEOUT
+                timeout = get_network_timeout(validation.timeout or DEFAULT_NETWORK_TIMEOUT)
                 port = validation.port or DEFAULT_NETWORK_PORT
-                hosts = resolve_network_hosts(validation.hosts, validation.host_alternatives)
-                ok, messages = check_network_connectivity(hosts, timeout=timeout, port=port)
+                hosts = resolve_network_hosts(
+                    validation.hosts, validation.host_alternatives, validation.flagged_hosts, active_flags
+                )
+                from sysagent.utils.infrastructure.retry import get_retry_attempts
+
+                attempts = get_retry_attempts(validation.retries)
+                ok, messages = check_network_connectivity(hosts, timeout=timeout, port=port, attempts=attempts)
             elif check_method == "docker_runtime_smoke":
                 timeout = validation.timeout or DEFAULT_DOCKER_SMOKE_TIMEOUT
                 image = validation.image or DEFAULT_DOCKER_SMOKE_IMAGE

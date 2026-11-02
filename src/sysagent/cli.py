@@ -9,10 +9,12 @@ Most functionality has been moved to specialized modules in utils.cli.commands.
 """
 
 import atexit
+import logging
 import sys
 
 from sysagent.utils.cli.commands import get_command_function
 from sysagent.utils.cli.parsers import get_argument_parser
+from sysagent.utils.core import shared_state
 from sysagent.utils.core.dependencies import get_dependency_manager
 from sysagent.utils.infrastructure import download_github_repo
 from sysagent.utils.logging import cleanup_logging, configure_logging
@@ -36,8 +38,20 @@ def main() -> int:
     Main entry point for the CLI.
 
     Returns:
-        int: Exit code (0 for success, non-zero for failure)
+        int: Exit code (0 for success, non-zero for failure; 130 if interrupted by Ctrl+C)
     """
+    try:
+        return _main()
+    except KeyboardInterrupt:
+        # Ctrl+C outside the test-execution block (readiness checks, downloads, other
+        # commands) - exit cleanly instead of with a traceback. The run command's signal
+        # handler has already logged "Interrupt detected"; log it for commands without one.
+        if not shared_state.INTERRUPT_OCCURRED:
+            logging.getLogger(__name__).warning("Interrupted by user (Ctrl+C)")
+        return 130
+
+
+def _main() -> int:
     # Import at function level to avoid circular imports
     import os
     import sys
@@ -73,15 +87,17 @@ def main() -> int:
     # Skip dependency verification for deps command or commands that don't need it
     skip_deps = args.command == "deps" or not hasattr(args, "command")
 
-    # Skip GitHub repo downloads for commands that don't need them or clean them
-    skip_downloads = args.command in ["deps", "clean"] or not hasattr(args, "command")
+    # GitHub repo downloads (e.g. allure3) are only needed to generate reports. "run" downloads
+    # inside run_tests, right after the network readiness check, so only "report" needs it here;
+    # info, list, summary, clean, deps, etc. must not trigger network downloads.
+    skip_downloads = args.command != "report"
 
     if not skip_deps:
         # Check dependencies with detailed reporting
         if not check_and_report_dependencies():
             return 1
 
-    # Configure the dependencies and environment (skip for deps and clean commands)
+    # Download the third-party repos required for report generation
     if not skip_downloads:
         download_github_repo()
 
@@ -143,6 +159,7 @@ def main() -> int:
                 report_version=args.report_version,
                 force=args.force,
                 debug=debug,
+                verbose=verbose,
             )
         elif args.command == "summary":
             generate_summary = get_command_function("generate_summary")
@@ -164,9 +181,6 @@ def main() -> int:
             parser.print_help()
             return 0
     except Exception as e:
-        # Import logging here to avoid potential issues during startup
-        import logging
-
         logger = logging.getLogger(__name__)
         logger.error(f"Command execution failed: {e}")
         return 1

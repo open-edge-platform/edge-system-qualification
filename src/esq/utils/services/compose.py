@@ -6,10 +6,10 @@
 import concurrent.futures
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional
 
 from esq.utils.services.models import ComposeProjectConfig, ServiceStartResult
 from sysagent.utils.core import check_command_available, run_command
+from sysagent.utils.infrastructure.retry import run_command_with_retry
 
 logger = logging.getLogger(__name__)
 
@@ -36,17 +36,19 @@ class ComposeServiceOrchestrator:
         if not compose_path.is_file():
             raise FileNotFoundError(f"Compose file was not found: {compose_path}")
 
-    def pull_images(self, images: Optional[List[str]] = None) -> None:
+    def pull_images(self, images: list[str] | None = None) -> None:
         """Pull required container images when explicitly configured."""
         if not images:
             return
 
         for image in images:
-            result = run_command(["docker", "pull", image], timeout=self.timeout)
+            result = run_command_with_retry(
+                ["docker", "pull", image], description=f"docker pull {image}", timeout=self.timeout
+            )
             if not result.success:
                 raise RuntimeError(f"Failed to pull image '{image}': {result.stderr}")
 
-    def up_services(self, services: List[str], env: Optional[Dict[str, str]] = None) -> ServiceStartResult:
+    def up_services(self, services: list[str], env: dict[str, str] | None = None) -> ServiceStartResult:
         """Start one or more services with docker compose up -d."""
         command = [
             "docker",
@@ -69,11 +71,11 @@ class ComposeServiceOrchestrator:
 
     def up_services_parallel(
         self,
-        service_groups: Dict[str, List[str]],
-        env: Optional[Dict[str, str]] = None,
-    ) -> Dict[str, ServiceStartResult]:
+        service_groups: dict[str, list[str]],
+        env: dict[str, str] | None = None,
+    ) -> dict[str, ServiceStartResult]:
         """Start independent service groups in parallel."""
-        results: Dict[str, ServiceStartResult] = {}
+        results: dict[str, ServiceStartResult] = {}
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=max(len(service_groups), 1)) as executor:
             futures = {

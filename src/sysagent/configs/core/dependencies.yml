@@ -9,6 +9,7 @@ version: "1.0"
 # Dependency installation order (dependencies will be processed in this order)
 install_order:
   - "system_packages"
+  - "network_connectivity"
 
 # Dependency groups for logical organization
 groups:
@@ -17,6 +18,12 @@ groups:
     description: "Essential system utilities and libraries"
     dependencies: ["system_packages"]
     optional: false
+
+  readiness_checks:
+    name: "Readiness Checks"
+    description: "Functional checks executed before any download or test execution"
+    dependencies: ["network_connectivity"]
+    optional: true
 
 # Individual dependency definitions
 dependencies:
@@ -43,3 +50,55 @@ dependencies:
         documentation_url: "coming soon"
         notes:
           - "Coming soon"
+
+  # Generic outbound reachability for hosts the sysagent framework itself downloads from.
+  # Run FIRST by the CLI, before any of those downloads start. Extension packages (e.g. esq)
+  # append their own use-case-specific hosts - 'hosts'/'host_alternatives' are merged, not
+  # replaced.
+  #   github.com, codeload.github.com   archive URL, and the redirect target that serves the zip
+  #   release-assets.githubusercontent.com   GitHub release downloads
+  #   raw.githubusercontent.com         raw repository files
+  #   pci-ids.ucw.cz                    PCI IDs database
+  #   nodejs.org                        Node.js tarball (report generation)
+  #   registry.npmjs.org                'npm install -g yarn' (report generation)
+  #   registry.yarnpkg.com              'yarn install' (report generation)
+  # Hosts are probed directly: a custom npm registry/mirror (~/.npmrc, npm_config_registry)
+  # is not detected.
+  network_connectivity:
+    name: "network_connectivity"
+    description: "Outbound network connectivity required to download tools and dependencies"
+    required: true
+    priority: 15
+    installations:
+      - os_type: "linux"
+        install_method: "functional_check"
+        validation:
+          check_method: "network"
+          hosts:
+            - "github.com"
+            - "codeload.github.com"
+            - "release-assets.githubusercontent.com"
+            - "raw.githubusercontent.com"
+            - "pci-ids.ucw.cz"
+            - "nodejs.org"
+            - "registry.npmjs.org"
+            - "registry.yarnpkg.com"
+          port: 443
+          timeout: 10
+          retries: 5
+      - os_type: "windows"
+        install_method: "functional_check"
+        validation:
+          check_method: "network"
+          hosts:
+            - "github.com"
+            - "codeload.github.com"
+            - "release-assets.githubusercontent.com"
+            - "raw.githubusercontent.com"
+            - "pci-ids.ucw.cz"
+            - "nodejs.org"
+            - "registry.npmjs.org"
+            - "registry.yarnpkg.com"
+          port: 443
+          timeout: 10
+          retries: 5

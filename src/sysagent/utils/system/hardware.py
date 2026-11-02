@@ -167,6 +167,7 @@ def collect_hardware_info() -> dict[str, Any]:
         "openvino": all_openvino_devices,
         "pci": pci_devices,
         "power": collect_power_info(),
+        "prerun": collect_prerun_info(),
         "storage": collect_storage_info(),
     }
 
@@ -1215,26 +1216,35 @@ def collect_storage_info() -> dict[str, Any]:
         return {"error": str(e)}
 
 
+def collect_prerun_info() -> dict[str, Any]:
+    """
+    Collect the outcome of the pre-run readiness checks (network connectivity,
+    device smoke tests, ...) executed earlier in this process.
+
+    Empty when none ran (e.g. ``esq info``).
+    """
+    from sysagent.utils.core.dependencies import get_prerun_report
+
+    return get_prerun_report()
+
+
 def collect_network_info() -> dict[str, Any]:
     """
     Collect network interface information including addresses and statistics.
 
-    Also checks for network restrictions that may affect access to certain
-    services like HuggingFace.
+    Reachability of external services is covered by the pre-run readiness checks
+    (see ``collect_prerun_info``), not probed here.
 
     Returns:
         Dict containing network information
     """
     try:
-        from sysagent.utils.infrastructure.network import check_internet_connectivity, check_network_restrictions
-
         interfaces = psutil.net_if_addrs()
         stats = psutil.net_if_stats()
 
         network_info = {
             "interfaces": [],
             "default_gateway": None,
-            "internet_connected": check_internet_connectivity(),
         }
 
         for interface_name, addresses in interfaces.items():
@@ -1260,19 +1270,6 @@ def collect_network_info() -> dict[str, Any]:
                 interface_info["addresses"].append(addr_info)
 
             network_info["interfaces"].append(interface_info)
-
-        # Check for network restrictions (e.g., blocked access to certain services)
-        # Only check if internet is connected
-        if network_info["internet_connected"]:
-            try:
-                is_restricted, restriction_details = check_network_restrictions(timeout=5.0)
-                network_info["restricted_access"] = is_restricted
-                network_info["restriction_details"] = restriction_details
-            except Exception as e:
-                logger.debug(f"Could not check network restrictions: {e}")
-                # Don't fail the entire collection if restriction check fails
-                network_info["restricted_access"] = False
-                network_info["restriction_details"] = {"error": str(e)}
 
         return network_info
 

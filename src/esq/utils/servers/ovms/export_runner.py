@@ -20,6 +20,8 @@ import os
 import shutil
 from pathlib import Path
 
+from sysagent.utils.infrastructure.retry import with_retry
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -132,23 +134,30 @@ def get_export_venv_name() -> str:
     return f"ovms_export_{OVMS_COMMIT[:8]}_py{_EXPORT_VENV_PYTHON_VERSION.replace('.', '')}"
 
 
-def _download_upstream_file(url: str, dest_path: str) -> None:
-    """Download a single upstream file to dest_path, skipping if already cached."""
+@with_retry()
+def _fetch_text(url: str) -> str:
+    """GET ``url`` and return its text; transient network failures are retried (see ``with_retry``)."""
     import requests
 
+    response = requests.get(url, timeout=60)
+    response.raise_for_status()
+    return response.text
+
+
+def _download_upstream_file(url: str, dest_path: str) -> None:
+    """Download a single upstream file to dest_path, skipping if already cached."""
     if os.path.exists(dest_path):
         logger.debug(f"Using cached file: {dest_path}")
         return
 
     logger.info(f"Downloading: {url}")
     try:
-        response = requests.get(url, timeout=60)
-        response.raise_for_status()
+        text = _fetch_text(url)
     except Exception as exc:
         raise RuntimeError(f"Failed to download {url}: {exc}") from exc
 
     with open(dest_path, "w") as fh:
-        fh.write(response.text)
+        fh.write(text)
     os.chmod(dest_path, 0o640)
     logger.debug(f"Cached to: {dest_path}")
 

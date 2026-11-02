@@ -11,10 +11,11 @@ import platform
 import shutil
 import tarfile
 import zipfile
-from typing import Tuple
 
 # Import secure process execution utilities
 from sysagent.utils.core.process import run_command
+
+from .retry import with_retry
 
 logger = logging.getLogger(__name__)
 
@@ -55,9 +56,10 @@ def _validate_url_scheme(url: str) -> None:
         raise ValueError(f"Unsafe URL scheme '{parsed.scheme}'. Only http/https are allowed.")
 
 
+@with_retry()
 def download_file(url: str, target_path: str) -> None:
     """
-    Download a file from a URL to a target path.
+    Download a file from a URL to a target path. Transient network failures are retried.
 
     Args:
         url: URL to download from
@@ -104,7 +106,7 @@ def is_nodejs_installed(node_dir: str) -> bool:
     return os.path.exists(node_exe) and os.path.exists(npm_exe)
 
 
-def get_node_binary_paths(node_dir: str) -> Tuple[str, str, str]:
+def get_node_binary_paths(node_dir: str) -> tuple[str, str, str]:
     """
     Get paths to node, npm, and yarn binaries.
 
@@ -112,7 +114,7 @@ def get_node_binary_paths(node_dir: str) -> Tuple[str, str, str]:
         node_dir: Directory where Node.js is installed
 
     Returns:
-        Tuple[str, str, str]: Paths to node, npm, and yarn binaries
+        tuple[str, str, str]: Paths to node, npm, and yarn binaries
     """
     if platform.system() == "Windows":
         node_bin = os.path.join(node_dir, "node.exe")

@@ -19,11 +19,12 @@ import logging
 import os
 import re
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import requests
 
 from sysagent.utils.config import setup_data_dir
+from sysagent.utils.infrastructure.retry import with_retry
 
 # Setup logger
 logger = logging.getLogger(__name__)
@@ -31,6 +32,15 @@ logger = logging.getLogger(__name__)
 # PCI IDs database URL
 PCI_IDS_URL = "https://pci-ids.ucw.cz/v2.2/pci.ids"
 PCI_IDS_CACHE_TTL = 30 * 24 * 60 * 60  # 30 days in seconds
+
+
+@with_retry()
+def _fetch_pci_ids() -> requests.Response:
+    """GET the PCI IDs database, retrying transient network failures and 5xx responses."""
+    response = requests.get(PCI_IDS_URL, timeout=10)
+    if response.status_code >= 500:
+        response.raise_for_status()
+    return response
 
 
 class PCIDeviceInfo:
@@ -44,7 +54,7 @@ class PCIDeviceInfo:
     """
 
     def __init__(
-        self, thirdparty_dir: Optional[str] = None, cache_dir: Optional[str] = None
+        self, thirdparty_dir: str | None = None, cache_dir: str | None = None
     ):
         """
         Initialize the PCI device info helper.
@@ -82,7 +92,7 @@ class PCIDeviceInfo:
         """
         try:
             logger.info(f"Downloading PCI IDs database from {PCI_IDS_URL}")
-            response = requests.get(PCI_IDS_URL, timeout=10)
+            response = _fetch_pci_ids()
 
             if response.status_code == 200:
                 with open(self.pci_ids_path, "wb") as f:
@@ -101,7 +111,7 @@ class PCIDeviceInfo:
             logger.error(f"Error downloading PCI IDs database: {e}")
             return False
 
-    def _parse_pci_ids(self) -> Dict[str, Any]:
+    def _parse_pci_ids(self) -> dict[str, Any]:
         """
         Parse the PCI IDs database file into a structured dictionary.
 
@@ -221,7 +231,7 @@ class PCIDeviceInfo:
 
         return pci_db
 
-    def _load_or_download_pci_db(self) -> Dict[str, Any]:
+    def _load_or_download_pci_db(self) -> dict[str, Any]:
         """
         Load the PCI IDs database, downloading and parsing if necessary.
 
@@ -348,7 +358,7 @@ class PCIDeviceInfo:
 
     def get_class_info(
         self, class_id: str, subclass_id: str = None, prog_if: str = None
-    ) -> Tuple[str, str, str]:
+    ) -> tuple[str, str, str]:
         """
         Get human-readable names for PCI class, subclass, and programming interface.
 
@@ -386,7 +396,7 @@ class PCIDeviceInfo:
 
         return (class_name, subclass_name, prog_if_name)
 
-    def extract_pci_devices(self) -> List[Dict[str, Any]]:
+    def extract_pci_devices(self) -> list[dict[str, Any]]:
         """
         Extract all PCI devices from the system using sysfs.
 
@@ -521,8 +531,8 @@ class PCIDeviceInfo:
 
 
 def get_pci_devices(
-    thirdparty_dir: Optional[str] = None, cache_dir: Optional[str] = None
-) -> List[Dict[str, Any]]:
+    thirdparty_dir: str | None = None, cache_dir: str | None = None
+) -> list[dict[str, Any]]:
     """
     Helper function to get all PCI devices in the system.
 

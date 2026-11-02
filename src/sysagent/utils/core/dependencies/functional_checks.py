@@ -18,6 +18,7 @@ instead of hanging the whole CLI.
 """
 
 import logging
+import os
 import re
 import shutil
 import tempfile
@@ -27,21 +28,61 @@ import urllib.error
 import urllib.request
 
 from sysagent.utils.core.process import run_command
+from sysagent.utils.spinner import set_spinner_suffix
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_OV_SMOKE_TIMEOUT = 30.0
-DEFAULT_NETWORK_TIMEOUT = 5.0
+DEFAULT_NETWORK_TIMEOUT = 10.0
+# Environment override for the per-host network check timeout (seconds), for testing slow or
+# lossy networks without editing config.
+NETWORK_TIMEOUT_ENV = "CORE_NETWORK_TIMEOUT_SECONDS"
 DEFAULT_NETWORK_PORT = 443
+DEFAULT_NETWORK_RETRY_DELAY = 1.0
 DEFAULT_DOCKER_SMOKE_TIMEOUT = 60.0
 DEFAULT_DOCKER_SMOKE_IMAGE = "curlimages/curl:latest"
 
 _HOSTNAME_PATTERN = re.compile(r"[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?")
 
 
+_OK_MARK = "✓"
+_FAIL_MARK = "✗"
+
+
+_warned_invalid_timeouts: set[str] = set()
+
+
+def get_network_timeout(default: float = DEFAULT_NETWORK_TIMEOUT) -> float:
+    """Resolve the per-host network check timeout: env override, else ``default``.
+
+    ``CORE_NETWORK_TIMEOUT_SECONDS`` wins when set to a positive number; an invalid value
+    (non-numeric, <= 0) is logged once as a warning and ignored.
+    """
+    raw = os.environ.get(NETWORK_TIMEOUT_ENV, "").strip()
+    if raw:
+        try:
+            timeout = float(raw)
+            if 0 < timeout < float("inf"):
+                return timeout
+        except ValueError:
+            pass
+        if raw not in _warned_invalid_timeouts:
+            _warned_invalid_timeouts.add(raw)
+            logger.warning("Ignoring invalid %s=%r (expected a positive number of seconds)", NETWORK_TIMEOUT_ENV, raw)
+    return default
+
+
 def _mark(ok: bool, text: str) -> str:
     """Prefix a check-result line with a pass/fail glyph for quick visual scanning."""
-    return f"{'✓' if ok else '✗'} {text}"
+    return f"{_OK_MARK if ok else _FAIL_MARK} {text}"
+
+
+def split_mark(line: str) -> tuple[bool | None, str]:
+    """Inverse of ``_mark``: ``(ok, text)``, with ``ok`` None if the line has no glyph."""
+    for mark, ok in ((_OK_MARK, True), (_FAIL_MARK, False)):
+        if line.startswith(f"{mark} "):
+            return ok, line[len(mark) + 1 :]
+    return None, line
 
 
 def check_openvino_device(device: str, model_path: str, timeout: float = DEFAULT_OV_SMOKE_TIMEOUT) -> tuple[bool, str]:
@@ -132,7 +173,12 @@ def _connect_host(host: str, port: int, timeout: float, results: dict) -> None:
         results[host] = (False, _mark(False, f"{host}:{port}: unreachable ({reason})"))
 
 
-def resolve_network_hosts(hosts: list[str], host_alternatives: dict) -> list[str]:
+def resolve_network_hosts(
+    hosts: list[str],
+    host_alternatives: dict,
+    flagged_hosts: dict | None = None,
+    active_flags: set[str] | None = None,
+) -> list[str]:
     """Expand ``hosts`` with the host(s) for whichever alternative source is preferred.
 
     ``host_alternatives`` maps a group name (e.g. "model_download") to a dict
@@ -142,12 +188,18 @@ def resolve_network_hosts(hosts: list[str], host_alternatives: dict) -> list[str
     source the user isn't configured to use (e.g. huggingface.co when
     PREFER_MODELSCOPE=1 is set) is never reported as a false failure.
     """
+    resolved = list(hosts)
+    # Hosts gated behind a profile requirement flag (e.g. Docker registry only when
+    # docker_required) are skipped when the flags are known and don't include theirs.
+    for flag, flag_hosts in (flagged_hosts or {}).items():
+        if active_flags is None or flag in active_flags:
+            resolved.extend(h for h in flag_hosts if h not in resolved)
+
     if not host_alternatives:
-        return list(hosts)
+        return resolved
 
     from sysagent.utils.infrastructure.network import get_preferred_download_source
 
-    resolved = list(hosts)
     for group in host_alternatives.values():
         if not group:
             continue
@@ -158,18 +210,77 @@ def resolve_network_hosts(hosts: list[str], host_alternatives: dict) -> list[str
 
 
 def check_network_connectivity(
-    hosts: list[str], timeout: float = DEFAULT_NETWORK_TIMEOUT, port: int = DEFAULT_NETWORK_PORT
+    hosts: list[str],
+    timeout: float = DEFAULT_NETWORK_TIMEOUT,
+    port: int = DEFAULT_NETWORK_PORT,
+    attempts: int | None = None,
+    retry_delay: float = DEFAULT_NETWORK_RETRY_DELAY,
 ) -> tuple[bool, list[str]]:
     """Check outbound network connectivity via an HTTP(S) request to each host.
 
+    Networks with intermittent connectivity (proxies/firewalls that sporadically
+    drop or reset connections) can fail a host on one attempt and pass on the next,
+    so each failing host is retried up to ``attempts`` times in total, waiting a fixed
+    ``retry_delay`` between rounds. Hosts that already passed are not probed again.
+    The current attempt is shown on the status spinner when more than one is allowed.
+
     Returns:
-        (any_reachable, messages) - passes if at least one host is reachable,
-        since any single host/proxy being blocked shouldn't be treated the
-        same as having no network connectivity at all.
+        (all_reachable, messages) - passes only if every host is reachable. The
+        host list is already narrowed to what the run needs (core hosts, plus
+        flag-gated and preferred-source hosts), so an unreachable host would
+        otherwise fail later during its download. A host that only passed after a
+        retry is reported with the attempt count, to make intermittency visible.
     """
     if not hosts:
         return True, []
 
+    # Same attempt count as the downloaders (env override, else the shared default).
+    from sysagent.utils.infrastructure.retry import get_retry_attempts
+
+    attempts = get_retry_attempts(attempts)
+    hosts = list(dict.fromkeys(hosts))
+    outcomes: dict[str, tuple[bool, str]] = {}
+    passed_on: dict[str, int] = {}
+    pending = hosts
+    for attempt in range(1, max(attempts, 1) + 1):
+        if attempts > 1:
+            set_spinner_suffix(f"attempt {attempt}/{attempts}")
+        for host, (ok, message) in _probe_hosts(pending, timeout, port).items():
+            outcomes[host] = (ok, message)
+            if ok:
+                passed_on[host] = attempt
+        pending = [h for h in hosts if not outcomes[h][0]]
+        if not pending:
+            break
+        # "attempt N/M failed" refers to the attempt that just ran, not the next one
+        # One host per indented line so a long list never overflows a narrow terminal.
+        host_lines = "\n".join(f"    {h}" for h in pending)
+        logger.info(
+            "Network check attempt %d/%d failed: %d host(s) unreachable; %s\n%s",
+            attempt,
+            attempts,
+            len(pending),
+            f"retrying in {retry_delay:.1f}s" if attempt < attempts else "no attempts left",
+            host_lines,
+        )
+        if attempt == attempts:
+            break
+        time.sleep(retry_delay)
+
+    set_spinner_suffix("")
+    messages = []
+    for host in hosts:
+        ok, message = outcomes[host]
+        if ok and passed_on.get(host, 1) > 1:
+            message = f"{message} (after {passed_on[host]} attempts)"
+        elif not ok and attempts > 1:
+            message = f"{message} [{attempts} attempts]"
+        messages.append(message)
+    return not pending, messages
+
+
+def _probe_hosts(hosts: list[str], timeout: float, port: int) -> dict[str, tuple[bool, str]]:
+    """Probe ``hosts`` in parallel, returning ``{host: (reachable, message)}``."""
     # urlopen()'s own `timeout` only bounds each individual connect() call -
     # it does NOT bound DNS resolution (getaddrinfo) or iterating over
     # multiple addresses resolved for a host, either of which can block far
@@ -187,18 +298,14 @@ def check_network_connectivity(
         threads.append((host, thread))
 
     deadline = time.monotonic() + timeout
-    messages = []
-    any_success = False
+    outcomes: dict[str, tuple[bool, str]] = {}
     for host, thread in threads:
         thread.join(timeout=max(0.0, deadline - time.monotonic()))
         if host in results:
-            ok, message = results[host]
-            messages.append(message)
-            any_success = any_success or ok
+            outcomes[host] = results[host]
         else:
-            messages.append(_mark(False, f"{host}:{port}: unreachable (timed out after {timeout:.0f}s)"))
-
-    return any_success, messages
+            outcomes[host] = (False, _mark(False, f"{host}:{port}: unreachable (timed out after {timeout:g}s)"))
+    return outcomes
 
 
 def _last_line(result) -> str:
@@ -237,7 +344,13 @@ def check_docker_runtime(
     messages = [_mark(True, "docker access: OK (no sudo required)")]
 
     try:
-        pull_result = run_command([docker_bin, "pull", image], timeout=timeout)
+        from sysagent.utils.infrastructure.retry import run_command_with_retry
+
+        # Transient registry/network errors are retried; goes through the daemon, so it also
+        # follows any configured registry mirror or proxy.
+        pull_result = run_command_with_retry(
+            [docker_bin, "pull", image], description="docker pull (readiness)", timeout=timeout
+        )
     except Exception as e:
         messages.append(_mark(False, f"image pull: failed ({e})"))
         return False, messages

@@ -204,9 +204,15 @@ def format_system_summary(hardware_info: dict[str, Any], software_info: dict[str
         if version and version != "Unknown":
             os_line += f" {version}"
 
-        if os_info.get("pretty_name"):
-            os_pretty = os_info["pretty_name"]
+        # On Linux the pretty name (e.g. "Ubuntu 24.04.4 LTS") lives under "distribution"
+        dist = os_info.get("distribution") or {}
+        os_pretty = dist.get("pretty_name") or os_info.get("pretty_name")
+        if os_pretty and os_pretty != "Unknown":
             os_line = f"OS: {os_pretty}"
+        elif dist.get("name") and dist["name"] != "Unknown":
+            os_line = f"OS: {dist['name']}"
+            if dist.get("version_id") and dist["version_id"] != "Unknown":
+                os_line += f" {dist['version_id']}"
 
         lines.append(os_line)
 
@@ -287,29 +293,12 @@ def format_system_summary(hardware_info: dict[str, Any], software_info: dict[str
         # Powercap exists but zone directories were unreadable entirely
         lines.append("Power: Available (setup required for non-root access)")
 
-    # Network Information
-    network = hardware_info.get("network", {})
-    if network:
-        internet_connected = network.get("internet_connected", False)
-        restricted_access = network.get("restricted_access", False)
-        restriction_details = network.get("restriction_details", {})
-
-        if internet_connected:
-            if restricted_access:
-                lines.append("Network: Internet connected (Restricted)")
-                if restriction_details:
-                    # Derive blocked services from accessibility flags
-                    blocked_services = [
-                        service.replace("_accessible", "").capitalize()
-                        for service, accessible in restriction_details.items()
-                        if service.endswith("_accessible") and not accessible
-                    ]
-                    if blocked_services:
-                        lines.append(f"  Blocked: {', '.join(blocked_services)}")
-            else:
-                lines.append("Network: Internet connected (Open)")
-        else:
-            lines.append("Network: No internet connection")
+    # Pre-run readiness checks (network connectivity, device smoke tests, ...)
+    prerun = hardware_info.get("prerun", {})
+    if prerun:
+        lines.append("Readiness checks:")
+        for name, entry in prerun.items():
+            lines.append(f"  {name.replace('_', ' ')}: {entry.get('status', 'unknown')}")
 
     lines.append("")  # Empty line after system info
     return "\n".join(lines)
@@ -433,6 +422,10 @@ def build_display_summary(hardware: dict[str, Any], software: dict[str, Any]) ->
     # Convert Network info (pass through as-is)
     if "network" in hardware:
         summary_hardware["network"] = hardware["network"]
+
+    # Convert pre-run readiness results (pass through as-is)
+    if "prerun" in hardware:
+        summary_hardware["prerun"] = hardware["prerun"]
 
     # Pass OS info through as-is to keep the same structure as system_info_software.json
     if "os" in software:

@@ -10,16 +10,23 @@ and applying INT8 quantization using NNCF.
 
 import logging
 from pathlib import Path
-from typing import Optional
+
+from sysagent.utils.infrastructure.retry import with_retry
 
 logger = logging.getLogger(__name__)
+
+
+@with_retry()
+def _download_with_retry(kagglehub_module, kaggle_handle: str) -> str:
+    """kagglehub.model_download with the shared retry policy (it raises ``requests`` exceptions)."""
+    return kagglehub_module.model_download(kaggle_handle)
 
 
 def download_kaggle_model(
     model_id: str,
     kaggle_handle: str,
-    models_dir: Optional[str] = None,
-) -> Optional[Path]:
+    models_dir: str | None = None,
+) -> Path | None:
     """
     Download model from Kaggle Hub.
 
@@ -40,8 +47,9 @@ def download_kaggle_model(
     try:
         import kagglehub
 
-        # Download model from Kaggle Hub (kagglehub manages its own cache)
-        model_path = kagglehub.model_download(kaggle_handle)
+        # Download model from Kaggle Hub (kagglehub manages its own cache); transient
+        # network failures are retried (see with_retry)
+        model_path = _download_with_retry(kagglehub, kaggle_handle)
         logger.info(f"Model downloaded to: {model_path}")
 
         # Create a marker file in models_dir to track that we've downloaded this model
@@ -67,8 +75,8 @@ def export_kaggle_model(
     kaggle_handle: str,
     models_dir: str = "models",
     model_precision: str = "fp16",
-    convert_args: Optional[dict] = None,
-    quantize_args: Optional[dict] = None,
+    convert_args: dict | None = None,
+    quantize_args: dict | None = None,
 ) -> bool:
     """
     Convert Kaggle model to OpenVINO format and optionally quantize to INT8.

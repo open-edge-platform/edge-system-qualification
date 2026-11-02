@@ -64,9 +64,43 @@ except ImportError:
 
 
 import time
-from typing import Mapping
+from collections.abc import Mapping
+
+from .retry import is_transient_error_text, with_retry
 
 logger = logging.getLogger(__name__)
+
+
+@with_retry()
+def _pull_with_progress(client, image: str, log_every: int) -> None:
+    """Stream a ``docker pull``; transient registry/network failures are retried.
+
+    Connection errors and 5xx API errors raise out of the stream and are retried by
+    ``with_retry`` (4xx such as image-not-found/unauthorized are not). Errors reported
+    in-band as ``{"error": ...}`` lines are raised too, so they are neither retried
+    silently nor mistaken for a successful pull.
+    """
+    stream = client.api.pull(image, stream=True, decode=True)
+    download_count = 0
+    extract_count = 0
+    for line in stream:
+        if line.get("error"):
+            message = f"Failed to pull Docker image '{image}': {line['error']}"
+            if is_transient_error_text(line["error"]):
+                raise ConnectionError(message)
+            raise RuntimeError(message)
+        status = line.get("status", "")
+        progress = line.get("progress", "")
+        if status.lower().startswith("downloading"):
+            download_count += 1
+            if download_count % log_every == 0:
+                logger.info(f"Downloading... {progress}")
+        elif status.lower().startswith("extracting"):
+            extract_count += 1
+            if extract_count % log_every == 0:
+                logger.info(f"Extracting... {progress}")
+        elif status.lower().startswith("pull complete"):
+            logger.info("Pull complete for layer")
 
 
 class DockerClient:
@@ -104,23 +138,7 @@ class DockerClient:
             logger.warning(f"Error checking local image '{image}': {e}. Attempting to pull anyway.")
 
         logger.info(f"Pulling Docker image: {image}")
-        stream = self.client.api.pull(image, stream=True, decode=True)
-        download_count = 0
-        extract_count = 0
-        for line in stream:
-            status = line.get("status", "")
-            progress = line.get("progress", "")
-            if status.lower().startswith("downloading"):
-                download_count += 1
-                if download_count % log_every == 0:
-                    logger.info(f"Downloading... {progress}")
-            elif status.lower().startswith("extracting"):
-                extract_count += 1
-                if extract_count % log_every == 0:
-                    logger.info(f"Extracting... {progress}")
-            elif status.lower().startswith("pull complete"):
-                logger.info("Pull complete for layer")
-
+        _pull_with_progress(self.client, image, log_every)
         logger.info(f"Successfully pulled Docker image: {image}")
 
     @staticmethod

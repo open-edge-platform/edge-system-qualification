@@ -234,10 +234,19 @@ Framework-level settings use the `CORE_` prefix and apply to every run, not to a
 | `CORE_NETWORK_TIMEOUT_SECONDS` | Per-host timeout of the network readiness check (default `10`) | Positive number of seconds, e.g. `10` or `2.5` |
 | `CORE_NETWORK_RETRY_ATTEMPTS` | Attempts per host in the network readiness check, and attempts per download for tool/dependency archives, files, Node.js, the PCI IDs database, the OVMS export script, test images, Hugging Face/ModelScope, Kaggle Hub and Ultralytics model downloads, Docker image pulls (`docker pull`, compose pulls and the Docker SDK) and the rustup installer download (default `10`). Timeouts are not retried, and Docker CLI pulls are only retried for transient network/registry errors | Positive integer; `1` disables retries |
 
-An invalid value (non-numeric, or not greater than `0`/`1` respectively) is logged once as a warning and ignored.
+!!! info "Invalid Values"
+    A value outside the accepted values is logged once as a warning and ignored; the default is used.
 
-!!! danger "Debugging and troubleshooting only"
-    `CORE_SKIP_PRERUN_CHECKS=1` skips the pre-run readiness checks (network connectivity, device smoke tests, ...). It is **not** an officially supported option or configuration: it exists for advanced users isolating a problem, and a warning is logged whenever it is set. Skipping the checks means network or device problems surface later as download errors or test timeouts, and results from such runs should not be used for qualification.
+### Developer mode
+
+!!! warning "Debugging and troubleshooting only"
+    These variables are for development and advanced troubleshooting. They are **not** officially supported options, and results from runs that use them should not be used for qualification.
+
+| Variable | Effect | Accepted values |
+|---|---|---|
+| `DEVELOPER_MODE` | Enables developer-only report behavior: keeps `index.html` next to the platform-named report (removed by default) so a browser refresh shows the latest report. | `1`, `true`, `yes` |
+| `CORE_SKIP_CPU_CHECK` | Bypasses the supported-CPU compatibility check. A warning is logged whenever it is set. | `1`, `true`, `yes` |
+| `CORE_SKIP_PRERUN_CHECKS` | Skips the pre-run readiness checks (network connectivity, device smoke tests, ...). Network or device problems then surface later as download errors or test timeouts. A warning is logged whenever it is set. | `1`, `true`, `yes`, `on` |
 
 ### Usage examples
 
@@ -253,6 +262,9 @@ CORE_NETWORK_TIMEOUT_SECONDS=15 esq -v run --profile profile.suite.system.cpu-sk
 
 # Fail fast: a single attempt, no retries
 CORE_NETWORK_RETRY_ATTEMPTS=1 esq -v run --profile profile.suite.system.cpu-sku
+
+# Keep index.html after report generation (refresh the browser to see the latest report)
+DEVELOPER_MODE=1 esq -v run --profile profile.suite.system.cpu-sku
 ```
 
 ### Priority rules

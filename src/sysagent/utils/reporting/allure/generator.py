@@ -398,6 +398,18 @@ def generate_allure_report(
         # Generate final timestamped copy with system information
         final_report_path = generate_final_report_copy(report_dir, debug)
         if final_report_path:
+            # Remove the duplicate index.html so only the platform-named report remains.
+            # In developer mode it is kept so a browser refresh shows the latest report.
+            developer_mode = os.environ.get("DEVELOPER_MODE", "0").lower() in ["1", "true", "yes"]
+            if developer_mode:
+                logger.debug("[DEVELOPER MODE] Keeping index.html alongside the final report")
+            else:
+                try:
+                    os.remove(os.path.join(report_dir, "index.html"))
+                    logger.debug("Removed duplicate index.html after final report copy")
+                except OSError as e:
+                    logger.warning(f"Failed to remove duplicate index.html: {e}")
+
             # Convert to relative path for cleaner CLI output
             relative_path = os.path.relpath(final_report_path, os.getcwd())
             logger.info(f"\nReport available at: {relative_path}")

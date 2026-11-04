@@ -229,10 +229,10 @@ def _check_system_validation_esq(force: bool = False, mode: str = "qualification
         codename = generation_info.get("codename")
         cpu_brand = cpu_info.get("brand", "Unknown")
 
-        # Check for developer mode
-        developer_mode = os.environ.get("DEVELOPER_MODE", "0").lower() in ["1", "true", "yes"]
-        if developer_mode:
-            logger.warning("[DEVELOPER MODE] System validation bypassed")
+        # Check for explicit CPU check bypass
+        skip_cpu_check = os.environ.get("CORE_SKIP_CPU_CHECK", "0").lower() in ["1", "true", "yes"]
+        if skip_cpu_check:
+            logger.warning("CORE_SKIP_CPU_CHECK is set - system validation bypassed")
             return True, True, False
 
         # Check if CPU is supported for ESQ qualification
@@ -359,10 +359,10 @@ def _prompt_run_configuration_esq(
         codename = generation_info.get("codename")
         cpu_brand = cpu_info.get("brand", "Unknown")
 
-        # Check for developer mode
-        developer_mode = os.environ.get("DEVELOPER_MODE", "0").lower() in ["1", "true", "yes"]
-        if developer_mode:
-            logger.warning("[DEVELOPER MODE] System compatibility check bypassed")
+        # Check for explicit CPU check bypass
+        skip_cpu_check = os.environ.get("CORE_SKIP_CPU_CHECK", "0").lower() in ["1", "true", "yes"]
+        if skip_cpu_check:
+            logger.warning("CORE_SKIP_CPU_CHECK is set - system compatibility check bypassed")
             return True, True, [], []
 
         # Check if CPU is supported for ESQ qualification

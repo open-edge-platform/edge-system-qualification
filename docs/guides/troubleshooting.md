@@ -149,7 +149,7 @@ When a test fails but the CLI output does not show a clear root cause:
 3. Review the Allure* report for detailed attachments and execution timeline:
 
     ```
-    esq_data/reports/allure/index.html
+    esq_data/reports/allure/<app>_report_<platform>_<timestamp>.html
     ```
 
 4. Verify that asset preparation is completed without errors.

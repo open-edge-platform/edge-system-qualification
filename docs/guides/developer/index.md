@@ -51,7 +51,7 @@ Developers working on the tests or framework code must install the project in ed
 
 #### Prerequisites
 
-- Python* 3.10 or newer
+- Python* 3.11 or newer
 - [uv](https://docs.astral.sh/uv/) package manager
 
 Install `uv` if not already present:

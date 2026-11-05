@@ -109,11 +109,6 @@ quote-style = "double"
 [tool.ruff.lint]
 extend-select = ["E501"]
 
-[tool.sysagent]
-github_dependencies = [
-  { name = "edge-developer-kit-reference-scripts", url = "https://github.com/intel/edge-developer-kit-reference-scripts.git", ref = "4f05e9a" },
-]
-
 [dependency-groups]
 dev = [
     "ruff>=0.13.1",

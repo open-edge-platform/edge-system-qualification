@@ -78,7 +78,7 @@ def _download_and_extract(url: str, dest_dir: Path):
         else:
             with tarfile.open(tmp_path, "r:gz") as tar_ref:
                 tar_ref.extractall(dest_dir)
-        logger.info(f"Extracted to: {dest_dir}")
+        logger.info(f"Extracted to: {os.path.relpath(dest_dir, os.getcwd())}")
 
         # Flatten single top-level folder
         items = list(dest_dir.iterdir())
@@ -201,38 +201,6 @@ def setup_allure() -> str:
     return str(allure_dir)
 
 
-def setup_edge_developer_kit() -> str:
-    """
-    Set up Edge Developer Kit scripts.
-
-    Returns:
-        str: Path to Edge Developer Kit installation directory
-    """
-    tool_config = load_tool_config()
-    edk_config = tool_config.get("edge_developer_kit", {})
-
-    url = edk_config.get(
-        "url",
-        "https://github.com/intel-ai-reference-kits/edge-developer-kit-reference-scripts/archive/refs/heads/main.zip",
-    )
-
-    thirdparty_dir = Path(get_thirdparty_dir())
-    edk_dir = thirdparty_dir / "edge-developer-kit-reference-scripts"
-
-    if edk_dir.exists():
-        logger.info(f"Edge Developer Kit already installed at {edk_dir}")
-        return str(edk_dir)
-
-    logger.info("Setting up Edge Developer Kit reference scripts")
-    edk_dir.mkdir(parents=True, exist_ok=True)
-
-    # Download and extract
-    _download_and_extract(url, edk_dir)
-
-    logger.info(f"Edge Developer Kit installed successfully at {edk_dir}")
-    return str(edk_dir)
-
-
 def setup_node() -> str:
     """
     Set up Node.js.
@@ -261,9 +229,6 @@ def setup_dependency(dependency_name: str) -> str:
     setup_functions = {
         "allure": setup_allure,
         "allure3": setup_allure,
-        "edge-developer-kit": setup_edge_developer_kit,
-        "edge_developer_kit": setup_edge_developer_kit,
-        "edk": setup_edge_developer_kit,
         "node": setup_node,
         "nodejs": setup_node,
         "node.js": setup_node,
@@ -285,7 +250,7 @@ def setup_all_dependencies() -> dict[str, str]:
     """
     results = {}
 
-    dependencies = ["allure", "edge-developer-kit", "node"]
+    dependencies = ["allure", "node"]
 
     for dep in dependencies:
         try:
@@ -324,10 +289,6 @@ def verify_dependency_installation(dependency_name: str, install_path: str) -> b
             allure_bin = install_path / "bin" / "allure.bat"
         return allure_bin.exists()
 
-    elif dependency_name in ["edge-developer-kit", "edge_developer_kit", "edk"]:
-        # Check for reference scripts
-        return (install_path / "README.md").exists()
-
     elif dependency_name in ["node", "nodejs", "node.js"]:
         # Check for node binary
         from .node import is_nodejs_installed
@@ -352,9 +313,6 @@ def cleanup_dependency(dependency_name: str) -> bool:
     dependency_paths = {
         "allure": thirdparty_dir / "allure3",
         "allure3": thirdparty_dir / "allure3",
-        "edge-developer-kit": thirdparty_dir / "edge-developer-kit-reference-scripts",
-        "edge_developer_kit": thirdparty_dir / "edge-developer-kit-reference-scripts",
-        "edk": thirdparty_dir / "edge-developer-kit-reference-scripts",
         "node": thirdparty_dir / "node",
         "nodejs": thirdparty_dir / "node",
         "node.js": thirdparty_dir / "node",
@@ -388,7 +346,6 @@ def list_installed_dependencies() -> dict[str, str | None]:
 
     dependencies = {
         "allure": thirdparty_dir / "allure3",
-        "edge-developer-kit": thirdparty_dir / "edge-developer-kit-reference-scripts",
         "node": thirdparty_dir / "node",
     }
 
@@ -420,9 +377,6 @@ def get_dependency_info(dependency_name: str) -> dict[str, Any]:
     if dependency_name in ["allure", "allure3"]:
         config = tool_config.get("allure", {})
         path = thirdparty_dir / "allure3"
-    elif dependency_name in ["edge-developer-kit", "edge_developer_kit", "edk"]:
-        config = tool_config.get("edge_developer_kit", {})
-        path = thirdparty_dir / "edge-developer-kit-reference-scripts"
     elif dependency_name in ["node", "nodejs", "node.js"]:
         config = {"version": "v20.11.0"}  # Default version
         path = thirdparty_dir / "node"
@@ -485,7 +439,7 @@ def download_github_repo(section: str = "tool.sysagent", package: str = "sysagen
             # Use the robust download and extract function
             logger.info(f"Installing '{dep_name}' from {archive_url}")
             _download_and_extract(archive_url, dep_dest)
-            logger.info(f"Installed '{dep_name}' to {dep_dest}")
+            logger.info(f"Installed '{dep_name}' to {os.path.relpath(dep_dest, os.getcwd())}")
         except Exception as e:
             logger.error(f"Failed to install '{dep_name}': {e}")
 

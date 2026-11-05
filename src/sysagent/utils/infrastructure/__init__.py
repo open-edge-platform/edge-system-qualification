@@ -47,7 +47,6 @@ try:
         setup_all_dependencies,
         setup_allure,
         setup_dependency,
-        setup_edge_developer_kit,
         setup_node,
         verify_dependency_installation,
     )
@@ -84,7 +83,6 @@ __all__ = [
     "extract_zip_file",
     "download_and_prepare_audio",
     "setup_allure",
-    "setup_edge_developer_kit",
     "setup_node",
     "setup_dependency",
     "setup_all_dependencies",

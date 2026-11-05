@@ -69,8 +69,9 @@ Run Intel® Edge System Qualification (ESQ).
 USAGE PATTERNS:
   1. Default run (interactive prompts):
      {cli_name} run
-     • Choose ONE qualification profile from a numbered list, or 'n' for none
-     • Then choose whether to include vertical profiles
+     • Choose ONE qualification profile from a numbered list
+     • If it defines default_optional_profiles, asks "Run additional profile(s) as well?"
+       and, unless declined, opens the profile picker with them pre-selected
      • Exits if the system is unsupported or no valid selection is made
 
   2. Run all profiles (data collection, not for qualification):
@@ -86,6 +87,9 @@ USAGE PATTERNS:
   4. Run specific profile:
      {cli_name} run -p PROFILE_NAME
      • Runs the specified profile with validation
+     • If the profile defines default_optional_profiles, asks "Run additional profile(s) as well?"
+       and, unless declined, opens the same picker with the profile and its default optional
+       profiles pre-selected (--force accepts them without prompting)
 
   5. Run by tag (short keyword instead of full profile name):
      {cli_name} run -t TAG
@@ -101,8 +105,7 @@ USAGE PATTERNS:
      • Up/Down to move, Right/Left to expand/collapse, Space to toggle, 'a' to toggle all,
        Enter to confirm
      • Drill into a profile to pick specific test_id(s) instead of the whole profile
-     • CPU validation and associated vertical profile prompts apply automatically
-       for any selected qualification profile(s)
+     • CPU validation applies automatically for any selected qualification profile(s)
      • After confirming, optionally save the selection (including any test_id scoping)
        to a YAML file for reuse
 
@@ -146,7 +149,7 @@ For available profiles, use: {cli_name} list
         action="store_true",
         help=(
             "Run qualification profiles only (exits if system requirements not met). "
-            "Combined with --profile/--tag, skips that profile's vertical_profiles entirely "
+            "Combined with --profile/--tag, skips that profile's default_optional_profiles entirely "
             "(no prompt, not auto-included even with --force)"
         ),
     )

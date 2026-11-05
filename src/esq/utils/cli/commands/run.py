@@ -18,6 +18,7 @@ from typing import Any
 # Import sysagent's low-level execution functions (generic, reusable)
 from sysagent.utils.cli.commands.run import (
     TIER_SKIP_EXIT,
+    _build_default_profile_preselection,
     _collect_requirement_flags_from_profiles,
     _determine_final_exit_code,
     _format_filters_for_display,
@@ -307,38 +308,28 @@ def _prompt_run_configuration_esq(
     qualification_profiles: list = None,
 ) -> tuple:
     """
-    ESQ-specific unified prompt for run configuration.
+    ESQ-specific prompt for the default `esq run`: pick ONE qualification profile.
 
-    Lists available qualification profiles for selection (scalable to any number of
-    qualification types, instead of always assuming a single hardcoded profile) alongside
-    vertical profile inclusion, adapting based on Intel CPU compatibility status. Kept
-    concise - full options remain available via `esq run --help` (--all, --profile, --tag).
-
-    There is no implicit "default" qualification profile. Exactly one profile must be
-    explicitly chosen by number. Any other response terminates the run rather than
-    silently falling back to a preset profile, since each qualification profile can
-    have different dependencies/system setup requirements.
-
-    Vertical profile inclusion is opt-in per qualification profile (via the profile's
-    `vertical_profiles` param, a list of vertical profile names) rather than a single
-    yes/no that applies to every qualification profile. Only the selected qualification's
-    own associated verticals (if any) are offered; if it declares none, nothing is prompted
-    and no vertical profiles are included.
+    Lists the available qualification profiles by number (scalable to any number of
+    qualification types) and adapts to Intel CPU compatibility. There is no implicit default
+    qualification profile: any response other than a valid number terminates the run, since
+    each qualification profile can have different dependencies/system setup requirements.
+    Whether to run its default_optional_profiles is asked afterwards, by the shared
+    --profile execution path.
 
     Args:
-        force: If True, skip prompt (non-interactive). Qualification only runs when
+        force: If True, skip the prompt (non-interactive). Qualification only runs when
             explicitly requested via --profile/--tag/--qualification-only.
-        vertical_profile_names: List of all vertical profile names (used only for the
-            unsupported-system fallback prompt, where no qualification is selected).
-        qualification_profiles: List of dicts describing selectable qualification profiles
-            (profiles with the "hidden" label set are already excluded by the caller):
-            {"name", "display_name", "tags", "vertical_profiles"}
+        vertical_profile_names: All vertical profile names (used only for the unsupported-system
+            fallback prompt, where no qualification can be selected).
+        qualification_profiles: List of {"name", "display_name"} dicts for the selectable
+            qualification profiles (profiles with the "hidden" label are already excluded).
 
     Returns:
         tuple: (is_cpu_supported, should_continue, selected_qualification_names, selected_vertical_names)
         selected_qualification_names is a list containing zero or exactly one qualification
-        profile name to run. selected_vertical_names is the list of vertical profile names
-        (possibly empty) to run alongside it.
+        profile name to run. selected_vertical_names is the vertical profile names to run when the
+        system is unsupported and the user chose to continue with them (otherwise empty).
     """
     qualification_profiles = qualification_profiles or []
 
@@ -427,49 +418,25 @@ def _prompt_run_configuration_esq(
         # since different profiles can have different dependencies/system setup. There is
         # no default and no multi-select here - an invalid response terminates the run
         # instead of guessing. Use --all/-a to run everything for data collection instead.
-        selected_qualification_names = []
-        selected_qualification = None
-        if qualification_profiles:
-            print("Qualification profiles:")
-            for i, q in enumerate(qualification_profiles, 1):
-                print(f"  {i}) {q['display_name']}")
+        if not qualification_profiles:
+            return True, True, [], []
 
-            valid_range = "1" if len(qualification_profiles) == 1 else f"1-{len(qualification_profiles)}"
-            try:
-                response = input(f"\nSelect a qualification profile [{valid_range}]: ").strip().lower()
-            except (KeyboardInterrupt, EOFError):
-                logger.info("Interrupted by user. Exiting.")
-                return False, False, [], []
+        print("Qualification profiles:")
+        for i, q in enumerate(qualification_profiles, 1):
+            print(f"  {i}) {q['display_name']}")
 
-            if response.isdigit() and 1 <= int(response) <= len(qualification_profiles):
-                selected_qualification = qualification_profiles[int(response) - 1]
-                selected_qualification_names = [selected_qualification["name"]]
-            else:
-                logger.error(f"Invalid selection '{response}' - expected a number ({valid_range}). Exiting.")
-                return True, False, [], []
+        valid_range = "1" if len(qualification_profiles) == 1 else f"1-{len(qualification_profiles)}"
+        try:
+            response = input(f"\nSelect a qualification profile [{valid_range}]: ").strip().lower()
+        except (KeyboardInterrupt, EOFError):
+            logger.info("Interrupted by user. Exiting.")
+            return False, False, [], []
 
-        # Vertical profiles are opt-in per qualification profile. Only prompt for the
-        # verticals the selected qualification itself declares; skip silently (no
-        # prompt, nothing included) if it declares none.
-        selected_vertical_names = []
-        associated_verticals = selected_qualification.get("vertical_profiles", []) if selected_qualification else []
-        if associated_verticals:
-            associated_list = "\n".join(f"    - {name}" for name in sorted(associated_verticals))
-            print(f"\nVertical profiles for this qualification:\n{associated_list}\n")
-            try:
-                response = input("Include these vertical profile(s) as well? (Y/n) ").strip().lower()
-            except (KeyboardInterrupt, EOFError):
-                logger.info("Interrupted by user. Exiting.")
-                return True, False, [], []
+        if response.isdigit() and 1 <= int(response) <= len(qualification_profiles):
+            return True, True, [qualification_profiles[int(response) - 1]["name"]], []
 
-            if response in ["n", "no"]:
-                logger.info("User chose to skip the associated vertical profile(s)")
-            else:
-                selected_vertical_names = associated_verticals
-                logger.info("User chose to include the associated vertical profile(s)")
-
-        print("Tip: use --profile/-p or --tag/-t to skip this prompt. See 'esq run --help' for all options.\n")
-        return True, True, selected_qualification_names, selected_vertical_names
+        logger.error(f"Invalid selection '{response}' - expected a number ({valid_range}). Exiting.")
+        return True, False, [], []
 
     except Exception as e:
         logger.warning(f"Failed to process run configuration: {e}")
@@ -817,6 +784,7 @@ def _run_profiles_file_esq(
         force,
         qualification_only,
         per_profile_filters=per_profile_filters,
+        prompt_associated=False,
     )
 
 
@@ -830,6 +798,7 @@ def _resolve_and_execute_profiles_esq(
     force: bool = False,
     qualification_only: bool = False,
     per_profile_filters: dict[str, dict[str, Any]] = None,
+    prompt_associated: bool = True,
 ) -> tuple:
     """
     Resolve dependencies for one or more explicitly requested profiles and execute them.
@@ -844,13 +813,16 @@ def _resolve_and_execute_profiles_esq(
             `filters` for specific requested profiles (e.g., a per-profile test_id scope
             picked via --select or loaded from --profiles-file). Profiles not present in
             this mapping fall back to the shared `filters`.
+        prompt_associated: If False, don't offer the associated vertical/suite profiles of a
+            requested qualification profile (used for --profiles-file, where the file already
+            lists exactly what to run).
 
     Returns:
         tuple: (exit_code, tests_ran)
     """
     from sysagent.utils.config import expand_profile_with_dependencies, resolve_profile_dependencies
 
-    per_profile_filters = per_profile_filters or {}
+    per_profile_filters = dict(per_profile_filters or {})
 
     # Get all available profiles
     all_profiles_data = list_profiles(include_examples=True)
@@ -900,40 +872,49 @@ def _resolve_and_execute_profiles_esq(
         logger.error("No requested profile(s) meet system requirements - nothing to run")
         return 1, False
 
-    for profile_name in list(viable_requested_names):
-        labels = all_profiles_dict[profile_name].get("params", {}).get("labels", {})
-        if labels.get("type") != "qualification":
-            continue
-        associated_verticals = [
-            name
-            for name in (all_profiles_dict[profile_name].get("params", {}).get("vertical_profiles") or [])
-            if name in all_profiles_dict and name not in viable_requested_names
-        ]
-        if not associated_verticals:
-            continue
-
-        display_name = labels.get("profile_display_name", profile_name)
-        if qualification_only:
-            logger.info(f"Skipping vertical profile(s) for '{display_name}' (--qualification-only flag)")
-            continue
-        if force:
-            logger.info(f"Including vertical profile(s) for '{display_name}' (--force flag)")
-            viable_requested_names.extend(associated_verticals)
-            continue
-
-        associated_list = "\n".join(f"    - {name}" for name in sorted(associated_verticals))
-        print(f"\nVertical profiles for '{display_name}':\n{associated_list}\n")
+    picked_associated = False
+    preselected = (
+        _build_default_profile_preselection(viable_requested_names, all_profiles_dict) if prompt_associated else {}
+    )
+    include_additional = bool(preselected) and not qualification_only
+    if include_additional and not force:
+        # Ask first, so declining skips the (long) picker and runs just the requested profile(s).
         try:
-            response = input("Include these vertical profile(s) as well? (Y/n) ").strip().lower()
+            response = input("\nRun additional profile(s) as well? (Y/n) ").strip().lower()
         except (KeyboardInterrupt, EOFError):
             logger.info("Interrupted by user. Exiting.")
             return 1, False
+        include_additional = response not in ("n", "no")
 
-        if response in ["n", "no"]:
-            logger.info(f"Skipping the associated vertical profile(s) for '{display_name}'")
-        else:
-            logger.info(f"Including the associated vertical profile(s) for '{display_name}'")
-            viable_requested_names.extend(associated_verticals)
+    if preselected and qualification_only:
+        logger.info("Skipping the default optional profile(s) (--qualification-only flag)")
+    elif preselected and not include_additional:
+        logger.info("Running the requested profile(s) only")
+    elif preselected:
+        # Same picker as --select (all profile types), with the requested profile(s) and their
+        # default_optional_profiles pre-ticked. Hidden profiles aren't listed, so keep them as requested.
+        hidden_requested = [
+            name
+            for name in viable_requested_names
+            if all_profiles_dict[name].get("params", {}).get("labels", {}).get("hidden", False)
+        ]
+        selected_names, selected_filters = _prompt_select_any_profile(
+            force, all_profiles_data, preselected, required=set(viable_requested_names), additional=True
+        )
+        if not selected_names and not hidden_requested:
+            logger.error("No profile selected - nothing to run")
+            return 1, False
+        viable_requested_names = [*hidden_requested, *selected_names]
+        per_profile_filters.update(selected_filters)
+        picked_associated = not force
+    if picked_associated:
+        # Save the full selection (qualification + picked verticals/suites) so it can be replayed with
+        # --profiles-file. Ctrl+C here cancels the run, like the --select save prompt.
+        try:
+            _offer_save_profiles_selection(viable_requested_names, per_profile_filters)
+        except KeyboardInterrupt:
+            logger.info("Interrupted by user. Exiting.")
+            return 1, False
 
     # Expand each requested profile with its dependencies; a dict naturally
     # dedupes profiles shared across multiple requested profiles.
@@ -1003,6 +984,9 @@ def _run_all_profiles_esq(
     """
     ESQ-specific all-profiles execution with Intel CPU validation prompts.
 
+    --all and --qualification-only run without prompts. --select opens a picker listing every
+    profile type. The default run asks for ONE qualification profile from a numbered list.
+
     Returns:
         tuple: (exit_code, tests_ran)
     """
@@ -1010,7 +994,6 @@ def _run_all_profiles_esq(
     from sysagent.utils.config import (
         expand_profile_with_dependencies,
         get_profile_dependencies,
-        get_profile_tags,
         resolve_profile_dependencies,
         validate_profile_dependencies,
     )
@@ -1031,50 +1014,9 @@ def _run_all_profiles_esq(
                     complete_profiles_dict[profile_name] = configs
                     complete_profile_items_map[profile_name] = (profile_type, profile)
 
-    # Collect vertical profile names and qualification profile metadata for prompting.
-    # Qualification metadata is collected generically (not hardcoded to one profile) so
-    # the interactive prompt scales automatically as new qualification profiles are added.
-    vertical_profile_names = []
-    qualification_profiles_meta = []
-    for profile_type, profiles in all_profiles.items():
-        for profile in profiles:
-            configs = profile.get("configs")
-            if configs:
-                profile_name = configs.get("name")
-                if profile_name:
-                    params = configs.get("params", {})
-                    labels = params.get("labels", {})
-                    profile_label_type = labels.get("type", "")
-                    is_vertical = profile_type == "verticals" or profile_label_type == "vertical"
-                    is_qualification = profile_type == "qualifications" or profile_label_type == "qualification"
-                    if is_vertical:
-                        vertical_profile_names.append(profile_name)
-                    elif is_qualification and not labels.get("hidden", False):
-                        # "hidden" is a generic, reusable label (not prompt-listing-specific)
-                        # for excluding a profile from interactive discovery while still
-                        # allowing it to run explicitly via --profile/--tag.
-                        qualification_profiles_meta.append(
-                            {
-                                "name": profile_name,
-                                "display_name": labels.get("profile_display_name", profile_name),
-                                "tags": get_profile_tags(configs),
-                                # Vertical profiles this qualification opts in to prompting for.
-                                # Absent/empty means no vertical prompt for this qualification.
-                                "vertical_profiles": params.get("vertical_profiles") or [],
-                            }
-                        )
-    qualification_profiles_meta.sort(key=lambda q: q["display_name"])
-
     # Initialize defaults
     skip_vertical_profiles = False
     skip_qualification = False
-    # Explicit qualification selection from the interactive default prompt. Remains None
-    # for --all/--qualification-only flag-driven runs so their existing behavior (based on
-    # skip_qualification gating) is left untouched.
-    interactive_qualification_selection = None
-    # Specific vertical profile names accepted alongside the interactive qualification
-    # selection (opt-in per qualification profile, not a blanket all-verticals toggle).
-    interactive_vertical_selection = []
 
     # ESQ-specific prompt handling
     if run_all_profiles:
@@ -1103,11 +1045,9 @@ def _run_all_profiles_esq(
         logger.info("Running qualification profiles only")
 
     elif select_profile:
-        # --select flag: let the user pick one or more available profiles (or drill into
-        # a profile to pick specific test_id(s)) via a checkbox tree menu (qualification,
-        # suite, and/or vertical - see 'esq list'), then reuse the same execution path as
-        # --profile/--tag so CPU validation and associated-vertical prompts apply
-        # automatically when relevant.
+        # --select flag: one picker listing every profile type (qualifications, suites, verticals -
+        # see 'esq list') with nothing pre-ticked. The selection then goes through the same
+        # execution path as --profile/--tag, so CPU validation applies when relevant.
         try:
             selected_profile_names, per_profile_filters = _prompt_select_any_profile(force, all_profiles)
         except KeyboardInterrupt:
@@ -1118,11 +1058,12 @@ def _run_all_profiles_esq(
             logger.error("No profile selected - nothing to run")
             return 1, False
 
-        try:
-            _offer_save_profiles_selection(selected_profile_names, per_profile_filters)
-        except KeyboardInterrupt:
-            logger.info("Interrupted by user. Exiting.")
-            return 1, False
+        if not force:
+            try:
+                _offer_save_profiles_selection(selected_profile_names, per_profile_filters)
+            except KeyboardInterrupt:
+                logger.info("Interrupted by user. Exiting.")
+                return 1, False
 
         return _resolve_and_execute_profiles_esq(
             selected_profile_names,
@@ -1134,11 +1075,35 @@ def _run_all_profiles_esq(
             force,
             qualification_only=False,
             per_profile_filters=per_profile_filters,
+            # The picker is the single place to choose profiles, so don't ask again
+            prompt_associated=False,
         )
 
     else:
-        # Default mode: Show ESQ unified prompt
-        include_all_types = False
+        # Default mode: choose ONE qualification profile from a numbered list. The profile then
+        # follows the same path as --profile, including the default_optional_profiles question.
+        vertical_profile_names = []
+        qualification_profiles_meta = []
+        for profile_type, profiles in all_profiles.items():
+            for profile in profiles:
+                configs = profile.get("configs") or {}
+                profile_name = configs.get("name")
+                if not profile_name:
+                    continue
+                labels = configs.get("params", {}).get("labels", {})
+                profile_label_type = labels.get("type", "")
+                if profile_type == "verticals" or profile_label_type == "vertical":
+                    vertical_profile_names.append(profile_name)
+                elif (profile_type == "qualifications" or profile_label_type == "qualification") and not labels.get(
+                    "hidden", False
+                ):
+                    # "hidden" excludes a profile from interactive discovery while still
+                    # allowing it to run explicitly via --profile/--tag.
+                    qualification_profiles_meta.append(
+                        {"name": profile_name, "display_name": labels.get("profile_display_name", profile_name)}
+                    )
+        qualification_profiles_meta.sort(key=lambda q: q["display_name"])
+
         try:
             (
                 is_cpu_supported,
@@ -1146,28 +1111,21 @@ def _run_all_profiles_esq(
                 selected_qualification_names,
                 selected_vertical_names,
             ) = _prompt_run_configuration_esq(force, vertical_profile_names, qualification_profiles_meta)
-            interactive_qualification_selection = selected_qualification_names
-            interactive_vertical_selection = selected_vertical_names
-            skip_qualification = not selected_qualification_names
-            skip_vertical_profiles = not selected_vertical_names
-
-            if not should_continue:
-                logger.info("Exiting as requested")
-                return 1, False
-
-            if skip_qualification:
-                # No qualification selected, so no other profiles are available to
-                # include either (they're offered alongside a selected qualification).
-                logger.error("No profile selected - nothing to run")
-                return 1, False
-            elif skip_vertical_profiles:
-                logger.info("Running selected profile only")
-            else:
-                logger.info("Running selected profile and its additional profile(s)")
-
         except KeyboardInterrupt:
             logger.info("Interrupted by user")
             sys.exit(1)
+
+        selected_names = [*selected_qualification_names, *selected_vertical_names]
+        if not should_continue:
+            logger.info("Exiting as requested")
+            return 1, False
+        if not selected_names:
+            logger.error("No profile selected - nothing to run")
+            return 1, False
+
+        return _resolve_and_execute_profiles_esq(
+            selected_names, pytest_args, data_dir, verbose, debug, {}, force, qualification_only=False
+        )
 
     # Collect requested profiles based on filter
     requested_profile_names = []
@@ -1182,14 +1140,6 @@ def _run_all_profiles_esq(
                     profile_label_type = labels.get("type", "")
                     is_qualification = profile_type == "qualifications" or profile_label_type == "qualification"
 
-                    # A qualification profile explicitly selected via the interactive
-                    # prompt is included regardless of which prompt path built the list.
-                    explicitly_selected_qualification = (
-                        interactive_qualification_selection is not None
-                        and is_qualification
-                        and profile_name in interactive_qualification_selection
-                    )
-
                     if include_all_types:
                         # skip_qualification only applies to profiles that opted-in
                         # to the ESQ-level UNSUPPORTED_GENERATIONS system compatibility check
@@ -1199,15 +1149,6 @@ def _run_all_profiles_esq(
                             )
                             continue
                         requested_profile_names.append(profile_name)
-                    elif interactive_qualification_selection is not None:
-                        # Default interactive-prompt path: use the explicit qualification
-                        # selection, and only the specific vertical profiles accepted
-                        # alongside it (not a blanket all-verticals toggle).
-                        is_vertical = profile_type == "verticals" or profile_label_type == "vertical"
-                        if explicitly_selected_qualification or (
-                            is_vertical and profile_name in interactive_vertical_selection
-                        ):
-                            requested_profile_names.append(profile_name)
                     else:
                         is_vertical = profile_type == "verticals" or profile_label_type == "vertical"
                         # Include qualification profiles that either pass the system compatibility

@@ -57,3 +57,28 @@ To find `test_id` values for a profile without typing them by hand:
 ```bash
 esq run --profiles-file custom_profiles.yml
 ```
+
+## Default Optional Profiles per Qualification
+
+A qualification profile can list `default_optional_profiles` in its `params`. When you run it
+with `esq run --profile <name>`, `--tag`, or by choosing it in the numbered list of `esq run`, ESQ first asks "Run additional profile(s) as well? (Y/n)".
+Answer `n` to run only the requested profile. Otherwise it opens the same picker as
+`esq run --select` (qualifications, suites and verticals) with the qualification and its listed
+profiles pre-ticked. Press Enter to accept, or tick and untick profiles and individual tests first.
+Omit the key to run the qualification directly, without the question or picker.
+
+```yaml
+params:
+  default_optional_profiles:
+    - "profile.vertical.manufacturing"
+    - profile: "profile.vertical.metro"
+      default_test_ids: ["MET-001", "MET-002"]
+```
+
+- A name-only entry pre-ticks the whole profile. Use `default_test_ids` to pre-tick only some tests.
+- The requested qualification itself is marked "(required)" in the picker and can't be unticked.
+- `esq run --select` opens the picker with nothing pre-ticked.
+- `--force` takes the default optional profiles without asking. `--qualification-only` skips them.
+- Selections you save from the picker go to new, git-ignored
+  `custom_profiles_<date>_<time>.yml` files.
+- `esq run --profiles-file <file>` runs every profile in the file without prompting.

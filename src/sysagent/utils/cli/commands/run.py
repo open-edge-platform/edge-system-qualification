@@ -596,12 +596,13 @@ def _run_single_profile(
     logger.info(f"Running profile: {profile_name}")
     os.environ["ACTIVE_PROFILE"] = profile_name
 
-    # Store filters in environment for access by pytest plugins
+    # Store filters in environment for access by pytest plugins. Always reset it when this
+    # profile has no filters so a previous profile's filters don't leak into it.
     if filters:
-        import json
-
         os.environ["CORE_TEST_FILTERS"] = json.dumps(filters)
         logger.debug(f"Applied test filters: {filters}")
+    else:
+        os.environ.pop("CORE_TEST_FILTERS", None)
 
     # Use the profile name to find the profile configuration
     all_profiles = list_profiles(include_examples=True)
@@ -793,6 +794,14 @@ def _run_suite_tests(suite_name: str, sub_suite_name: str, test_name: str, pytes
 # Default location (relative to cwd) offered when saving a --select checkbox
 # choice, and used as the suggested path in --profiles-file help text.
 DEFAULT_PROFILES_FILE = "custom_profiles.yml"
+
+
+class ProfileSelectionCancelled(KeyboardInterrupt):
+    """
+    Raised when the user cancels (q/Ctrl+C) an interactive profile picker used as a sub-prompt.
+    It subclasses KeyboardInterrupt so existing interrupt handling still aborts the run, while
+    callers can catch it first to report "no profile selected" like the `--select` picker does.
+    """
 
 
 def _sanitize_path(path: str) -> str:
@@ -1006,7 +1015,14 @@ def _build_profile_tree(all_profiles: dict) -> dict:
     return tree
 
 
-def _prompt_checkbox_profiles(tree: dict) -> tuple:
+def _prompt_checkbox_profiles(
+    tree: dict,
+    heading: str = None,
+    expand_groups=False,
+    preselected: dict = None,
+    group_order: list = None,
+    locked: set = None,
+) -> tuple:
     """
     Interactive tree-style picker with real inline group/ungroup (expand/collapse),
     built directly on `prompt_toolkit`, spanning three levels: group -> profile -> test_id.
@@ -1030,10 +1046,25 @@ def _prompt_checkbox_profiles(tree: dict) -> tuple:
 
     Requires a real TTY on stdin/stdout.
 
+    Args:
+        tree: Nested {group: {profile_name: {"display_name", "tests"}}} structure.
+        heading: Optional custom instruction text. When given, the picker is used as a
+            sub-prompt (e.g., picking associated profiles), so the generic "nothing
+            selected"/"skip this prompt" messages are not shown.
+        expand_groups: True to start with every group expanded, or an iterable of group names to
+            expand (the others start collapsed).
+        group_order: Optional group display order; defaults to Qualifications, Suites, Verticals.
+        preselected: Optional {profile_name: iterable of test_id} to pre-check. For
+            profiles that declare no test_id(s), presence in the mapping checks the profile.
+        locked: Optional set of profile names that are always selected with all of their test_id(s)
+            and can't be unchecked (shown as "required").
+
     Returns:
         tuple: (selected_profile_names, per_profile_filters) - per_profile_filters is
         {profile_name: {"test_id": [...]}} for profiles scoped to specific tests.
-        Returns ([], {}) if cancelled/nothing selected.
+        Returns ([], {}) if cancelled/nothing selected. When `heading` is given (sub-prompt),
+        a cancel raises ProfileSelectionCancelled (a KeyboardInterrupt) instead, so the caller can
+        abort the run.
     """
     from prompt_toolkit import Application
     from prompt_toolkit.key_binding import KeyBindings
@@ -1043,7 +1074,7 @@ def _prompt_checkbox_profiles(tree: dict) -> tuple:
     from prompt_toolkit.layout.layout import Layout
     from prompt_toolkit.styles import Style
 
-    group_order = [section for section in ("Qualifications", "Suites", "Verticals") if section in tree]
+    group_order = [section for section in (group_order or ("Qualifications", "Suites", "Verticals")) if section in tree]
     profiles_by_group = {
         section: sorted(tree[section].items(), key=lambda kv: kv[1]["display_name"]) for section in group_order
     }
@@ -1051,7 +1082,10 @@ def _prompt_checkbox_profiles(tree: dict) -> tuple:
         profile_name: info for profiles in profiles_by_group.values() for profile_name, info in profiles
     }
 
-    expanded_groups = dict.fromkeys(group_order, False)
+    expanded_groups = {
+        section: (expand_groups if isinstance(expand_groups, bool) else section in expand_groups)
+        for section in group_order
+    }
     expanded_profiles = {}
     checked_profiles = set()  # profiles with no test_id(s) - checked/unchecked as a whole
     checked_tests = {}  # profile_name -> set(test_id), for profiles that declare test_id(s)
@@ -1059,6 +1093,22 @@ def _prompt_checkbox_profiles(tree: dict) -> tuple:
 
     def _all_test_ids(tests):
         return {test_id for test_id, _ in tests}
+
+    locked = {name for name in (locked or ()) if name in profile_info_by_name}
+    for pre_name, pre_ids in {
+        **(preselected or {}),
+        **{name: _all_test_ids(profile_info_by_name[name]["tests"]) for name in locked},
+    }.items():
+        pre_info = profile_info_by_name.get(pre_name)
+        if not pre_info:
+            continue
+        if pre_info["tests"]:
+            all_ids = _all_test_ids(pre_info["tests"])
+            checked_tests[pre_name] = set(pre_ids) & all_ids
+            # Surface partial defaults so the pre-selected test_id(s) are visible.
+            expanded_profiles[pre_name] = bool(checked_tests[pre_name]) and checked_tests[pre_name] != all_ids
+        else:
+            checked_profiles.add(pre_name)
 
     def _is_profile_fully_checked(profile_name, tests):
         if not tests:
@@ -1092,6 +1142,8 @@ def _prompt_checkbox_profiles(tree: dict) -> tuple:
         return False
 
     def _set_checked(row, value):
+        if not value and row[0] in ("profile", "test") and row[2] in locked:
+            return
         if row[0] == "profile":
             _, _section, profile_name, _display_name, tests = row
             if tests:
@@ -1135,6 +1187,8 @@ def _prompt_checkbox_profiles(tree: dict) -> tuple:
                 else:
                     box = "[ ]"
                 suffix = f"  ({len(test_set)}/{len(tests)} tests)" if has_tests and test_set else ""
+                if profile_name in locked:
+                    suffix += "  (required)"
                 text = f"{pointer}  {arrow} {box} {display_name}  ({profile_name}){suffix}\n"
             else:
                 _, _section, profile_name, test_id, test_display = row
@@ -1225,8 +1279,12 @@ def _prompt_checkbox_profiles(tree: dict) -> tuple:
 
     cli_name = _sanitize_cli_name(get_cli_aware_project_name().lower())
     instructions = (
-        f"Select profile(s) to run - or drill into a profile to pick specific test_id(s) "
-        f"(see '{cli_name} list' for full details):\n"
+        (
+            heading
+            or f"Select profile(s) to run - or drill into a profile to pick specific test_id(s) "
+            f"(see '{cli_name} list' for full details):"
+        )
+        + "\n"
         "Up/Down: move   Right/Left: expand/collapse   Space: toggle   "
         "a: toggle all visible   Enter: confirm   q: cancel"
     )
@@ -1242,6 +1300,14 @@ def _prompt_checkbox_profiles(tree: dict) -> tuple:
     app = Application(layout=layout, key_bindings=kb, style=style, full_screen=True, mouse_support=True)
     selected_profile_names, per_profile_filters = app.run()
 
+    if heading:
+        # Sub-prompt (e.g., associated profiles): cancelling (q/Ctrl+C) must abort the whole run, not
+        # be mistaken for "select nothing", which would carry on with the qualification.
+        if selected_profile_names is None:
+            logger.info("No profile selected. Exiting.")
+            raise ProfileSelectionCancelled
+        return selected_profile_names, per_profile_filters or {}
+
     if not selected_profile_names:
         logger.info("No profile selected. Exiting.")
         return [], {}
@@ -1250,82 +1316,45 @@ def _prompt_checkbox_profiles(tree: dict) -> tuple:
     return selected_profile_names, per_profile_filters
 
 
-def _prompt_checkbox_profiles_fallback(tree: dict) -> tuple:
-    """
-    Plain-text profile-level fallback for non-interactive terminals (e.g., piped input,
-    CI). Accepts comma-separated numbers (e.g., "1,3,5") or "all". Does not support
-    drilling into individual test_id(s) - use --filter test_id=... for that instead.
-    """
-    entries = []
-    for section in ("Qualifications", "Suites", "Verticals"):
-        for profile_name, info in sorted(tree.get(section, {}).items(), key=lambda kv: kv[1]["display_name"]):
-            entries.append((section, info["display_name"], profile_name))
-
-    cli_name = _sanitize_cli_name(get_cli_aware_project_name().lower())
-    print(f"Available profiles (see '{cli_name} list' for full details):\n")
-    for i, (section, display_name, profile_name) in enumerate(entries, 1):
-        print(f"  {i}) [{section}] {display_name}  [{profile_name}]")
-
-    valid_range = f"1-{len(entries)}"
-    try:
-        response = input(
-            f"\nSelect profile(s) to run [{valid_range}, comma-separated, or 'all'] (or press Enter to cancel): "
-        ).strip()
-    except (KeyboardInterrupt, EOFError):
-        logger.info("Interrupted by user. Exiting.")
-        return [], {}
-
-    if not response:
-        logger.info("No profile selected. Exiting.")
-        return [], {}
-
-    if response.lower() == "all":
-        return [profile_name for _, _, profile_name in entries], {}
-
-    selected = []
-    for token in response.split(","):
-        token = token.strip()
-        if token.isdigit() and 1 <= int(token) <= len(entries):
-            selected.append(entries[int(token) - 1][2])
-        else:
-            logger.error(f"Invalid selection '{token}' - expected a number ({valid_range}). Exiting.")
-            return [], {}
-
-    print(
-        "Tip: use --profile/-p or --tag/-t to skip this prompt, or --filter test_id=... to run "
-        f"specific tests within a profile. See '{cli_name} run --help' for all options.\n"
-    )
-    return selected, {}
-
-
 def _prompt_select_any_profile(
     force: bool = False,
     all_profiles: dict = None,
+    preselected: dict = None,
+    required: set = None,
+    additional: bool = False,
 ) -> tuple:
     """
     Prompt the user to interactively pick one or more available profiles to run - or
     drill into a profile to pick specific test_id(s) within it - via a checkbox-style
-    tree menu (falls back to a plain profile-level prompt without a TTY).
+    tree menu (falls back to a plain-text prompt without a TTY).
 
     Unlike a qualification-only picker, this lists every non-hidden profile across all
     profile types (qualifications, suites, verticals - the same set shown by the `list`
     command), so users aren't limited to qualification profiles when running interactively.
+    This is the single picker used by every interactive run mode.
 
     Generic and reusable across extension packages (like the other low-level execution
-    functions in this module): CPU/system-specific validation and any associated-profile
-    prompts are the caller's responsibility, applied downstream of the returned selection.
+    functions in this module): CPU/system-specific validation is the caller's responsibility,
+    applied downstream of the returned selection.
 
     Args:
-        force: If True, skip prompting entirely (non-interactive run - use --profile/--tag/
-            --all/--qualification-only to run something specific).
+        force: If True, skip prompting. Without `preselected` nothing is selected (use
+            --profile/--tag/--all/--qualification-only to run something specific); with it,
+            the pre-selected profiles are returned as is.
         all_profiles: Dict of {profile_type: [profile_item, ...]} from list_profiles().
+        preselected: Optional {profile_name: None | iterable of test_id} to pre-tick (None ticks
+            every test). Names that aren't listed (e.g., hidden profiles) are ignored.
+        required: Optional set of profile names that are always selected (with every test) and
+            can't be unticked.
+        additional: If True, word the prompts as choosing additional profile(s) on top of the
+            required ones, instead of choosing the profiles to run.
 
     Returns:
         tuple: (selected_profile_names, per_profile_filters) - per_profile_filters is
         {profile_name: {"test_id": [...]}} for profiles scoped to specific tests.
         Returns ([], {}) if nothing was selected/cancelled.
     """
-    if force:
+    if force and not preselected:
         logger.info(
             "No profile auto-selected in non-interactive mode (--force). "
             "Use --profile/--tag/--all/--qualification-only to run something."
@@ -1337,13 +1366,294 @@ def _prompt_select_any_profile(
         logger.error("No profiles found to select from")
         return [], {}
 
+    preselected = preselected or {}
+    required = set(required or ())
+    candidates = {}
+    for section in ("Qualifications", "Suites", "Verticals"):
+        for name, info in sorted(tree.get(section, {}).items(), key=lambda kv: kv[1]["display_name"]):
+            defaults = None
+            if name in required:
+                defaults = {test_id for test_id, _ in info["tests"]}
+            elif name in preselected:
+                all_ids = {test_id for test_id, _ in info["tests"]}
+                defaults = all_ids if preselected[name] is None else {str(i) for i in preselected[name]} & all_ids
+            candidates[name] = {**info, "defaults": defaults, "group": section, "locked": name in required}
+
+    if force:
+        return _default_associated_selection(candidates)
+
+    cli_name = _sanitize_cli_name(get_cli_aware_project_name().lower())
+    if additional:
+        heading, prompt = "Select additional profile(s) or test case(s) to run:", "Select additional profile(s)"
+    else:
+        heading = (
+            "Select profile(s) to run - or drill into a profile to pick specific test_id(s) "
+            f"(see '{cli_name} list' for full details):"
+        )
+        prompt = "Select profile(s) to run"
+    try:
+        return _prompt_select_associated_profiles(candidates, heading=heading, prompt=prompt)
+    except (KeyboardInterrupt, EOFError):
+        logger.info("No profile selected. Exiting.")
+        return [], {}
+
+
+def _scope_filter_for_ids(tests: list, selected_ids: set) -> dict:
+    """Return a {"test_id": [...]} filter when `selected_ids` is a strict subset of the profile's tests."""
+    all_ids = {test_id for test_id, _ in tests}
+    if all_ids and selected_ids != all_ids:
+        return {"test_id": sorted(selected_ids)}
+    return {}
+
+
+def _prompt_select_associated_profiles(
+    candidates: dict,
+    heading: str,
+    prompt: str,
+    group: str = "Verticals",
+) -> tuple:
+    """
+    Let the user pick any subset of an associated group of profiles (e.g., the vertical
+    profiles linked to a qualification profile) - or individual test_id(s) within them -
+    instead of an all-or-nothing choice.
+
+    Uses the same checkbox tree picker as `--select` on a TTY, and a plain-text prompt
+    otherwise. Defaults declared by the profile config are pre-selected in both modes.
+
+    Args:
+        candidates: {profile_name: {"display_name": str, "tests": [(test_id, display), ...],
+            "defaults": set of test_id | None, "group": optional group label}} for the profiles
+            to choose from. "defaults" is the pre-selected test_id set (an empty set pre-selects
+            a profile that declares no test_id(s)); None means nothing is pre-selected. "group"
+            overrides the `group` label for that profile so several groups share one picker.
+            "locked" (optional, truthy) makes the profile required: always selected with all of
+            its tests and not deselectable.
+        heading: Instruction text shown above the checkbox picker.
+        prompt: Prompt text for the non-TTY fallback.
+        group: Default group label shown in the picker.
+
+    Returns:
+        tuple: (selected_profile_names, per_profile_filters) - names keep the candidate order
+        and per_profile_filters is {profile_name: {"test_id": [...]}} for profiles scoped to
+        specific tests. Raises KeyboardInterrupt/EOFError if the user interrupts the prompt.
+    """
+    if not candidates:
+        return [], {}
+
+    preselected = {name: info["defaults"] for name, info in candidates.items() if info.get("defaults") is not None}
+
     if sys.stdin.isatty() and sys.stdout.isatty():
+        tree = {}
+        for name, info in candidates.items():
+            tree.setdefault(info.get("group", group), {})[name] = {
+                "display_name": info["display_name"],
+                "tests": info["tests"],
+            }
+        # Expand only the groups with pre-selected profiles so they stay visible; the rest (e.g., a
+        # long suites list) start collapsed. Groups appear in candidate order.
+        expand = {info.get("group", group) for info in candidates.values() if info.get("defaults") is not None}
         try:
-            return _prompt_checkbox_profiles(tree)
+            selected, filters = _prompt_checkbox_profiles(
+                tree,
+                heading=heading,
+                expand_groups=expand,
+                preselected=preselected,
+                group_order=list(tree),
+                locked={name for name, info in candidates.items() if info.get("locked")},
+            )
+            return [name for name in candidates if name in set(selected)], filters
+        except (KeyboardInterrupt, EOFError):
+            raise
         except Exception as e:
             logger.debug(f"Checkbox picker unavailable ({e}), falling back to plain prompt")
 
-    return _prompt_checkbox_profiles_fallback(tree)
+    entries = list(candidates.items())
+    current_group = None
+    for i, (name, info) in enumerate(entries, 1):
+        entry_group = info.get("group", group)
+        if entry_group != current_group:
+            print(f"\n{entry_group}:")
+            current_group = entry_group
+        print(f"  {i}) {info['display_name']}  [{name}]")
+        defaults = info.get("defaults")
+        if defaults is None:
+            continue
+        for test_id, test_display in info["tests"]:
+            marker = "*" if test_id in defaults else " "
+            print(f"      {marker} {test_id}  {test_display}")
+
+    def _defaults_selection():
+        names, filters = [], {}
+        for name, info in entries:
+            defaults = info.get("defaults")
+            if defaults is None:
+                continue
+            names.append(name)
+            if info["tests"]:
+                scope = _scope_filter_for_ids(info["tests"], set(defaults))
+                if scope:
+                    filters[name] = scope
+        return names, filters
+
+    locked = {name for name, info in candidates.items() if info.get("locked")}
+
+    def _enforce_locked(names, filters):
+        # Required profiles are always included, with all of their tests.
+        selected = set(names) | locked
+        return [name for name, _ in entries if name in selected], {k: v for k, v in filters.items() if k not in locked}
+
+    has_defaults = bool(preselected)
+    enter_hint = "Enter for defaults (*)" if has_defaults else "Enter for none"
+    valid_range = f"1-{len(entries)}"
+    help_text = (
+        f"expected N or N:TEST_ID+TEST_ID with N in {valid_range} (comma-separated), 'all', 'none', or {enter_hint}"
+    )
+    if locked:
+        required = ", ".join(info["display_name"] for name, info in entries if name in locked)
+        print(f"\nRequired (always included): {required}")
+    while True:
+        response = input(f"\n{prompt} [{valid_range}, e.g. 1,3:ID1+ID2, 'all', or {enter_hint}]: ").strip()
+        keyword = response.lower()
+        if not response:
+            return _enforce_locked(*_defaults_selection())
+        if keyword in ("n", "no", "none"):
+            return _enforce_locked([], {})
+        if keyword in ("y", "yes", "all"):
+            return [name for name, _ in entries], {}
+
+        picked = {}  # index -> set(test_id) | None (None means all tests)
+        error = None
+        for token in (t.strip() for t in response.split(",")):
+            number, _, id_part = token.partition(":")
+            number = number.strip()
+            if not (number.isdigit() and 1 <= int(number) <= len(entries)):
+                error = f"Invalid selection '{token}'"
+                break
+            index = int(number)
+            tests = entries[index - 1][1]["tests"]
+            if not id_part.strip():
+                picked[index] = None
+                continue
+            known = {test_id.lower(): test_id for test_id, _ in tests}
+            ids = set()
+            for raw_id in id_part.split("+"):
+                match = known.get(raw_id.strip().lower())
+                if match is None:
+                    error = f"Unknown test_id '{raw_id.strip()}' for profile {index}"
+                    break
+                ids.add(match)
+            if error:
+                break
+            picked[index] = ids | (picked.get(index) or set())
+        if error:
+            print(f"{error} - {help_text}.")
+            continue
+
+        names, filters = [], {}
+        for index, (name, info) in enumerate(entries, 1):
+            if index not in picked:
+                continue
+            names.append(name)
+            if picked[index]:
+                scope = _scope_filter_for_ids(info["tests"], picked[index])
+                if scope:
+                    filters[name] = scope
+        return _enforce_locked(names, filters)
+
+
+def _get_associated_profile_entries(params: dict, key: str = "default_optional_profiles") -> list:
+    """
+    Normalize a profile's associated-profiles param (default `default_optional_profiles`) into a list of
+    {"name": str, "default_test_ids": None | "all" | list[str]} entries.
+
+    Each item may be a plain profile name (string) or a mapping:
+        - profile: "profile.vertical.metro"
+          default_test_ids: ["MET-001", "MET-002"]   # or "all"; omit to pre-select every test
+    """
+    entries = []
+    for item in (params or {}).get(key) or []:
+        if isinstance(item, str):
+            entries.append({"name": item, "default_test_ids": None})
+        elif isinstance(item, dict) and (item.get("profile") or item.get("name")):
+            entries.append(
+                {"name": item.get("profile") or item.get("name"), "default_test_ids": item.get("default_test_ids")}
+            )
+        else:
+            logger.warning(f"Ignoring invalid {key} entry: {item!r}")
+    return entries
+
+
+def _build_associated_profile_candidates(entries: list, profile_configs_by_name: dict, exclude: set = None) -> dict:
+    """
+    Build the {profile_name: {"display_name", "tests", "defaults"}} choices offered by the
+    associated-profile selection prompt from normalized entries. Unknown profiles and names in
+    `exclude` are skipped. "defaults" is the pre-selected test_id set: every test when no
+    `default_test_ids` is declared (or "all"), otherwise the declared ids that exist in the profile.
+    """
+    candidates = {}
+    for entry in entries:
+        name = entry["name"]
+        configs = profile_configs_by_name.get(name)
+        if not configs or name in candidates or name in (exclude or ()):
+            continue
+        tests = _get_test_ids_from_profile(configs)
+        all_ids = {test_id for test_id, _ in tests}
+        declared = entry["default_test_ids"]
+        if declared is None or declared == "all":
+            defaults = set(all_ids)
+        else:
+            declared_ids = {str(test_id) for test_id in (declared if isinstance(declared, list) else [declared])}
+            unknown = declared_ids - all_ids
+            if unknown:
+                logger.warning(f"Ignoring unknown default_test_ids for '{name}': {', '.join(sorted(unknown))}")
+            defaults = declared_ids & all_ids
+        candidates[name] = {
+            "display_name": configs.get("params", {}).get("labels", {}).get("profile_display_name", name),
+            "tests": tests,
+            "defaults": defaults,
+        }
+    return candidates
+
+
+def _default_associated_selection(candidates: dict) -> tuple:
+    """
+    Return (profile_names, per_profile_filters) for the pre-selected defaults of the candidates.
+    Candidates with no pre-selection ("defaults" is None) are left out.
+    """
+    names, filters = [], {}
+    for name, info in candidates.items():
+        defaults = info["defaults"]
+        if defaults is None or (info["tests"] and not defaults):
+            continue
+        names.append(name)
+        scope = _scope_filter_for_ids(info["tests"], defaults) if info["tests"] else {}
+        if scope:
+            filters[name] = scope
+    return names, filters
+
+
+def _build_default_profile_preselection(requested_names: list, profile_configs_by_name: dict) -> dict:
+    """
+    Build the picker pre-selection for explicitly requested profiles that declare
+    `default_optional_profiles`: every requested profile (all of its tests) plus the default
+    optional profiles of those that declare any (each limited to its `default_test_ids`, if set).
+
+    Returns:
+        dict: {profile_name: None | list[test_id]} (None means every test), or {} when none of
+        the requested profiles declares `default_optional_profiles` (nothing to offer).
+    """
+    preselected = {}
+    has_defaults = False
+    for owner in requested_names:
+        entries = _get_associated_profile_entries(profile_configs_by_name[owner].get("params", {}))
+        candidates = _build_associated_profile_candidates(entries, profile_configs_by_name, exclude={owner})
+        has_defaults = has_defaults or bool(candidates)
+        for name, info in candidates.items():
+            preselected[name] = sorted(info["defaults"])
+    if not has_defaults:
+        return {}
+    preselected.update({name: None for name in requested_names})
+    return preselected
 
 
 def _run_all_profiles(
@@ -1553,7 +1863,7 @@ def _log_no_tier_match(profile_name: str, tier_results: dict) -> None:
     logger.error(f"No system tier matched for profile '{profile_name}' - skipping")
 
 
-def _run_single_profile_in_batch(profile, data_dir: str, verbose: bool, debug: bool) -> int:
+def _run_single_profile_in_batch(profile, data_dir: str, verbose: bool, debug: bool, filters: dict = None) -> int:
     """Run a single profile in batch mode with proper cleanup."""
     profile_configs = profile.get("configs")
     profile_name = profile_configs.get("name")
@@ -1570,6 +1880,14 @@ def _run_single_profile_in_batch(profile, data_dir: str, verbose: bool, debug: b
     if "ACTIVE_PROFILE" in os.environ:
         del os.environ["ACTIVE_PROFILE"]
     os.environ["ACTIVE_PROFILE"] = profile_name
+
+    # Scope this profile to specific tests (e.g., test_id(s) picked interactively), and reset
+    # it otherwise so another profile's filters don't leak into this one.
+    if filters:
+        os.environ["CORE_TEST_FILTERS"] = json.dumps(filters)
+        logger.debug(f"Applied test filters for '{profile_name}': {filters}")
+    else:
+        os.environ.pop("CORE_TEST_FILTERS", None)
 
     # Get profile tier and filter configuration
     from sysagent.utils.testing.tier_validator import get_highest_matching_tier

@@ -14,14 +14,18 @@ params:
     system_compatibility: true
     tags:
       - "aes"
-  # Vertical profiles associated with this qualification.
-  vertical_profiles:
+  # Profiles offered with this qualification by `esq run --profile/--tag` ("Run additional profile(s)
+  # as well?"), pre-ticked together with it in the profile picker. Omit this key in qualifications
+  # that should run without the question. Each entry is a profile name, or
+  # {profile: <name>, default_test_ids: [<test_id>, ...]} to pre-tick only some tests.
+  default_optional_profiles:
     - "profile.vertical.manufacturing"
     - "profile.vertical.manufacturing.timeseries-wt"
     - "profile.vertical.metro"
     - "profile.vertical.retail-asc"
     - "profile.vertical.retail-lp"
     - "profile.vertical.retail-lp-vlm"
+    - "profile.vertical.retail-ta-vlm"
   tiers:
     - entry
     - mainstream

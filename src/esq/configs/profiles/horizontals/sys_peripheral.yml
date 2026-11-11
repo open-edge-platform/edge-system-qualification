@@ -1,14 +1,13 @@
 # Copyright (C) 2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-name: "profile.suite.system.peripheral"
+name: "profile.horizontal.system.peripheral"
 description: "System Peripheral Device Detection and Enumeration"
-version: "1.0.0"
 params:
   labels:
-    profile_display_name: "System Peripheral"
-    group: "system.peripheral"
-    type: "suite"
+    profile_group_name: "System Peripheral"
+    profile_display_name: "System Peripheral - Detection"
+    type: "horizontal"
     display_status: false
   requirements:
     # Hardware requirements

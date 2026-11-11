@@ -1,14 +1,13 @@
 # Copyright (C) 2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-name: "profile.suite.media.performance-pipelines"
+name: "profile.horizontal.media.performance-pipelines"
 description: "Media Performance"
-version: "1.0.0"
 params:
   labels:
-    profile_display_name: "Media Performance"
-    group: "media.performance"
-    type: "suite"
+    profile_group_name: "Media Performance"
+    profile_display_name: "Media Performance - Pipelines"
+    type: "horizontal"
     display_status: false
   requirements:
     # Hardware requirements

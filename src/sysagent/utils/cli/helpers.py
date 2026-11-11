@@ -12,7 +12,7 @@ from typing import List, Tuple
 
 def get_test_names_from_profile(profile_configs) -> List[Tuple[str, str, str]]:
     """
-    Extract test names from a profile configs. Works for both qualification and suite profiles.
+    Extract test names from a profile configs. Works for both qualification and horizontal profiles.
     
     Args:
         profile_configs: The profile configurations

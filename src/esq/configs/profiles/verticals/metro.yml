@@ -2,21 +2,19 @@
 # SPDX-License-Identifier: Apache-2.0
 
 name: "profile.vertical.metro"
-display_name: "Metro"
 description: "Metro Suites"
-version: "1.0.0"
 params:
   labels:
-    profile_display_name: "Metro"
-    group: "metro"
+    profile_group_name: "Metro"
+    profile_display_name: "Metro - Visual AI Proxy Pipelines"
     type: "vertical"
     display_status: false
   depends_on:
-    - "profile.suite.system.memory-stream"
-    - "profile.suite.system.gpu-ov"
-    - "profile.suite.ai.vision-ov"
-    - "profile.suite.media.performance-pipelines"
-    - "profile.suite.ai.vision-va"
+    - "profile.horizontal.system.memory-stream"
+    - "profile.horizontal.system.gpu-ov"
+    - "profile.horizontal.ai.vision-ov"
+    - "profile.horizontal.media.performance-pipelines"
+    - "profile.horizontal.ai.vision-va"
   requirements:
     # Hardware requirements
     cpu_min_cores: 4

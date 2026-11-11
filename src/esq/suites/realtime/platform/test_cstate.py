@@ -42,7 +42,7 @@ _CSV_FIELDS = ["cpu", "state_id", "disabled", "latency_us", "usage", "time_us", 
 
 # Per-suite environment override — bypasses the isolcpus requirement for
 # development and CI.  Named after this test file ("cstate") per convention.
-# Example: ENV_SUITE_CSTATE_RT_CPU_IDS=2,3 esq run -p profile.suite.realtime.platform
+# Example: ENV_SUITE_CSTATE_RT_CPU_IDS=2,3 esq run -p profile.horizontal.realtime.platform
 _RT_CPU_IDS_ENV_VAR = "ENV_SUITE_CSTATE_RT_CPU_IDS"
 
 

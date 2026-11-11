@@ -1,14 +1,13 @@
 # Copyright (C) 2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-name: "profile.suite.ai.gen-chatqna-core"
-description: "Gen AI Chat Q&A Core suite profile"
-version: "1.0.0"
+name: "profile.horizontal.ai.gen-chatqna-core"
+description: "Gen AI Chat Q&A Core horizontal profile"
 params:
   labels:
-    profile_display_name: "Gen AI"
-    group: "ai.gen"
-    type: "suite"
+    profile_group_name: "Gen AI"
+    profile_display_name: "Gen AI - ChatQnA Core"
+    type: "horizontal"
     display_status: false
   requirements:
     cpu_min_cores: 4

@@ -119,7 +119,7 @@ def run_tests(
     Run tests based on profiles, suites, or specific test cases.
 
     Generic sysagent behavior:
-    - Default run (no flags): Runs all profile types (qualifications, suites, verticals)
+    - Default run (no flags): Runs all profile types (qualifications, horizontals, verticals)
     - Specific profile (-p): Runs specified profile
     - Suite/test run: Runs specified suite/test
     - Profiles file (--profiles-file): Runs the profile(s) listed in a YAML file
@@ -996,7 +996,7 @@ def _build_profile_tree(all_profiles: dict) -> dict:
     """
     all_profiles = all_profiles or {}
     tree = {}
-    for profile_type in ("qualifications", "suites", "verticals"):
+    for profile_type in ("qualifications", "horizontals", "verticals"):
         section = profile_type.capitalize()
         for profile in all_profiles.get(profile_type, []):
             configs = profile.get("configs")
@@ -1053,7 +1053,7 @@ def _prompt_checkbox_profiles(
             selected"/"skip this prompt" messages are not shown.
         expand_groups: True to start with every group expanded, or an iterable of group names to
             expand (the others start collapsed).
-        group_order: Optional group display order; defaults to Qualifications, Suites, Verticals.
+        group_order: Optional group display order; defaults to Qualifications, Horizontals, Verticals.
         preselected: Optional {profile_name: iterable of test_id} to pre-check. For
             profiles that declare no test_id(s), presence in the mapping checks the profile.
         locked: Optional set of profile names that are always selected with all of their test_id(s)
@@ -1074,7 +1074,7 @@ def _prompt_checkbox_profiles(
     from prompt_toolkit.layout.layout import Layout
     from prompt_toolkit.styles import Style
 
-    group_order = [section for section in (group_order or ("Qualifications", "Suites", "Verticals")) if section in tree]
+    group_order = [section for section in (group_order or ("Qualifications", "Horizontals", "Verticals")) if section in tree]
     profiles_by_group = {
         section: sorted(tree[section].items(), key=lambda kv: kv[1]["display_name"]) for section in group_order
     }
@@ -1329,7 +1329,7 @@ def _prompt_select_any_profile(
     tree menu (falls back to a plain-text prompt without a TTY).
 
     Unlike a qualification-only picker, this lists every non-hidden profile across all
-    profile types (qualifications, suites, verticals - the same set shown by the `list`
+    profile types (qualifications, horizontals, verticals - the same set shown by the `list`
     command), so users aren't limited to qualification profiles when running interactively.
     This is the single picker used by every interactive run mode.
 
@@ -1369,7 +1369,7 @@ def _prompt_select_any_profile(
     preselected = preselected or {}
     required = set(required or ())
     candidates = {}
-    for section in ("Qualifications", "Suites", "Verticals"):
+    for section in ("Qualifications", "Horizontals", "Verticals"):
         for name, info in sorted(tree.get(section, {}).items(), key=lambda kv: kv[1]["display_name"]):
             defaults = None
             if name in required:
@@ -1666,7 +1666,7 @@ def _run_all_profiles(
     """Run all available profiles - generic sysagent behavior without prompts or CPU validation.
 
     Generic behavior: No prompts, no CPU validation checks.
-    Always runs all profile types (qualifications, suites, verticals).
+    Always runs all profile types (qualifications, horizontals, verticals).
     Package-specific implementations (e.g., ESQ) should override the entire run command.
 
     Args:
@@ -1704,7 +1704,7 @@ def _run_all_profiles(
 
     # Simplified generic behavior: no prompts, no CPU validation, no filtering
     # Package-specific implementations (e.g., ESQ) should override this command
-    logger.info("Running all profile types (qualifications, suites, verticals)")
+    logger.info("Running all profile types (qualifications, horizontals, verticals)")
 
     # First pass: collect all available profiles
     requested_profile_names = []

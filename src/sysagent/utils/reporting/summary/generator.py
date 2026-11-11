@@ -389,10 +389,10 @@ class CoreResultsSummaryGenerator:
             tests_by_profile[parent_suite][test_case["status"]] += 1
             tests_by_profile[parent_suite]["duration_seconds"] += test_case["total_duration_seconds"]
 
-        # Build tests_by_group (grouped by group label from test metadata)
+        # Build tests_by_group (grouped by profile_group_name label)
         tests_by_group = {}
         for test_case in unique_test_cases:
-            group_label = test_case.get("labels", {}).get("group", "unknown")
+            group_label = test_case.get("labels", {}).get("profile_group_name") or "unknown"
             if group_label not in tests_by_group:
                 tests_by_group[group_label] = {
                     "total": 0,

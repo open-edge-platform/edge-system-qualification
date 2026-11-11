@@ -1,14 +1,13 @@
 # Copyright (C) 2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-name: "profile.suite.ai.clustering-adbscan"
-description: "Clustering AI suite profile - ADBScan Benchmark"
-version: "1.0.0"
+name: "profile.horizontal.ai.clustering-adbscan"
+description: "Clustering AI horizontal profile - ADBScan Benchmark"
 params:
   labels:
-    profile_display_name: "Clustering AI"
-    group: "ai.clustering"
-    type: "suite"
+    profile_group_name: "Clustering AI"
+    profile_display_name: "Clustering AI - ADBScan Benchmark"
+    type: "horizontal"
     display_status: false
   requirements:
     # Hardware requirements

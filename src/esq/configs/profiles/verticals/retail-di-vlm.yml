@@ -3,11 +3,10 @@
 
 name: "profile.vertical.retail-di-vlm"
 description: "Dine-In Order Accuracy VLM Benchmark Test Suite"
-version: "1.0.0"
 params:
   labels:
-    profile_display_name: "Retail"
-    group: "retail"
+    profile_group_name: "Retail"
+    profile_display_name: "Retail - Dine-In Order Accuracy VLM"
     type: "vertical"
     display_status: false
   requirements:

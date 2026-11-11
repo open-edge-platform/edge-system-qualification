@@ -2,13 +2,11 @@
 # SPDX-License-Identifier: Apache-2.0
 
 name: "profile.vertical.retail-lp"
-display_name: "Retail Loss Prevention"
 description: "Retail Loss Prevention Suites"
-version: "1.0.0"
 params:
   labels:
-    profile_display_name: "Retail"
-    group: "retail"
+    profile_group_name: "Retail"
+    profile_display_name: "Retail - Loss Prevention"
     type: "vertical"
     display_status: false
   requirements:

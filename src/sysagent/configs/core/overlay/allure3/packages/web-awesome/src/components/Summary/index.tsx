@@ -16,6 +16,13 @@ import * as bulletChartStyles from "./BulletChartStyle.scss";
 import { TelemetrySection } from "./TelemetrySection";
 import { ChartsSection } from "./ChartsSection";
 
+type ProfileType = "qualification" | "horizontal" | "vertical";
+
+// Default section headings are derived from the profile `type` label (e.g. "horizontal" -> "Horizontals").
+// A profile can opt into a custom heading with the `report_section` label instead.
+const getProfileTypeSectionTitle = (profileType: ProfileType): string =>
+  `${profileType.charAt(0).toUpperCase()}${profileType.slice(1)}s`;
+
 // Summary table components
 interface SortableTableProps {
   title: string;
@@ -1419,14 +1426,14 @@ export const Summary = () => {
     return (testName && testDescriptions[testName]) || null;
   };
 
-  // Create profile table data for test results (type: "suite")
+  // Create profile table data for test results (type: "horizontal")
   // Create profile table data for a given profile `type` label, optionally scoped to a
   // specific `report_section` label value. Passing `null` for typeFilter matches any
   // type (used for custom sections that mix profile types). Passing `null` for
   // sectionFilter returns only profiles that do NOT opt into a custom report_section
   // (i.e. each type's default bucket); passing a section name returns only profiles
   // that opted into that specific custom section via `report_section`, regardless of
-  // their `type` — this is what lets any profile type (suite, qualification, vertical)
+  // their `type` — this is what lets any profile type (horizontal, qualification, vertical)
   // use `report_section` to get its own dedicated report section.
   const createReportSectionProfilesFromTestResults = (
     typeFilter: string | null,
@@ -1442,7 +1449,7 @@ export const Summary = () => {
     
     Object.values(individualTestResults).forEach((testResult: any) => {
       const parentSuite = testResult.labels?.find((label: any) => label.name === "parentSuite")?.value;
-      const groupLabel = testResult.labels?.find((label: any) => label.name === "group")?.value;
+      const groupLabel = testResult.labels?.find((label: any) => label.name === "profile_group_name")?.value;
       const typeLabel = testResult.labels?.find((label: any) => label.name === "type")?.value;
       const reportSection = testResult.labels?.find((label: any) => label.name === "report_section")?.value || null;
       
@@ -1470,9 +1477,9 @@ export const Summary = () => {
 
     // Create profile table data similar to test results but for qualifications
     const profilesArray = Object.entries(profileGroups).map(([profileName, tests]) => {
-      // Get profile_display_name from the first test in the group
+      // Heading comes from profile_group_name, which every profile in the group shares
       const firstTest = tests[0];
-      const profileDisplayName = firstTest?.labels?.find((label: any) => label.name === "profile_display_name")?.value;
+      const profileGroupName = firstTest?.labels?.find((label: any) => label.name === "profile_group_name")?.value;
       const displayStatus = firstTest?.labels?.find((label: any) => label.name === "display_status")?.value;
       const displayReference = firstTest?.labels?.find((label: any) => label.name === "display_reference")?.value;
       const displayId = firstTest?.labels?.find((label: any) => label.name === "display_id")?.value;
@@ -1546,7 +1553,7 @@ export const Summary = () => {
       const profileType = firstTestForType?.labels?.find((label: any) => label.name === "type")?.value;
 
       return {
-        profileName: profileDisplayName || profileName.replace(/^profile\.(suite|qualification|vertical)\./, ""), // Use profile_display_name or fallback to processed profileName
+        profileName: profileGroupName || profileName.replace(/^profile\.(horizontal|qualification|vertical)\./, ""), // Use group heading or fallback to processed grouping key
         testsData,
         hideStatusColumn, // Pass this flag to the table rendering
         showReferenceColumn, // Pass flag for showing reference column
@@ -1577,7 +1584,7 @@ export const Summary = () => {
     });
   };
 
-  const individualProfilesData = createReportSectionProfilesFromTestResults("suite", null);
+  const individualProfilesData = createReportSectionProfilesFromTestResults("horizontal", null);
   const qualificationProfilesData = createReportSectionProfilesFromTestResults("qualification", null);
   const verticalProfilesData = createReportSectionProfilesFromTestResults("vertical", null);
 
@@ -2297,7 +2304,7 @@ export const Summary = () => {
           <div className={styles["collapsible-section"]}>
             <div className={styles["collapsible-header-enhanced"]}>
               <div className={styles["header-left-enhanced"]}>
-                <h3 className={styles["section-title"]}>Qualifications</h3>
+                <h3 className={styles["section-title"]}>{getProfileTypeSectionTitle("qualification")}</h3>
               </div>
               <div className={styles["header-right-enhanced"]}>
                 <div className={styles["search-container-inline"]}>
@@ -2994,7 +3001,7 @@ export const Summary = () => {
           <div className={styles["collapsible-section"]}>
             <div className={styles["collapsible-header-enhanced"]}>
               <div className={styles["header-left-enhanced"]}>
-                <h3 className={styles["section-title"]}>Vertical</h3>
+                <h3 className={styles["section-title"]}>{getProfileTypeSectionTitle("vertical")}</h3>
               </div>
               <div className={styles["header-right-enhanced"]}>
                 <div className={styles["search-container-inline"]}>
@@ -3257,7 +3264,7 @@ export const Summary = () => {
           <div className={styles["collapsible-section"]}>
             <div className={styles["collapsible-header-enhanced"]}>
               <div className={styles["header-left-enhanced"]}>
-                <h3 className={styles["section-title"]}>Test Results</h3>
+                <h3 className={styles["section-title"]}>{getProfileTypeSectionTitle("horizontal")}</h3>
                 {(() => {
                   const sectionTierDisplayName = getSectionTierDisplayName(filteredProfilesData);
                   return sectionTierDisplayName ? (

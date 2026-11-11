@@ -60,33 +60,33 @@ Quick reference of all available test suites and their profile names.
 | `profile.qualification.ai-edge-system` | Qualification | Intel® AI Edge Systems qualification | `esq run --profile profile.qualification.ai-edge-system` |
 | `profile.qualification.hybrid-edge-system-debian` | HEC | Intel® Hybrid Edge Computing system qualification - Debian | `esq run --profile profile.qualification.hybrid-edge-system-debian` |
 | `profile.qualification.hybrid-edge-system-emt` | HEC | Intel® Hybrid Edge Computing system qualification - Edge Microvisor Toolkit (EMT) | `esq run --profile profile.qualification.hybrid-edge-system-emt` |
-| `profile.suite.ai.gen-chatqna-core` | Horizontal | Gen AI Chat QnA Core profile | `esq run --profile profile.suite.ai.gen-chatqna-core` |
-| `profile.suite.ai.gen-llm` | Horizontal | Gen AI LLM serving benchmark profile | `esq run --profile profile.suite.ai.gen-llm` |
-| `profile.suite.ai.vision-light` | Horizontal | DL Streamer Analysis - Multi-Stream Pipelines With Multiple AI Stages | `esq run --profile profile.suite.ai.vision-light` |
-| `profile.suite.ai.vision-ov` | Horizontal | OpenVINO™ Toolkit Benchmark - Measures raw inference performance using OpenVINO Runtime API | `esq run --profile profile.suite.ai.vision-ov` |
-| `profile.suite.ai.vision-va` | Horizontal | Multi-stage video analytics pipelines with detection, tracking, and classification | `esq run --profile profile.suite.ai.vision-va` |
-| `profile.suite.ai.vision-vrb` | Horizontal | Vision AI profile - Verified Reference Blueprints | `esq run --profile profile.suite.ai.vision-vrb` |
-| `profile.suite.media.performance-pipelines` | Horizontal | Media Performance | `esq run --profile profile.suite.media.performance-pipelines` |
-| `profile.suite.realtime.performance` | Horizontal | Real-time wakeup latency measurement with cyclictest under stress load profile | `esq run --profile profile.suite.realtime.performance` |
-| `profile.suite.realtime.platform` | Horizontal | Real-time platform capability detection and configuration checks profile | `esq run --profile profile.suite.realtime.platform` |
-| `profile.suite.system.cpu-sku` | Horizontal | CPU SKU characterisation suite — processor identification, generation, core counts, and frequency collection profile | `esq run --profile profile.suite.system.cpu-sku` |
-| `profile.suite.system.display` | Horizontal | System display related tests | `esq run --profile profile.suite.system.display` |
-| `profile.suite.system.gpu-ov` | Horizontal | System GPU Performance using OpenVINO™ Toolkit benchmark | `esq run --profile profile.suite.system.gpu-ov` |
-| `profile.suite.system.memory-health` | Horizontal | System memory health — detects and helps identify faulty RAM modules at runtime | `esq run --profile profile.suite.system.memory-health` |
-| `profile.suite.system.memory-stream` | Horizontal | System Memory Performance using STREAM benchmark | `esq run --profile profile.suite.system.memory-stream` |
-| `profile.suite.system.network` | Horizontal | System network related tests | `esq run --profile profile.suite.system.network` |
-| `profile.suite.system.peripheral` | Horizontal | System Peripheral Device Detection and Enumeration | `esq run --profile profile.suite.system.peripheral` |
-| `profile.suite.system.stress` | Horizontal | Host machine stress-ng suite with CPU, memory, iGPU, and mixed stress scenarios | `esq run --profile profile.suite.system.stress` |
-| `profile.suite.virtualization.kvm` | Horizontal | KVM/QEMU* virtualization compatibility validation | `esq run --profile profile.suite.virtualization.kvm` |
-| `profile.suite.virtualization.kvm-qemu` | Horizontal | QEMU*/KVM VM reboot testing | `esq run --profile profile.suite.virtualization.kvm-qemu` |
+| `profile.horizontal.ai.gen-chatqna-core` | Horizontal | Gen AI Chat QnA Core profile | `esq run --profile profile.horizontal.ai.gen-chatqna-core` |
+| `profile.horizontal.ai.gen-llm` | Horizontal | Gen AI LLM serving benchmark profile | `esq run --profile profile.horizontal.ai.gen-llm` |
+| `profile.horizontal.ai.vision-light` | Horizontal | DL Streamer Analysis - Multi-Stream Pipelines With Multiple AI Stages | `esq run --profile profile.horizontal.ai.vision-light` |
+| `profile.horizontal.ai.vision-ov` | Horizontal | OpenVINO™ Toolkit Benchmark - Measures raw inference performance using OpenVINO Runtime API | `esq run --profile profile.horizontal.ai.vision-ov` |
+| `profile.horizontal.ai.vision-va` | Horizontal | Multi-stage video analytics pipelines with detection, tracking, and classification | `esq run --profile profile.horizontal.ai.vision-va` |
+| `profile.horizontal.ai.vision-vrb` | Horizontal | Vision AI profile - Verified Reference Blueprints | `esq run --profile profile.horizontal.ai.vision-vrb` |
+| `profile.horizontal.media.performance-pipelines` | Horizontal | Media Performance | `esq run --profile profile.horizontal.media.performance-pipelines` |
+| `profile.horizontal.realtime.performance` | Horizontal | Real-time wakeup latency measurement with cyclictest under stress load profile | `esq run --profile profile.horizontal.realtime.performance` |
+| `profile.horizontal.realtime.platform` | Horizontal | Real-time platform capability detection and configuration checks profile | `esq run --profile profile.horizontal.realtime.platform` |
+| `profile.horizontal.system.cpu-sku` | Horizontal | CPU SKU characterisation suite — processor identification, generation, core counts, and frequency collection profile | `esq run --profile profile.horizontal.system.cpu-sku` |
+| `profile.horizontal.system.display` | Horizontal | System display related tests | `esq run --profile profile.horizontal.system.display` |
+| `profile.horizontal.system.gpu-ov` | Horizontal | System GPU Performance using OpenVINO™ Toolkit benchmark | `esq run --profile profile.horizontal.system.gpu-ov` |
+| `profile.horizontal.system.memory-health` | Horizontal | System memory health — detects and helps identify faulty RAM modules at runtime | `esq run --profile profile.horizontal.system.memory-health` |
+| `profile.horizontal.system.memory-stream` | Horizontal | System Memory Performance using STREAM benchmark | `esq run --profile profile.horizontal.system.memory-stream` |
+| `profile.horizontal.system.network` | Horizontal | System network related tests | `esq run --profile profile.horizontal.system.network` |
+| `profile.horizontal.system.peripheral` | Horizontal | System Peripheral Device Detection and Enumeration | `esq run --profile profile.horizontal.system.peripheral` |
+| `profile.horizontal.system.stress` | Horizontal | Host machine stress-ng suite with CPU, memory, iGPU, and mixed stress scenarios | `esq run --profile profile.horizontal.system.stress` |
+| `profile.horizontal.virtualization.kvm` | Horizontal | KVM/QEMU* virtualization compatibility validation | `esq run --profile profile.horizontal.virtualization.kvm` |
+| `profile.horizontal.virtualization.kvm-qemu` | Horizontal | QEMU*/KVM VM reboot testing | `esq run --profile profile.horizontal.virtualization.kvm-qemu` |
 | `profile.vertical.manufacturing` | Vertical | Manufacturing | `esq run --profile profile.vertical.manufacturing` |
 | `profile.vertical.manufacturing.timeseries-wt` | Vertical | Manufacturing Timeseries Wind Turbine scenarios | `esq run --profile profile.vertical.manufacturing.timeseries-wt` |
 | `profile.vertical.metro` | Vertical | Metro proxy workloads (LPR, Smart NVR, Visual AI, VSaaS) | `esq run --profile profile.vertical.metro` |
 | `profile.vertical.retail-asc` | Vertical | Retail Automated Self-Checkout | `esq run --profile profile.vertical.retail-asc` |
 | `profile.vertical.retail-lp` | Vertical | Retail Loss Prevention | `esq run --profile profile.vertical.retail-lp` |
 | `profile.vertical.retail-lp-vlm` | Vertical | Retail Loss Prevention Visual Language Model | `esq run --profile profile.vertical.retail-lp-vlm` |
-| `profile.suite.ai.clustering-adbscan` | Horizontal | Clustering AI ADBScan point cloud benchmark | `esq run --profile profile.suite.ai.clustering-adbscan` |
-| `profile.suite.ai.audio-funasr` | Horizontal | Audio AI FunASR speech-recognition benchmark | `esq run --profile profile.suite.ai.audio-funasr` |
+| `profile.horizontal.ai.clustering-adbscan` | Horizontal | Clustering AI ADBScan point cloud benchmark | `esq run --profile profile.horizontal.ai.clustering-adbscan` |
+| `profile.horizontal.ai.audio-funasr` | Horizontal | Audio AI FunASR speech-recognition benchmark | `esq run --profile profile.horizontal.ai.audio-funasr` |
 
 **List all available profiles**:
 ```bash
@@ -109,8 +109,8 @@ with a required `name` and an optional `test_ids` (when present, runs only those
 
 ```yaml
 profiles:
-  - name: profile.suite.system.cpu-sku
-  - name: profile.suite.system.display
+  - name: profile.horizontal.system.cpu-sku
+  - name: profile.horizontal.system.display
     test_ids:
       - SYS-DISP-001
       - SYS-DISP-002
@@ -299,11 +299,11 @@ esq run --profile profile.vertical.metro
 ```
 
 > **Note:** Running `esq run --profile profile.vertical.metro` also runs dependent profiles:
-> `profile.suite.system.memory-stream`,
-> `profile.suite.system.gpu-ov`,
-> `profile.suite.ai.vision-ov`,
-> `profile.suite.media.performance-pipelines`, and
-> `profile.suite.ai.vision-va`.
+> `profile.horizontal.system.memory-stream`,
+> `profile.horizontal.system.gpu-ov`,
+> `profile.horizontal.ai.vision-ov`,
+> `profile.horizontal.media.performance-pipelines`, and
+> `profile.horizontal.ai.vision-va`.
 > Total execution time depends on your hardware capabilities and available accelerators.
 
 ---
@@ -371,7 +371,7 @@ esq run --profile profile.vertical.retail-lp-vlm
 
 #### FunASR ASR Benchmark
 
-**Profile**: `profile.suite.ai.audio-funasr`
+**Profile**: `profile.horizontal.ai.audio-funasr`
 
 **Test Cases**:
 
@@ -383,7 +383,7 @@ esq run --profile profile.vertical.retail-lp-vlm
 
 **Run this profile**:
 ```bash
-esq run --profile profile.suite.ai.audio-funasr
+esq run --profile profile.horizontal.ai.audio-funasr
 ```
 
 ---
@@ -392,7 +392,7 @@ esq run --profile profile.suite.ai.audio-funasr
 
 #### ADBScan Benchmark
 
-**Profile**: `profile.suite.ai.clustering-adbscan`
+**Profile**: `profile.horizontal.ai.clustering-adbscan`
 
 **Test Cases**:
 
@@ -402,7 +402,7 @@ esq run --profile profile.suite.ai.audio-funasr
 
 **Run this profile**:
 ```bash
-esq run --profile profile.suite.ai.clustering-adbscan
+esq run --profile profile.horizontal.ai.clustering-adbscan
 ```
 
 ---
@@ -411,7 +411,7 @@ esq run --profile profile.suite.ai.clustering-adbscan
 
 #### LLM Serving Benchmark
 
-**Profile**: `profile.suite.ai.gen-llm`
+**Profile**: `profile.horizontal.ai.gen-llm`
 
 <details markdown="1">
 <summary><b>Test Cases</b> (click to expand)</summary>
@@ -455,14 +455,14 @@ esq run --profile profile.suite.ai.clustering-adbscan
 
 **Run this profile**:
 ```bash
-esq run --profile profile.suite.ai.gen-llm
+esq run --profile profile.horizontal.ai.gen-llm
 ```
 
 ---
 
 #### Chat Question and Answer Core
 
-**Profile**: `profile.suite.ai.gen-chatqna-core`
+**Profile**: `profile.horizontal.ai.gen-chatqna-core`
 
 **Test Cases**:
 
@@ -476,7 +476,7 @@ esq run --profile profile.suite.ai.gen-llm
 
 **Run this profile**:
 ```bash
-esq run --profile profile.suite.ai.gen-chatqna-core
+esq run --profile profile.horizontal.ai.gen-chatqna-core
 ```
 
 ---
@@ -484,7 +484,7 @@ esq run --profile profile.suite.ai.gen-chatqna-core
 ### Vision AI
 #### DL Streamer Analysis - Multi-Stream Pipelines With Multiple AI Stages
 
-**Profile**: `profile.suite.ai.vision-light`
+**Profile**: `profile.horizontal.ai.vision-light`
 
 **Test Cases**:
 
@@ -498,14 +498,14 @@ esq run --profile profile.suite.ai.gen-chatqna-core
 
 **Run this profile**:
 ```bash
-esq run --profile profile.suite.ai.vision-light
+esq run --profile profile.horizontal.ai.vision-light
 ```
 
 ---
 
 #### Verified Reference Blueprints
 
-**Profile**: `profile.suite.ai.vision-vrb`
+**Profile**: `profile.horizontal.ai.vision-vrb`
 
 **Test Cases**:
 
@@ -519,14 +519,14 @@ esq run --profile profile.suite.ai.vision-light
 
 **Run this profile**:
 ```bash
-esq run --profile profile.suite.ai.vision-vrb
+esq run --profile profile.horizontal.ai.vision-vrb
 ```
 
 ---
 
 #### OpenVINO™
 
-**Profile**: `profile.suite.ai.vision-ov`
+**Profile**: `profile.horizontal.ai.vision-ov`
 
 <details markdown="1">
 <summary><b>Test Cases</b> (click to expand)</summary>
@@ -559,14 +559,14 @@ esq run --profile profile.suite.ai.vision-vrb
 
 **Run this profile**:
 ```bash
-esq run --profile profile.suite.ai.vision-ov
+esq run --profile profile.horizontal.ai.vision-ov
 ```
 
 ---
 
 #### Video Analytics
 
-**Profile**: `profile.suite.ai.vision-va`
+**Profile**: `profile.horizontal.ai.vision-va`
 
 **Test Cases**:
 
@@ -578,14 +578,14 @@ esq run --profile profile.suite.ai.vision-ov
 
 **Run this profile**:
 ```bash
-esq run --profile profile.suite.ai.vision-va
+esq run --profile profile.horizontal.ai.vision-va
 ```
 
 ---
 
 ### Real-Time Performance
 
-**Profile**: `profile.suite.realtime.performance`
+**Profile**: `profile.horizontal.realtime.performance`
 
 **Test Cases**:
 
@@ -596,14 +596,14 @@ esq run --profile profile.suite.ai.vision-va
 
 **Run this profile**:
 ```bash
-esq run --profile profile.suite.realtime.performance
+esq run --profile profile.horizontal.realtime.performance
 ```
 
 ---
 
 ### Real-Time Platform
 
-**Profile**: `profile.suite.realtime.platform`
+**Profile**: `profile.horizontal.realtime.platform`
 
 **Test Cases**:
 
@@ -621,14 +621,14 @@ esq run --profile profile.suite.realtime.performance
 
 **Run this profile**:
 ```bash
-esq run --profile profile.suite.realtime.platform
+esq run --profile profile.horizontal.realtime.platform
 ```
 
 ---
 
 ### System CPU
 
-**Profile**: `profile.suite.system.cpu-sku`
+**Profile**: `profile.horizontal.system.cpu-sku`
 
 **Test Cases**:
 
@@ -642,14 +642,14 @@ esq run --profile profile.suite.realtime.platform
 
 **Run this profile**:
 ```bash
-esq run --profile profile.suite.system.cpu-sku
+esq run --profile profile.horizontal.system.cpu-sku
 ```
 
 ---
 
 ### System Display
 
-**Profile**: `profile.suite.system.display`
+**Profile**: `profile.horizontal.system.display`
 
 **Test Cases**:
 
@@ -661,14 +661,14 @@ esq run --profile profile.suite.system.cpu-sku
 
 **Run this profile**:
 ```bash
-esq run --profile profile.suite.system.display
+esq run --profile profile.horizontal.system.display
 ```
 
 ---
 
 ### System GPU
 
-**Profile**: `profile.suite.system.gpu-ov`
+**Profile**: `profile.horizontal.system.gpu-ov`
 
 **Test Cases**:
 
@@ -679,7 +679,7 @@ esq run --profile profile.suite.system.display
 
 **Run this profile**:
 ```bash
-esq run --profile profile.suite.system.gpu-ov
+esq run --profile profile.horizontal.system.gpu-ov
 ```
 
 ---
@@ -687,7 +687,7 @@ esq run --profile profile.suite.system.gpu-ov
 
 #### System Memory - STREAM
 
-**Profile**: `profile.suite.system.memory-stream`
+**Profile**: `profile.horizontal.system.memory-stream`
 
 **Test Cases**:
 
@@ -700,14 +700,14 @@ esq run --profile profile.suite.system.gpu-ov
 
 **Run this profile**:
 ```bash
-esq run --profile profile.suite.system.memory-stream
+esq run --profile profile.horizontal.system.memory-stream
 ```
 
 ---
 
 #### System Memory Health
 
-**Profile**: `profile.suite.system.memory-health`
+**Profile**: `profile.horizontal.system.memory-health`
 
 **Test Cases**:
 
@@ -718,14 +718,14 @@ esq run --profile profile.suite.system.memory-stream
 
 **Run this profile**:
 ```bash
-esq run --profile profile.suite.system.memory-health
+esq run --profile profile.horizontal.system.memory-health
 ```
 
 ---
 
 ### System Network
 
-**Profile**: `profile.suite.system.network`
+**Profile**: `profile.horizontal.system.network`
 
 **Test Cases**:
 
@@ -737,14 +737,14 @@ esq run --profile profile.suite.system.memory-health
 
 **Run this profile**:
 ```bash
-esq run --profile profile.suite.system.network
+esq run --profile profile.horizontal.system.network
 ```
 
 ---
 
 ### System Peripheral
 
-**Profile**: `profile.suite.system.peripheral`
+**Profile**: `profile.horizontal.system.peripheral`
 
 **Test Cases**:
 
@@ -768,14 +768,14 @@ esq run --profile profile.suite.system.network
 
 **Run this profile**:
 ```bash
-esq run --profile profile.suite.system.peripheral
+esq run --profile profile.horizontal.system.peripheral
 ```
 
 ---
 
 ### System Stress
 
-**Profile**: `profile.suite.system.stress`
+**Profile**: `profile.horizontal.system.stress`
 
 **Test Cases**:
 
@@ -791,7 +791,7 @@ esq run --profile profile.suite.system.peripheral
 
 **Run this profile**:
 ```bash
-esq run --profile profile.suite.system.stress
+esq run --profile profile.horizontal.system.stress
 ```
 
 ---
@@ -800,7 +800,7 @@ esq run --profile profile.suite.system.stress
 
 #### KVM Compatibility
 
-**Profile**: `profile.suite.virtualization.kvm`
+**Profile**: `profile.horizontal.virtualization.kvm`
 
 **Test Cases**:
 
@@ -814,14 +814,14 @@ esq run --profile profile.suite.system.stress
 
 **Run this profile**:
 ```bash
-esq run --profile profile.suite.virtualization.kvm
+esq run --profile profile.horizontal.virtualization.kvm
 ```
 
 ---
 
 #### QEMU* VM Reboot
 
-**Profile**: `profile.suite.virtualization.kvm-qemu`
+**Profile**: `profile.horizontal.virtualization.kvm-qemu`
 
 **Test Cases**:
 
@@ -832,13 +832,13 @@ esq run --profile profile.suite.virtualization.kvm
 
 **Run this profile**:
 ```bash
-esq run --profile profile.suite.virtualization.kvm-qemu
+esq run --profile profile.horizontal.virtualization.kvm-qemu
 ```
 
 ---
 
 ### Media Performance
-**Profile**: `profile.suite.media.performance-pipelines`
+**Profile**: `profile.horizontal.media.performance-pipelines`
 
 <details markdown="1">
 <summary><b>Test Cases</b> (click to expand)</summary>
@@ -876,7 +876,7 @@ esq run --profile profile.suite.virtualization.kvm-qemu
 
 **Run this profile**:
 ```bash
-esq run --profile profile.suite.media.performance-pipelines
+esq run --profile profile.horizontal.media.performance-pipelines
 ```
 
 ---

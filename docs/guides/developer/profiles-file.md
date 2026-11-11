@@ -12,13 +12,13 @@ key and an optional `test_ids` key:
 1. `name` only - runs the whole profile:
 
    ```yaml
-   - name: profile.suite.system.cpu-sku
+   - name: profile.horizontal.system.cpu-sku
    ```
 
 2. `name` with `test_ids` - runs only the listed `test_id`(s) within that profile:
 
    ```yaml
-   - name: profile.suite.system.display
+   - name: profile.horizontal.system.display
      test_ids:
        - SYS-DISP-001
        - SYS-DISP-002
@@ -34,8 +34,8 @@ Run `esq list` to see all available profile names.
 
 ```yaml
 profiles:
-  - name: profile.suite.system.cpu-sku
-  - name: profile.suite.system.display
+  - name: profile.horizontal.system.cpu-sku
+  - name: profile.horizontal.system.display
     test_ids:
       - SYS-DISP-001
       - SYS-DISP-002

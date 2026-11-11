@@ -12,9 +12,9 @@ A single test function is reused across three suite types. The suite type is def
 
 | Suite type | Report section | Purpose | Pass/fail on KPIs |
 |------------|----------------|---------|-------------------|
-| **Horizontal** | Test results (data collection) | General benchmarking and metric collection | No |
-| **Vertical** | Vertical | Industry-specific proxy workloads | No |
-| **Qualification** | Qualification | Validate metrics against Intel targets | Yes |
+| **Horizontal** | Horizontals (data collection) | General benchmarking and metric collection | No |
+| **Vertical** | Verticals | Industry-specific proxy workloads | No |
+| **Qualification** | Qualifications | Validate metrics against Intel targets | Yes |
 
 Because the type is profile-driven, a test does not need every file. Create only what the suite type requires:
 
@@ -159,19 +159,18 @@ profile, it also references the shared KPIs with `kpi_refs` and refines
 thresholds with `kpi_override`.
 
 ```yaml
-# src/<package>/configs/profiles/suites/my_feature.yml
-# (e.g., src/esq/configs/profiles/suites/my_feature.yml)
+# src/<package>/configs/profiles/horizontals/my_feature.yml
+# (e.g., src/esq/configs/profiles/horizontals/my_feature.yml)
 # Copyright (C) 2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-name: "profile.suite.my_feature"
+name: "profile.horizontal.my_feature"
 description: "My Feature Test Suite"
-version: "1.0.0"
 params:
   labels:
-    profile_display_name: "My Feature"
-    group: "custom.my_feature"
-    type: "suite"
+    profile_group_name: "My Feature"
+    profile_display_name: "My Feature - Basic Checks"
+    type: "horizontal"
   requirements:
     cpu_min_cores: 4
     memory_min_gib: 8.0
@@ -319,16 +318,16 @@ For the complete list of env vars supported by built-in suites, see [Runtime Env
 esq list
 
 # Run your profile
-esq -v run --profile profile.suite.my_feature
+esq -v run --profile profile.horizontal.my_feature
 
 # Run a specific test using a filter
-esq -d run --profile profile.suite.my_feature --filter test_id=MYF-FEA-001
+esq -d run --profile profile.horizontal.my_feature --filter test_id=MYF-FEA-001
 
 # Run without cache (force fresh execution)
-esq -d run -nc --profile profile.suite.my_feature
+esq -d run -nc --profile profile.horizontal.my_feature
 
 # Override a runtime parameter for this run only
-ENV_SUITE_MY_TEST_DURATION_SECONDS=60 esq -v run --profile profile.suite.my_feature
+ENV_SUITE_MY_TEST_DURATION_SECONDS=60 esq -v run --profile profile.horizontal.my_feature
 ```
 
 ---

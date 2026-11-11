@@ -76,7 +76,7 @@ USAGE PATTERNS:
 
   2. Run all profiles (data collection, not for qualification):
      {cli_name} run --all
-     • Runs every profile type (qualifications, suites, verticals) without prompts
+     • Runs every profile type (qualifications, horizontals, verticals) without prompts
      • Skips qualification profiles if system not supported
 
   3. Run qualification profiles only:
@@ -99,7 +99,7 @@ USAGE PATTERNS:
   6. Run with filters:
      {cli_name} run -p PROFILE_NAME --filter test_id=T0069
 
-  7. Interactively select one or more profiles via checkbox (qualification, suite, or vertical):
+  7. Interactively select one or more profiles via checkbox (qualification, horizontal, or vertical):
      {cli_name} run --select
      • Checkbox menu of ALL available profiles (same set as '{cli_name} list')
      • Up/Down to move, Right/Left to expand/collapse, Space to toggle, 'a' to toggle all,
@@ -120,7 +120,7 @@ EXAMPLES:
   {cli_name} run --qualification-only                               # Qualification profiles only
   {cli_name} run -p profile.qualification.ai-edge-system            # Specific profile
   {cli_name} run -t aes                                             # By tag
-  {cli_name} run -p profile.suite.ai.vision --filter test_id=T0001  # Filtered test
+  {cli_name} run -p profile.horizontal.ai.vision --filter test_id=T0001 # Filtered test
   {cli_name} run --select                                           # Pick profile(s) via checkbox
   {cli_name} run --profiles-file custom_profiles.yml                # Run from a saved template
 
@@ -139,7 +139,7 @@ For available profiles, use: {cli_name} list
         "-a",
         action="store_true",
         help=(
-            "Run all profile types (qualifications, suites, verticals) without prompts, e.g., for data "
+            "Run all profile types (qualifications, horizontals, verticals) without prompts, e.g., for data "
             "collection. Not intended for qualifying against a specific profile (skips qualification if unsupported)"
         ),
     )
@@ -240,7 +240,7 @@ For available profiles, use: {cli_name} list
         "-f",
         action="store_true",
         help=(
-            "Skip interactive prompts. Runs vertical/suite profiles only; use --profile/--tag/"
+            "Skip interactive prompts. Runs vertical/horizontal profiles only; use --profile/--tag/"
             "--qualification-only to also run a specific qualification profile"
         ),
     )

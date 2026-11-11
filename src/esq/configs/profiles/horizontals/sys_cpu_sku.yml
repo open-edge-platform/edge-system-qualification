@@ -1,14 +1,13 @@
 # Copyright (C) 2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-name: "profile.suite.system.cpu-sku"
+name: "profile.horizontal.system.cpu-sku"
 description: "CPU SKU characterisation suite — processor identification, generation, core counts, and frequency collection"
-version: "1.0.0"
 params:
   labels:
-    profile_display_name: "System CPU"
-    group: "system.cpu"
-    type: "suite"
+    profile_group_name: "System CPU"
+    profile_display_name: "System CPU - SKU Characterisation"
+    type: "horizontal"
     display_status: false
   requirements:
     # Hardware requirements
@@ -33,10 +32,10 @@ suites:
           # adding kpi_refs + kpi_override (see hybrid_edge_system.yml for an
           # example with cpu_compatibility).
           #
-          # Note: cpu_compatibility is intentionally omitted from this suite.
+          # Note: cpu_compatibility is intentionally omitted from this horizontal.
           # In data-collection mode it always returns 1 (no allowlist active),
-          # which would mislead users comparing suite and qualification results
-          # on an unsupported platform — the suite shows 1 while the
+          # which would mislead users comparing horizontal and qualification results
+          # on an unsupported platform — the horizontal shows 1 while the
           # qualification shows 0 for the same metric.  cpu_compatibility is
           # exercised exclusively via qualification profiles.
           #

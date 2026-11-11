@@ -68,8 +68,8 @@ Priority order (highest to lowest):
 The value must be a whole number of seconds (minimum 1).
 
 ```bash
-esq run --profile profile.suite.ai.gen --telemetry-interval 10
-CORE_TELEMETRY_INTERVAL=10 esq run --profile profile.suite.ai.gen
+esq run --profile profile.horizontal.ai.gen --telemetry-interval 10
+CORE_TELEMETRY_INTERVAL=10 esq run --profile profile.horizontal.ai.gen
 ```
 
 ---

@@ -1,15 +1,14 @@
 # Copyright (C) 2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-name: "profile.suite.system.stress"
+name: "profile.horizontal.system.stress"
 description: "Host machine stress-ng suite with CPU, memory, iGPU, and mixed stress scenarios"
-version: "1.0.0"
 params:
   stress_duration_seconds_default: &stress_duration_seconds_default 60
   labels:
-    profile_display_name: "System Stress"
-    group: "system.stress"
-    type: "suite"
+    profile_group_name: "System Stress"
+    profile_display_name: "System Stress - stress-ng"
+    type: "horizontal"
     display_status: false
   requirements:
     # Hardware requirements

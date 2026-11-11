@@ -3,11 +3,10 @@
 
 name: "profile.qualification.ai-edge-system"
 description: "AI Edge System qualification"
-version: "1.0.0"
 params:
   labels:
+    profile_group_name: "AI Edge System"
     profile_display_name: "AI Edge System"
-    group: "ai-edge-system"
     type: "qualification"
     display_reference: true
     kpi_enabled: true

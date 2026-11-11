@@ -1,14 +1,13 @@
 # Copyright (C) 2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-name: "profile.suite.virtualization.kvm"
+name: "profile.horizontal.virtualization.kvm"
 description: "KVM/QEMU virtualization compatibility validation"
-version: "1.0.0"
 params:
   labels:
-    profile_display_name: "Virtualization"
-    group: "virtualization.kvm"
-    type: "suite"
+    profile_group_name: "Virtualization"
+    profile_display_name: "Virtualization - KVM Compatibility and VM Capacity"
+    type: "horizontal"
     display_status: false
   requirements:
     # Hardware requirements

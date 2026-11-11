@@ -813,7 +813,7 @@ def _resolve_and_execute_profiles_esq(
             `filters` for specific requested profiles (e.g., a per-profile test_id scope
             picked via --select or loaded from --profiles-file). Profiles not present in
             this mapping fall back to the shared `filters`.
-        prompt_associated: If False, don't offer the associated vertical/suite profiles of a
+        prompt_associated: If False, don't offer the associated vertical/horizontal profiles of a
             requested qualification profile (used for --profiles-file, where the file already
             lists exactly what to run).
 
@@ -908,7 +908,7 @@ def _resolve_and_execute_profiles_esq(
         per_profile_filters.update(selected_filters)
         picked_associated = not force
     if picked_associated:
-        # Save the full selection (qualification + picked verticals/suites) so it can be replayed with
+        # Save the full selection (qualification + picked verticals/horizontals) so it can be replayed with
         # --profiles-file. Ctrl+C here cancels the run, like the --select save prompt.
         try:
             _offer_save_profiles_selection(viable_requested_names, per_profile_filters)
@@ -1028,7 +1028,7 @@ def _run_all_profiles_esq(
 
         include_all_types = True
         skip_vertical_profiles = False
-        logger.info("Running all profile types (qualifications, verticals, suites)")
+        logger.info("Running all profile types (qualifications, verticals, horizontals)")
 
     elif qualification_only:
         # --qualification-only: Run qualification profiles with ESQ validation.
@@ -1045,7 +1045,7 @@ def _run_all_profiles_esq(
         logger.info("Running qualification profiles only")
 
     elif select_profile:
-        # --select flag: one picker listing every profile type (qualifications, suites, verticals -
+        # --select flag: one picker listing every profile type (qualifications, horizontals, verticals -
         # see 'esq list') with nothing pre-ticked. The selection then goes through the same
         # execution path as --profile/--tag, so CPU validation applies when relevant.
         try:

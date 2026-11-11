@@ -1,14 +1,13 @@
 # Copyright (C) 2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-name: "profile.suite.system.memory-health"
+name: "profile.horizontal.system.memory-health"
 description: "System memory health — detects and helps identify faulty RAM modules at runtime"
-version: "1.0.0"
 params:
   labels:
-    profile_display_name: "System Memory"
-    group: "system.memory"
-    type: "suite"
+    profile_group_name: "System Memory"
+    profile_display_name: "System Memory - Health Check"
+    type: "horizontal"
     display_status: false
   requirements:
     # Hardware requirements

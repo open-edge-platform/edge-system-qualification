@@ -1,14 +1,13 @@
 # Copyright (C) 2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-name: "profile.suite.ai.vision-vrb"
-description: "Vision AI suite profile - Verified Reference Blueprints"
-version: "1.0.0"
+name: "profile.horizontal.ai.vision-vrb"
+description: "Vision AI horizontal profile - Verified Reference Blueprints"
 params:
   labels:
-    profile_display_name: "Vision AI"
-    group: "ai.vision"
-    type: "suite"
+    profile_group_name: "Vision AI"
+    profile_display_name: "Vision AI - Verified Reference Blueprints"
+    type: "horizontal"
     display_status: false
   requirements:
     # Hardware requirements

@@ -1,14 +1,13 @@
 # Copyright (C) 2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-name: "profile.suite.virtualization.kvm-qemu"
+name: "profile.horizontal.virtualization.kvm-qemu"
 description: "QEMU/KVM VM reboot testing"
-version: "1.0.0"
 params:
   labels:
-    profile_display_name: "Virtualization"
-    group: "virtualization.kvm"
-    type: "suite"
+    profile_group_name: "Virtualization"
+    profile_display_name: "Virtualization - QEMU/KVM Reboot"
+    type: "horizontal"
     display_status: false
   requirements:
     # Hardware requirements

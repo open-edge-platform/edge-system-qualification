@@ -5,13 +5,36 @@ import csv
 import glob
 import logging
 import os
+import shutil
 
 import allure
 import pytest
-from sysagent.utils.core import Metrics, Result, run_command
+from sysagent.utils.core import Metrics, Result, get_metric_name_for_device, run_command
 from sysagent.utils.system.ov_helper import get_available_devices_by_category
 
 logger = logging.getLogger(__name__)
+
+
+def _mean(values):
+    return sum(values) / len(values) if values else None
+
+
+def _parse_key_values(line, wanted_keys):
+    """Parse space-separated key=value tokens of a log line into floats for the wanted keys."""
+    parsed = {}
+    for token in line.strip().split():
+        if "=" not in token:
+            continue
+        key, raw_val = token.split("=", 1)
+        if key not in wanted_keys:
+            continue
+        try:
+            float_val = float(raw_val)
+        except ValueError:
+            continue
+        if float_val >= 0:
+            parsed[key] = float_val
+    return parsed
 
 
 @allure.description(
@@ -47,12 +70,13 @@ def test_ta_vlm(
     devices = configs.get("devices", ["igpu"])
     commit_id = configs.get("commit_id", "65d1959")
 
-    # Resolve actual OpenVINO device ID from category at runtime (matches test_text_generation pattern)
+    # Resolve actual OpenVINO device IDs from the categories at runtime. A category can match
+    # several devices (e.g. multiple dGPUs), and the benchmark is run once on each of them.
     device_dict = get_available_devices_by_category(device_categories=devices)
     if not device_dict:
         pytest.skip(f"No available devices found for device categories: {devices}")
-    target_device = next(iter(device_dict))
-    logger.info(f"Resolved device category {devices} -> {target_device}")
+    device_list = list(device_dict.keys())
+    logger.info(f"Resolved device category {devices} -> {device_list}")
 
     # Sanitize numeric benchmark parameters
     benchmark_workers = max(1, int(configs.get("benchmark_workers", 1)))
@@ -61,7 +85,7 @@ def test_ta_vlm(
 
     logger.info(f"Starting Take-Away Order Accuracy VLM Test: {test_display_name}")
     logger.info(
-        f"Config: device={target_device}, workers={benchmark_workers}, "
+        f"Config: devices={device_list}, workers={benchmark_workers}, "
         f"duration={benchmark_duration}s, init={benchmark_init_duration}s"
     )
 
@@ -136,11 +160,11 @@ def test_ta_vlm(
             logger.info(f"order-accuracy repository already exists: {oa_base_dir}")
 
         # ================================================================
-        # STEP 3: Prepare Assets/Dependencies
+        # STEP 3: Prepare Assets/Dependencies (run per device in STEP 4)
         # ================================================================
-        def prepare_assets():
+        def prepare_assets(target_device):
             preparation_result = Result(
-                name=f"{test_id} - Asset Preparation",
+                name=f"{test_id} - Asset Preparation ({target_device})",
                 metadata={"status": "in_progress"},
             )
             try:
@@ -267,15 +291,22 @@ def test_ta_vlm(
                 logger.error(f"Asset preparation failed: {prep_err}")
                 raise
 
-        prepare_test(test_name=test_name, prepare_func=prepare_assets, configs=configs, name="Assets")
-
         # ================================================================
-        # STEP 4: Execute Test Logic (with caching)
+        # STEP 4: Execute Test Logic (with caching) - once per device
         # ================================================================
-        def execute_logic():
-            run_results = Result(name=f"{test_id} - {test_display_name}")
+        def execute_logic(target_device):
+            run_results = Result(name=f"{test_id} - {test_display_name} ({target_device})")
 
             try:
+                # Start from an empty results folder so files from earlier runs are not parsed or consolidated
+                results_dir = os.path.join(ta_base_dir, "results")
+                if os.path.isdir(results_dir):
+                    try:
+                        shutil.rmtree(results_dir)
+                    except OSError as rm_err:
+                        logger.warning(f"Could not fully remove previous results {results_dir}: {rm_err}")
+                os.makedirs(results_dir, exist_ok=True)
+
                 # Run fixed-workers benchmark (benchmark-oa starts services automatically)
                 logger.info(
                     f"Running benchmark-oa: workers={benchmark_workers}, "
@@ -302,8 +333,6 @@ def test_ta_vlm(
                     name="Benchmark Run Output",
                     attachment_type=allure.attachment_type.TEXT,
                 )
-
-                results_dir = os.path.join(ta_base_dir, "results")
 
                 run_results.metadata["benchmark_workers"] = benchmark_workers
                 run_results.metadata["benchmark_duration"] = benchmark_duration
@@ -341,7 +370,9 @@ def test_ta_vlm(
                                 except ValueError:
                                     continue
                                 if metric_key == "VLM_AVERAGE_CALL_DURATION":
-                                    run_results.metrics["vlm_avg_call_duration"] = Metrics(
+                                    run_results.metrics[
+                                        get_metric_name_for_device(target_device, prefix="vlm_avg_call_duration")
+                                    ] = Metrics(
                                         value=round(metric_value, 4),
                                         unit="sec",
                                     )
@@ -360,7 +391,8 @@ def test_ta_vlm(
                     logger.warning(f"consolidated_metrics.csv not found: {csv_path}")
 
                 # ── Parse vlm_performance_metrics_*.txt ─────────────────────
-                throughput_vals, tpot_vals, gen_dur_vals, gen_tok_vals = [], [], [], []
+                perf_keys = {"throughput_mean_sec", "tpot_sec", "Generate_Duration_Mean", "generated_tokens"}
+                perf_vals = {key: [] for key in perf_keys}
                 perf_files = sorted(
                     glob.glob(os.path.join(results_dir, "vlm_performance_metrics_*.txt")),
                     key=os.path.getctime,
@@ -371,52 +403,40 @@ def test_ta_vlm(
                             for line in pf:
                                 if "application=take-away-order-accuracy" not in line:
                                     continue
-                                for token in line.strip().split():
-                                    if "=" not in token:
-                                        continue
-                                    if token.startswith(("application=", "timestamp_ms=")):
-                                        continue
-                                    try:
-                                        key, raw_val = token.split("=", 1)
-                                        float_val = float(raw_val)
-                                        if float_val < 0:
-                                            continue
-                                        if key == "throughput_mean_sec":
-                                            throughput_vals.append(float_val)
-                                        elif key == "tpot_sec":
-                                            tpot_vals.append(float_val)
-                                        elif key == "Generate_Duration_Mean":
-                                            gen_dur_vals.append(float_val)
-                                        elif key == "generated_tokens":
-                                            gen_tok_vals.append(float_val)
-                                    except (ValueError, IndexError):
-                                        continue
+                                for key, val in _parse_key_values(line, perf_keys).items():
+                                    perf_vals[key].append(val)
                     except Exception as txt_err:
                         logger.warning(f"Could not parse {perf_file}: {txt_err}")
 
-                if throughput_vals:
-                    avg_tput = sum(throughput_vals) / len(throughput_vals)
-                    run_results.metrics["throughput_mean_sec"] = Metrics(
-                        value=round(avg_tput, 4),
-                        unit="tokens/sec",
-                        is_key_metric=True,
+                avg_tput = _mean(perf_vals["throughput_mean_sec"])
+                if avg_tput is not None:
+                    run_results.metrics[get_metric_name_for_device(target_device, prefix="throughput_mean_sec")] = (
+                        Metrics(
+                            value=round(avg_tput, 4),
+                            unit="tokens/sec",
+                            is_key_metric=True,
+                        )
                     )
                     logger.info(
                         f"Average throughput: {avg_tput:.4f} tokens/sec "
-                        f"({len(throughput_vals)} samples)"
+                        f"({len(perf_vals['throughput_mean_sec'])} samples)"
                     )
 
-                if tpot_vals:
-                    run_results.metadata["avg_tpot_sec"] = round(sum(tpot_vals) / len(tpot_vals), 4)
+                avg_tpot = _mean(perf_vals["tpot_sec"])
+                if avg_tpot is not None:
+                    run_results.metadata["avg_tpot_sec"] = round(avg_tpot, 4)
 
-                if gen_dur_vals:
-                    run_results.metadata["avg_generate_duration_sec"] = round(sum(gen_dur_vals) / len(gen_dur_vals), 4)
+                avg_gen_dur = _mean(perf_vals["Generate_Duration_Mean"])
+                if avg_gen_dur is not None:
+                    run_results.metadata["avg_generate_duration_sec"] = round(avg_gen_dur, 4)
 
-                if gen_tok_vals:
-                    run_results.metadata["avg_generated_tokens"] = round(sum(gen_tok_vals) / len(gen_tok_vals), 1)
+                avg_gen_tok = _mean(perf_vals["generated_tokens"])
+                if avg_gen_tok is not None:
+                    run_results.metadata["avg_generated_tokens"] = round(avg_gen_tok, 1)
 
                 # ── Parse vlm_application_metrics_*.txt (ovms_vlm_request events) ──
-                total_latency_vals, prompt_tok_vals, completion_tok_vals = [], [], []
+                app_keys = {"total_latency_sec", "prompt_tokens", "completion_tokens"}
+                app_vals = {key: [] for key in app_keys}
                 app_metric_files = sorted(
                     glob.glob(os.path.join(results_dir, "vlm_application_metrics_*.txt")),
                     key=os.path.getctime,
@@ -427,41 +447,22 @@ def test_ta_vlm(
                             for line in af:
                                 if "event=ovms_vlm_request" not in line:
                                     continue
-                                for token in line.strip().split():
-                                    if "=" not in token:
-                                        continue
-                                    if token.startswith(("application=", "timestamp_ms=", "id=", "event=")):
-                                        continue
-                                    try:
-                                        key, raw_val = token.split("=", 1)
-                                        float_val = float(raw_val)
-                                        if float_val < 0:
-                                            continue
-                                        if key == "total_latency_sec":
-                                            total_latency_vals.append(float_val)
-                                        elif key == "prompt_tokens":
-                                            prompt_tok_vals.append(float_val)
-                                        elif key == "completion_tokens":
-                                            completion_tok_vals.append(float_val)
-                                    except (ValueError, IndexError):
-                                        continue
+                                for key, val in _parse_key_values(line, app_keys).items():
+                                    app_vals[key].append(val)
                     except Exception as app_err:
                         logger.warning(f"Could not parse {app_file}: {app_err}")
 
-                if total_latency_vals:
-                    run_results.metadata["avg_total_latency_sec"] = round(sum(total_latency_vals) / len(total_latency_vals), 4)
+                avg_total_latency = _mean(app_vals["total_latency_sec"])
+                if avg_total_latency is not None:
+                    run_results.metadata["avg_total_latency_sec"] = round(avg_total_latency, 4)
 
-                if prompt_tok_vals:
-                    run_results.metadata["avg_prompt_tokens"] = round(sum(prompt_tok_vals) / len(prompt_tok_vals), 1)
+                avg_prompt_tok = _mean(app_vals["prompt_tokens"])
+                if avg_prompt_tok is not None:
+                    run_results.metadata["avg_prompt_tokens"] = round(avg_prompt_tok, 1)
 
-                if completion_tok_vals:
-                    run_results.metadata["avg_completion_tokens"] = round(sum(completion_tok_vals) / len(completion_tok_vals), 1)
-
-                # Domain-specific result parameters (do not include test_id or display_name)
-                run_results.parameters["Devices"] = ", ".join(devices)
-                run_results.parameters["Target Device"] = target_device
-                run_results.parameters["Benchmark Workers"] = str(benchmark_workers)
-                run_results.parameters["Benchmark Duration"] = f"{benchmark_duration}s"
+                avg_completion_tok = _mean(app_vals["completion_tokens"])
+                if avg_completion_tok is not None:
+                    run_results.metadata["avg_completion_tokens"] = round(avg_completion_tok, 1)
 
                 has_metrics = bool(run_results.metrics)
                 run_results.metadata["status"] = "passed" if has_metrics else "failed"
@@ -509,20 +510,59 @@ def test_ta_vlm(
                     except Exception as attach_err:
                         logger.warning(f"Failed to attach application metrics log: {attach_err}")
 
-        results = execute_test_with_cache(
-            cached_result=cached_result,
-            cache_result=cache_result,
-            run_test_func=execute_logic,
-            test_name=test_name,
-            configs=configs,
-        )
+        # Run the benchmark on every resolved device one after another. The Take-Away stack serves the
+        # VLM from a single device, so services are stopped between devices. A failure on one device
+        # does not prevent the remaining devices from being tested.
+        results = Result(name=f"{test_id} - {test_display_name}")
+        results.parameters["Devices"] = ", ".join(devices)
+        results.parameters["Device List"] = ", ".join(device_list)
+        results.parameters["Benchmark Workers"] = str(benchmark_workers)
+        results.parameters["Benchmark Duration"] = f"{benchmark_duration}s"
 
-        if results.metadata.get("status") != "passed":
+        failed_devices = {}
+        for device_id in device_list:
+            logger.info(f"Running Take-Away benchmark for device: {device_id}")
+            try:
+                prepare_test(
+                    test_name=test_name,
+                    prepare_func=lambda device_id=device_id: prepare_assets(device_id),
+                    configs=configs,
+                    name=f"Assets {device_id}",
+                )
+
+                device_result = execute_test_with_cache(
+                    cached_result=cached_result,
+                    cache_result=cache_result,
+                    run_test_func=lambda device_id=device_id: execute_logic(device_id),
+                    test_name=test_name,
+                    configs=configs,
+                    cache_configs={"device_id": device_id},
+                    name=f"Analysis {device_id}",
+                )
+            except Exception as device_err:
+                logger.error(f"Take-Away benchmark failed for device {device_id}: {device_err}", exc_info=True)
+                failed_devices[device_id] = str(device_err)
+                results.metadata[f"Device {device_id} status"] = "failed"
+                results.metadata[f"Device {device_id} error"] = str(device_err)
+                continue
+            finally:
+                cleanup()
+
+            results.metrics.update(device_result.metrics)
+            for meta_key, meta_value in device_result.metadata.items():
+                results.metadata[f"Device {device_id} {meta_key}"] = meta_value
+
+            if device_result.metadata.get("status") != "passed":
+                failed_devices[device_id] = device_result.metadata.get("error", "Test did not complete successfully")
+
+        results.metadata["status"] = "failed" if failed_devices else "passed"
+        if failed_devices:
+            results.metadata["error"] = "; ".join(f"{dev}: {err}" for dev, err in failed_devices.items())
+        results.update_timestamps()
+
+        if failed_devices:
             test_failed = True
-            failure_message = (
-                f"Take-Away VLM benchmark failed: "
-                f"{results.metadata.get('error', 'Test did not complete successfully')}"
-            )
+            failure_message = f"Take-Away VLM benchmark failed: {results.metadata['error']}"
 
     except KeyboardInterrupt:
         failure_message = "Interrupt detected during Take-Away VLM test execution"
@@ -543,7 +583,7 @@ def test_ta_vlm(
                 metrics={},
                 parameters={
                     "Devices": ", ".join(devices),
-                    "Target Device": target_device,
+                    "Device List": ", ".join(device_list),
                 },
             )
         else:

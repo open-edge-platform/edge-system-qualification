@@ -26,6 +26,7 @@ params:
     - "profile.vertical.retail-lp"
     - "profile.vertical.retail-lp-vlm"
     - "profile.vertical.retail-ta-vlm"
+    - "profile.vertical.retail-di-vlm"
   tiers:
     - entry
     - mainstream

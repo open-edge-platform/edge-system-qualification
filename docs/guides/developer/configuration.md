@@ -9,19 +9,18 @@ This page covers the profile YAML structure, how profiles map to test files, and
 Profiles are YAML files that define a test execution plan — which tests to run, with which parameters, and under what system requirements.
 
 ```yaml
-name: "profile.suite.example"
+name: "profile.horizontal.example"
 description: "Example test suite"
-version: "1.0.0"
 
 params:
   labels:
-    profile_display_name: "Example"
-    group: "example.group"
-    type: "suite"   # "qualification", "suite", or "vertical"
+    profile_group_name: "Example"
+    profile_display_name: "Example - Basic Checks"
+    type: "horizontal"   # "qualification", "horizontal", or "vertical"
     # report_section: "HEC"  # optional (any profile type); overrides which report
     #   section this profile's tests are grouped under. Defaults to each type's
-    #   standard section ("Qualifications", "Suites"/Test Results, or "Vertical")
-    #   when omitted. Keep this short (e.g. an abbreviation) since many profiles
+    #   standard section ("Qualifications", "Horizontals", or "Verticals") when
+    #   omitted. Keep this short (e.g. an abbreviation) since many profiles
     #   may each define their own section name.
 
   requirements:
@@ -61,8 +60,51 @@ Profiles are stored in `src/esq/configs/profiles/` in one of these sub-directori
 | Directory | Purpose |
 |-----------|---------|
 | `qualifications/` | Tests with KPI-based pass/fail criteria |
-| `suites/` | Data collection tests without KPI validation |
+| `horizontals/` | Horizontal tests: data collection without KPI validation (`type: "horizontal"`) |
 | `verticals/` | Industry-specific tests |
+
+### Profile Labels
+
+Each label under `params.labels` has one role. Labels are also attached to every test result, so the report reads them from there.
+
+```yaml
+params:
+  labels:
+    type: "horizontal"
+    profile_group_name: "Vision AI"
+    profile_display_name: "Vision AI - OpenVINO Benchmark"
+```
+
+**Report sections and grouping**
+
+| Label | Required | Role |
+|-------|----------|------|
+| `type` | Yes | Sets the default report section: `qualification` → **Qualifications**, `horizontal` → **Horizontals**, `vertical` → **Verticals**. |
+| `report_section` | No | Overrides the default section with a custom heading (for example, `HEC`). Works with any `type`. |
+| `profile_group_name` | Yes | Groups related profiles in the report and sets the group heading. Profiles that share the value appear together under one heading. |
+
+**Profile selection**
+
+| Label | Required | Role |
+|-------|----------|------|
+| `profile_display_name` | Yes | Names the individual profile in the `esq run --select` picker. Make it unique and describe what the profile runs, for example `"Vision AI - OpenVINO Benchmark"`. |
+| `hidden` | No | Hides the profile from interactive selection. It can still run with `--profile` or `--tag`. |
+| `tags` | No | Tags used to select profiles with `--tag`. |
+| `system_compatibility` | No | Qualification profiles only. Runs the CPU compatibility check before the profile and skips the profile on unsupported platforms. |
+
+**Report presentation**
+
+| Label | Default | Role |
+|-------|---------|------|
+| `display_reference` | `false` | Shows the reference column when set to `true`. It does not enable or disable KPI validation. |
+| `display_status` | `true` | Hides the status column when set to `false`. |
+| `display_id` | `false` | Shows the test ID column when set to `true`. |
+
+!!! note
+    - `profile_group_name` is required. A profile without it is reported under "unknown group". The old `group` label is no longer read.
+    - An existing installation keeps its previously built report UI. After updating, run `esq clean --thirdparty-only` once so the report UI is rebuilt and uses `profile_group_name`.
+    - `kpi_enabled` is informational. The framework does not read it today. KPI validation is controlled by `kpi_refs` and `kpi_override` on each test.
+    - Profiles do not need a top-level `display_name`. The picker and report use `profile_display_name` and `profile_group_name`.
 
 ---
 

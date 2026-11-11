@@ -1,14 +1,13 @@
 # Copyright (C) 2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-name: "profile.suite.system.network"
+name: "profile.horizontal.system.network"
 description: "System network related tests"
-version: "1.0.0"
 params:
   labels:
-    profile_display_name: "System Network"
-    group: "system.network"
-    type: "suite"
+    profile_group_name: "System Network"
+    profile_display_name: "System Network - Connectivity"
+    type: "horizontal"
     display_status: false
   requirements:
     # Hardware requirements

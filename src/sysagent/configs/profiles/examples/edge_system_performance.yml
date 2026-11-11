@@ -5,12 +5,11 @@
 
 name: "profile.example.system-performance"
 description: "System performance example for edge devices using sysbench tests."
-version: "1.0.0"
 params:
   labels:
+    profile_group_name: "System Performance Example"
     profile_display_name: "System Performance Example"
-    group: "example.docker"
-    type: "suite"
+    type: "horizontal"
   requirements:
     # Hardware requirements
     cpu_min_cores: 2

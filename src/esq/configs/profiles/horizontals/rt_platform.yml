@@ -1,14 +1,13 @@
 # Copyright (C) 2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-name: "profile.suite.realtime.platform"
+name: "profile.horizontal.realtime.platform"
 description: "Real-time platform capability detection and configuration checks"
-version: "1.0.0"
 params:
   labels:
-    profile_display_name: "Real-Time Platform"
-    group: "realtime.platform"
-    type: "suite"
+    profile_group_name: "Real-Time Platform"
+    profile_display_name: "Real-Time Platform - Capability Checks"
+    type: "horizontal"
     display_status: false
   requirements:
     # Hardware requirements

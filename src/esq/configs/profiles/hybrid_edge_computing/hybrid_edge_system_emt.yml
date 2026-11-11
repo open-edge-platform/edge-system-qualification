@@ -3,11 +3,10 @@
 
 name: "profile.qualification.hybrid-edge-system-emt"
 description: "Hybrid Edge Computing (HEC) system qualification - Edge Microvisor Toolkit (EMT)"
-version: "1.0.0"
 params:
   labels:
+    profile_group_name: "Hybrid Edge Computing - EMT"
     profile_display_name: "Hybrid Edge Computing - EMT"
-    group: "hybrid-edge-system-emt"
     type: "qualification"
     report_section: "HEC"
     display_reference: false
@@ -16,14 +15,14 @@ params:
     tags:
       - "hec-emt"
   depends_on:
-    - "profile.suite.system.cpu-sku"
-    - "profile.suite.system.display"
-    - "profile.suite.system.memory-health"
-    - "profile.suite.system.network"
-    - "profile.suite.system.peripheral"
-    - "profile.suite.system.stress"
-    - "profile.suite.virtualization.kvm"
-    - "profile.suite.virtualization.kvm-qemu"
+    - "profile.horizontal.system.cpu-sku"
+    - "profile.horizontal.system.display"
+    - "profile.horizontal.system.memory-health"
+    - "profile.horizontal.system.network"
+    - "profile.horizontal.system.peripheral"
+    - "profile.horizontal.system.stress"
+    - "profile.horizontal.virtualization.kvm"
+    - "profile.horizontal.virtualization.kvm-qemu"
   requirements:
     # Hardware requirements
     cpu_min_cores: 4

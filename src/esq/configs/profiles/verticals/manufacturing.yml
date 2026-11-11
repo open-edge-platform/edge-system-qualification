@@ -2,13 +2,11 @@
 # SPDX-License-Identifier: Apache-2.0
 
 name: "profile.vertical.manufacturing"
-display_name: "Manufacturing"
 description: "Manufacturing Suites"
-version: "1.0.0"
 params:
   labels:
-    profile_display_name: "Manufacturing"
-    group: "manufacturing"
+    profile_group_name: "Manufacturing"
+    profile_display_name: "Manufacturing - Pallet Defect and Weld Porosity"
     type: "vertical"
     display_status: false
   requirements:

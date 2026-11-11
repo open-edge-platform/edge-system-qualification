@@ -81,7 +81,7 @@ _CSV_FIELDS = [
 
 # Per-suite environment override — bypasses the ``isolcpus`` requirement for
 # development and CI where the kernel may not have RT isolation configured.
-# Example: ENV_SUITE_CPUFREQ_RT_CPU_IDS=2,3 esq run -p profile.suite.realtime.platform
+# Example: ENV_SUITE_CPUFREQ_RT_CPU_IDS=2,3 esq run -p profile.horizontal.realtime.platform
 _RT_CPU_IDS_ENV_VAR = "ENV_SUITE_CPUFREQ_RT_CPU_IDS"
 
 

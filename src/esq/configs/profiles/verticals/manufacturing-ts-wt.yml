@@ -2,13 +2,11 @@
 # SPDX-License-Identifier: Apache-2.0
 
 name: "profile.vertical.manufacturing.timeseries-wt"
-display_name: "Manufacturing Timeseries Wind Turbine"
 description: "Manufacturing Timeseries wind turbine reference application suite"
-version: "1.0.0"
 params:
   labels:
-    profile_display_name: "Manufacturing Timeseries Wind Turbine"
-    group: "manufacturing"
+    profile_group_name: "Manufacturing"
+    profile_display_name: "Manufacturing - Timeseries Wind Turbine"
     type: "vertical"
     display_status: false
   requirements:

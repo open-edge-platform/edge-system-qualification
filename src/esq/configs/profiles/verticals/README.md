@@ -8,7 +8,8 @@ name: "profile.vertical.retail"
 description: "Retail vertical workload benchmarking"
 params:
   labels:
-    profile_display_name: "Retail"
+    profile_group_name: "Retail"
+    profile_display_name: "Retail - Loss Prevention"
     type: "vertical"
 ```
 

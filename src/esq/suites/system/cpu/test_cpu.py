@@ -343,7 +343,7 @@ def test_cpu(
         )
 
         # Step 4: Determine which metrics are key for this test run.
-        # Priority: kpi_refs (qualification profiles) > key_metrics (suite profiles).
+        # Priority: kpi_refs (qualification profiles) > key_metrics (horizontal profiles).
         # Only the explicitly requested metrics are included in the result; all others
         # are omitted to keep reports concise when multiple CPU tests run together.
         kpi_refs_set = set(configs.get("kpi_refs", []))

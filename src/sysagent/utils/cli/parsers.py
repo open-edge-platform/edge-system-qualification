@@ -100,7 +100,7 @@ Run tests using one of the following patterns:
 USAGE PATTERNS:
   1. Run all profiles (default):
      {cli_name} run
-     • Runs all profile types (qualifications, suites, verticals)
+     • Runs all profile types (qualifications, horizontals, verticals)
      • Generic behavior - no prompts or filtering
 
   2. Run a specific profile:
@@ -125,8 +125,8 @@ USAGE PATTERNS:
 
 EXAMPLES:
   {cli_name} run                                      # All profiles (default)
-  {cli_name} run -p profile.suite.ai.vision           # Specific profile
-  {cli_name} run -p profile.suite.ai.vision --filter test_id=T0001  # Filtered test
+  {cli_name} run -p profile.horizontal.ai.vision           # Specific profile
+  {cli_name} run -p profile.horizontal.ai.vision --filter test_id=T0001  # Filtered test
   {cli_name} run --select                             # Pick profile(s) via checkbox
   {cli_name} run --profiles-file custom_profiles.yml  # Run from a saved template
 
@@ -138,7 +138,7 @@ For available profiles, use: {cli_name} list
     # Main execution options (grouped for clarity)
     execution_group = run_parser.add_argument_group("EXECUTION OPTIONS")
     execution_group.add_argument(
-        "--profile", "-p", metavar="PROFILE_NAME", help="Run a specific profile (e.g., profile.suite.ai-vision)"
+        "--profile", "-p", metavar="PROFILE_NAME", help="Run a specific profile (e.g., profile.horizontal.ai-vision)"
     )
     execution_group.add_argument(
         "--select",

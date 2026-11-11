@@ -1,14 +1,13 @@
 # Copyright (C) 2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-name: "profile.suite.realtime.performance"
+name: "profile.horizontal.realtime.performance"
 description: "Real-time wakeup latency measurement with cyclictest under stress load"
-version: "1.0.0"
 params:
   labels:
-    profile_display_name: "Real-Time Performance"
-    group: "realtime.performance"
-    type: "suite"
+    profile_group_name: "Real-Time Performance"
+    profile_display_name: "Real-Time Performance - Cyclictest Latency"
+    type: "horizontal"
     display_status: false
   requirements:
     memory_min_gib: 4.0

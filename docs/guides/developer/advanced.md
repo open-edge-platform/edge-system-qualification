@@ -19,8 +19,7 @@ This page covers recommended practices for test design, configuration, and secur
 
 1. **Define clear KPIs** — Set realistic thresholds based on measured baselines.
 2. **Use requirement flags** — Prefer built-in flags over custom validation logic. See [System Requirements](requirements.md).
-3. **Version profiles** — Include a `version` field in all profile YAML files.
-4. **Organize profiles** — Place in `qualifications/`, `suites/`, or `verticals/` as appropriate.
+3. **Organize profiles** — Place in `qualifications/`, `suites/`, or `verticals/` as appropriate.
 
 ### Error Handling
 
@@ -252,19 +251,19 @@ Framework-level settings use the `CORE_` prefix and apply to every run, not to a
 
 ```bash
 # Run cyclictest for 60 seconds instead of the profile default (24 h)
-ENV_SUITE_CYCLICTEST_DURATION=60s esq -v run --profile profile.suite.realtime.performance
+ENV_SUITE_CYCLICTEST_DURATION=60s esq -v run --profile profile.horizontal.realtime.performance
 
 # Try 10 attempts (instead of the default 5) for the network readiness check and downloads
-CORE_NETWORK_RETRY_ATTEMPTS=10 esq -v run --profile profile.suite.system.cpu-sku
+CORE_NETWORK_RETRY_ATTEMPTS=10 esq -v run --profile profile.horizontal.system.cpu-sku
 
 # Allow slow networks up to 15 seconds per host in the network readiness check
-CORE_NETWORK_TIMEOUT_SECONDS=15 esq -v run --profile profile.suite.system.cpu-sku
+CORE_NETWORK_TIMEOUT_SECONDS=15 esq -v run --profile profile.horizontal.system.cpu-sku
 
 # Fail fast: a single attempt, no retries
-CORE_NETWORK_RETRY_ATTEMPTS=1 esq -v run --profile profile.suite.system.cpu-sku
+CORE_NETWORK_RETRY_ATTEMPTS=1 esq -v run --profile profile.horizontal.system.cpu-sku
 
 # Keep index.html after report generation (refresh the browser to see the latest report)
-DEVELOPER_MODE=1 esq -v run --profile profile.suite.system.cpu-sku
+DEVELOPER_MODE=1 esq -v run --profile profile.horizontal.system.cpu-sku
 ```
 
 ### Priority rules

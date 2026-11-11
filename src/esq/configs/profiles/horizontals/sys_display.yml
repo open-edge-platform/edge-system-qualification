@@ -1,14 +1,13 @@
 # Copyright (C) 2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-name: "profile.suite.system.display"
+name: "profile.horizontal.system.display"
 description: "System display related tests"
-version: "1.0.0"
 params:
   labels:
-    profile_display_name: "System Display"
-    group: "system.display"
-    type: "suite"
+    profile_group_name: "System Display"
+    profile_display_name: "System Display - Connectivity"
+    type: "horizontal"
     display_status: false
   requirements:
     # Hardware requirements

@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 #
-# Video Analytics (VA) Suite Profile
+# Video Analytics (VA) Horizontal Profile
 #
 # Multi-stage video analytics pipelines with detection, tracking, and classification.
 # Supports heterogeneous compute modes (CPU/iGPU/dGPU/NPU combinations).
@@ -27,15 +27,14 @@
 #   - Mode 7: iGPU + NPU concurrent (GPU and NPU pipelines run simultaneously)
 #   - Mode 8: dGPU + NPU concurrent (GPU and NPU pipelines run simultaneously)
 
-name: "profile.suite.ai.vision-va"
+name: "profile.horizontal.ai.vision-va"
 description: "Video Analytics (VA) Suite - Multi-stage pipelines with detection, tracking, and classification"
-version: "1.1.0"
 
 params:
   labels:
-    profile_display_name: "Vision AI"
-    group: "ai.vision"
-    type: "suite"
+    profile_group_name: "Vision AI"
+    profile_display_name: "Vision AI - Video Analytics Pipelines"
+    type: "horizontal"
     display_status: false
   
   requirements:

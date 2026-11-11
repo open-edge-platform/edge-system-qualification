@@ -8,9 +8,10 @@ name: "profile.qualification.ai-edge-system"
 description: "AI Edge System qualification profile"
 params:
   labels:
+    profile_group_name: "AI Edge System"
     profile_display_name: "AI Edge System"
     type: "qualification"
     kpi_enabled: true
 ```
 
-For profiles without KPI validation, see the `suites` folder. 
+For profiles without KPI validation, see the `horizontals` folder. 

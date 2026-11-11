@@ -1,14 +1,13 @@
 # Copyright (C) 2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-name: "profile.suite.system.memory-stream"
+name: "profile.horizontal.system.memory-stream"
 description: "System Memory Performance suite using STREAM benchmark"
-version: "1.0.0"
 params:
   labels:
-    profile_display_name: "System Memory"
-    group: "system.memory"
-    type: "suite"
+    profile_group_name: "System Memory"
+    profile_display_name: "System Memory - STREAM Benchmark"
+    type: "horizontal"
     display_status: false
   requirements:
     # Hardware requirements

@@ -1,14 +1,13 @@
 # Copyright (C) 2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-name: "profile.suite.ai.vision-ov"
+name: "profile.horizontal.ai.vision-ov"
 description: "OpenVINO Benchmark Suite - Measures raw inference performance using OpenVINO Runtime API"
-version: "1.0.0"
 params:
   labels:
-    profile_display_name: "Vision AI"
-    group: "ai.vision"
-    type: "suite"
+    profile_group_name: "Vision AI"
+    profile_display_name: "Vision AI - OpenVINO Benchmark"
+    type: "horizontal"
     display_status: false
   requirements:
     # Hardware requirements

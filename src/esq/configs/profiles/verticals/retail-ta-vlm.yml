@@ -11,8 +11,6 @@ params:
     type: "vertical"
     display_status: false
   requirements:
-    memory_min_gib: 16.0
-    storage_min_gib: 30.0
     os_type:
       - "linux"
     docker_required: true
@@ -69,6 +67,9 @@ suites:
                 benchmark_duration: 200
                 benchmark_init_duration: 10
                 commit_id: "65d1959"  # Order Accuracy repository commit (tag release v2026.2.3) to checkout
+                requirements:
+                  memory_min_gib: 16.0
+                  storage_min_gib: 50.0
 
               # iGPU fixed-workers benchmark
               - test_id: "TAO-BNK-002"
@@ -80,6 +81,8 @@ suites:
                 benchmark_init_duration: 10
                 commit_id: "65d1959"  # Order Accuracy repository commit (tag release v2026.2.3) to checkout
                 requirements:
+                  memory_min_gib: 16.0
+                  storage_min_gib: 50.0
                   igpu_required: true
 
               # dGPU fixed-workers benchmark
@@ -92,5 +95,7 @@ suites:
                 benchmark_init_duration: 10
                 commit_id: "65d1959"  # Order Accuracy repository commit (tag release v2026.2.3) to checkout
                 requirements:
+                  memory_min_gib: 16.0
+                  storage_min_gib: 50.0
                   dgpu_required: true
 

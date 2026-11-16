@@ -1,0 +1,92 @@
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+name: "profile.vertical.federal-and-aerospace"
+description: "Federal and Aerospace Suites"
+params:
+  labels:
+    profile_group_name: "Federal and Aerospace"
+    profile_display_name: "Federal and Aerospace"
+    type: "vertical"
+    display_status: false
+  depends_on:
+    - "profile.horizontal.ai.audio-whisper"
+    - "profile.horizontal.ai.gen-llm"
+    - "profile.horizontal.ai.vision-light"
+    - "profile.horizontal.ai.vision-ov"
+    - "profile.horizontal.ai.vision-va"
+    - "profile.horizontal.media.performance-pipelines"
+    - "profile.horizontal.system.memory-stream"
+  requirements:
+    # Hardware requirements
+    cpu_min_cores: 4
+    memory_min_gib: 8.0
+    storage_total_min_gib: 64.0
+    storage_min_gib: 15.0  # Free storage for test execution
+    # Software requirements
+    os_type:
+      - "linux"
+    docker_required: true
+  # Telemetry configuration
+  telemetry:
+    enabled: true
+    interval: 10  # seconds between samples
+    modules:
+      # Title, scales, thresholds and axes are defined as defaults within each module.
+      # Only specify these here to override the module defaults.
+      # --- sysagent core modules ---
+      - name: cpu_usage
+        enabled: true
+
+      - name: cpu_freq
+        enabled: true
+
+      - name: cpu_temp
+        enabled: true
+
+      - name: memory_usage
+        enabled: true
+
+      # --- ESQ package modules ---
+      - name: package_power
+        enabled: true
+
+      - name: gpu_temp
+        enabled: true
+
+      - name: gpu_freq
+        enabled: true
+
+      - name: gpu_power
+        enabled: true
+
+      - name: gpu_usage
+        enabled: true
+
+      - name: npu_usage
+        enabled: true
+
+      - name: npu_freq
+        enabled: true
+
+
+suites:
+  - name: "system"
+    sub_suites:
+      - name: "cpu"
+        tests:
+          test_cpu:
+            params:
+              - test_id: "FAE-CPU-001"
+                display_name: "CPU Compatibility"
+                description: |
+                  Checks that the processor is a qualified Federal and
+                  Aerospace platform.
+                timeout: 60
+                key_metrics:
+                  - cpu_compatibility
+                # Accepted platforms:
+                #   - Core Ultra (Series 3) → Panther Lake (PTL)
+                exact_generations:
+                  - generation: "Core Ultra (Series 3)"
+                    codename: "Panther Lake"

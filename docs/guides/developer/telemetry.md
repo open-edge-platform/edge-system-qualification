@@ -46,6 +46,12 @@ To disable telemetry, remove the block or set `enabled: false`.
 
 ---
 
+## Platform-Level External Telemetry
+
+For `module_group: external`, ESQ manages the official Metrics Manager slim image (`intel/metrics-manager:2026.2.0`) and reads platform metrics from its API, bound to `127.0.0.1:19090`. This integration does not change modular `module_group: sysfs` telemetry.
+
+---
+
 ## Per-Module Keys
 
 | Key | Description |

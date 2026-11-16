@@ -32,6 +32,8 @@ params:
     # block is most useful when multiple devices contribute to the result.
     # Disable it here to keep the Allure summary minimal.
     kpi_correlation: false
+    # module_group: external uses the Metrics Manager Docker container as
+    # primary backend (see docs/getting-started/telemetry/).
     module_group: external
     modules:
       - name: platform_telemetry

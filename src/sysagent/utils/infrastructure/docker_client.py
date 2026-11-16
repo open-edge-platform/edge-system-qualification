@@ -786,6 +786,8 @@ class DockerClient:
         attach_logs: bool = True,  # Whether to attach container logs to Allure report
         privileged: bool = False,  # Run container in privileged mode
         ipc_mode: str = None,  # IPC mode (e.g., "host")
+        pid_mode: str = None,  # PID namespace mode (e.g., "host")
+        security_opt: list[str] | None = None,  # Security options (e.g., ["apparmor:unconfined"])
     ):
         """
         Run a Docker container with specified configuration.
@@ -817,6 +819,8 @@ class DockerClient:
             attach_logs: Whether to attach container logs to Allure report
             privileged: Run container in privileged mode
             ipc_mode: IPC mode (e.g., "host" for shared memory)
+            pid_mode: PID namespace mode (e.g., "host" to share the host PID namespace)
+            security_opt: Security options (e.g., ["apparmor:unconfined"])
 
         Returns:
             For batch mode: dict with container_logs_text, result_text, result_json, container_info
@@ -908,6 +912,8 @@ class DockerClient:
                 ports=ports,
                 privileged=privileged,
                 ipc_mode=ipc_mode,
+                pid_mode=pid_mode,
+                security_opt=security_opt,
             )
             logger.debug(f"Container {container.name} with mode {mode} started successfully")
 

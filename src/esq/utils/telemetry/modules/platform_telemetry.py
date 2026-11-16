@@ -2,19 +2,17 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-Framework-level system telemetry module (scaffold).
+Framework-level system telemetry module.
 
 This module is the ESQ integration point for provider-orchestrated telemetry
-collection. The active backend is the telecollect collector; the provider
-registry is structured so additional backends can be added later by
-implementing ``BaseFrameworkTelemetryProvider`` and listing them in the
-profile YAML ``provider_order``.
+collection. Metrics Manager supplies supported metrics and device
+capabilities. A supplemental in-process provider supplies only CPU package
+power, CPU/system bandwidth, GPU memory utilization, and GPU temperature.
 
-Phase-1 behavior:
+Behavior:
 - Accept and expose module-specific options from profile YAML.
-- Resolve provider scaffolding and compose metadata.
+- Resolve the active provider and compose metadata.
 - Accept target_device hint (auto/cpu/igpu/dgpu/npu) for provider filtering.
-- Publish scaffold placeholder samples until full provider execution is implemented.
 """
 
 from __future__ import annotations
@@ -25,19 +23,19 @@ import time
 from typing import Any, Dict
 
 from sysagent.utils.telemetry.base import BaseTelemetryModule, TelemetryConfig, TelemetrySample
-from sysagent.utils.system.cache import SystemInfoCache
-from sysagent.utils.system.ov_helper import get_openvino_gpu_devices, get_openvino_npu_devices
 
 from esq.utils.telemetry.providers import get_provider
+from esq.utils.telemetry.providers.metrics_manager.device_inventory import (
+    gpu_groups_by_pci_bdf,
+)
 
 logger = logging.getLogger(__name__)
 
 
 class PlatformTelemetryModule(BaseTelemetryModule):
-    """Scaffold module for framework-level telemetry orchestration."""
+    """External telemetry adapter for Metrics Manager and gap-only supplements."""
 
     module_name = "platform_telemetry"
-    _PLACEHOLDER_METRIC = "scaffold_placeholder"
 
     _GROUP_RULES = {
         "cpu": lambda k: "cpu_" in k,
@@ -49,7 +47,7 @@ class PlatformTelemetryModule(BaseTelemetryModule):
     # Device order and per-section metric layout. ``System`` holds
     # host-level metrics (system memory, thermals, chassis power).
     _DEVICE_ORDER = ["System", "CPU", "iGPU", "dGPU", "NPU"]
-    _TELECOLECT_DEVICE_METRICS = {
+    _PLATFORM_DEVICE_METRICS = {
         "System": [
             ("system.memory_utilization", "%"),
             ("system.power_w", "W"),
@@ -128,12 +126,12 @@ class PlatformTelemetryModule(BaseTelemetryModule):
     def __init__(self, config: TelemetryConfig) -> None:
         super().__init__(config)
         self.options: Dict[str, Any] = dict(config.options or {})
-        # provider_order lists the active backend(s); platform_telemetry is
-        # the only registered backend
+        # Metrics Manager owns all supported external telemetry. The
+        # supplemental provider supplies only fields not yet exposed there.
         self.provider_order = list(
             self.options.get(
                 "provider_order",
-                ["platform_telemetry"],
+                ["metrics_manager", "additional_metrics"],
             )
         )
         self.target_device = self._parse_target_device(self.options.get("target_device", "auto"))
@@ -149,6 +147,7 @@ class PlatformTelemetryModule(BaseTelemetryModule):
         self._provider_instances = []
         self._active_provider = None
         self._active_provider_contributors: list[str] = []
+        self._device_inventory: list[Dict[str, Any]] = []
 
         for provider_name in self.provider_order:
             provider = get_provider(provider_name, self.options)
@@ -556,10 +555,8 @@ class PlatformTelemetryModule(BaseTelemetryModule):
             return grouped_metrics
 
         expected_devices = self._get_platform_expected_devices()
-        has_igpu_slot = "iGPU" in expected_devices
         expected_dgpu_slots = [d for d in expected_devices if d == "dGPU" or d.startswith("dGPU[")]
 
-        has_igpu = "iGPU" in grouped_metrics
         has_dgpu = any(k == "dGPU" or k.startswith("dGPU[") for k in grouped_metrics.keys())
 
         def _dgpu_label(slot_index: int) -> str:
@@ -601,80 +598,26 @@ class PlatformTelemetryModule(BaseTelemetryModule):
 
         return grouped_metrics
 
-    @staticmethod
-    def _classify_openvino_device(device: Dict[str, Any]) -> str:
-        """Classify OpenVINO device entry into igpu/dgpu/npu/unknown."""
-        quick = device.get("quick_access", {}) or {}
-        device_type = str(quick.get("device_type") or device.get("device_type") or "").lower()
-        full_name = str(quick.get("full_device_name") or device.get("full_device_name") or "").lower()
-        device_name = str(device.get("device_name") or "").lower()
+    def _refresh_device_inventory(self) -> None:
+        inventory: list[Dict[str, Any]] = []
+        for provider in self._provider_instances:
+            if provider.name == "metrics_manager":
+                inventory = provider.get_device_inventory()
+                break
 
-        text = " ".join([device_type, full_name, device_name])
-        if "npu" in text or "ai boost" in text:
-            return "npu"
-        if "integrated" in text or "(igpu)" in text or " igpu" in text:
-            return "igpu"
-        if "discrete" in text or "(dgpu)" in text or " dgpu" in text:
-            return "dgpu"
-        return "unknown"
+        self._device_inventory = inventory
+        for provider in self._provider_instances:
+            provider.set_device_inventory(inventory)
 
     def _get_platform_expected_devices(self) -> list[str]:
-        """Return device list driven by platform-supported hardware/OpenVINO info."""
+        """Return device layout from the Metrics Manager expanded inventory."""
         expected: list[str] = ["System", "CPU"]
-        igpu_count = 0
-        dgpu_count = 0
-        npu_count = 0
-
-        try:
-            hw = SystemInfoCache().get_hardware_info() or {}
-            gpu_devices = ((hw.get("gpu") or {}).get("devices") or [])
-            npu_devices = ((hw.get("npu") or {}).get("devices") or [])
-
-            for dev in gpu_devices:
-                ov = (dev.get("openvino") or {}).copy()
-                ov.setdefault("device_name", dev.get("device_name", ""))
-                kind = self._classify_openvino_device(ov)
-                if kind == "igpu":
-                    igpu_count += 1
-                elif kind == "dgpu":
-                    dgpu_count += 1
-
-            npu_count += len(npu_devices)
-        except Exception as exc:
-            logger.debug("[%s] hardware cache device detection failed: %s", self.module_name, exc)
-
-        # Fallback to direct OpenVINO query when cache is incomplete.
-        try:
-            if igpu_count == 0 and dgpu_count == 0:
-                for dev in get_openvino_gpu_devices():
-                    kind = self._classify_openvino_device(dev)
-                    if kind == "igpu":
-                        igpu_count += 1
-                    elif kind == "dgpu":
-                        dgpu_count += 1
-                    else:
-                        # Unknown GPU kind defaults to discrete bucket.
-                        dgpu_count += 1
-        except Exception as exc:
-            logger.debug("[%s] OpenVINO GPU detection fallback failed: %s", self.module_name, exc)
-
-        try:
-            if npu_count == 0:
-                npu_count = len(get_openvino_npu_devices())
-        except Exception as exc:
-            logger.debug("[%s] OpenVINO NPU detection fallback failed: %s", self.module_name, exc)
-
-        if igpu_count > 0:
-            expected.append("iGPU")
-
-        if dgpu_count <= 1:
-            if dgpu_count == 1:
-                expected.append("dGPU")
-        else:
-            for idx in range(dgpu_count):
-                expected.append(f"dGPU[{idx}]")
-
-        if npu_count > 0:
+        gpu_groups = gpu_groups_by_pci_bdf(self._device_inventory)
+        expected.extend(dict.fromkeys(gpu_groups.values()))
+        if any(
+            device.get("present") and str(device.get("category") or "").lower() == "npu"
+            for device in self._device_inventory
+        ):
             expected.append("NPU")
 
         return expected
@@ -698,25 +641,18 @@ class PlatformTelemetryModule(BaseTelemetryModule):
     def get_default_config(self) -> Dict[str, Any]:
         return {
             "chart_type": "line",
-            "title": {"display": True, "text": "Framework System Telemetry (Scaffold)"},
-            "scales": {
-                self._PLACEHOLDER_METRIC: {
-                    "display": True,
-                    "label": "Scaffold Placeholder",
-                    "unit": "state",
-                }
-            },
+            "title": {"display": True, "text": "Framework System Telemetry"},
+            "scales": {},
         }
 
     def is_available(self) -> bool:
-        # Keep this module loadable while it is still scaffolded so profile
-        # validation and plumbing can be exercised end-to-end.
         return True
 
     def collect_sample(self) -> TelemetrySample:
         merged_values: Dict[str, Any] = {}
         active_provider = None
         contributors: list[str] = []
+        self._refresh_device_inventory()
 
         for provider in self._iter_provider_candidates():
             try:
@@ -772,30 +708,25 @@ class PlatformTelemetryModule(BaseTelemetryModule):
             )
             return TelemetrySample(timestamp=time.time(), values=merged_values)
 
-        # Scaffold fallback path when provider metrics are not available yet.
         self._active_provider_contributors = []
         if self._provider_instances:
-            logger.debug(
-                "[%s] providers discovered (scaffold fallback, target_device=%s): %s",
+            logger.warning(
+                "[%s] no external telemetry values collected (target_device=%s, providers=%s)",
                 self.module_name,
                 self.target_devices or self.target_device,
                 [p.name for p in self._provider_instances],
             )
-        return TelemetrySample(
-            timestamp=time.time(),
-            values={
-                self._PLACEHOLDER_METRIC: 0,
-            },
-        )
+        return TelemetrySample(timestamp=time.time(), values={})
 
     def close(self) -> None:
         """Tear down every provider this module instantiated.
 
         Idempotent: each provider is closed at most once, and exceptions
         are swallowed per-provider so one stuck teardown cannot block the
-        rest.  After this call, every external resource (qmmd daemon,
-        in-process collector threads) owned by ``platform_telemetry`` is
-        released.
+        rest.         The supplemental in-process collector threads are stopped here;
+        the ``metrics_manager`` Docker container is a process-wide
+        singleton reused across tests and is intentionally NOT stopped by
+        this per-test call — it is stopped exactly once at process exit.
         """
         for provider in self._provider_instances:
             try:
@@ -815,21 +746,15 @@ class PlatformTelemetryModule(BaseTelemetryModule):
         summary = super().get_summary()
         config = dict(summary.get("configs") or {})
 
-        # When real provider metrics exist, replace scaffold chart config so
-        # report renderers do not keep plotting the placeholder-only layout.
-        metric_keys = [k for k in (summary.get("averages") or {}).keys() if k != self._PLACEHOLDER_METRIC]
+        metric_keys = list((summary.get("averages") or {}).keys())
         if not metric_keys:
-            # Fallback to sample values in case averages are empty for short runs.
             for sample in summary.get("samples") or []:
                 values = sample.get("values") or {}
-                for key in values.keys():
-                    if key != self._PLACEHOLDER_METRIC:
-                        metric_keys.append(key)
+                metric_keys.extend(values.keys())
             metric_keys = sorted(set(metric_keys))
 
         if metric_keys:
             scales = dict(config.get("scales") or {})
-            scales.pop(self._PLACEHOLDER_METRIC, None)
             for key in metric_keys:
                 scales.setdefault(
                     key,
@@ -1005,7 +930,7 @@ class PlatformTelemetryModule(BaseTelemetryModule):
                     continue
 
                 expected_metric_group = "dGPU" if expected_device.startswith("dGPU[") else expected_device
-                expected_rows = list(self._TELECOLECT_DEVICE_METRICS.get(expected_metric_group, []))
+                expected_rows = list(self._PLATFORM_DEVICE_METRICS.get(expected_metric_group, []))
                 expected_scales = {
                     metric_name: {
                         "display": True,
@@ -1039,8 +964,7 @@ class PlatformTelemetryModule(BaseTelemetryModule):
 
         if virtual_modules:
             # Re-order so device sections always follow ``_DEVICE_ORDER``
-            # (System, CPU, iGPU, dGPU, NPU) regardless of which were
-            # populated by provider samples vs. added by the fallback loop.
+            # (System, CPU, iGPU, dGPU, NPU), including expected empty sections.
             virtual_modules = {
                 k: virtual_modules[k]
                 for k in sorted(
@@ -1063,13 +987,8 @@ class PlatformTelemetryModule(BaseTelemetryModule):
                 provider_status.append({"name": provider.name, "health": False, "error": str(exc)})
         summary.update(
             {
-                "status": "active" if active_provider_name and metric_keys else "scaffold",
-                "placeholder_message": (
-                    "platform_telemetry loaded successfully, but external provider runtime "
-                    "collection is not implemented yet."
-                    if not metric_keys
-                    else ""
-                ),
+                "status": "active" if active_provider_name and metric_keys else "unavailable",
+                "placeholder_message": "No external telemetry values were collected." if not metric_keys else "",
                 "provider_order": list(self.provider_order),
                 "providers_discovered": [provider.name for provider in self._provider_instances],
                 "provider_status": provider_status,

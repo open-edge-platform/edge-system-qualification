@@ -26,7 +26,7 @@ Serves a large language model (LLM) with OpenVINO™ Model Server (OVMS) and mea
 | `devices` | `[]` | Device categories to test |
 | `test_num_prompts`, `test_request_rate`, `test_max_concurrent_requests` | `5`, `1`, `1` | Number of prompts, requests per second, and concurrent requests |
 | `rest_workers` | `2` | OVMS REST worker threads. Kept low because a large value can exceed the open files limit on systems with many cores. |
-| `ovms_container_image` | `openvino/model_server:2026.2.1-gpu` | Model server image |
+| `ovms_container_image` | `openvino/model_server:2026.4.1-gpu` | Model server image |
 | `hf_dataset_repo`, `ms_dataset_repo`, `dataset_filename` | ShareGPT V3 | Dataset source on Hugging Face or ModelScope |
 | `timeout`, `server_timeout`, `benchmark_timeout`, `export_timeout`, `download_timeout` | `300`, `600`, `600`, `1800`, `18000` | Time limits in seconds |
 | `kpi_refs`, `kpi_override`, `kpi_validation_mode`, `tiers` | `[]`, unset, `all`, unset | KPI validation and qualification tiers |

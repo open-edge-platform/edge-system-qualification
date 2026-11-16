@@ -71,7 +71,7 @@ def test_text_generation(
     dataset_filename = configs.get("dataset_filename", "ShareGPT_V3_unfiltered_cleaned_split.json")
     docker_image_tag = f"{configs.get('container_image_name', 'genai-ovms')}:{configs.get('container_tag', 'latest')}"
     benchmark_docker_base_image = f"{configs.get('benchmark_container_image', 'vllm/vllm-openai-cpu:v0.31.0')}"
-    ovms_docker_base_image = configs.get("ovms_container_image", "openvino/model_server:2026.2.1-gpu")
+    ovms_docker_base_image = configs.get("ovms_container_image", "openvino/model_server:2026.4.1-gpu")
 
     # Setup
     test_dir = os.path.dirname(os.path.abspath(__file__))

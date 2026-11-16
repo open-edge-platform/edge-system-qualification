@@ -1,7 +1,7 @@
 # Copyright (C) 2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-FROM openvino/model_server:2026.2.1-gpu
+FROM openvino/model_server:2026.4.1-gpu
 
 USER root
 RUN apt-get update \

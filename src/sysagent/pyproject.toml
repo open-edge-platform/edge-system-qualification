@@ -34,7 +34,7 @@ dependencies = [
     "psutil>=7.0.0",
     "py-cpuinfo>=9.0.0",
     "requests>=2.33.1",
-    "openvino>=2025.2.0",
+    "openvino>=2026.4.1",
 ]
 
 [project.scripts]

@@ -58,7 +58,7 @@ The time to first token follows the name and unit of `gen_ai.server.time_to_firs
 |-----------|---------|-------------|
 | `model_id` | required | Hugging Face model ID |
 | `model_precision`, `quantization_params` | unset | Export and quantize `model_id` (for example `int4`). Unset means `model_id` is a pre-quantized OpenVINO model. |
-| `ovms_container_image` | `openvino/model_server:2026.3.1-gpu` | Model server image |
+| `ovms_container_image` | `openvino/model_server:2026.4.1-gpu` | Model server image |
 | `cache_size`, `max_num_seqs`, `max_num_batched_tokens`, `enable_prefix_caching`, `plugin_config` | `4`, `4`, `8192`, `true`, `{}` | Serving graph settings (`VLM_CB` pipeline) |
 | `rest_workers`, `max_rest_workers` | unset, unset | OVMS REST worker threads. Unset uses the OVMS default of one per CPU core. `max_rest_workers` caps it on systems with many cores, see [REST Workers](#rest-workers-and-max_num_seqs). |
 | `system_prompt`, `prompt`, `prompt_params` | required `prompt` | Prompt text. `${NAME}` is filled from `prompt_params`, `${NUM_FRAMES}` with the number of images in the request. |
@@ -82,7 +82,7 @@ The profiles take their ingredients from the official OEP release `2026.2.1`, wh
 | Ingredient | Take-Away (`retail-oa-ta.yml`) | Dine-In (`retail-oa-di.yml`) |
 |------------|--------------------------------|------------------------------|
 | Model | `openbmb/MiniCPM-V-4_5`, INT4 asymmetric, group size 128 (as `setup_models.sh`) | Same, shared export |
-| Serving | OVMS `2026.3.1-gpu`, `VLM_CB`, cache 4 GB, 4 sequences, 8192 batched tokens | Same |
+| Serving | OVMS `2026.4.1-gpu` (upstream order-accuracy app defaults to `2026.3.1-gpu`), `VLM_CB`, cache 4 GB, 4 sequences, 8192 batched tokens | Same |
 | Prompt | Order-aware prompt with inventory and expected items, plus system prompt | Generic template with inventory, JSON `response_format`, no system prompt |
 | Media | Sample video, 3 frames per request | 4 plate images, 1 per request |
 | Generation | 100 tokens, temperature 0.2, thinking disabled | 96 tokens, temperature 0.0 |

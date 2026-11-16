@@ -31,6 +31,8 @@ params:
     # GPU frequency-measurement runs surface per-device frequency curves
     # — the KPI cost block is not meaningful for a frequency probe.
     kpi_correlation: false
+    # module_group: external uses the Metrics Manager Docker container as
+    # primary backend (see docs/getting-started/telemetry/).
     module_group: external
     modules:
       - name: platform_telemetry

@@ -32,6 +32,8 @@ params:
     # cost-per-inference block enabled so the Allure report shows
     # per-device resource attribution.
     kpi_correlation: true
+    # module_group: external uses the Metrics Manager Docker container as
+    # primary backend (see docs/getting-started/telemetry/).
     module_group: external
     modules:
       - name: platform_telemetry

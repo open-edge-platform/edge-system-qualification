@@ -1,11 +1,12 @@
 # Copyright (C) 2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 
-"""Process-wide cleanup orchestrator for platform_telemetry.
+"""Process-wide cleanup orchestrator for framework-level telemetry providers.
 
-Guarantees that **every** runtime artefact this package starts (qmmd
-daemon, in-process collector threads) is reaped before the Python
-interpreter exits, regardless of how the test session terminates:
+Guarantees that **every** runtime artefact these providers start (the
+Metrics Manager Docker container, in-process collector threads) is reaped
+before the Python interpreter exits, regardless of how the test session
+terminates:
 
 * Normal completion (pytest finishes) — handled by
   ``TelemetryCollector.stop()`` calling ``module.close()``.
@@ -16,7 +17,9 @@ interpreter exits, regardless of how the test session terminates:
 The hook is registered once per process on first import.  Cleanup
 callbacks register themselves with :func:`register` and run in LIFO
 order so resources are torn down in the reverse order they were
-created (typical safe ordering for nested daemons).
+created (typical safe ordering for nested daemons). This module lives
+under ``platform_telemetry`` for historical reasons but is generic and is
+also used by the ``metrics_manager`` provider package.
 """
 
 from __future__ import annotations

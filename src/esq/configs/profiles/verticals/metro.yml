@@ -37,6 +37,8 @@ params:
     # Metro proxy pipelines use iGPU + dGPU — the KPI cost-per-fps block
     # highlights which device dominates the power budget per stream.
     kpi_correlation: true
+    # module_group: external uses the Metrics Manager Docker container as
+    # primary backend (see docs/getting-started/telemetry/).
     module_group: external
     modules:
       - name: platform_telemetry

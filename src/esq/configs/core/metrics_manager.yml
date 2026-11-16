@@ -1,0 +1,72 @@
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+version: "1.0"
+
+# Open Edge Platform "Metrics Manager" integration settings.
+#
+# Consumed by esq.utils.telemetry.providers.metrics_manager (the
+# `module_group: external` / `platform_telemetry` provider). The image is
+# always pulled from the official Docker Hub release — never built from
+# source. See: https://hub.docker.com/r/intel/metrics-manager
+docker:
+  # Official slim release; ESQ consumes its telemetry API and expanded device
+  # inventory but does not use software functional capability values.
+  image: "intel/metrics-manager"
+  tag: "2026.2.0"
+  container_name: "esq-metrics-manager"
+
+  # Host ports are bound to 127.0.0.1; Metrics Manager's internal ports stay
+  # fixed at 9090, 9273, and 8186. These alternate host ports avoid common
+  # conflicts with other OEP services.
+  ports:
+    api: 19090 # Metrics Manager REST/SSE API
+    telegraf_prometheus: 19273
+    telegraf_http: 18186
+
+  environment:
+    HARDWARE_TELEMETRY_ENABLED: "true"
+    METRICS_RETENTION_SECONDS: "300"
+    MAX_METRICS_BATCH_SIZE: "1000"
+    LOG_LEVEL: "INFO"
+
+  # Host paths bind-mounted read-only for hardware telemetry discovery.
+  volumes:
+    - host: "/sys"
+      container: "/sys"
+      mode: "ro"
+    - host: "/run"
+      container: "/run"
+      mode: "ro"
+
+  devices:
+    - "/dev/dri:/dev/dri"
+
+  # Host "render" group auto-detected via grp.getgrnam(render_group_name);
+  # render_group_gid_fallback is only used if that lookup fails.
+  render_group_name: "render"
+  render_group_gid_fallback: 109
+
+  privileged: false
+  pid_mode: null
+  # qmassa needs performance-monitoring access; retain Docker's default
+  # capability set and add only PERFMON for GPU/NPU telemetry.
+  cap_add:
+    - "PERFMON"
+  security_opt:
+    - "no-new-privileges:true"
+
+  # Startup / health-check behavior.
+  health:
+    endpoint: "/health"
+    timeout_s: 60
+    poll_interval_s: 1.0
+
+  pull:
+    timeout_s: 600
+
+# API paths consumed by MetricsManagerProvider.
+api:
+  latest_metrics_path: "/api/v1/metrics/latest"
+  capabilities_path: "/api/v1/capabilities"
+  health_path: "/health"

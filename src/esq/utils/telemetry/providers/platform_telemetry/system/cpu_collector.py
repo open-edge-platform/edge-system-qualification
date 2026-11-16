@@ -4,11 +4,8 @@
 from __future__ import annotations
 
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import List
-
-import psutil
 
 from esq.utils.telemetry.providers.platform_telemetry.base import BaseCollector
 from esq.utils.telemetry.providers.platform_telemetry.models import MetricSample
@@ -30,47 +27,14 @@ class CpuCollector(BaseCollector):
     def stop(self) -> None:
         self._running = False
 
-    def collect_once(self) -> List[MetricSample]:
+    def collect_once(self) -> list[MetricSample]:
         if not self._running:
             return []
 
-        now = datetime.utcnow().isoformat() + "Z"
-        usage = psutil.cpu_percent(interval=None)
-        freq = psutil.cpu_freq()
-        current_freq = float(freq.current) if freq else 0.0
-        mem = psutil.virtual_memory()
-        memory_util = float(mem.percent)
+        now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
         power_w, power_origin = self._read_cpu_package_power_w()
-        temp_c, temp_origin = self._read_cpu_temperature_c()
         bandwidth_mb_s, bandwidth_origin = self._read_cpu_bandwidth_mb_s()
         return [
-            MetricSample(
-                timestamp_utc=now,
-                collector=self.name,
-                device="CPU",
-                metric_name="cpu.utilization",
-                value=float(usage),
-                unit="%",
-                tags={"vendor": "generic", "platform": "x86"},
-            ),
-            MetricSample(
-                timestamp_utc=now,
-                collector=self.name,
-                device="CPU",
-                metric_name="cpu.frequency_mhz",
-                value=current_freq,
-                unit="MHz",
-                tags={"vendor": "generic", "platform": "x86"},
-            ),
-            MetricSample(
-                timestamp_utc=now,
-                collector=self.name,
-                device="CPU",
-                metric_name="cpu.memory_utilization",
-                value=memory_util,
-                unit="%",
-                tags={"vendor": "generic", "platform": "x86"},
-            ),
             MetricSample(
                 timestamp_utc=now,
                 collector=self.name,
@@ -82,19 +46,6 @@ class CpuCollector(BaseCollector):
                     "vendor": "generic",
                     "platform": "x86",
                     "metric_origin": power_origin,
-                },
-            ),
-            MetricSample(
-                timestamp_utc=now,
-                collector=self.name,
-                device="CPU",
-                metric_name="cpu.temperature_c",
-                value=temp_c,
-                unit="°C",
-                tags={
-                    "vendor": "generic",
-                    "platform": "x86",
-                    "metric_origin": temp_origin,
                 },
             ),
             MetricSample(
@@ -160,96 +111,6 @@ class CpuCollector(BaseCollector):
         # pgpgin/pgpgout are reported in KB since boot.
         mb_s = (delta_kb / 1024.0) / delta_s
         return max(0.0, float(mb_s)), "proc_vmstat_pgpg_io_approx"
-
-    @staticmethod
-    def _read_cpu_temperature_c() -> tuple[float, str]:
-        permission_denied = False
-
-        # Prefer package/CPU thermal zones when available.
-        thermal_root = Path("/sys/class/thermal")
-        if thermal_root.exists():
-            for zone in sorted(thermal_root.glob("thermal_zone*")):
-                type_path = zone / "type"
-                temp_path = zone / "temp"
-                if not temp_path.exists():
-                    continue
-
-                try:
-                    zone_type = type_path.read_text(encoding="utf-8").strip().lower()
-                except PermissionError:
-                    permission_denied = True
-                    continue
-                except OSError:
-                    continue
-
-                if not any(token in zone_type for token in ("x86_pkg_temp", "package", "cpu", "soc")):
-                    continue
-
-                try:
-                    raw = float(temp_path.read_text(encoding="utf-8").strip())
-                    return max(0.0, raw / 1000.0), "sysfs_thermal_zone"
-                except PermissionError:
-                    permission_denied = True
-                except (OSError, ValueError):
-                    continue
-
-        # Fall back to hwmon package/core temperatures.
-        hwmon_root = Path("/sys/class/hwmon")
-        if hwmon_root.exists():
-            for hw in sorted(hwmon_root.glob("hwmon*")):
-                name = ""
-                try:
-                    name = (hw / "name").read_text(encoding="utf-8").strip().lower()
-                except PermissionError:
-                    permission_denied = True
-                    continue
-                except OSError:
-                    continue
-
-                if name and name not in {"coretemp", "k10temp", "zenpower", "cpu_thermal", "soc_thermal"}:
-                    continue
-
-                for temp_file in sorted(hw.glob("temp*_input")):
-                    try:
-                        raw = float(temp_file.read_text(encoding="utf-8").strip())
-                        return max(0.0, raw / 1000.0), "sysfs_hwmon"
-                    except PermissionError:
-                        permission_denied = True
-                    except (OSError, ValueError):
-                        continue
-
-        # Last fallback: psutil sensors API when available.
-        try:
-            sensors = psutil.sensors_temperatures()
-        except (AttributeError, OSError):
-            sensors = {}
-
-        if sensors:
-            preferred = ("coretemp", "k10temp", "cpu_thermal", "soc_thermal")
-            for key in preferred:
-                entries = sensors.get(key, [])
-                for entry in entries:
-                    current = getattr(entry, "current", None)
-                    if current is None:
-                        continue
-                    try:
-                        return max(0.0, float(current)), "psutil_sensors"
-                    except (TypeError, ValueError):
-                        continue
-
-            for entries in sensors.values():
-                for entry in entries:
-                    current = getattr(entry, "current", None)
-                    if current is None:
-                        continue
-                    try:
-                        return max(0.0, float(current)), "psutil_sensors"
-                    except (TypeError, ValueError):
-                        continue
-
-        if permission_denied:
-            return 0.0, "placeholder_cpu_temp_permission_denied"
-        return 0.0, "placeholder_cpu_temp_unavailable"
 
     def _read_cpu_package_power_w(self) -> tuple[float, str]:
         energy, energy_status = self._read_total_rapl_energy_uj()

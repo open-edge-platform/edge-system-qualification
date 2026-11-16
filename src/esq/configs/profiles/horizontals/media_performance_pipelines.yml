@@ -30,6 +30,8 @@ params:
       interval_s: 1    # sample cadence during the idle window
     # primarily look at the raw telemetry charts for these tests — disable kpi_correlation
     kpi_correlation: false
+    # module_group: external uses the Metrics Manager Docker container as
+    # primary backend (see docs/getting-started/telemetry/).
     module_group: external
     modules:
       - name: platform_telemetry

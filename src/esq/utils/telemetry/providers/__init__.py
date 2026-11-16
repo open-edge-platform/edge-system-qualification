@@ -8,14 +8,12 @@ from __future__ import annotations
 from typing import Any, Dict, Optional
 
 from .base import BaseFrameworkTelemetryProvider
-from .platform_telemetry.provider import PlatformTelemetryProvider
+from .metrics_manager.provider import MetricsManagerProvider
+from .platform_telemetry.provider import AdditionalMetricsProvider
 
 _PROVIDERS = {
-    PlatformTelemetryProvider.name: PlatformTelemetryProvider,
-    # Backward-compat alias: profile YAMLs and historical result schemas
-    # may still reference the legacy provider id "telecollect_collector".
-    # Resolve them to the same in-process PlatformTelemetryProvider.
-    "telecollect_collector": PlatformTelemetryProvider,
+    MetricsManagerProvider.name: MetricsManagerProvider,
+    AdditionalMetricsProvider.name: AdditionalMetricsProvider,
 }
 
 

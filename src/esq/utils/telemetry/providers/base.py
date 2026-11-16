@@ -25,6 +25,14 @@ class BaseFrameworkTelemetryProvider(ABC):
     def collect_sample(self) -> Dict[str, Any]:
         """Return one normalized sample as metric_name -> numeric_value."""
 
+    def get_device_inventory(self) -> list[Dict[str, Any]]:
+        """Return provider-owned device inventory when available."""
+        return []
+
+    def set_device_inventory(self, devices: list[Dict[str, Any]]) -> None:
+        """Receive the primary provider's device inventory when needed."""
+        return
+
     def get_status(self) -> Dict[str, Any]:
         """Return provider status details for telemetry summary metadata."""
         return {"name": self.name, "health": self.health()}

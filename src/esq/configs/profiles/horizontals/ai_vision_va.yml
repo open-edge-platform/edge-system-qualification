@@ -82,6 +82,8 @@ params:
     # Video-analytics pipelines exercise CPU + iGPU/dGPU + NPU — the
     # cost-per-fps and dominant-device hint are valuable here.
     kpi_correlation: true
+    # module_group: external uses the Metrics Manager Docker container as
+    # primary backend (see docs/getting-started/telemetry/).
     module_group: external
     modules:
       - name: platform_telemetry

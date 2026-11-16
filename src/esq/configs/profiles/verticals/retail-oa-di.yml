@@ -69,7 +69,7 @@ suites:
               # - Model: openbmb/MiniCPM-V-4_5 exported to INT4 (asymmetric, group size 128,
               #   ratio 1.0), the same weights ovms-service/setup_models.sh produces. The
               #   export is shared with profile.vertical.retail-oa-ta.
-              # - Serving: OVMS 2026.3.1 with the VLM_CB graph settings of setup_models.sh.
+              # - Serving: OVMS 2026.4.1 (upstream order-accuracy app defaults to 2026.3.1) with the VLM_CB graph settings of setup_models.sh.
               # - Prompt: the generic template of dine-in/configs/prompt_config.json with the
               #   inventory of dine-in/configs/inventory.json. No system prompt.
               # - Output: max 96 tokens, greedy decoding, guided JSON output (response_format).
@@ -95,7 +95,7 @@ suites:
                 model_id: "openbmb/MiniCPM-V-4_5"
                 model_precision: "int4"
                 quantization_params: "--task image-text-to-text --group-size 128 --ratio 1.0"
-                ovms_container_image: "openvino/model_server:2026.3.1-gpu"  # OVMS_IMAGE default in the application docker-compose.yaml, tag v2026.2.0
+                ovms_container_image: "openvino/model_server:2026.4.1-gpu"  # Newer than the upstream order-accuracy app default (OVMS_IMAGE 2026.3.1 in docker-compose.yaml, tag v2026.2.0)
                 cache_size: 4
                 max_num_seqs: 4
                 max_num_batched_tokens: 8192

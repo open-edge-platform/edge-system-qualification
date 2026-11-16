@@ -154,7 +154,7 @@ def test_vlm_prompt(
     model_precision = configs.get("model_precision")
     quantization_params = configs.get("quantization_params")
     export_timeout = int(configs.get("export_timeout", 3600))
-    ovms_image = configs.get("ovms_container_image", "openvino/model_server:2026.3.1-gpu")
+    ovms_image = configs.get("ovms_container_image", "openvino/model_server:2026.4.1-gpu")
 
     # Placeholders in the prompt, such as ${INVENTORY}, are filled from prompt_params.
     # ${NUM_FRAMES} is resolved per request by the client.

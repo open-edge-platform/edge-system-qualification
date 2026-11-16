@@ -15,6 +15,7 @@ To upgrade to a newer upstream commit, update OVMS_COMMIT below.  The venv will 
 automatically rebuilt because the venv name incorporates the commit hash.
 """
 
+import hashlib
 import logging
 import os
 import shutil
@@ -28,7 +29,7 @@ logger = logging.getLogger(__name__)
 # Upstream script configuration
 # Update OVMS_COMMIT to pull a newer version of the script and requirements.
 # ---------------------------------------------------------------------------
-OVMS_COMMIT = "3e5cbf5"  # Apr 7, 2026 (v2026.1)
+OVMS_COMMIT = "6c25e51"  # Nov 14, 2026 (v2026.4.1)
 _OVMS_BASE_URL = (
     f"https://raw.githubusercontent.com/openvinotoolkit/model_server/{OVMS_COMMIT}/demos/common/export_models"
 )
@@ -51,6 +52,18 @@ OVMS_REQUIREMENTS_URL = f"{_OVMS_BASE_URL}/requirements.txt"
 _EXPORT_VENV_PYTHON_VERSION = "3.12"
 
 # ---------------------------------------------------------------------------
+# Export venv package constraints
+# ---------------------------------------------------------------------------
+# The upstream requirements.txt does not pin ``transformers``; optimum-intel 2.2.0
+# only requires ``transformers>=4.51,<5.6``, so a fresh install resolves 5.5.x.
+# The trust_remote_code modelling code of several VLMs (e.g. openbmb/MiniCPM-V-4_5)
+# is not compatible with transformers 5 and the export fails with:
+#   "AttributeError: 'MiniCPMV' object has no attribute 'all_tied_weights_keys'".
+# Stay on the 4.x line (4.57.x was used by the previous working export venv).
+# The constraints are part of the venv name, so changing them rebuilds the venv.
+_EXPORT_VENV_CONSTRAINTS = ("transformers>=4.51,<5",)
+
+# ---------------------------------------------------------------------------
 # Forced export task
 # ---------------------------------------------------------------------------
 # OVMS continuous-batching LLM serving requires a *stateful* model that exposes
@@ -67,29 +80,6 @@ _EXPORT_VENV_PYTHON_VERSION = "3.12"
 # Forcing the task explicitly guarantees a stateful, KV-cached export regardless
 # of the (often absent or wrong) Hub metadata.
 _FORCED_EXPORT_TASK = "text-generation-with-past"
-
-# ---------------------------------------------------------------------------
-# Per-commit package version overrides
-# ---------------------------------------------------------------------------
-# For each pinned upstream commit, define exact stable package versions to
-# substitute for pre-release pins in the upstream requirements.txt.
-# This guarantees a fully reproducible install that never drifts to a newer
-# nightly or pre-release build on subsequent runs.
-#
-# When upgrading OVMS_COMMIT, add a new entry here with the known-working
-# stable versions for that commit.  Run the export once manually, note the
-# installed versions from the venv, then record the stable equivalents.
-# ---------------------------------------------------------------------------
-_COMMIT_PACKAGE_OVERRIDES: dict = {
-    # Commit: 3e5cbf5 (Apr 7, 2026, v2026.1)
-    # Upstream pins openvino==2026.1.0rc2 and openvino-tokenizers==2026.1.0.0rc2.
-    # Replace with stable 2026.1.0 releases.
-    "3e5cbf5": {
-        "openvino": "2026.1.0",
-        "openvino-tokenizers": "2026.1.0.0",
-    },
-}
-
 
 # ---------------------------------------------------------------------------
 # Internal helpers
@@ -127,11 +117,22 @@ def get_export_venv_name() -> str:
     """
     Derive a deterministic venv name from the upstream commit hash.
 
-    The name changes whenever OVMS_COMMIT changes, triggering automatic venv
-    recreation.  Both the script and requirements.txt are pinned to the same
-    commit, so the commit hash alone uniquely identifies the environment.
+    The name changes whenever OVMS_COMMIT, the Python version or the package
+    constraints change, triggering automatic venv recreation.  The script and
+    requirements.txt are pinned to the same commit, so the commit hash plus the
+    local constraints uniquely identify the environment.
     """
-    return f"ovms_export_{OVMS_COMMIT[:8]}_py{_EXPORT_VENV_PYTHON_VERSION.replace('.', '')}"
+    constraints_hash = hashlib.sha256("\n".join(_EXPORT_VENV_CONSTRAINTS).encode()).hexdigest()[:6]
+    return f"ovms_export_{OVMS_COMMIT[:8]}_py{_EXPORT_VENV_PYTHON_VERSION.replace('.', '')}_c{constraints_hash}"
+
+
+def _write_constraints_file(cache_dir: str) -> str:
+    """Write the export venv package constraints to *cache_dir* and return the file path."""
+    constraints_path = os.path.join(cache_dir, f"constraints_{OVMS_COMMIT}.txt")
+    with open(constraints_path, "w") as fh:
+        fh.write("\n".join(_EXPORT_VENV_CONSTRAINTS) + "\n")
+    os.chmod(constraints_path, 0o640)
+    return constraints_path
 
 
 @with_retry()
@@ -224,108 +225,6 @@ def download_requirements_file(cache_dir: str | None = None) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _preprocess_requirements(req_file: str, processed_dir: str) -> str:
-    """
-    Pre-process the upstream requirements.txt to apply reproducible package
-    version pins for the current OVMS_COMMIT.
-
-    Strategy:
-
-    1. **Commit-specific overrides** (preferred): if ``_COMMIT_PACKAGE_OVERRIDES``
-       contains an entry for the current ``OVMS_COMMIT``, substitute the listed
-       packages with their exact stable versions and strip the nightly/pre-release
-       index URLs and the ``--pre`` directive from the file.  This guarantees a
-       fully reproducible install that never drifts to a newer nightly.
-
-    2. **Fallback** (no overrides defined): relax pre-release exact pins
-       (``==XrcN`` → ``>=XrcN``) so uv can at least find a compatible release.
-       This is non-deterministic and may break when new nightlies appear.
-       A warning is emitted so developers know to add overrides.
-
-    The processed file is written to ``requirements_{commit}_pinned.txt``
-    (with overrides) or ``requirements_{commit}_processed.txt`` (fallback),
-    so re-runs reuse the cached copy without re-processing.
-
-    Args:
-        req_file: Path to the raw downloaded requirements.txt.
-        processed_dir: Directory where the processed file is written.
-
-    Returns:
-        str: Path to the processed requirements file.
-    """
-    import re
-
-    overrides = _COMMIT_PACKAGE_OVERRIDES.get(OVMS_COMMIT, {})
-
-    if overrides:
-        processed_path = os.path.join(processed_dir, f"requirements_{OVMS_COMMIT}_pinned.txt")
-    else:
-        processed_path = os.path.join(processed_dir, f"requirements_{OVMS_COMMIT}_processed.txt")
-
-    if os.path.exists(processed_path):
-        logger.debug(f"Using cached requirements: {processed_path}")
-        return processed_path
-
-    with open(req_file) as fh:
-        content = fh.read()
-
-    if overrides:
-        # Apply exact commit-specific stable version pins.
-        # Replace any existing version specifier for the named package with
-        # the exact pinned version.  The character-by-character copy below
-        # builds the replacement line without propagating the tainted input
-        # version string from the upstream file.
-        processed_content = content
-        for pkg_name, pinned_version in overrides.items():
-            pkg_pattern = re.compile(
-                r"^(" + re.escape(pkg_name) + r")([=><!\s].*)$",
-                re.MULTILINE | re.IGNORECASE,
-            )
-            # Build replacement from safe local constants (not from file content)
-            replacement_line = "".join(c for c in f"{pkg_name}=={pinned_version}")
-            new_content = pkg_pattern.sub(replacement_line, processed_content)
-            if new_content != processed_content:
-                logger.info(f"Pinned {pkg_name}=={pinned_version} (commit {OVMS_COMMIT})")
-            processed_content = new_content
-
-        # Remove nightly and pre-release OpenVINO index URLs – stable packages
-        # are available on PyPI.  The PyTorch CPU index is kept because
-        # torch==X.Y.Z+cpu is only available there.
-        processed_content = re.sub(
-            r'^--extra-index-url\s+"?https://storage\.openvinotoolkit\.org/simple/wheels/'
-            r'(?:nightly|pre-release)"?\s*$\n?',
-            "",
-            processed_content,
-            flags=re.MULTILINE,
-        )
-        # Remove the --pre directive from the file – stable pins don't need it
-        # and it would cause uv to prefer pre-release versions of unversioned deps.
-        processed_content = re.sub(r"^--pre\s*$\n?", "", processed_content, flags=re.MULTILINE)
-
-        logger.info(
-            f"Applied commit-specific stable version overrides for {OVMS_COMMIT}: "
-            + ", ".join(f"{k}=={v}" for k, v in overrides.items())
-        )
-    else:
-        # Fallback: relax pre-release exact pins to >=  so uv can pick a final release.
-        logger.warning(
-            f"No stable package overrides defined for commit {OVMS_COMMIT}. "
-            "Falling back to >=rc relaxation – the resolver may pick unstable nightly builds. "
-            "Add an entry to _COMMIT_PACKAGE_OVERRIDES to fix this."
-        )
-        pre_release_pattern = re.compile(
-            r"^([A-Za-z0-9][A-Za-z0-9._-]*)==(\d[\d.]*(?:(?:rc|a|b|alpha|beta)\.?\d+|\.dev\d+))\s*$",
-            re.MULTILINE,
-        )
-        processed_content = pre_release_pattern.sub(r"\1>=\2", content)
-
-    with open(processed_path, "w") as fh:
-        fh.write(processed_content)
-    os.chmod(processed_path, 0o640)
-    logger.debug(f"Processed requirements written to: {processed_path}")
-    return processed_path
-
-
 def setup_export_venv(
     cache_dir: str | None = None,
     venv_data_dir: str | None = None,
@@ -373,20 +272,11 @@ def setup_export_venv(
     os.makedirs(cache_dir, exist_ok=True)
     req_file = download_requirements_file(cache_dir)
 
-    # Pre-process requirements to apply stable version pins (or fallback >=rc)
-    req_file = _preprocess_requirements(req_file, cache_dir)
-
-    # Extra pip args needed for the upstream requirements.txt:
-    # - "--index-strategy unsafe-best-match": nncf@git needs setuptools>=77.0 which is only
-    #   on PyPI, but uv finds an older setuptools on pytorch.org/whl/cpu first and stops.
-    #   This flag makes uv consider all indexes and pick the best matching version.
-    # - "--pre": only needed when falling back to >=rc relaxation (no commit overrides).
-    #   With stable pinned versions the nightly/pre-release indexes are removed from the
-    #   processed requirements file, so --pre is omitted here to prevent uv from
-    #   accidentally selecting pre-release versions of unversioned dependencies.
-    extra_pip_args = ["--index-strategy", "unsafe-best-match"]
-    if OVMS_COMMIT not in _COMMIT_PACKAGE_OVERRIDES:
-        extra_pip_args = ["--pre"] + extra_pip_args
+    # "--index-strategy unsafe-best-match": nncf@git needs setuptools>=77.0 which is only
+    # on PyPI, but uv finds an older setuptools on pytorch.org/whl/cpu first and stops.
+    # This flag makes uv consider all indexes and pick the best matching version.
+    constraints_file = _write_constraints_file(cache_dir)
+    extra_pip_args = ["--index-strategy", "unsafe-best-match", "--constraint", constraints_file]
 
     success, message = manager.setup_named_venv(
         venv_name=venv_name,

@@ -1218,7 +1218,7 @@ dependencies = [
 requires-dist = [
     { name = "allure-pytest", specifier = ">=2.14.3" },
     { name = "matplotlib", specifier = ">=3.11.2" },
-    { name = "openvino", specifier = ">=2025.2.0" },
+    { name = "openvino", specifier = ">=2026.4.1" },
     { name = "prompt-toolkit", specifier = ">=3.0.53" },
     { name = "psutil", specifier = ">=7.0.0" },
     { name = "py-cpuinfo", specifier = ">=9.0.0" },

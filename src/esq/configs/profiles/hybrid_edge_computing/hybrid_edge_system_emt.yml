@@ -8,6 +8,8 @@ params:
     profile_group_name: "Hybrid Edge Computing - EMT"
     profile_display_name: "Hybrid Edge Computing - EMT"
     type: "qualification"
+    # Exclude from the docs list of qualification profiles.
+    docs_exclude: true
     report_section: "HEC"
     display_reference: false
     kpi_enabled: true

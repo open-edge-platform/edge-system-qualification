@@ -199,6 +199,7 @@ def fps_guided_adaptive_search(
     initial_count: int = 1,
     config: Optional[AdaptiveSearchConfig] = None,
     logger: Optional[logging.Logger] = None,
+    value_label: str = "FPS",
 ) -> Tuple[int, SearchMetadata]:
     """
     FPS-Guided Adaptive Search Algorithm.
@@ -225,6 +226,9 @@ def fps_guided_adaptive_search(
         initial_count: Starting stream count (default 1, can use reference).
         config: Search configuration. Uses defaults if None.
         logger: Optional logger for debug output.
+        value_label: Name of the measured value in log messages. The search only compares the value
+            with ``target_fps``, so other higher-is-better values (for example a latency headroom
+            ratio) can use it and pass their own label.
 
     Returns:
         Tuple of (optimal_stream_count, search_metadata).
@@ -260,7 +264,7 @@ def fps_guided_adaptive_search(
         logger.info(f"[ADAPTIVE] Initial memory usage: {initial_memory_gb:.1f} GB")
 
     logger.info(
-        f"[ADAPTIVE] Starting search: target={target_fps} FPS, max={effective_max}, "
+        f"[ADAPTIVE] Starting search: target={target_fps} {value_label}, max={effective_max}, "
         f"initial={current}, safety={config.safety_factor}"
     )
 
@@ -292,7 +296,7 @@ def fps_guided_adaptive_search(
 
         headroom = fps / target_fps if target_fps > 0 else 0
         logger.info(
-            f"[ADAPTIVE] Phase 1: {current} streams -> {fps:.1f} FPS "
+            f"[ADAPTIVE] Phase 1: {current} streams -> {fps:.1f} {value_label} "
             f"(target: {target_fps}, headroom: {headroom:.2f}x, status: {status})"
         )
 
@@ -327,7 +331,7 @@ def fps_guided_adaptive_search(
                         # Confirmation passed - we were in warmup zone
                         logger.info(
                             f"[ADAPTIVE] Confirmation passed: {confirm_count} streams "
-                            f"-> {confirm_fps:.1f} FPS. Continuing from here."
+                            f"-> {confirm_fps:.1f} {value_label}. Continuing from here."
                         )
                         low = confirm_count
                         best_fps = confirm_fps
@@ -404,7 +408,7 @@ def fps_guided_adaptive_search(
         metadata.search_path.append(step_info)
 
         logger.info(
-            f"[ADAPTIVE] Phase 2: {mid} streams -> {fps:.1f} FPS "
+            f"[ADAPTIVE] Phase 2: {mid} streams -> {fps:.1f} {value_label} "
             f"(binary search: low={low}, high={high})"
         )
 
@@ -439,7 +443,7 @@ def fps_guided_adaptive_search(
             )
 
     logger.info(
-        f"[ADAPTIVE] Search complete: {low} streams @ {best_fps:.1f} FPS in "
+        f"[ADAPTIVE] Search complete: {low} streams @ {best_fps:.1f} {value_label} in "
         f"{metadata.iterations} iterations "
         f"(Phase1: {metadata.phase1_iterations}, Phase2: {metadata.phase2_iterations}, "
         f"Time: {metadata.total_time:.1f}s)"

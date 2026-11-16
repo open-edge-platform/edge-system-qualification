@@ -1,0 +1,6 @@
+# VLM Prompt load generator (vlm_client.py) requirements
+# Installed into an isolated venv, so the packages do not need to be project dependencies
+requests>=2.34.2
+pillow>=13.0.0
+numpy>=2.5.4
+opencv-python-headless>=5.0.0.93

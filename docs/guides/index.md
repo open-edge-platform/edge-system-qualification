@@ -13,9 +13,11 @@ Comprehensive guides for using and developing with Intel® ESQ.
 | Section | Description |
 |---------|-------------|
 | [Overview & Architecture](developer/index.md) | Framework structure and component overview |
+| [Integration Types](developer/integration-types.md) | Ways to integrate an external benchmark or application |
 | [Writing Tests](developer/writing-tests.md) | Step-by-step guide and the 7-step execution pattern |
 | [Profile & Test Config](developer/configuration.md) | Profile YAML structure and `config.yml` KPI definitions |
 | [System Requirements](developer/requirements.md) | All hardware and software requirement flags |
+| [Profiles File Reference](developer/profiles-file.md) | Run selected profiles and test cases from a file |
 | [Fixtures Reference](developer/fixtures.md) | Built-in pytest fixtures reference |
 | [Results & Metrics](developer/results-metrics.md) | `Result` and `Metrics` classes |
 | [KPI Validation](developer/kpi-validation.md) | Defining and validating KPI thresholds |

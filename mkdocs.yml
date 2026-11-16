@@ -11,6 +11,7 @@ docs_dir: docs/
 # Hooks
 hooks:
   - docs/hooks/md_import.py
+  - docs/hooks/esq_profiles.py
 
 # Copyright
 copyright: Copyright &copy; 2026 Intel Corporation
@@ -43,7 +44,6 @@ theme:
     - navigation.indexes
     - navigation.instant
     - navigation.instant.prefetch
-    - navigation.sections
     - navigation.tabs
     - navigation.tabs.sticky
     - navigation.top
@@ -136,10 +136,46 @@ nav:
     - getting-started/index.md
     - Requirements: getting-started/requirements.md
     - Quick Start: getting-started/quick-start.md
-    - Test Suites:
-      - getting-started/suites/index.md
-    - Telemetry:
-      - getting-started/telemetry/index.md
+
+  - Profiles:
+    - profiles/index.md
+    - Qualification: profiles/qualification.md
+    - Vertical: profiles/vertical.md
+    - Horizontal: profiles/horizontal.md
+
+  - Suites:
+    - suites/index.md
+    - AI:
+      - DL Streamer: suites/ai/dlstreamer.md
+      - VLM Prompt: suites/ai/vlm-prompt.md
+      - Text Generation: suites/ai/text-generation.md
+      - Chat Q&A Core: suites/ai/chatqna-core.md
+      - OpenVINO Benchmark: suites/ai/ov-benchmark.md
+      - Video Analytics: suites/ai/video-analytics.md
+      - FunASR: suites/ai/funasr.md
+      - Whisper: suites/ai/whisper.md
+      - ADBScan: suites/ai/adbscan.md
+      - Wind Turbine: suites/ai/wind-turbine.md
+    - Media:
+      - Media Pipelines: suites/media/media-pipelines.md
+    - Real-Time:
+      - Cyclictest: suites/realtime/cyclictest.md
+      - Platform Checks: suites/realtime/platform.md
+    - System:
+      - CPU: suites/system/cpu.md
+      - Display: suites/system/display.md
+      - GPU: suites/system/gpu.md
+      - Memory Health: suites/system/memory-health.md
+      - Memory STREAM: suites/system/memory-stream.md
+      - Network: suites/system/network.md
+      - Peripheral: suites/system/peripheral.md
+      - stress-ng: suites/system/stress-ng.md
+    - Vertical:
+      - Order Accuracy: suites/vertical/order-accuracy.md
+      - Loss Prevention VLM: suites/vertical/loss-prevention-vlm.md
+      - Proxy Pipelines: suites/vertical/proxy-pipelines.md
+    - Virtualization:
+      - KVM: suites/virtualization/kvm.md
 
   - Guides:
     - guides/index.md
@@ -147,6 +183,7 @@ nav:
     - Troubleshooting: guides/troubleshooting.md
     - Developer:
       - Overview: guides/developer/index.md
+      - Integration Types: guides/developer/integration-types.md
       - Writing Tests: guides/developer/writing-tests.md
       - Configuration:
         - Profile & Test Config: guides/developer/configuration.md

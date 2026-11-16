@@ -230,9 +230,11 @@ The framework reads YAML test keys (e.g., `test_dlstreamer`) and locates the cor
 
 | Page | Description |
 |------|-------------|
+| [Integration Types](integration-types.md) | Ways to integrate an external benchmark or application |
 | [Writing Tests](writing-tests.md) | Step-by-step guide to creating tests and the 7-step execution pattern |
 | [Profile & Test Config](configuration.md) | Profile YAML structure and `config.yml` KPI definitions |
 | [System Requirements](requirements.md) | All available hardware and software requirement flags |
+| [Profiles File Reference](profiles-file.md) | Run selected profiles and test cases from a file |
 | [Fixtures Reference](fixtures.md) | Complete reference for all built-in pytest fixtures |
 | [Results & Metrics](results-metrics.md) | `Result` and `Metrics` classes and how to use them |
 | [KPI Validation](kpi-validation.md) | Defining and validating KPI thresholds |

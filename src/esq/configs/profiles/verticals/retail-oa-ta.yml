@@ -1,0 +1,234 @@
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+name: "profile.vertical.retail-oa-ta"
+description: "Take-Away Order Accuracy Vision Language Model (VLM) benchmarks. Identifies the items packed in an order from video frames"
+params:
+  labels:
+    profile_group_name: "Retail"
+    profile_display_name: "Retail - Take-Away Order Accuracy VLM"
+    type: "vertical"
+    display_status: false
+  telemetry:
+    enabled: true
+    interval: 10  # seconds between samples
+    modules:
+      - name: cpu_usage
+        enabled: true
+
+      - name: cpu_freq
+        enabled: true
+
+      - name: cpu_temp
+        enabled: true
+
+      - name: memory_usage
+        enabled: true
+
+      - name: package_power
+        enabled: true
+
+      - name: gpu_temp
+        enabled: true
+
+      - name: gpu_freq
+        enabled: true
+
+      - name: gpu_power
+        enabled: true
+
+      - name: gpu_usage
+        enabled: true
+
+      - name: npu_usage
+        enabled: true
+        
+      - name: npu_freq
+        enabled: true
+
+suites:
+  - name: "ai"
+    sub_suites:
+      - name: "gen"
+        tests:
+          test_vlm_prompt:
+            params:
+              # Take-Away Order Accuracy ingredients and settings. They come from two places:
+              # - Ingredients (assets, prompts, model, request settings): the official OEP release 2026.2.1.
+              #   Its edge-ai-suites tag 2026.2.1 pins the submodule retail-ai-suite/order-accuracy at
+              #   commit 70734ba2, which is tag v2026.2.0 of intel-retail/order-accuracy.
+              # - Benchmark settings (stream density target and the load defaults): the latest main branch of
+              #   intel-retail/order-accuracy (checked at commit dc6caff8). This suite is part of ESQ and not the
+              #   sample application, so the settings can follow main while the ingredients stay on the release.
+              #   Today the target latency is the only setting that differs: 10000 ms on main, 25000 ms in the release.
+              # They run through the generic suite: model, prompts and media only. No frame selector,
+              # semantic service, object storage or UI is started.
+              #
+              # Each ingredient matches what the application sends to the model server, so the
+              # metrics are comparable with test_ta_vlm (profile.vertical.retail-ta-vlm):
+              # - Model: openbmb/MiniCPM-V-4_5 exported to INT4 (asymmetric, group size 128,
+              #   ratio 1.0), the same weights ovms-service/setup_models.sh produces.
+              # - Serving: OVMS 2026.3.1 with the VLM_CB graph settings of setup_models.sh.
+              # - Prompt: the order-aware prompt of take-away/src/core/vlm_service.py with the
+              #   expected items of order 651 from take-away/config/orders.json.
+              # - Media: the sample video, 3 frames per request (frame selector top_k).
+              - &take_away_prompt
+                test_id: "TAO-VLM-001"
+                display_name: "Take-Away Order Accuracy VLM - fixed load 1 worker 200s MiniCPM-V-4.5 INT4 (CPU)"
+                description: |
+                  Measures how fast the AI model reports the items found in an order video
+                  when orders are checked one at a time for 200 seconds.
+                  The key result is tokens per second (a token is about one word).
+                  A higher number is faster.
+                devices: [cpu]
+                requirements: &oa_requirements
+                  memory_min_gib: 16.0
+                  storage_min_gib: 30.0  # Free storage for the exported model, images or video, and containers
+                  os_type:
+                    - "linux"
+                  docker_required: true
+                timeout: 1800  # 30 minutes
+                model_id: "openbmb/MiniCPM-V-4_5"
+                model_precision: "int4"
+                quantization_params: "--task image-text-to-text --group-size 128 --ratio 1.0"
+                ovms_container_image: "openvino/model_server:2026.3.1-gpu"  # OVMS_IMAGE default in the application docker-compose.yaml, tag v2026.2.0
+                cache_size: 4
+                max_num_seqs: 4
+                max_num_batched_tokens: 8192
+                enable_prefix_caching: true
+                # OVMS REST workers: unset uses the OVMS default (one per CPU core) like the application docker-compose.yaml.
+                # max_rest_workers is a failsafe for systems with many cores (each worker needs about 3 file descriptors)
+                max_rest_workers: 128
+                benchmark_workers: 1
+                benchmark_duration: 200
+                benchmark_init_duration: 10
+                images_per_request: 3
+                max_new_tokens: 100
+                temperature: 0.2
+                enable_thinking: false
+                system_prompt: >-
+                  You are a grocery item counter.
+                  Respond ONLY with detected items in the exact format: item_name x quantity.
+                  One item per line. No greetings, no explanations, no extra text.
+                  If no items are visible output NO_ITEMS.
+                prompt: |
+                  You will receive ${NUM_FRAMES} frames from a grocery order packing station.
+
+                  This order is expected to contain:
+                  ${EXPECTED_ITEMS}
+
+                  Carefully examine ALL ${NUM_FRAMES} frames for EACH of the above items.
+                  For each item, report the MAXIMUM quantity visible in any single frame — do NOT sum counts across frames (the same item appears in multiple frames as packing progresses).
+
+                  Recognize products ONLY from this inventory list:
+                  ${INVENTORY}
+
+                  Rules:
+                  - Always choose the closest matching inventory item name.
+                  - Never invent new product names outside the list.
+                  - Count items carefully — report separate lines for different items.
+                  - Format strictly as: inventory_item_name x quantity (one item per line)
+                  - If no inventory items are visible, output NO_ITEMS.
+                prompt_params:
+                  EXPECTED_ITEMS:
+                    - "  - banana (qty expected: 2)"
+                    - "  - coke 2 liter bottle (qty expected: 1)"
+                  INVENTORY:
+                    - "- green apple"
+                    - "- apple"
+                    - "- water bottle"
+                    - "- coke 2 liter bottle"
+                    - "- coke large bottle"
+                    - "- coke bottle"
+                    - "- pepsi can"
+                    - "- yellow banana"
+                    - "- banana"
+                # Sample video of the Take-Away application: SAMPLE_VIDEO_URL in take-away/Makefile of
+                # intel-retail/order-accuracy tag v2026.2.0 of the OEP release 2026.2.1 (same value on main), downloaded by
+                # `make download-sample-video` to take-away/storage/videos/test.mp4
+                media:
+                  - name: "test.mp4"
+                    url: "https://www.pexels.com/download/video/35120438/"
+                    sha256: "41f7c49f678c92f11c04717e4d875efad9dc7d8a5fb55b4f536dc4e399b01a30"
+
+              - <<: *take_away_prompt
+                test_id: "TAO-VLM-002"
+                display_name: "Take-Away Order Accuracy VLM - fixed load 1 worker 200s MiniCPM-V-4.5 INT4 (iGPU)"
+                description: |
+                  Measures how fast the AI model reports the items found in an order video
+                  when orders are checked one at a time for 200 seconds.
+                  The key result is tokens per second (a token is about one word).
+                  A higher number is faster.
+                devices: [igpu]
+                requirements:
+                  <<: *oa_requirements
+                  igpu_required: true
+
+              - <<: *take_away_prompt
+                test_id: "TAO-VLM-003"
+                display_name: "Take-Away Order Accuracy VLM - fixed load 1 worker 200s MiniCPM-V-4.5 INT4 (dGPU)"
+                description: |
+                  Measures how fast the AI model reports the items found in an order video
+                  when orders are checked one at a time for 200 seconds.
+                  The key result is tokens per second (a token is about one word).
+                  A higher number is faster.
+                devices: [dgpu]
+                requirements:
+                  <<: *oa_requirements
+                  dgpu_required: true
+
+              # Stream density: the highest number of workers whose average latency stays within the
+              # target. Same method as `make benchmark-stream-density` of the application: N workers, and
+              # the model server is restarted for every step, so each step measures a cold model. N is
+              # searched with the latency-guided search of test_dlstreamer (density_search) instead of
+              # testing 1, 2, 3, ... Defaults are those of take-away/Makefile on the main branch of
+              # intel-retail/order-accuracy: BENCHMARK_TARGET_LATENCY_MS=10000 (the Order Accuracy
+              # target of 10 seconds per order, 25000 at tag v2026.2.0), BENCHMARK_LATENCY_METRIC=avg,
+              # BENCHMARK_WORKER_INCREMENT=1, BENCHMARK_MIN_TRANSACTIONS=1,
+              # BENCHMARK_REQUEST_TIMEOUT=600.
+              # Set target_latency_ms to 2000 for a single quality station.
+              - &take_away_density
+                <<: *take_away_prompt
+                test_id: "TAO-VLM-004"
+                display_name: "Take-Away Order Accuracy VLM - stream density avg latency 10s MiniCPM-V-4.5 INT4 (CPU)"
+                description: |
+                  Finds the largest number of orders the AI model can check at the same
+                  time while each answer still takes 10 seconds or less on average.
+                  The key result is that number, shown as streams (one stream is one
+                  order).
+                benchmark_mode: "stream_density"
+                target_latency_ms: 10000
+                latency_metric: "avg"
+                density_increment: 1
+                min_requests: 1
+                requests_per_worker: 1
+                max_workers: 600  # the application stops at 50 steps, a higher limit finds the real maximum
+                density_search: "adaptive"  # latency-guided search like test_dlstreamer, "linear" tests 1, 2, 3, ... workers
+                restart_server_per_iteration: true
+                request_timeout: 600
+
+              - <<: *take_away_density
+                test_id: "TAO-VLM-005"
+                display_name: "Take-Away Order Accuracy VLM - stream density avg latency 10s MiniCPM-V-4.5 INT4 (iGPU)"
+                description: |
+                  Finds the largest number of orders the AI model can check at the same
+                  time while each answer still takes 10 seconds or less on average.
+                  The key result is that number, shown as streams (one stream is one
+                  order).
+                devices: [igpu]
+                requirements:
+                  <<: *oa_requirements
+                  igpu_required: true
+
+              - <<: *take_away_density
+                test_id: "TAO-VLM-006"
+                display_name: "Take-Away Order Accuracy VLM - stream density avg latency 10s MiniCPM-V-4.5 INT4 (dGPU)"
+                description: |
+                  Finds the largest number of orders the AI model can check at the same
+                  time while each answer still takes 10 seconds or less on average.
+                  The key result is that number, shown as streams (one stream is one
+                  order).
+                devices: [dgpu]
+                requirements:
+                  <<: *oa_requirements
+                  dgpu_required: true

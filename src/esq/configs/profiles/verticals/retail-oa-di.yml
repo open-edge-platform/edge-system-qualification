@@ -1,0 +1,257 @@
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+name: "profile.vertical.retail-oa-di"
+description: "Dine-In Order Accuracy Vision Language Model (VLM) benchmarks. Identifies the food items on a plate from an image"
+params:
+  labels:
+    profile_group_name: "Retail"
+    profile_display_name: "Retail - Dine-In Order Accuracy VLM"
+    type: "vertical"
+    display_status: false
+  telemetry:
+    enabled: true
+    interval: 10  # seconds between samples
+    modules:
+      - name: cpu_usage
+        enabled: true
+
+      - name: cpu_freq
+        enabled: true
+
+      - name: cpu_temp
+        enabled: true
+
+      - name: memory_usage
+        enabled: true
+
+      - name: package_power
+        enabled: true
+
+      - name: gpu_temp
+        enabled: true
+
+      - name: gpu_freq
+        enabled: true
+
+      - name: gpu_power
+        enabled: true
+
+      - name: gpu_usage
+        enabled: true
+
+      - name: npu_usage
+        enabled: true
+        
+      - name: npu_freq
+        enabled: true
+
+suites:
+  - name: "ai"
+    sub_suites:
+      - name: "gen"
+        tests:
+          test_vlm_prompt:
+            params:
+              # Dine-In Order Accuracy ingredients and settings. They come from two places:
+              # - Ingredients (assets, prompts, model, request settings): the official OEP release 2026.2.1.
+              #   Its edge-ai-suites tag 2026.2.1 pins the submodule retail-ai-suite/order-accuracy at
+              #   commit 70734ba2, which is tag v2026.2.0 of intel-retail/order-accuracy.
+              # - Benchmark settings (stream density target and the load defaults): the latest main branch of
+              #   intel-retail/order-accuracy (checked at commit dc6caff8). This suite is part of ESQ and not the
+              #   sample application, so the settings can follow main while the ingredients stay on the release.
+              #   Today the target latency is the only setting that differs: 10000 ms on main, 25000 ms in the release.
+              # They run through the generic suite: model, prompt and images only. No application,
+              # semantic service, worker containers or UI is started.
+              #
+              # Each ingredient matches what the application sends to the model server
+              # (dine-in/src/services/vlm_client.py):
+              # - Model: openbmb/MiniCPM-V-4_5 exported to INT4 (asymmetric, group size 128,
+              #   ratio 1.0), the same weights ovms-service/setup_models.sh produces. The
+              #   export is shared with profile.vertical.retail-oa-ta.
+              # - Serving: OVMS 2026.3.1 with the VLM_CB graph settings of setup_models.sh.
+              # - Prompt: the generic template of dine-in/configs/prompt_config.json with the
+              #   inventory of dine-in/configs/inventory.json. No system prompt.
+              # - Output: max 96 tokens, greedy decoding, guided JSON output (response_format).
+              # - Images: the 4 sample plate images, 1 image per request, in file name order
+              #   (dine-in/src/worker.py), preprocessed like the application's ImagePreprocessor.
+              # - Load: the defaults of dine-in/Makefile (1 worker, 60 s init, 180 s duration).
+              - &dine_in_prompt
+                test_id: "DIO-VLM-001"
+                display_name: "Dine-In Order Accuracy VLM - fixed load 1 worker 180s MiniCPM-V-4.5 INT4 (CPU)"
+                description: |
+                  Measures how fast the AI model reports the food items found in a plate
+                  photo when photos are checked one at a time for 180 seconds.
+                  The key result is tokens per second (a token is about one word).
+                  A higher number is faster.
+                devices: [cpu]
+                requirements: &oa_requirements
+                  memory_min_gib: 16.0
+                  storage_min_gib: 30.0  # Free storage for the exported model, images or video, and containers
+                  os_type:
+                    - "linux"
+                  docker_required: true
+                timeout: 1800  # 30 minutes
+                model_id: "openbmb/MiniCPM-V-4_5"
+                model_precision: "int4"
+                quantization_params: "--task image-text-to-text --group-size 128 --ratio 1.0"
+                ovms_container_image: "openvino/model_server:2026.3.1-gpu"  # OVMS_IMAGE default in the application docker-compose.yaml, tag v2026.2.0
+                cache_size: 4
+                max_num_seqs: 4
+                max_num_batched_tokens: 8192
+                enable_prefix_caching: true
+                # OVMS REST workers: unset uses the OVMS default (one per CPU core) like the application docker-compose.yaml.
+                # max_rest_workers is a failsafe for systems with many cores (each worker needs about 3 file descriptors)
+                max_rest_workers: 128
+                benchmark_workers: 1
+                benchmark_duration: 180
+                benchmark_init_duration: 60
+                images_per_request: 1
+                image_max_size: 448
+                jpeg_quality: 82
+                image_preprocessing:
+                  min_size: 224
+                  contrast: 1.15
+                  color: 1.08
+                  sharpen_percent: 50
+                  progressive: true
+                  enhance_after_padding: true  # the application pads to the square canvas first, then enhances it
+                max_new_tokens: 96
+                temperature: 0.0
+                prompt: |-
+                  Inventory (the ONLY item names you may use): ${INVENTORY}
+
+                  Identify which of the inventory items above are CLEARLY VISIBLE in this image.
+                  Use only names from the inventory list. Do NOT guess or include items you cannot see.
+                  "quantity" = number of separate ORDER SERVINGS (boxes/wrappers), NEVER the piece count inside one serving. Do NOT count individual nuggets, fries, or pieces. Example: a box containing 6 nuggets is quantity 1, not 6. Only increase quantity if you see 2+ separate boxes/wrappers of the same item.
+                  Respond with MINIFIED JSON on a single line only (no spaces, no newlines, no markdown).
+                  JSON schema: {"items":[{"name":"item","quantity":1}]}
+                prompt_params:
+                  INVENTORY: "Cheeseburger, French Fries, McChicken, Chicken Nuggets, Chicken Burger, Veg Burger, Soft Drink, Filet-O-Fish, Cheesy Fries"
+                response_format:
+                  type: "json_schema"
+                  json_schema:
+                    name: "detected_items"
+                    strict: true
+                    schema:
+                      type: "object"
+                      properties:
+                        items:
+                          type: "array"
+                          items:
+                            type: "object"
+                            properties:
+                              name:
+                                type: "string"
+                              quantity:
+                                type: "integer"
+                                minimum: 1
+                                description: "Number of separate order servings (boxes/wrappers), NOT the piece count inside one serving. One box of nuggets or fries = 1, regardless of how many pieces are visible inside it."
+                            required: ["name", "quantity"]
+                            additionalProperties: false
+                      required: ["items"]
+                      additionalProperties: false
+                # Sample plate images, path dine-in/images/ of intel-retail/order-accuracy, tag v2026.2.0.
+                # This is the version pinned by the official OEP release: edge-ai-suites tag 2026.2.1,
+                # submodule retail-ai-suite/order-accuracy -> commit 70734ba2 (branch release-2026.2.0).
+                # The URLs use the commit because it cannot change. The same files are at
+                # https://github.com/intel-retail/order-accuracy/tree/v2026.2.0/dine-in/images
+                media:
+                  - name: "MCD-1001.png"
+                    url: "https://raw.githubusercontent.com/intel-retail/order-accuracy/70734ba24959c322cade476a917182978a90a6a6/dine-in/images/MCD-1001.png"
+                    sha256: "0dd99c8be106d4563e058f6b79f93c1e41c8509bdfb3129b9d333088aa68223e"
+                  - name: "MCD-1002.png"
+                    url: "https://raw.githubusercontent.com/intel-retail/order-accuracy/70734ba24959c322cade476a917182978a90a6a6/dine-in/images/MCD-1002.png"
+                    sha256: "57814adfa38cbfee930042b56dc1e0458174e6305413811504f98cc8b68cd07f"
+                  - name: "MCD-1003.png"
+                    url: "https://raw.githubusercontent.com/intel-retail/order-accuracy/70734ba24959c322cade476a917182978a90a6a6/dine-in/images/MCD-1003.png"
+                    sha256: "e119e0ac8bd7fddcfef307309f8ee9935e30f149731e7cb9cf7605f7bb9aa1b8"
+                  - name: "MCD-1004.png"
+                    url: "https://raw.githubusercontent.com/intel-retail/order-accuracy/70734ba24959c322cade476a917182978a90a6a6/dine-in/images/MCD-1004.png"
+                    sha256: "1ee45fa98b515c519d6f4d51467e6074edf345c15c7c8f6922fb5c9be7112a16"
+
+              - <<: *dine_in_prompt
+                test_id: "DIO-VLM-002"
+                display_name: "Dine-In Order Accuracy VLM - fixed load 1 worker 180s MiniCPM-V-4.5 INT4 (iGPU)"
+                description: |
+                  Measures how fast the AI model reports the food items found in a plate
+                  photo when photos are checked one at a time for 180 seconds.
+                  The key result is tokens per second (a token is about one word).
+                  A higher number is faster.
+                devices: [igpu]
+                requirements:
+                  <<: *oa_requirements
+                  igpu_required: true
+
+              - <<: *dine_in_prompt
+                test_id: "DIO-VLM-003"
+                display_name: "Dine-In Order Accuracy VLM - fixed load 1 worker 180s MiniCPM-V-4.5 INT4 (dGPU)"
+                description: |
+                  Measures how fast the AI model reports the food items found in a plate
+                  photo when photos are checked one at a time for 180 seconds.
+                  The key result is tokens per second (a token is about one word).
+                  A higher number is faster.
+                devices: [dgpu]
+                requirements:
+                  <<: *oa_requirements
+                  dgpu_required: true
+
+              # Stream density: the highest number of concurrent plate validations whose average
+              # latency stays within the target. Same method as `make benchmark-stream-density`
+              # of the application: N concurrent requests, one burst per step. N is searched with the
+              # latency-guided search of test_dlstreamer (density_search) instead of testing 1, 2, 3, ...
+              # Defaults are those of dine-in/Makefile on the main branch of
+              # intel-retail/order-accuracy: BENCHMARK_TARGET_LATENCY_MS=10000 (the Order Accuracy
+              # target of 10 seconds per order, 25000 at tag v2026.2.0), BENCHMARK_LATENCY_METRIC=avg,
+              # BENCHMARK_DENSITY_INCREMENT=1, BENCHMARK_MIN_REQUESTS=3, BENCHMARK_REQUEST_TIMEOUT=300.
+              # Set target_latency_ms to 2000 for a single quality station.
+              - &dine_in_density
+                <<: *dine_in_prompt
+                test_id: "DIO-VLM-004"
+                display_name: "Dine-In Order Accuracy VLM - stream density avg latency 10s MiniCPM-V-4.5 INT4 (CPU)"
+                description: |
+                  Finds the largest number of plate photos the AI model can check at the
+                  same time while each answer still takes 10 seconds or less on average.
+                  The key result is that number, shown as streams (one stream is one plate
+                  photo).
+                benchmark_mode: "stream_density"
+                target_latency_ms: 10000
+                latency_metric: "avg"
+                density_increment: 1
+                min_requests: 3
+                requests_per_worker: 1
+                max_workers: 600  # the application stops at 50 steps, a higher limit finds the real maximum
+                density_search: "adaptive"  # latency-guided search like test_dlstreamer, "linear" tests 1, 2, 3, ... workers
+                request_timeout: 300
+                # Warm-up request of VLMClient.warmup() in dine-in/src/services/vlm_client.py:
+                # a 64x64 gray image, max 8 tokens, sent once before the first step
+                warmup:
+                  prompt: 'Respond with {"items":[]}'
+                  image_size: 64
+                  max_new_tokens: 8
+
+              - <<: *dine_in_density
+                test_id: "DIO-VLM-005"
+                display_name: "Dine-In Order Accuracy VLM - stream density avg latency 10s MiniCPM-V-4.5 INT4 (iGPU)"
+                description: |
+                  Finds the largest number of plate photos the AI model can check at the
+                  same time while each answer still takes 10 seconds or less on average.
+                  The key result is that number, shown as streams (one stream is one plate
+                  photo).
+                devices: [igpu]
+                requirements:
+                  <<: *oa_requirements
+                  igpu_required: true
+
+              - <<: *dine_in_density
+                test_id: "DIO-VLM-006"
+                display_name: "Dine-In Order Accuracy VLM - stream density avg latency 10s MiniCPM-V-4.5 INT4 (dGPU)"
+                description: |
+                  Finds the largest number of plate photos the AI model can check at the
+                  same time while each answer still takes 10 seconds or less on average.
+                  The key result is that number, shown as streams (one stream is one plate
+                  photo).
+                devices: [dgpu]
+                requirements:
+                  <<: *oa_requirements
+                  dgpu_required: true

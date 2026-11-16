@@ -198,7 +198,7 @@ class TelemetryCollector:
             "platform_telemetry (external) and the existing sysfs telemetry "
             "modules cannot be enabled together in the same profile.  "
             "Pick exactly one group per profile.  "
-            "See docs/getting-started/telemetry/ for the supported configurations."
+            "See docs/guides/developer/telemetry.md for the supported configurations."
         )
 
         # 1. Mixed groups in the modules list itself.

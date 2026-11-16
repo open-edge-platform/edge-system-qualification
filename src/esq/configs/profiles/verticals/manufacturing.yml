@@ -105,6 +105,91 @@ params:
       - name: npu_freq
         enabled: true
 
+  # Manufacturing reference values for report comparison.
+  verified_reference_data:
+    vision_ai:
+      columns:
+        test_id: "Test ID"
+        scenario: "Scenario"
+        device_sku: "Device SKU"
+        type: "Type"
+        model: "Model"
+        precision: "Precision"
+        batch_size: "Batch Size"
+        no_of_streams: "No. of Streams"
+      data:
+        - test_id: "MFG-PDD-001"
+          scenario: "Pallet Defect Detection - YOLOX-TINY INT8 (CPU)"
+          device_sku: "Intel Core Ultra Series 3 X7 358H"
+          type: "CPU"
+          model: "YOLOX-TINY"
+          precision: "INT8"
+          batch_size: 1
+          no_of_streams: 6
+        - test_id: "MFG-PDD-002"
+          scenario: "Pallet Defect Detection - YOLOX-TINY INT8 (iGPU)"
+          device_sku: "Intel Core Ultra Series 3 X7 358H"
+          type: "iGPU"
+          model: "YOLOX-TINY"
+          precision: "INT8"
+          batch_size: 1
+          no_of_streams: 5
+        - test_id: "MFG-PDD-003"
+          scenario: "Pallet Defect Detection - YOLOX-TINY INT8 (dGPU)"
+          device_sku: "Intel Arc B580"
+          type: "dGPU"
+          model: "YOLOX-TINY"
+          precision: "INT8"
+          batch_size: 1
+          no_of_streams: 10
+        - test_id: "MFG-PDD-004"
+          scenario: "Pallet Defect Detection - YOLOX-TINY FP32 (CPU)"
+          device_sku: "Intel Core Ultra Series 3 X7 358H"
+          type: "CPU"
+          model: "YOLOX-TINY"
+          precision: "FP32"
+          batch_size: 1
+          no_of_streams: 4
+        - test_id: "MFG-PDD-005"
+          scenario: "Pallet Defect Detection - YOLOX-TINY FP32 (iGPU)"
+          device_sku: "Intel Core Ultra Series 3 X7 358H"
+          type: "iGPU"
+          model: "YOLOX-TINY"
+          precision: "FP32"
+          batch_size: 1
+          no_of_streams: 4
+        - test_id: "MFG-PDD-006"
+          scenario: "Pallet Defect Detection - YOLOX-TINY FP32 (dGPU)"
+          device_sku: "Intel Arc B580"
+          type: "dGPU"
+          model: "YOLOX-TINY"
+          precision: "FP32"
+          batch_size: 1
+          no_of_streams: 8
+        - test_id: "MFG-PDD-007"
+          scenario: "Pallet Defect Detection - YOLOX-TINY FP16 (CPU)"
+          device_sku: "Intel Core Ultra Series 3 X7 358H"
+          type: "CPU"
+          model: "YOLOX-TINY"
+          precision: "FP16"
+          batch_size: 1
+          no_of_streams: 5
+        - test_id: "MFG-PDD-008"
+          scenario: "Pallet Defect Detection - YOLOX-TINY FP16 (iGPU)"
+          device_sku: "Intel Core Ultra Series 3 X7 358H"
+          type: "iGPU"
+          model: "YOLOX-TINY"
+          precision: "FP16"
+          batch_size: 1
+          no_of_streams: 4
+        - test_id: "MFG-PDD-009"
+          scenario: "Pallet Defect Detection - YOLOX-TINY FP16 (dGPU)"
+          device_sku: "Intel Arc B580"
+          type: "dGPU"
+          model: "YOLOX-TINY"
+          precision: "FP16"
+          batch_size: 1
+          no_of_streams: 6
 
 suites:
   - name: "ai"

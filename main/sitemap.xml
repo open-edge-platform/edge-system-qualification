@@ -2,174 +2,290 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://open-edge-platform.github.io/edge-system-qualification/main/</loc>
-         <lastmod>2026-11-02</lastmod>
+         <lastmod>2026-11-16</lastmod>
     </url>
     <url>
          <loc>https://open-edge-platform.github.io/edge-system-qualification/main/about/</loc>
-         <lastmod>2026-11-02</lastmod>
+         <lastmod>2026-11-16</lastmod>
     </url>
     <url>
          <loc>https://open-edge-platform.github.io/edge-system-qualification/main/about/changelog/</loc>
-         <lastmod>2026-11-02</lastmod>
+         <lastmod>2026-11-16</lastmod>
     </url>
     <url>
          <loc>https://open-edge-platform.github.io/edge-system-qualification/main/about/license/</loc>
-         <lastmod>2026-11-02</lastmod>
+         <lastmod>2026-11-16</lastmod>
     </url>
     <url>
          <loc>https://open-edge-platform.github.io/edge-system-qualification/main/about/support/</loc>
-         <lastmod>2026-11-02</lastmod>
+         <lastmod>2026-11-16</lastmod>
     </url>
     <url>
          <loc>https://open-edge-platform.github.io/edge-system-qualification/main/assets/</loc>
-         <lastmod>2026-11-02</lastmod>
+         <lastmod>2026-11-16</lastmod>
     </url>
     <url>
          <loc>https://open-edge-platform.github.io/edge-system-qualification/main/getting-started/</loc>
-         <lastmod>2026-11-02</lastmod>
+         <lastmod>2026-11-16</lastmod>
     </url>
     <url>
          <loc>https://open-edge-platform.github.io/edge-system-qualification/main/getting-started/quick-start/</loc>
-         <lastmod>2026-11-02</lastmod>
+         <lastmod>2026-11-16</lastmod>
     </url>
     <url>
          <loc>https://open-edge-platform.github.io/edge-system-qualification/main/getting-started/requirements/</loc>
-         <lastmod>2026-11-02</lastmod>
-    </url>
-    <url>
-         <loc>https://open-edge-platform.github.io/edge-system-qualification/main/getting-started/suites/</loc>
-         <lastmod>2026-11-02</lastmod>
-    </url>
-    <url>
-         <loc>https://open-edge-platform.github.io/edge-system-qualification/main/getting-started/telemetry/</loc>
-         <lastmod>2026-11-02</lastmod>
+         <lastmod>2026-11-16</lastmod>
     </url>
     <url>
          <loc>https://open-edge-platform.github.io/edge-system-qualification/main/guides/</loc>
-         <lastmod>2026-11-02</lastmod>
+         <lastmod>2026-11-16</lastmod>
     </url>
     <url>
          <loc>https://open-edge-platform.github.io/edge-system-qualification/main/guides/optimization/</loc>
-         <lastmod>2026-11-02</lastmod>
+         <lastmod>2026-11-16</lastmod>
     </url>
     <url>
          <loc>https://open-edge-platform.github.io/edge-system-qualification/main/guides/troubleshooting/</loc>
-         <lastmod>2026-11-02</lastmod>
+         <lastmod>2026-11-16</lastmod>
     </url>
     <url>
          <loc>https://open-edge-platform.github.io/edge-system-qualification/main/guides/developer/</loc>
-         <lastmod>2026-11-02</lastmod>
+         <lastmod>2026-11-16</lastmod>
     </url>
     <url>
          <loc>https://open-edge-platform.github.io/edge-system-qualification/main/guides/developer/advanced/</loc>
-         <lastmod>2026-11-02</lastmod>
+         <lastmod>2026-11-16</lastmod>
     </url>
     <url>
          <loc>https://open-edge-platform.github.io/edge-system-qualification/main/guides/developer/allure-reports/</loc>
-         <lastmod>2026-11-02</lastmod>
+         <lastmod>2026-11-16</lastmod>
     </url>
     <url>
          <loc>https://open-edge-platform.github.io/edge-system-qualification/main/guides/developer/assets/</loc>
-         <lastmod>2026-11-02</lastmod>
+         <lastmod>2026-11-16</lastmod>
     </url>
     <url>
          <loc>https://open-edge-platform.github.io/edge-system-qualification/main/guides/developer/configuration/</loc>
-         <lastmod>2026-11-02</lastmod>
+         <lastmod>2026-11-16</lastmod>
     </url>
     <url>
          <loc>https://open-edge-platform.github.io/edge-system-qualification/main/guides/developer/fixtures/</loc>
-         <lastmod>2026-11-02</lastmod>
+         <lastmod>2026-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://open-edge-platform.github.io/edge-system-qualification/main/guides/developer/integration-types/</loc>
+         <lastmod>2026-11-16</lastmod>
     </url>
     <url>
          <loc>https://open-edge-platform.github.io/edge-system-qualification/main/guides/developer/kpi-validation/</loc>
-         <lastmod>2026-11-02</lastmod>
+         <lastmod>2026-11-16</lastmod>
     </url>
     <url>
          <loc>https://open-edge-platform.github.io/edge-system-qualification/main/guides/developer/profiles-file/</loc>
-         <lastmod>2026-11-02</lastmod>
+         <lastmod>2026-11-16</lastmod>
     </url>
     <url>
          <loc>https://open-edge-platform.github.io/edge-system-qualification/main/guides/developer/quick-reference/</loc>
-         <lastmod>2026-11-02</lastmod>
+         <lastmod>2026-11-16</lastmod>
     </url>
     <url>
          <loc>https://open-edge-platform.github.io/edge-system-qualification/main/guides/developer/requirements/</loc>
-         <lastmod>2026-11-02</lastmod>
+         <lastmod>2026-11-16</lastmod>
     </url>
     <url>
          <loc>https://open-edge-platform.github.io/edge-system-qualification/main/guides/developer/results-metrics/</loc>
-         <lastmod>2026-11-02</lastmod>
+         <lastmod>2026-11-16</lastmod>
     </url>
     <url>
          <loc>https://open-edge-platform.github.io/edge-system-qualification/main/guides/developer/telemetry/</loc>
-         <lastmod>2026-11-02</lastmod>
+         <lastmod>2026-11-16</lastmod>
     </url>
     <url>
          <loc>https://open-edge-platform.github.io/edge-system-qualification/main/guides/developer/writing-tests/</loc>
-         <lastmod>2026-11-02</lastmod>
+         <lastmod>2026-11-16</lastmod>
     </url>
     <url>
          <loc>https://open-edge-platform.github.io/edge-system-qualification/main/includes/common/quick-start/docker-engine/</loc>
-         <lastmod>2026-11-02</lastmod>
+         <lastmod>2026-11-16</lastmod>
     </url>
     <url>
          <loc>https://open-edge-platform.github.io/edge-system-qualification/main/includes/common/quick-start/esq-install/</loc>
-         <lastmod>2026-11-02</lastmod>
+         <lastmod>2026-11-16</lastmod>
     </url>
     <url>
          <loc>https://open-edge-platform.github.io/edge-system-qualification/main/includes/common/quick-start/python-package-manager/</loc>
-         <lastmod>2026-11-02</lastmod>
+         <lastmod>2026-11-16</lastmod>
     </url>
     <url>
          <loc>https://open-edge-platform.github.io/edge-system-qualification/main/includes/common/quick-start/run/</loc>
-         <lastmod>2026-11-02</lastmod>
+         <lastmod>2026-11-16</lastmod>
     </url>
     <url>
          <loc>https://open-edge-platform.github.io/edge-system-qualification/main/includes/common/quick-start/system-drivers/</loc>
-         <lastmod>2026-11-02</lastmod>
+         <lastmod>2026-11-16</lastmod>
     </url>
     <url>
          <loc>https://open-edge-platform.github.io/edge-system-qualification/main/includes/common/quick-start/system-setup-advanced/</loc>
-         <lastmod>2026-11-02</lastmod>
+         <lastmod>2026-11-16</lastmod>
     </url>
     <url>
          <loc>https://open-edge-platform.github.io/edge-system-qualification/main/includes/common/quick-start/system-setup-rt/</loc>
-         <lastmod>2026-11-02</lastmod>
+         <lastmod>2026-11-16</lastmod>
     </url>
     <url>
          <loc>https://open-edge-platform.github.io/edge-system-qualification/main/includes/common/quick-start/system-setup/</loc>
-         <lastmod>2026-11-02</lastmod>
+         <lastmod>2026-11-16</lastmod>
     </url>
     <url>
          <loc>https://open-edge-platform.github.io/edge-system-qualification/main/includes/common/quick-start/uninstall/</loc>
-         <lastmod>2026-11-02</lastmod>
+         <lastmod>2026-11-16</lastmod>
     </url>
     <url>
          <loc>https://open-edge-platform.github.io/edge-system-qualification/main/includes/common/requirements/operating-system/</loc>
-         <lastmod>2026-11-02</lastmod>
+         <lastmod>2026-11-16</lastmod>
     </url>
     <url>
          <loc>https://open-edge-platform.github.io/edge-system-qualification/main/includes/quick-start/ai-edge-system/</loc>
-         <lastmod>2026-11-02</lastmod>
+         <lastmod>2026-11-16</lastmod>
     </url>
     <url>
          <loc>https://open-edge-platform.github.io/edge-system-qualification/main/includes/quick-start/generic/</loc>
-         <lastmod>2026-11-02</lastmod>
+         <lastmod>2026-11-16</lastmod>
     </url>
     <url>
          <loc>https://open-edge-platform.github.io/edge-system-qualification/main/includes/quick-start/hec/</loc>
-         <lastmod>2026-11-02</lastmod>
+         <lastmod>2026-11-16</lastmod>
     </url>
     <url>
          <loc>https://open-edge-platform.github.io/edge-system-qualification/main/includes/requirements/ai-edge-system/</loc>
-         <lastmod>2026-11-02</lastmod>
+         <lastmod>2026-11-16</lastmod>
     </url>
     <url>
          <loc>https://open-edge-platform.github.io/edge-system-qualification/main/includes/requirements/generic/</loc>
-         <lastmod>2026-11-02</lastmod>
+         <lastmod>2026-11-16</lastmod>
     </url>
     <url>
          <loc>https://open-edge-platform.github.io/edge-system-qualification/main/includes/requirements/hec/</loc>
-         <lastmod>2026-11-02</lastmod>
+         <lastmod>2026-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://open-edge-platform.github.io/edge-system-qualification/main/profiles/</loc>
+         <lastmod>2026-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://open-edge-platform.github.io/edge-system-qualification/main/profiles/horizontal/</loc>
+         <lastmod>2026-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://open-edge-platform.github.io/edge-system-qualification/main/profiles/qualification/</loc>
+         <lastmod>2026-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://open-edge-platform.github.io/edge-system-qualification/main/profiles/vertical/</loc>
+         <lastmod>2026-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://open-edge-platform.github.io/edge-system-qualification/main/suites/</loc>
+         <lastmod>2026-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://open-edge-platform.github.io/edge-system-qualification/main/suites/ai/adbscan/</loc>
+         <lastmod>2026-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://open-edge-platform.github.io/edge-system-qualification/main/suites/ai/chatqna-core/</loc>
+         <lastmod>2026-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://open-edge-platform.github.io/edge-system-qualification/main/suites/ai/dlstreamer/</loc>
+         <lastmod>2026-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://open-edge-platform.github.io/edge-system-qualification/main/suites/ai/funasr/</loc>
+         <lastmod>2026-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://open-edge-platform.github.io/edge-system-qualification/main/suites/ai/ov-benchmark/</loc>
+         <lastmod>2026-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://open-edge-platform.github.io/edge-system-qualification/main/suites/ai/text-generation/</loc>
+         <lastmod>2026-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://open-edge-platform.github.io/edge-system-qualification/main/suites/ai/video-analytics/</loc>
+         <lastmod>2026-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://open-edge-platform.github.io/edge-system-qualification/main/suites/ai/vlm-prompt/</loc>
+         <lastmod>2026-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://open-edge-platform.github.io/edge-system-qualification/main/suites/ai/whisper/</loc>
+         <lastmod>2026-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://open-edge-platform.github.io/edge-system-qualification/main/suites/ai/wind-turbine/</loc>
+         <lastmod>2026-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://open-edge-platform.github.io/edge-system-qualification/main/suites/media/media-pipelines/</loc>
+         <lastmod>2026-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://open-edge-platform.github.io/edge-system-qualification/main/suites/realtime/cyclictest/</loc>
+         <lastmod>2026-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://open-edge-platform.github.io/edge-system-qualification/main/suites/realtime/platform/</loc>
+         <lastmod>2026-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://open-edge-platform.github.io/edge-system-qualification/main/suites/system/cpu/</loc>
+         <lastmod>2026-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://open-edge-platform.github.io/edge-system-qualification/main/suites/system/display/</loc>
+         <lastmod>2026-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://open-edge-platform.github.io/edge-system-qualification/main/suites/system/gpu/</loc>
+         <lastmod>2026-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://open-edge-platform.github.io/edge-system-qualification/main/suites/system/memory-health/</loc>
+         <lastmod>2026-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://open-edge-platform.github.io/edge-system-qualification/main/suites/system/memory-stream/</loc>
+         <lastmod>2026-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://open-edge-platform.github.io/edge-system-qualification/main/suites/system/network/</loc>
+         <lastmod>2026-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://open-edge-platform.github.io/edge-system-qualification/main/suites/system/peripheral/</loc>
+         <lastmod>2026-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://open-edge-platform.github.io/edge-system-qualification/main/suites/system/stress-ng/</loc>
+         <lastmod>2026-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://open-edge-platform.github.io/edge-system-qualification/main/suites/vertical/loss-prevention-vlm/</loc>
+         <lastmod>2026-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://open-edge-platform.github.io/edge-system-qualification/main/suites/vertical/order-accuracy/</loc>
+         <lastmod>2026-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://open-edge-platform.github.io/edge-system-qualification/main/suites/vertical/proxy-pipelines/</loc>
+         <lastmod>2026-11-16</lastmod>
+    </url>
+    <url>
+         <loc>https://open-edge-platform.github.io/edge-system-qualification/main/suites/virtualization/kvm/</loc>
+         <lastmod>2026-11-16</lastmod>
     </url>
 </urlset>

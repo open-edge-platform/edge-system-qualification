@@ -1,0 +1,4118 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A comprehensive framework for testing and evaluating edge computing systems. Provides automated test suites, system validation, and detailed reporting  for Intel edge platforms.">
+      
+      
+      
+        <link rel="canonical" href="https://open-edge-platform.github.io/edge-system-qualification/main/suites/ai/vlm-prompt/">
+      
+      
+        <link rel="prev" href="../dlstreamer/">
+      
+      
+        <link rel="next" href="../text-generation/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/logo.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.1">
+    
+    
+      
+        <title>VLM Prompt - Intel® Edge System Qualification</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.57a0d79d.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.fb2fffe2.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="white" data-md-color-accent="white">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#vlm-prompt" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="Intel® Edge System Qualification" class="md-header__button md-logo" aria-label="Intel® Edge System Qualification" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Intel® Edge System Qualification
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              VLM Prompt
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="white" data-md-color-accent="white"  aria-hidden="true"  type="radio" name="__palette" id="__palette_0">
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/open-edge-platform/edge-system-qualification" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    open-edge-platform/edge-system-qualification
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../getting-started/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../profiles/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Profiles
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../../" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Suites
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../guides/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../about/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  About
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="Intel® Edge System Qualification" class="md-nav__button md-logo" aria-label="Intel® Edge System Qualification" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Intel® Edge System Qualification
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/open-edge-platform/edge-system-qualification" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    open-edge-platform/edge-system-qualification
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../getting-started/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting-started/requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting-started/quick-start/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../profiles/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profiles
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Profiles
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../profiles/qualification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Qualification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../profiles/vertical/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vertical
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../profiles/horizontal/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Horizontal
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Suites
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Suites
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4_2" id="__nav_4_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    AI
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dlstreamer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DL Streamer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    VLM Prompt
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    VLM Prompt
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How It Works
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Metrics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Metrics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#metric-naming" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Metric Naming
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parameters
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ingredients-of-the-order-accuracy-profiles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ingredients of the Order Accuracy Profiles
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#architecture-comparison-with-the-upstream-applications" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture Comparison With the Upstream Applications
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Architecture Comparison With the Upstream Applications">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#vlm-prompt-suite-type-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VLM Prompt Suite (Type 1)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dine-in-application-type-2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dine-In Application (Type 2)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#take-away-application-type-2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Take-Away Application (Type 2)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Components
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#comparison-with-the-upstream-benchmarks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Comparison With the Upstream Benchmarks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#checking-comparability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Checking Comparability
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rest-workers-and-max_num_seqs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        REST Workers and max_num_seqs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#profiles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Profiles
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../text-generation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Text Generation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../chatqna-core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Chat Q&A Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ov-benchmark/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    OpenVINO Benchmark
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../video-analytics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Video Analytics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../funasr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FunASR
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../whisper/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Whisper
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adbscan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADBScan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../wind-turbine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Wind Turbine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_3" id="__nav_4_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Media
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Media
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../media/media-pipelines/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Media Pipelines
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_4" id="__nav_4_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Real-Time
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Real-Time
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../realtime/cyclictest/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cyclictest
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../realtime/platform/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform Checks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_5" id="__nav_4_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    System
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    System
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../system/cpu/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CPU
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../system/display/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Display
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../system/gpu/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GPU
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../system/memory-health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Memory Health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../system/memory-stream/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Memory STREAM
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../system/network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Network
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../system/peripheral/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Peripheral
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../system/stress-ng/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    stress-ng
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_6" id="__nav_4_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vertical
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Vertical
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../vertical/order-accuracy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Order Accuracy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../vertical/loss-prevention-vlm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Loss Prevention VLM
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../vertical/proxy-pipelines/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proxy Pipelines
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_7" id="__nav_4_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Virtualization
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Virtualization
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../virtualization/kvm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    KVM
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../guides/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/optimization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Optimization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../guides/developer/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developer
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/developer/integration-types/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/developer/writing-tests/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Writing Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_4_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4_4" id="__nav_5_4_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_4_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/developer/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profile & Test Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/developer/requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    System Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/developer/profiles-file/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Profiles File Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_4_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4_5" id="__nav_5_4_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Framework API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_4_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Framework API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/developer/fixtures/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Fixtures Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/developer/results-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Results & Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/developer/kpi-validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    KPI Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_4_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4_6" id="__nav_5_4_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_4_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/developer/assets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Asset Management
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/developer/telemetry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Modular Telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_4_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4_7" id="__nav_5_4_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Advanced
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_5_4_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Advanced
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/developer/advanced/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Best Practices
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../guides/developer/allure-reports/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Allure Report Customization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../about/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    About
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_6" id="__nav_6_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    About
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../about/license/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    License
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../about/support/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Support
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../about/changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How It Works
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Metrics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Metrics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#metric-naming" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Metric Naming
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parameters
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ingredients-of-the-order-accuracy-profiles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ingredients of the Order Accuracy Profiles
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#architecture-comparison-with-the-upstream-applications" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture Comparison With the Upstream Applications
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Architecture Comparison With the Upstream Applications">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#vlm-prompt-suite-type-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VLM Prompt Suite (Type 1)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dine-in-application-type-2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dine-In Application (Type 2)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#take-away-application-type-2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Take-Away Application (Type 2)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Components
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#comparison-with-the-upstream-benchmarks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Comparison With the Upstream Benchmarks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#checking-comparability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Checking Comparability
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rest-workers-and-max_num_seqs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        REST Workers and max_num_seqs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#profiles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Profiles
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/open-edge-platform/edge-system-qualification/edit/master/docs/suites/ai/vlm-prompt.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+    
+      
+    
+    <a href="https://github.com/open-edge-platform/edge-system-qualification/raw/master/docs/suites/ai/vlm-prompt.md" title="View source of this page" class="md-content__button md-icon">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 18c.56 0 1 .44 1 1s-.44 1-1 1-1-.44-1-1 .44-1 1-1m0-3c-2.73 0-5.06 1.66-6 4 .94 2.34 3.27 4 6 4s5.06-1.66 6-4c-.94-2.34-3.27-4-6-4m0 6.5a2.5 2.5 0 0 1-2.5-2.5 2.5 2.5 0 0 1 2.5-2.5 2.5 2.5 0 0 1 2.5 2.5 2.5 2.5 0 0 1-2.5 2.5M9.27 20H6V4h7v5h5v4.07c.7.08 1.36.25 2 .49V8l-6-6H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h4.5a8.2 8.2 0 0 1-1.23-2"/></svg>
+    </a>
+  
+
+
+<h1 id="vlm-prompt">VLM Prompt<a class="headerlink" href="#vlm-prompt" title="Permanent link">&para;</a></h1>
+<p>Sends prompts with images or video frames to a vision language model (VLM) on OpenVINO™ Model Server (OVMS) and measures token throughput, request latency, and how many requests the device can serve at the same time within a latency target.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Test suite</strong></td>
+<td><code>test_vlm_prompt</code> (<code>src/esq/suites/ai/gen/test_vlm_prompt.py</code>)</td>
+</tr>
+<tr>
+<td><strong>Integration type</strong></td>
+<td><a href="../../../guides/developer/integration-types/#type-1-generic-suite-with-configurable-ingredients">Type 1: generic suite</a>. The model, prompt, and media come from the profile.</td>
+</tr>
+<tr>
+<td><strong>Key metric</strong></td>
+<td>Fixed load: <code>output_token_throughput</code> (tokens/sec). Stream density: <code>streams_max</code> (streams). Both per device, for example <code>output_token_throughput_igpu</code> or <code>streams_max_dgpu1</code>.</td>
+</tr>
+<tr>
+<td><strong>Devices</strong></td>
+<td>CPU, iGPU, dGPU. A category that matches several devices (two dGPUs) runs once on each.</td>
+</tr>
+</tbody>
+</table>
+<p>It is the baseline of the Order Accuracy applications: only the model server and a load generator run, without the application's other services. The <a href="../../vertical/order-accuracy/">Order Accuracy</a> suites (Type 2) run the full applications.</p>
+<h2 id="how-it-works">How It Works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h2>
+<ol>
+<li>Export the model with the OVMS export flow of the text generation suite (or download a pre-quantized model), write the serving graph, and download the <code>media</code>.</li>
+<li>Start one OVMS container on the device.</li>
+<li>Run the load generator (<code>src/vlm_prompt/vlm_client.py</code>) in its own <code>uv</code> venv. It sends chat-completion requests from concurrent workers and records latency and token usage of every request.</li>
+<li>Report the results:<ul>
+<li><strong>Fixed load</strong> (<code>benchmark_mode: fixed_workers</code>): <code>benchmark_workers</code> run for <code>benchmark_duration</code>. Requests started during <code>benchmark_init_duration</code> are left out.</li>
+<li><strong>Stream density</strong> (<code>benchmark_mode: stream_density</code>): adds concurrent requests until the latency exceeds <code>target_latency_ms</code> and reports the largest count that passed. The count is searched with the latency-guided search of <code>test_dlstreamer</code> (<code>density_search: adaptive</code>) or one step at a time (<code>linear</code>).</li>
+</ul>
+</li>
+</ol>
+<h2 id="metrics">Metrics<a class="headerlink" href="#metrics" title="Permanent link">&para;</a></h2>
+<p>Per device, with the device as suffix (<code>_cpu</code>, <code>_igpu</code>, <code>_dgpu1</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Unit</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>output_token_throughput</code></td>
+<td>tokens/sec</td>
+<td>Standard aggregate throughput of the system: the generated tokens of all measured requests, from all concurrent workers, divided by the measurement window from the start of the first request to the end of the last (key metric of fixed load)</td>
+</tr>
+<tr>
+<td><code>request_latency_avg</code></td>
+<td>sec</td>
+<td>Mean duration of a full request</td>
+</tr>
+<tr>
+<td><code>streams_max</code></td>
+<td>streams</td>
+<td>Stream density: most concurrent requests within the target (key metric of stream density)</td>
+</tr>
+<tr>
+<td><code>time_to_first_token_cold_start</code></td>
+<td>sec</td>
+<td>Time to first token of the first request after the model server starts</td>
+</tr>
+<tr>
+<td><code>time_to_first_token_warm_start</code></td>
+<td>sec</td>
+<td>Mean time to first token of the following requests</td>
+</tr>
+</tbody>
+</table>
+<p><code>output_token_throughput</code> is a system-level value over many requests, not the rate of one request. With one worker it is the rate of requests that follow each other. With several workers it adds up their tokens, so it grows with the concurrency until the device is saturated. It is not the mean of the per-request rates, which is the <code>throughput_mean_sec</code> of the Order Accuracy applications, see <a href="#metric-naming">Metric Naming</a>.</p>
+<p>The metadata of the result also has <code>request_count</code>, <code>measurement_window_sec</code>, <code>input_sequence_length_avg</code>, <code>output_sequence_length_avg</code> (in tokens), and <code>throughput_mean_sec</code>, see below.</p>
+<h3 id="metric-naming">Metric Naming<a class="headerlink" href="#metric-naming" title="Permanent link">&para;</a></h3>
+<p>The names follow the LLM serving metrics of NVIDIA <a href="https://docs.nvidia.com/aiperf/reference/ai-perf-metrics-reference">GenAI-Perf and AIPerf</a> and the <a href="https://github.com/open-telemetry/semantic-conventions-genai/blob/main/docs/gen-ai/gen-ai-metrics.md">OpenTelemetry GenAI semantic conventions</a>, written in snake case with <code>sec</code> for seconds. The suite does not use the names of the Order Accuracy applications, so it can serve other workloads.</p>
+<table>
+<thead>
+<tr>
+<th>ESQ metric</th>
+<th>AIPerf, GenAI-Perf</th>
+<th>OpenTelemetry GenAI</th>
+<th>Take-Away and Dine-In applications</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>request_latency_avg</code></td>
+<td><code>request_latency</code> (mean)</td>
+<td><code>gen_ai.client.inference.duration</code></td>
+<td><code>vlm_avg_call_duration</code> of <code>test_ta_vlm</code> and <code>test_di_vlm</code>, <code>VLM_AVERAGE_CALL_DURATION</code> in <code>consolidated_metrics.csv</code>, <code>elapsed_sec</code> of the <code>ovms_vlm_request</code> event</td>
+</tr>
+<tr>
+<td><code>output_token_throughput</code></td>
+<td><code>output_token_throughput</code> (same definition, aggregate of all concurrent requests)</td>
+<td>None</td>
+<td>None. The closest is <code>throughput_mean_sec</code>, which is a per-request mean, see the note below</td>
+</tr>
+<tr>
+<td><code>time_to_first_token_cold_start</code>, <code>time_to_first_token_warm_start</code></td>
+<td><code>time_to_first_token</code></td>
+<td><code>gen_ai.server.time_to_first_token</code></td>
+<td>Not reported</td>
+</tr>
+<tr>
+<td><code>input_sequence_length_avg</code>, <code>output_sequence_length_avg</code></td>
+<td><code>input_sequence_length</code>, <code>output_sequence_length</code></td>
+<td><code>gen_ai.client.inference.operation.input_tokens</code>, <code>...output_tokens</code></td>
+<td><code>prompt_tokens</code>, <code>completion_tokens</code> of the <code>ovms_vlm_request</code> event, <code>generated_tokens</code></td>
+</tr>
+<tr>
+<td><code>streams_max</code></td>
+<td>None</td>
+<td>None</td>
+<td>Result of <code>make benchmark-stream-density</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>throughput_mean_sec</code> of the applications is the mean over the requests of the generated tokens divided by the request latency. It has no standard name, and it is not the standard output token throughput, which divides all generated tokens by the measurement window and so also counts the time between requests. The two are equal when requests follow each other without a gap, and differ by the time the client needs to prepare a request (0.3% for Dine-In, 7.6% for Take-Away, which prepares 3 video frames per request on the CPU). The suite keeps the application value as <code>throughput_mean_sec</code> in the metadata, and the <a href="#comparison-with-the-upstream-benchmarks">comparison</a> uses it. The applications have no time per output token in the standard sense: their <code>tpot_sec</code> is the request latency divided by the generated tokens, which includes the time to first token.</p>
+<p>The time to first token follows the name and unit of <code>gen_ai.server.time_to_first_token</code> in the <a href="https://github.com/open-telemetry/semantic-conventions-genai/blob/main/docs/gen-ai/gen-ai-metrics.md">OpenTelemetry GenAI semantic conventions</a>, called TTFT in MLPerf Inference. It covers the time in the queue and the prefill of the prompt and images. It is measured by a short probe of <code>ttft_requests</code> streaming requests, one after another, right after the server starts and before any other request. The benchmark requests stay non-streaming like the source applications, so the throughput and latency are unchanged. The cold start is the first request, which pays for the lazy initialization of the model, and the warm start is the mean of the others. Requests repeat the same prompt and media, so the warm start benefits from prefix caching like the benchmark requests do. With <code>restart_server_per_iteration</code> the probe runs only after the first start.</p>
+<h2 id="parameters">Parameters<a class="headerlink" href="#parameters" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>model_id</code></td>
+<td>required</td>
+<td>Hugging Face model ID</td>
+</tr>
+<tr>
+<td><code>model_precision</code>, <code>quantization_params</code></td>
+<td>unset</td>
+<td>Export and quantize <code>model_id</code> (for example <code>int4</code>). Unset means <code>model_id</code> is a pre-quantized OpenVINO model.</td>
+</tr>
+<tr>
+<td><code>ovms_container_image</code></td>
+<td><code>openvino/model_server:2026.3.1-gpu</code></td>
+<td>Model server image</td>
+</tr>
+<tr>
+<td><code>cache_size</code>, <code>max_num_seqs</code>, <code>max_num_batched_tokens</code>, <code>enable_prefix_caching</code>, <code>plugin_config</code></td>
+<td><code>4</code>, <code>4</code>, <code>8192</code>, <code>true</code>, <code>{}</code></td>
+<td>Serving graph settings (<code>VLM_CB</code> pipeline)</td>
+</tr>
+<tr>
+<td><code>rest_workers</code>, <code>max_rest_workers</code></td>
+<td>unset, unset</td>
+<td>OVMS REST worker threads. Unset uses the OVMS default of one per CPU core. <code>max_rest_workers</code> caps it on systems with many cores, see <a href="#rest-workers-and-max_num_seqs">REST Workers</a>.</td>
+</tr>
+<tr>
+<td><code>system_prompt</code>, <code>prompt</code>, <code>prompt_params</code></td>
+<td>required <code>prompt</code></td>
+<td>Prompt text. <code>${NAME}</code> is filled from <code>prompt_params</code>, <code>${NUM_FRAMES}</code> with the number of images in the request.</td>
+</tr>
+<tr>
+<td><code>media</code></td>
+<td>required</td>
+<td>Images or videos, each with <code>url</code>, <code>name</code>, and <code>sha256</code></td>
+</tr>
+<tr>
+<td><code>images_per_request</code></td>
+<td><code>3</code></td>
+<td>Images (or video frames, sampled evenly) per request</td>
+</tr>
+<tr>
+<td><code>image_max_size</code>, <code>jpeg_quality</code>, <code>image_preprocessing</code></td>
+<td><code>448</code>, <code>82</code>, <code>{}</code></td>
+<td>Square canvas size, JPEG quality, and enhancement (<code>contrast</code>, <code>color</code>, <code>sharpen_percent</code>, <code>min_size</code>, <code>progressive</code>, <code>enhance_after_padding</code>)</td>
+</tr>
+<tr>
+<td><code>max_new_tokens</code>, <code>temperature</code></td>
+<td><code>100</code>, <code>0.2</code></td>
+<td>Generation settings</td>
+</tr>
+<tr>
+<td><code>enable_thinking</code>, <code>response_format</code></td>
+<td>unset</td>
+<td>Sent only when set: <code>chat_template_kwargs</code> and structured output (JSON schema)</td>
+</tr>
+<tr>
+<td><code>benchmark_mode</code></td>
+<td><code>fixed_workers</code></td>
+<td><code>fixed_workers</code> or <code>stream_density</code></td>
+</tr>
+<tr>
+<td><code>benchmark_workers</code>, <code>benchmark_duration</code>, <code>benchmark_init_duration</code></td>
+<td><code>1</code>, <code>200</code>, <code>10</code></td>
+<td>Fixed load: workers, measured seconds, warm-up seconds</td>
+</tr>
+<tr>
+<td><code>target_latency_ms</code>, <code>latency_metric</code></td>
+<td><code>10000</code>, <code>avg</code></td>
+<td>Stream density target (<code>avg</code>, <code>p95</code>, or <code>max</code>)</td>
+</tr>
+<tr>
+<td><code>density_search</code>, <code>density_increment</code>, <code>max_workers</code></td>
+<td><code>adaptive</code>, <code>1</code>, <code>50</code></td>
+<td>Stream density search, step size, and most workers tested. A result equal to <code>max_workers</code> is reported as <code>Worker Limit: ... (reached)</code>.</td>
+</tr>
+<tr>
+<td><code>requests_per_worker</code>, <code>min_requests</code>, <code>request_timeout</code></td>
+<td><code>1</code>, <code>3</code>, <code>360</code></td>
+<td>Stream density: requests per worker per step, minimum requests, request timeout</td>
+</tr>
+<tr>
+<td><code>ttft_requests</code></td>
+<td><code>4</code></td>
+<td>Streaming requests of the time to first token probe: 1 cold start and the rest warm start. <code>0</code> turns it off.</td>
+</tr>
+<tr>
+<td><code>warmup</code>, <code>restart_server_per_iteration</code></td>
+<td>unset, <code>false</code></td>
+<td>Stream density: one small request before the first step, or a server restart before every step (cold model)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="ingredients-of-the-order-accuracy-profiles">Ingredients of the Order Accuracy Profiles<a class="headerlink" href="#ingredients-of-the-order-accuracy-profiles" title="Permanent link">&para;</a></h2>
+<p>The profiles take their ingredients from the official OEP release <code>2026.2.1</code>, whose <code>edge-ai-suites</code> tag pins <code>retail-ai-suite/order-accuracy</code> at <code>v2026.2.0</code> (commit <code>70734ba2</code>). Benchmark settings follow the <code>main</code> branch of <code>intel-retail/order-accuracy</code>, which only changes the target latency (10 s instead of 25 s).</p>
+<table>
+<thead>
+<tr>
+<th>Ingredient</th>
+<th>Take-Away (<code>retail-oa-ta.yml</code>)</th>
+<th>Dine-In (<code>retail-oa-di.yml</code>)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Model</td>
+<td><code>openbmb/MiniCPM-V-4_5</code>, INT4 asymmetric, group size 128 (as <code>setup_models.sh</code>)</td>
+<td>Same, shared export</td>
+</tr>
+<tr>
+<td>Serving</td>
+<td>OVMS <code>2026.3.1-gpu</code>, <code>VLM_CB</code>, cache 4 GB, 4 sequences, 8192 batched tokens</td>
+<td>Same</td>
+</tr>
+<tr>
+<td>Prompt</td>
+<td>Order-aware prompt with inventory and expected items, plus system prompt</td>
+<td>Generic template with inventory, JSON <code>response_format</code>, no system prompt</td>
+</tr>
+<tr>
+<td>Media</td>
+<td>Sample video, 3 frames per request</td>
+<td>4 plate images, 1 per request</td>
+</tr>
+<tr>
+<td>Generation</td>
+<td>100 tokens, temperature 0.2, thinking disabled</td>
+<td>96 tokens, temperature 0.0</td>
+</tr>
+<tr>
+<td>Fixed load</td>
+<td>1 worker, 10 s warm-up, 200 s</td>
+<td>1 worker, 60 s warm-up, 180 s</td>
+</tr>
+</tbody>
+</table>
+<p>The rendered prompts and <code>response_format</code> are identical to what the applications send, and the preprocessed images are identical byte for byte.</p>
+<h2 id="architecture-comparison-with-the-upstream-applications">Architecture Comparison With the Upstream Applications<a class="headerlink" href="#architecture-comparison-with-the-upstream-applications" title="Permanent link">&para;</a></h2>
+<p>The suite keeps the components that decide the VLM result (the model server, the model, the prompt, and the image preprocessing) and replaces the rest of the application with a load generator. Diagrams follow the <a href="https://github.com/intel-retail/order-accuracy/blob/main/docs/user-guide/oa-how-it-works.md#architecture-diagrams">upstream architecture diagrams</a>. Components with a dark border run in both; the others run only in the application.</p>
+<h3 id="vlm-prompt-suite-type-1">VLM Prompt Suite (Type 1)<a class="headerlink" href="#vlm-prompt-suite-type-1" title="Permanent link">&para;</a></h3>
+<pre class="mermaid"><code>%%{init: {'theme': 'base', 'themeVariables': {'fontSize': '14px', 'primaryColor': '#F5F5F5', 'primaryBorderColor': '#BDBDBD', 'lineColor': '#757575', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart LR
+    P["Profile YAML&lt;br/&gt;model, prompt, media,&lt;br/&gt;serving settings"] --&gt; T["test_vlm_prompt"]
+    T --&gt; PREP["Prepare&lt;br/&gt;model export, media,&lt;br/&gt;client venv"]
+    PREP --&gt; LG["Load generator&lt;br/&gt;vlm_client.py (uv venv)&lt;br/&gt;image preprocessing,&lt;br/&gt;N concurrent workers"]
+    LG --&gt;|"/v3/chat/completions"| OVMS["OVMS VLM_CB&lt;br/&gt;MiniCPM-V-4.5 INT4&lt;br/&gt;(one container)"]
+    OVMS --&gt; LG
+    LG --&gt; R["Result and Metrics&lt;br/&gt;tokens/sec, latency,&lt;br/&gt;streams_max"]
+
+    classDef shared fill:#E3F2FD,stroke:#1565C0,stroke-width:3px;
+    classDef defaultNode fill:#F5F5F5,stroke:#9E9E9E;
+    class OVMS,LG shared
+    class P,T,PREP,R defaultNode</code></pre>
+<h3 id="dine-in-application-type-2">Dine-In Application (Type 2)<a class="headerlink" href="#dine-in-application-type-2" title="Permanent link">&para;</a></h3>
+<pre class="mermaid"><code>%%{init: {'theme': 'base', 'themeVariables': {'fontSize': '14px', 'primaryColor': '#F5F5F5', 'primaryBorderColor': '#BDBDBD', 'lineColor': '#757575', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart LR
+    UI["Gradio UI&lt;br/&gt;:7861"] --&gt; API["FastAPI API&lt;br/&gt;:8083"]
+    API --&gt; VC["VLM client&lt;br/&gt;image preprocessing,&lt;br/&gt;circuit breaker"]
+    VC --&gt;|"/v3/chat/completions"| OVMS["OVMS VLM&lt;br/&gt;MiniCPM-V-4.5 INT4&lt;br/&gt;:8002"]
+    API --&gt; SC["Semantic client&lt;br/&gt;circuit breaker"]
+    SC --&gt; SEM["Semantic service&lt;br/&gt;:8081"]
+    API --&gt; VAL["Validation service"]
+    VAL --&gt; MET["Metrics collector&lt;br/&gt;:9000"]
+
+    classDef shared fill:#E3F2FD,stroke:#1565C0,stroke-width:3px;
+    classDef defaultNode fill:#F5F5F5,stroke:#9E9E9E;
+    class OVMS,VC shared
+    class UI,API,SC,SEM,VAL,MET defaultNode</code></pre>
+<h3 id="take-away-application-type-2">Take-Away Application (Type 2)<a class="headerlink" href="#take-away-application-type-2" title="Permanent link">&para;</a></h3>
+<pre class="mermaid"><code>%%{init: {'theme': 'base', 'themeVariables': {'fontSize': '14px', 'primaryColor': '#F5F5F5', 'primaryBorderColor': '#BDBDBD', 'lineColor': '#757575', 'edgeLabelBackground': '#FFFFFF'}}}%%
+flowchart LR
+    RTSP["RTSP streamer&lt;br/&gt;:8554"] --&gt; SW["Station workers&lt;br/&gt;GStreamer decode,&lt;br/&gt;OCR (EasyOCR)"]
+    SW --&gt; MINIO["MinIO&lt;br/&gt;frame storage"]
+    MINIO --&gt; FS["Frame selector&lt;br/&gt;YOLO11n, top 3 frames&lt;br/&gt;:8085"]
+    FS --&gt; SCH["VLM scheduler&lt;br/&gt;thread pool,&lt;br/&gt;image preprocessing"]
+    SCH --&gt;|"/v3/chat/completions"| OVMS["OVMS VLM&lt;br/&gt;MiniCPM-V-4.5 INT4&lt;br/&gt;:8001"]
+    FS --&gt; VAL["Validation agent"]
+    VAL --&gt; SEM["Semantic service&lt;br/&gt;:8081"]
+    SCH --&gt; UI["Gradio UI + FastAPI&lt;br/&gt;:7860, :8080"]
+    VAL --&gt; UI
+
+    classDef shared fill:#E3F2FD,stroke:#1565C0,stroke-width:3px;
+    classDef defaultNode fill:#F5F5F5,stroke:#9E9E9E;
+    class OVMS,SCH shared
+    class RTSP,SW,MINIO,FS,VAL,SEM,UI defaultNode</code></pre>
+<h3 id="components">Components<a class="headerlink" href="#components" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Function</th>
+<th>Take-Away application</th>
+<th>Dine-In application</th>
+<th>VLM Prompt suite</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>VLM serving</td>
+<td><code>ovms-vlm</code>, OVMS with MiniCPM-V-4.5 INT4</td>
+<td><code>dinein_ovms_vlm</code>, same</td>
+<td>One OVMS container, same model, image, and <code>VLM_CB</code> settings</td>
+</tr>
+<tr>
+<td>Model export</td>
+<td><code>setup_models.sh</code></td>
+<td>Shared with Take-Away</td>
+<td>OVMS export flow of the text generation suite, same quantization</td>
+</tr>
+<tr>
+<td>Request source</td>
+<td>Station workers and VLM scheduler (thread pool, staggered stations)</td>
+<td>FastAPI API, one request per image</td>
+<td>Load generator workers, requests back to back</td>
+</tr>
+<tr>
+<td>Image preprocessing</td>
+<td>Frame selector output, resized and encoded in the scheduler</td>
+<td>Orient, resize, enhance, JPEG 82% in the VLM client</td>
+<td>Same operations in <code>vlm_client.py</code>, same bytes</td>
+</tr>
+<tr>
+<td>Prompt</td>
+<td>Order-aware prompt with inventory and expected items</td>
+<td>Template with inventory and JSON <code>response_format</code></td>
+<td>Same text, from the profile</td>
+</tr>
+<tr>
+<td>Video capture and decode</td>
+<td>RTSP streamer, GStreamer</td>
+<td>Not used (images)</td>
+<td>Frames sampled from the media file</td>
+</tr>
+<tr>
+<td>Frame selection</td>
+<td>YOLO11n frame selector, MinIO storage</td>
+<td>Not used</td>
+<td>Not used, frames are sampled evenly</td>
+</tr>
+<tr>
+<td>OCR and validation</td>
+<td>EasyOCR, validation agent</td>
+<td>Validation service</td>
+<td>Not run</td>
+</tr>
+<tr>
+<td>Semantic matching</td>
+<td>Semantic service (<code>:8081</code>)</td>
+<td>Semantic service (<code>:8081</code>)</td>
+<td>Not run</td>
+</tr>
+<tr>
+<td>User interface and API</td>
+<td>Gradio and FastAPI</td>
+<td>Gradio and FastAPI</td>
+<td>None</td>
+</tr>
+<tr>
+<td>Metrics</td>
+<td>Application metrics logs</td>
+<td>Metrics collector</td>
+<td><code>Metrics</code> and the Allure report</td>
+</tr>
+<tr>
+<td>Resilience</td>
+<td>Circuit breaker, RTSP probe</td>
+<td>Circuit breakers</td>
+<td>Request timeout and per-device failure reporting</td>
+</tr>
+<tr>
+<td>Containers</td>
+<td>6</td>
+<td>4</td>
+<td>1</td>
+</tr>
+<tr>
+<td>Stream density</td>
+<td><code>make benchmark-stream-density</code>, restarts the stack per step</td>
+<td>Same</td>
+<td>Search with <code>density_search</code>, optional server restart per step</td>
+</tr>
+</tbody>
+</table>
+<p>What this means for the numbers: the suite measures the VLM path alone. Anything the application runs between requests (decoding, frame selection, OCR, semantic matching, the UI) appears only in the application result, which is why the Take-Away application is slower on the CPU and why <a href="#comparison-with-the-upstream-benchmarks">Dine-In matches within 3%</a>.</p>
+<h2 id="comparison-with-the-upstream-benchmarks">Comparison With the Upstream Benchmarks<a class="headerlink" href="#comparison-with-the-upstream-benchmarks" title="Permanent link">&para;</a></h2>
+<p>Measured on Intel® Core™ Ultra 9 285K with Intel® Arc™ Pro B70 (<code>GPU.1</code>), against the full applications (<code>test_ta_vlm</code>, <code>test_di_vlm</code>, and the upstream <code>make benchmark-stream-density</code>). Both send the same requests to the same model: 288 prompt and 15 completion tokens for Take-Away, 204 prompt tokens and the same answer per image for Dine-In.</p>
+<p><strong>Fixed load, warm requests (<code>request_latency_avg</code>, <code>throughput_mean_sec</code> per request):</strong></p>
+<table>
+<thead>
+<tr>
+<th>Device</th>
+<th>Take-Away app</th>
+<th>Take-Away baseline</th>
+<th>Dine-In app</th>
+<th>Dine-In baseline</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CPU</td>
+<td>5.04 s, 2.99</td>
+<td>4.46 s, 3.36 (−11%)</td>
+<td>3.10 s, 8.84</td>
+<td>3.05 s, 8.95 (−1.6%)</td>
+</tr>
+<tr>
+<td>iGPU</td>
+<td>5.54 s, 2.71</td>
+<td>5.42 s, 2.78 (−2%)</td>
+<td>3.17 s, 8.63</td>
+<td>3.16 s, 8.66 (−0.4%)</td>
+</tr>
+<tr>
+<td>dGPU</td>
+<td>0.375 s, 41.07</td>
+<td>0.294 s, 50.81 (−22%)</td>
+<td>0.400 s, 68.52</td>
+<td>0.388 s, 70.64 (−3.1%)</td>
+</tr>
+</tbody>
+</table>
+<p>The percentage is the latency of the baseline relative to the application, so a negative value means the baseline is faster. The Dine-In figures are from a later run than the Take-Away figures. The Dine-In application sends only 8 requests (the 4 images twice), so its warm value is the mean of the second pass of 4 requests. The baseline value is the mean of all requests after its warm-up. A single application run varies by a few percent: a first CPU run gave 3.66 s where the repeat gave 3.10 s.</p>
+<p><strong>Stream density, largest count within 10 s average latency:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Device</th>
+<th>Take-Away app</th>
+<th>Take-Away baseline</th>
+<th>Dine-In app</th>
+<th>Dine-In baseline</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CPU</td>
+<td>1</td>
+<td>2</td>
+<td>11</td>
+<td>12</td>
+</tr>
+<tr>
+<td>iGPU</td>
+<td>1</td>
+<td>1</td>
+<td>7</td>
+<td>7</td>
+</tr>
+<tr>
+<td>dGPU</td>
+<td>50 (limit)</td>
+<td>323</td>
+<td>50 (limit)</td>
+<td>380</td>
+</tr>
+</tbody>
+</table>
+<p>The upstream benchmark stops after 50 steps, so it reports 50 on the dGPU. The profiles set <code>max_workers: 600</code> (the default of the suite is 50), so the baseline finds the real maximum there.</p>
+<p>What the gaps mean:</p>
+<ul>
+<li><strong>Dine-In</strong> matches within 3%, and the baseline is never slower, because its workers send requests back to back like the load generator and no other service runs between them.</li>
+<li><strong>Take-Away</strong> is slower in the application. On the CPU its frame selector, video decoding, OCR, and semantic matching share the cores with the model. On the GPUs the application adds about 0.1 s per request, which is large for a 0.3 s dGPU request.</li>
+<li><strong>Take-Away stream density</strong> restarts the whole stack per step. The baseline does the same (<code>restart_server_per_iteration</code>) but sends each step's requests at once, while the application's stations are staggered, so its maximum is a conservative value.</li>
+</ul>
+<p>Compare warm requests with warm requests: <code>test_ta_vlm</code> averages its cold first request into about 6 calls, and <code>test_di_vlm</code> averages the cold requests of its first pass into 8 calls (4.39 s on the CPU against 3.10 s warm), so their reported <code>throughput_mean_sec</code> is lower than their own warm requests.</p>
+<h2 id="checking-comparability">Checking Comparability<a class="headerlink" href="#checking-comparability" title="Permanent link">&para;</a></h2>
+<p>When a profile reproduces another application, check the ingredients in this order:</p>
+<ol>
+<li><strong>Prompt and media:</strong> the same <code>usage.prompt_tokens</code> as the application's metrics log.</li>
+<li><strong>Model:</strong> the same <code>nncf</code> section in <code>openvino_language_model.xml</code> and the same <code>.bin</code> sizes. A pre-quantized model with the same name is often different (for example <code>OpenVINO/MiniCPM-V-4_5-int4-cw-ov</code> is channel-wise symmetric INT4).</li>
+<li><strong>Serving:</strong> the same OVMS image and <code>LLMCalculatorOptions</code> in <code>graph.pbtxt</code>.</li>
+<li><strong>Metrics:</strong> warm requests on both sides.</li>
+</ol>
+<h2 id="rest-workers-and-max_num_seqs">REST Workers and <code>max_num_seqs</code><a class="headerlink" href="#rest-workers-and-max_num_seqs" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong><code>rest_workers</code> is the number of requests OVMS works on at once.</strong> On the dGPU, with more clients than workers, throughput followed the workers: 2.7, 6.8, 12.3, and 13.1 requests/s with 2, 4, 8, and the default (24) workers. Keep it at least as high as the concurrency the test needs. With 4, Dine-In stream density on the dGPU drops from 380 to 126.</li>
+<li><strong><code>max_rest_workers</code> is a failsafe.</strong> Each worker needs about 3 file descriptors, so the default on a 344-core system (1032) exceeds the usual limit of 1024 and OVMS fails with <code>Too many open files</code>. The profiles set 128. The value in use is shown as <code>OVMS REST Workers</code> in the result.</li>
+<li><strong><code>max_num_seqs</code> did not limit these workloads.</strong> Raising it from 4 to 16 changed throughput by less than 6% on the dGPU and iGPU. Keep the application's value (4).</li>
+</ul>
+<h2 id="profiles">Profiles<a class="headerlink" href="#profiles" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Profile</th>
+<th>Type</th>
+<th>Test cases</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/open-edge-platform/edge-system-qualification/blob/main/src/esq/configs/profiles/verticals/retail-oa-di.yml"><code>profile.vertical.retail-oa-di</code></a></td>
+<td>Vertical</td>
+<td>6</td>
+</tr>
+<tr>
+<td><a href="https://github.com/open-edge-platform/edge-system-qualification/blob/main/src/esq/configs/profiles/verticals/retail-oa-ta.yml"><code>profile.vertical.retail-oa-ta</code></a></td>
+<td>Vertical</td>
+<td>6</td>
+</tr>
+</tbody>
+</table>
+<p>Expand a profile to see the test cases it runs with this suite.</p>
+<details>
+<summary><code>profile.vertical.retail-oa-di</code></summary>
+<table>
+<thead>
+<tr>
+<th>Test ID</th>
+<th>Test case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>DIO-VLM-001</td>
+<td>Dine-In Order Accuracy VLM - fixed load 1 worker 180s MiniCPM-V-4.5 INT4 (CPU)</td>
+</tr>
+<tr>
+<td>DIO-VLM-002</td>
+<td>Dine-In Order Accuracy VLM - fixed load 1 worker 180s MiniCPM-V-4.5 INT4 (iGPU)</td>
+</tr>
+<tr>
+<td>DIO-VLM-003</td>
+<td>Dine-In Order Accuracy VLM - fixed load 1 worker 180s MiniCPM-V-4.5 INT4 (dGPU)</td>
+</tr>
+<tr>
+<td>DIO-VLM-004</td>
+<td>Dine-In Order Accuracy VLM - stream density avg latency 10s MiniCPM-V-4.5 INT4 (CPU)</td>
+</tr>
+<tr>
+<td>DIO-VLM-005</td>
+<td>Dine-In Order Accuracy VLM - stream density avg latency 10s MiniCPM-V-4.5 INT4 (iGPU)</td>
+</tr>
+<tr>
+<td>DIO-VLM-006</td>
+<td>Dine-In Order Accuracy VLM - stream density avg latency 10s MiniCPM-V-4.5 INT4 (dGPU)</td>
+</tr>
+</tbody>
+</table>
+</details>
+<details>
+<summary><code>profile.vertical.retail-oa-ta</code></summary>
+<table>
+<thead>
+<tr>
+<th>Test ID</th>
+<th>Test case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>TAO-VLM-001</td>
+<td>Take-Away Order Accuracy VLM - fixed load 1 worker 200s MiniCPM-V-4.5 INT4 (CPU)</td>
+</tr>
+<tr>
+<td>TAO-VLM-002</td>
+<td>Take-Away Order Accuracy VLM - fixed load 1 worker 200s MiniCPM-V-4.5 INT4 (iGPU)</td>
+</tr>
+<tr>
+<td>TAO-VLM-003</td>
+<td>Take-Away Order Accuracy VLM - fixed load 1 worker 200s MiniCPM-V-4.5 INT4 (dGPU)</td>
+</tr>
+<tr>
+<td>TAO-VLM-004</td>
+<td>Take-Away Order Accuracy VLM - stream density avg latency 10s MiniCPM-V-4.5 INT4 (CPU)</td>
+</tr>
+<tr>
+<td>TAO-VLM-005</td>
+<td>Take-Away Order Accuracy VLM - stream density avg latency 10s MiniCPM-V-4.5 INT4 (iGPU)</td>
+</tr>
+<tr>
+<td>TAO-VLM-006</td>
+<td>Take-Away Order Accuracy VLM - stream density avg latency 10s MiniCPM-V-4.5 INT4 (dGPU)</td>
+</tr>
+</tbody>
+</table>
+</details>
+<h2 id="run">Run<a class="headerlink" href="#run" title="Permanent link">&para;</a></h2>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>esq<span class="w"> </span>run<span class="w"> </span>--profile<span class="w"> </span>profile.vertical.retail-oa-di<span class="w"> </span>--filter<span class="w"> </span><span class="nv">test_id</span><span class="o">=</span>DIO-VLM-002
+</span></code></pre></div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../dlstreamer/" class="md-footer__link md-footer__link--prev" aria-label="Previous: DL Streamer">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                DL Streamer
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../text-generation/" class="md-footer__link md-footer__link--next" aria-label="Next: Text Generation">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Text Generation
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2026 Intel Corporation
+    </div>
+  
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/open-edge-platform/edge-system-qualification" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["announce.dismiss", "content.action.edit", "content.action.view", "content.code.annotate", "content.code.copy", "content.tabs.link", "content.tooltips", "navigation.expand", "navigation.footer", "navigation.indexes", "navigation.instant", "navigation.instant.prefetch", "navigation.tabs", "navigation.tabs.sticky", "navigation.top", "navigation.tracking", "search.highlight", "search.share", "search.suggest", "toc.follow"], "search": "../../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.a5f9d56c.min.js"></script>
+      
+        <script src="../../../javascripts/program-selector.js"></script>
+      
+    
+  </body>
+</html>

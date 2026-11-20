@@ -389,14 +389,13 @@ class MediaBenchmark(BaseDLBenchmark):
     def report_csv(self, *arg):
         result, resolution, codec, bitrate, ref_stream, ref_gpu_freq, ref_pkg_power, duration = arg
 
-        match self.task:
-            case "Decode+Compose":
-                compose_size = self.config[self.task]["compose_size"]
-                tc_name = f"Media Decode + {compose_size}*{compose_size} Compose Benchmark"
-            case "Decode" | "Encode":
-                tc_name = f"Media {self.task} Benchmark"
-            case _:
-                pass
+        if self.task == "Decode+Compose":
+            compose_size = self.config[self.task]["compose_size"]
+            tc_name = f"Media Decode + {compose_size}*{compose_size} Compose Benchmark"
+        elif self.task in ("Decode", "Encode"):
+            tc_name = f"Media {self.task} Benchmark"
+        else:
+            raise ValueError(f"Unsupported media benchmark task: {self.task}")
         prefix = f"{tc_name},{self.device},{codec},{int(bitrate / 1000)}Mbps,{resolution}@30, "
         prefix += f"{self.monitor_num}, {result}"
         prefix_esc = prefix.replace("+", "\\+").replace("*", "\\*")

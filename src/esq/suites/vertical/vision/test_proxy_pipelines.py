@@ -163,79 +163,78 @@ def proxy_pl_suite(suite_name: str, resources_base_dir: str):
     """
     csvlist = []
 
-    match suite_name:
-        case "SmartAIRunner" | "VisualAIRunner" | "VsaasAIRunner":
-            # Common resource preparation for Smart NVR, Headed Visual AI, and VSaaS
-            # Resources stored under esq_data/data/vertical/vision/results/ppl/resources
-            models_path = os.path.join(resources_base_dir, "models")
-            video_path = os.path.join(resources_base_dir, "videos")
-            os.makedirs(models_path, exist_ok=True)
-            ensure_dir_permissions(models_path, uid=os.getuid(), gid=os.getgid(), mode=0o775)
-            os.makedirs(video_path, exist_ok=True)
-            ensure_dir_permissions(video_path, uid=os.getuid(), gid=os.getgid(), mode=0o775)
+    if suite_name in ("SmartAIRunner", "VisualAIRunner", "VsaasAIRunner"):
+        # Common resource preparation for Smart NVR, Headed Visual AI, and VSaaS
+        # Resources stored under esq_data/data/vertical/vision/results/ppl/resources
+        models_path = os.path.join(resources_base_dir, "models")
+        video_path = os.path.join(resources_base_dir, "videos")
+        os.makedirs(models_path, exist_ok=True)
+        ensure_dir_permissions(models_path, uid=os.getuid(), gid=os.getgid(), mode=0o775)
+        os.makedirs(video_path, exist_ok=True)
+        ensure_dir_permissions(video_path, uid=os.getuid(), gid=os.getgid(), mode=0o775)
 
-            # Download proxy pipeline models and videos using Python utility
-            logger.info("Downloading proxy pipeline resources (models and videos)...")
-            try:
-                from esq.utils.models.proxy_pipeline_resources import download_proxy_pipeline_resources
+        # Download proxy pipeline models and videos using Python utility
+        logger.info("Downloading proxy pipeline resources (models and videos)...")
+        try:
+            from esq.utils.models.proxy_pipeline_resources import download_proxy_pipeline_resources
 
-                success = download_proxy_pipeline_resources(models_path, video_path)
-                if not success:
-                    raise RuntimeError("Failed to download proxy pipeline resources")
+            success = download_proxy_pipeline_resources(models_path, video_path)
+            if not success:
+                raise RuntimeError("Failed to download proxy pipeline resources")
 
-                logger.info(f"Proxy pipeline resources prepared: models={models_path}, videos={video_path}")
+            logger.info(f"Proxy pipeline resources prepared: models={models_path}, videos={video_path}")
 
-            except ImportError as e:
-                logger.error(f"Failed to import proxy pipeline resource downloader: {e}")
-                raise RuntimeError(f"Proxy pipeline resource downloader not available: {e}") from e
-            except Exception as e:
-                logger.error(f"Failed to download proxy pipeline resources: {e}")
-                raise RuntimeError(f"Proxy pipeline resource download failed: {e}") from e
+        except ImportError as e:
+            logger.error(f"Failed to import proxy pipeline resource downloader: {e}")
+            raise RuntimeError(f"Proxy pipeline resource downloader not available: {e}") from e
+        except Exception as e:
+            logger.error(f"Failed to download proxy pipeline resources: {e}")
+            raise RuntimeError(f"Proxy pipeline resource download failed: {e}") from e
 
-            # Set test suite name based on suite_name
-            if suite_name == "SmartAIRunner":
-                test_suite = "smart_nvr_benchmark"
-                csvlist.append("smart_nvr_proxy_pipeline.csv")
-            elif suite_name == "VisualAIRunner":
-                test_suite = "headed_visual_ai_benchmark"
-                csvlist.append("headed_visual_ai_proxy_pipeline.csv")
-            else:  # VsaasAIRunner
-                test_suite = "ai_vsaas_benchmark"
-                csvlist.append("ai_vsaas_proxy_pipeline.csv")
+        # Set test suite name based on suite_name
+        if suite_name == "SmartAIRunner":
+            test_suite = "smart_nvr_benchmark"
+            csvlist.append("smart_nvr_proxy_pipeline.csv")
+        elif suite_name == "VisualAIRunner":
+            test_suite = "headed_visual_ai_benchmark"
+            csvlist.append("headed_visual_ai_proxy_pipeline.csv")
+        else:  # VsaasAIRunner
+            test_suite = "ai_vsaas_benchmark"
+            csvlist.append("ai_vsaas_proxy_pipeline.csv")
 
-        case "LPRAIRunner":
-            test_suite = "lpr_benchmark"
-            # LPR resources stored under esq_data/data/vertical/vision/results/ppl/resources
-            models_path = os.path.join(resources_base_dir, "models")
-            video_path = os.path.join(resources_base_dir, "videos")
-            os.makedirs(models_path, exist_ok=True)
-            ensure_dir_permissions(models_path, uid=os.getuid(), gid=os.getgid(), mode=0o775)
-            os.makedirs(video_path, exist_ok=True)
-            ensure_dir_permissions(video_path, uid=os.getuid(), gid=os.getgid(), mode=0o775)
+    elif suite_name == "LPRAIRunner":
+        test_suite = "lpr_benchmark"
+        # LPR resources stored under esq_data/data/vertical/vision/results/ppl/resources
+        models_path = os.path.join(resources_base_dir, "models")
+        video_path = os.path.join(resources_base_dir, "videos")
+        os.makedirs(models_path, exist_ok=True)
+        ensure_dir_permissions(models_path, uid=os.getuid(), gid=os.getgid(), mode=0o775)
+        os.makedirs(video_path, exist_ok=True)
+        ensure_dir_permissions(video_path, uid=os.getuid(), gid=os.getgid(), mode=0o775)
 
-            # Download LPR models and videos using Python utility
-            logger.info("Downloading LPR resources (models and videos)...")
-            try:
-                from esq.utils.models.lpr_resources import download_lpr_resources
+        # Download LPR models and videos using Python utility
+        logger.info("Downloading LPR resources (models and videos)...")
+        try:
+            from esq.utils.models.lpr_resources import download_lpr_resources
 
-                success = download_lpr_resources(models_path, video_path)
-                if not success:
-                    raise RuntimeError("Failed to download LPR resources")
+            success = download_lpr_resources(models_path, video_path)
+            if not success:
+                raise RuntimeError("Failed to download LPR resources")
 
-                logger.info(f"LPR resources prepared: models={models_path}, videos={video_path}")
+            logger.info(f"LPR resources prepared: models={models_path}, videos={video_path}")
 
-            except ImportError as e:
-                logger.error(f"Failed to import LPR resource downloader: {e}")
-                raise RuntimeError(f"LPR resource downloader not available: {e}") from e
-            except Exception as e:
-                logger.error(f"Failed to download LPR resources: {e}")
-                raise RuntimeError(f"LPR resource download failed: {e}") from e
-            csvlist.append("lpr_proxy_pipeline.csv")
+        except ImportError as e:
+            logger.error(f"Failed to import LPR resource downloader: {e}")
+            raise RuntimeError(f"LPR resource downloader not available: {e}") from e
+        except Exception as e:
+            logger.error(f"Failed to download LPR resources: {e}")
+            raise RuntimeError(f"LPR resource download failed: {e}") from e
+        csvlist.append("lpr_proxy_pipeline.csv")
 
-        case _:
-            test_suite = "None"
-            models_path = None
-            video_path = None
+    else:
+        test_suite = "None"
+        models_path = None
+        video_path = None
 
     return test_suite, csvlist, models_path, video_path
 

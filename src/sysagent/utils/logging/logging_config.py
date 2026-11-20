@@ -20,6 +20,12 @@ DEFAULT_LOG_FORMAT = "%(asctime)s - %(name)s:%(lineno)d - %(levelname)s - %(mess
 MESSAGE_ONLY_FORMAT = "%(message)s"
 DEBUG_MESSAGE_ONLY_FORMAT = "%(message)s"
 
+# Log level policy: INFO is the default level. DEBUG is opt-in, either with the console debug flag or by
+# passing an explicit level. The framework's own log files (command logs, per-test logs) pass LOG_FILE_LEVEL
+# so they keep the full detail needed for troubleshooting, and callers can override it per call.
+DEFAULT_LOG_LEVEL = logging.INFO
+LOG_FILE_LEVEL = logging.DEBUG
+
 
 def get_project_name():
     """Get the project name from configuration."""
@@ -93,13 +99,16 @@ def init_core_logging(debug: bool = False) -> logging.Logger:
     return logger
 
 
-def configure_logging(verbose: bool = False, debug: bool = False) -> None:
+def configure_logging(verbose: bool = False, debug: bool = False, log_level: int = DEFAULT_LOG_LEVEL) -> None:
     """
     Configure logging level based on verbose and debug flags.
 
     Args:
         verbose: Whether to display more detailed messages
         debug: Whether to display DEBUG level logs
+        log_level: Lowest level the root logger passes on to its handlers (for example a log file).
+            Defaults to INFO; pass LOG_FILE_LEVEL to let a log file receive DEBUG records.
+            The debug flag always lowers it to DEBUG so debug output reaches the console.
 
     Note:
         By default, INFO level logs are shown on the console. Verbose mode adds more detail
@@ -110,7 +119,7 @@ def configure_logging(verbose: bool = False, debug: bool = False) -> None:
 
     # Set root logger level based on environment and parameters
     root_logger = logging.getLogger()
-    root_logger.setLevel(logging.DEBUG)
+    root_logger.setLevel(logging.DEBUG if debug else log_level)
 
     # Create a console handler if one doesn't exist
     console_handler = None
@@ -152,13 +161,14 @@ def remove_log_handlers() -> None:
         handler.close()
 
 
-def add_file_log_handler(command: str, data_dir: Optional[str] = None) -> None:
+def add_file_log_handler(command: str, data_dir: Optional[str] = None, level: int = LOG_FILE_LEVEL) -> None:
     """
     Add a file handler for logging to a command-specific log file.
 
     Args:
         command: The command name for the log file
         data_dir: Optional data directory path
+        level: Lowest level written to the log file. Defaults to LOG_FILE_LEVEL (DEBUG).
     """
     if data_dir is None:
         data_dir = setup_data_dir()
@@ -177,7 +187,7 @@ def add_file_log_handler(command: str, data_dir: Optional[str] = None) -> None:
 
     # Create file handler
     file_handler = logging.FileHandler(log_file, mode="w")  # Overwrite on each run
-    file_handler.setLevel(logging.DEBUG)
+    file_handler.setLevel(level)
     file_handler.setFormatter(logging.Formatter(DEFAULT_LOG_FORMAT))
 
     # Add to root logger
@@ -257,7 +267,11 @@ def create_context_filter(context: Dict[str, Any]) -> logging.Filter:
 
 
 def setup_command_logging(
-    command: str, verbose: bool = False, debug: bool = False, data_dir: Optional[str] = None
+    command: str,
+    verbose: bool = False,
+    debug: bool = False,
+    data_dir: Optional[str] = None,
+    file_log_level: int = LOG_FILE_LEVEL,
 ) -> None:
     """
     Set up logging for a specific command with both console and file output.
@@ -274,15 +288,17 @@ def setup_command_logging(
         verbose: Whether to enable verbose console output
         debug: Whether to enable debug console output
         data_dir: Optional data directory path
+        file_log_level: Lowest level written to the command log file. Defaults to LOG_FILE_LEVEL (DEBUG)
+            so the log keeps full detail for troubleshooting; pass logging.INFO for a quieter log.
     """
     # Initialize core logging
     init_core_logging()
 
-    # Configure console logging level
-    configure_logging(verbose=verbose, debug=debug)
+    # Configure console logging level; the root logger passes file_log_level and above to the log file
+    configure_logging(verbose=verbose, debug=debug, log_level=file_log_level)
 
     # Add file logging
-    add_file_log_handler(command, data_dir)
+    add_file_log_handler(command, data_dir, level=file_log_level)
 
     # Suppress third-party loggers
     suppress_third_party_loggers()
@@ -321,13 +337,14 @@ def log_system_info() -> None:
         logger.warning(f"Failed to log system info: {e}")
 
 
-def create_test_logger(test_name: str, log_dir: Optional[str] = None) -> logging.Logger:
+def create_test_logger(test_name: str, log_dir: Optional[str] = None, level: int = LOG_FILE_LEVEL) -> logging.Logger:
     """
     Create a logger specifically for a test case.
 
     Args:
         test_name: Name of the test
         log_dir: Optional directory for test logs
+        level: Lowest level written to the test log. Defaults to LOG_FILE_LEVEL (DEBUG).
 
     Returns:
         Configured test logger
@@ -343,7 +360,7 @@ def create_test_logger(test_name: str, log_dir: Optional[str] = None) -> logging
 
     # Create logger
     logger = logging.getLogger(f"test.{test_name}")
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(level)
 
     # Prevent duplicate handlers
     if logger.handlers:
@@ -352,7 +369,7 @@ def create_test_logger(test_name: str, log_dir: Optional[str] = None) -> logging
     # Create file handler for this test
     log_file = os.path.join(log_dir, f"{test_name}.log")
     file_handler = logging.FileHandler(log_file, mode="w")
-    file_handler.setLevel(logging.DEBUG)
+    file_handler.setLevel(level)
     file_handler.setFormatter(logging.Formatter(DEFAULT_LOG_FORMAT))
 
     logger.addHandler(file_handler)

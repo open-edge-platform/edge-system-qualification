@@ -37,6 +37,7 @@ def create_argument_parser() -> argparse.ArgumentParser:
         argparse.ArgumentParser: Parser with ESQ-specific run command
     """
     # Import base parser creator from sysagent
+    from sysagent.utils.cli.parsers import add_smoke_argument
     from sysagent.utils.cli.parsers import create_argument_parser as create_base_parser
 
     # Get the base parser with all standard commands
@@ -123,6 +124,7 @@ EXAMPLES:
   {cli_name} run -p profile.horizontal.ai.vision --filter test_id=T0001 # Filtered test
   {cli_name} run --select                                           # Pick profile(s) via checkbox
   {cli_name} run --profiles-file custom_profiles.yml                # Run from a saved template
+  {cli_name} run --smoke ai/gen/test_text_generation                # Smoke tests of one test
 
 HARDWARE REQUIREMENTS:
   Refer to the documentation for supported hardware and system requirements.
@@ -165,6 +167,7 @@ For available profiles, use: {cli_name} list
         metavar="FILE",
         help=("Run profile(s) listed in a YAML template file"),
     )
+    add_smoke_argument(execution_group)
     execution_group.add_argument(
         "--profile",
         "-p",

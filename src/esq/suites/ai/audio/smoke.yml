@@ -1,0 +1,24 @@
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+# Smoke tests: the minimum set of tests that shows this sub-suite still works on every
+# device it supports, chosen to finish quickly (smallest model, shortest variant).
+# Run them with: esq run --smoke ai/audio[/<test_name>]
+# CI runs them when this sub-suite, or framework code it imports, changes.
+# Times are approximate, from a full Test Benchmark run on a mainstream runner
+# (the first test of a profile also includes image builds and downloads).
+
+tests:
+  test_funasr:  # every device
+    - name: profile.horizontal.ai.audio-funasr
+      test_ids: [AUD-ASR-001, AUD-ASR-002, AUD-ASR-003]  # CPU ~9 min (incl. setup), GPU, NPU
+  test_whisper:  # tiny model, both backends, every device
+    - name: profile.horizontal.ai.audio-whisper
+      test_ids:
+        - AUD-WOV-001  # OpenVINO CPU (~5 min incl. setup)
+        - AUD-WOV-002  # OpenVINO iGPU
+        - AUD-WOV-003  # OpenVINO dGPU
+        - AUD-WOV-004  # OpenVINO NPU
+        - AUD-WPT-001  # PyTorch CPU
+        - AUD-WPT-002  # PyTorch iGPU
+        - AUD-WPT-003  # PyTorch dGPU

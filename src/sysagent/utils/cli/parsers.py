@@ -27,6 +27,18 @@ def get_cli_name() -> str:
     return project_name.lower()
 
 
+def add_smoke_argument(group) -> None:
+    """Add the 'run --smoke' option (shared by every package's run parser)."""
+    group.add_argument(
+        "--smoke",
+        metavar="SUITE/SUB_SUITE[/TEST]",
+        help=(
+            "Run the smoke tests (the quick minimum set per device) listed in a sub-suite's smoke.yml, "
+            "e.g. ai/gen or ai/gen/test_text_generation; 'all' runs every sub-suite's smoke tests"
+        ),
+    )
+
+
 def get_argument_parser() -> argparse.ArgumentParser:
     """
     Get the argument parser with package-specific override support.
@@ -129,6 +141,7 @@ EXAMPLES:
   {cli_name} run -p profile.horizontal.ai.vision --filter test_id=T0001  # Filtered test
   {cli_name} run --select                             # Pick profile(s) via checkbox
   {cli_name} run --profiles-file custom_profiles.yml  # Run from a saved template
+  {cli_name} run --smoke ai/vision                    # Smoke tests of a sub-suite
 
 For available profiles, use: {cli_name} list
         """,
@@ -159,6 +172,7 @@ For available profiles, use: {cli_name} list
             "or a mapping with a 'profiles' key). Create one by hand or save one via --select"
         ),
     )
+    add_smoke_argument(execution_group)
 
     # Individual test selection (grouped together)
     test_group = run_parser.add_argument_group("INDIVIDUAL TEST SELECTION")

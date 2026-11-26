@@ -1,0 +1,36 @@
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+# Smoke tests: the minimum set of tests that shows this sub-suite still works on every
+# device it supports, chosen to finish quickly (smallest model, shortest variant).
+# Run them with: esq run --smoke realtime/platform[/<test_name>]
+# CI runs them when this sub-suite, or framework code it imports, changes.
+# Times are approximate, from a full Test Benchmark run on a mainstream runner
+# (the first test of a profile also includes image builds and downloads).
+
+tests:
+  # Each check takes about a second.
+  test_cat_config:
+    - name: profile.horizontal.realtime.platform
+      test_ids: [RT-CAT-001]
+  test_cpufreq:
+    - name: profile.horizontal.realtime.platform
+      test_ids: [RT-FRQ-001, RT-FRQ-002]
+  test_cstate:
+    - name: profile.horizontal.realtime.platform
+      test_ids: [RT-CST-001]
+  test_pci_multi_vc:
+    - name: profile.horizontal.realtime.platform
+      test_ids: [RT-PCI-001]
+  test_preempt_rt:
+    - name: profile.horizontal.realtime.platform
+      test_ids: [RT-KRN-001]
+  test_timer_migration:
+    - name: profile.horizontal.realtime.platform
+      test_ids: [RT-TMR-001]
+  test_tsc_clocksource:
+    - name: profile.horizontal.realtime.platform
+      test_ids: [RT-TSC-001]
+  test_tsn:
+    - name: profile.horizontal.realtime.platform
+      test_ids: [RT-TSN-001]

@@ -1,0 +1,20 @@
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+# Smoke tests: the minimum set of tests that shows this sub-suite still works on every
+# device it supports, chosen to finish quickly (smallest model, shortest variant).
+# Run them with: esq run --smoke virtualization/kvm[/<test_name>]
+# CI runs them when this sub-suite, or framework code it imports, changes.
+# Times are approximate, from a full Test Benchmark run on a mainstream runner
+# (the first test of a profile also includes image builds and downloads).
+
+tests:
+  test_kvm_compatibility:
+    - name: profile.horizontal.virtualization.kvm
+      test_ids: [KVM-CPT-001]  # comprehensive check, ~2 s
+  test_kvm_qemu_reboot:
+    - name: profile.horizontal.virtualization.kvm-qemu
+      test_ids: [KVM-RBT-001]  # OVMF/UEFI, needs KVM
+  test_kvm_vm_capacity:
+    - name: profile.horizontal.virtualization.kvm
+      test_ids: [KVM-CAP-001]

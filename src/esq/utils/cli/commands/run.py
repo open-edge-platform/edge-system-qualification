@@ -21,9 +21,10 @@ from sysagent.utils.cli.commands.run import (
     _build_default_profile_preselection,
     _collect_requirement_flags_from_profiles,
     _determine_final_exit_code,
+    _expand_requested_profiles,
     _format_filters_for_display,
     _generate_test_reports,
-    _load_profiles_from_file,
+    _load_profile_selection,
     _offer_save_profiles_selection,
     _prompt_select_any_profile,
     _run_single_profile,
@@ -463,6 +464,7 @@ def run_tests(
     extra_args: list[str] = None,
     telemetry_interval: int = None,
     tags: list[str] = None,
+    smoke: str | None = None,
 ) -> int:
     """
     ESQ-specific run command with Intel processor validation.
@@ -522,6 +524,9 @@ def run_tests(
     if profiles_file and (profile_name or tags or suite_name):
         logger.error("Error: --profiles-file cannot be combined with --profile, --tag, or --suite")
         return 1
+    if smoke and (profile_name or tags or suite_name or profiles_file):
+        logger.error("Error: --smoke cannot be combined with --profile, --tag, --profiles-file, or --suite")
+        return 1
 
     # Parse filters
     parsed_filters = {}
@@ -532,8 +537,10 @@ def run_tests(
         except ValueError as e:
             logger.error(f"Invalid filter format: {e}")
             return 1
-        if not profile_name and not tags and not profiles_file:
-            logger.error("Error: --filter option can only be used with --profile, --tag, or --profiles-file option")
+        if not profile_name and not tags and not profiles_file and not smoke:
+            logger.error(
+                "Error: --filter option can only be used with --profile, --tag, --profiles-file, or --smoke option"
+            )
             return 1
 
     # Setup directories and logging
@@ -563,8 +570,8 @@ def run_tests(
         active_flags = _collect_requirement_flags_from_profiles([profile_name])
     elif tags:
         active_flags = _collect_requirement_flags_from_profiles(_resolve_tags_to_profile_names(tags))
-    elif profiles_file:
-        file_profile_names, _ = _load_profiles_from_file(profiles_file)
+    elif profiles_file or smoke:
+        file_profile_names, _ = _load_profile_selection(profiles_file, smoke)
         active_flags = _collect_requirement_flags_from_profiles(file_profile_names or [])
 
     # Readiness is always re-verified for each run, never reused from an earlier one.
@@ -623,8 +630,8 @@ def run_tests(
                 force,
                 qualification_only,
             )
-        elif profiles_file:
-            # Run profile(s) listed in a YAML profiles template file
+        elif profiles_file or smoke:
+            # Run profile(s) listed in a YAML profiles template file, or a sub-suite's smoke tests
             result_code, tests_ran = _run_profiles_file_esq(
                 profiles_file,
                 pytest_args,
@@ -634,6 +641,7 @@ def run_tests(
                 parsed_filters,
                 force,
                 qualification_only,
+                smoke=smoke,
             )
         elif suite_name:
             # Run suite/test directly (no prompts)
@@ -758,22 +766,26 @@ def _run_profiles_file_esq(
     filters: dict[str, Any] = None,
     force: bool = False,
     qualification_only: bool = False,
+    smoke: str | None = None,
 ) -> tuple:
     """
     ESQ-specific execution of profile(s) listed in a YAML profiles template file
-    (see --profiles-file), reusing the same shared executor used for --profile/--tag.
+    (see --profiles-file) or a sub-suite's smoke tests (see --smoke), reusing the same
+    shared executor used for --profile/--tag.
 
     Returns:
         tuple: (exit_code, tests_ran)
     """
-    profile_names, per_profile_filters = _load_profiles_from_file(profiles_file)
+    source = f"smoke tests '{smoke}'" if smoke else f"'{profiles_file}'"
+    selection = _load_profile_selection(profiles_file, smoke)
+    profile_names, per_profile_filters = selection
     if profile_names is None:
         return 1, False
     if not profile_names:
-        logger.error(f"No profiles listed in '{profiles_file}' - nothing to run")
+        logger.error(f"No profiles listed in {source} - nothing to run")
         return 1, False
 
-    logger.info(f"Loaded {len(profile_names)} profile(s) from '{profiles_file}': {', '.join(profile_names)}")
+    logger.info(f"Loaded {len(profile_names)} profile(s) from {source}: {', '.join(profile_names)}")
     return _resolve_and_execute_profiles_esq(
         profile_names,
         pytest_args,
@@ -785,6 +797,7 @@ def _run_profiles_file_esq(
         qualification_only,
         per_profile_filters=per_profile_filters,
         prompt_associated=False,
+        no_dependencies=getattr(selection, "no_dependencies", frozenset()),
     )
 
 
@@ -799,6 +812,7 @@ def _resolve_and_execute_profiles_esq(
     qualification_only: bool = False,
     per_profile_filters: dict[str, dict[str, Any]] = None,
     prompt_associated: bool = True,
+    no_dependencies: frozenset = frozenset(),
 ) -> tuple:
     """
     Resolve dependencies for one or more explicitly requested profiles and execute them.
@@ -816,11 +830,12 @@ def _resolve_and_execute_profiles_esq(
         prompt_associated: If False, don't offer the associated vertical/horizontal profiles of a
             requested qualification profile (used for --profiles-file, where the file already
             lists exactly what to run).
+        no_dependencies: Requested profiles to run without their depends_on profiles.
 
     Returns:
         tuple: (exit_code, tests_ran)
     """
-    from sysagent.utils.config import expand_profile_with_dependencies, resolve_profile_dependencies
+    from sysagent.utils.config import resolve_profile_dependencies
 
     per_profile_filters = dict(per_profile_filters or {})
 
@@ -916,16 +931,9 @@ def _resolve_and_execute_profiles_esq(
             logger.info("Interrupted by user. Exiting.")
             return 1, False
 
-    # Expand each requested profile with its dependencies; a dict naturally
-    # dedupes profiles shared across multiple requested profiles.
-    required_profiles: dict[str, Any] = {}
-    for profile_name in viable_requested_names:
-        try:
-            for expanded_name in expand_profile_with_dependencies(profile_name, all_profiles_dict):
-                required_profiles[expanded_name] = all_profiles_dict[expanded_name]
-        except Exception as e:
-            logger.error(f"Failed to resolve dependencies for profile '{profile_name}': {e}")
-            return 1, False
+    required_profiles = _expand_requested_profiles(viable_requested_names, all_profiles_dict, no_dependencies)
+    if required_profiles is None:
+        return 1, False
 
     # Resolve a single execution order across the combined set (dependencies first)
     try:

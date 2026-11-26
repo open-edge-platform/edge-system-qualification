@@ -1,0 +1,19 @@
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+# Smoke tests: the minimum set of tests that shows this sub-suite still works on every
+# device it supports, chosen to finish quickly (smallest model, shortest variant).
+# Run them with: esq run --smoke system/memory[/<test_name>]
+# CI runs them when this sub-suite, or framework code it imports, changes.
+# Times are approximate, from a full Test Benchmark run on a mainstream runner
+# (the first test of a profile also includes image builds and downloads).
+
+tests:
+  test_memory_health:  # each check type
+    - name: profile.horizontal.system.memory-health
+      test_ids:
+        - MEM-HLT-001  # EDAC scan (~10 s)
+        - MEM-HLT-002  # memtester 512 MB (~1.5 min)
+  test_memory_stream:  # one STREAM operation (container build and run)
+    - name: profile.horizontal.system.memory-stream
+      test_ids: [MEM-STR-001]  # ~30 s

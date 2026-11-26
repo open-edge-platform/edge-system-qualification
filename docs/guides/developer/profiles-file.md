@@ -58,6 +58,9 @@ To find `test_id` values for a profile without typing them by hand:
 esq run --profiles-file custom_profiles.yml
 ```
 
+A sub-suite's `smoke.yml` uses the same entry format. Run it with `esq run --smoke <suite>/<sub_suite>[/<test>]`
+instead of passing its path; see [Smoke Tests](writing-tests.md#smoke-tests).
+
 ## Default Optional Profiles per Qualification
 
 A qualification profile can list `default_optional_profiles` in its `params`. When you run it

@@ -1,0 +1,16 @@
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+# Smoke tests: the minimum set of tests that shows this sub-suite still works on every
+# device it supports, chosen to finish quickly (smallest model, shortest variant).
+# Run them with: esq run --smoke system/gpu[/<test_name>]
+# CI runs them when this sub-suite, or framework code it imports, changes.
+# Times are approximate, from a full Test Benchmark run on a mainstream runner
+# (the first test of a profile also includes image builds and downloads).
+
+tests:
+  test_system_gpu:  # every GPU type
+    - name: profile.horizontal.system.gpu-ov
+      test_ids:
+        - GPU-OBM-001  # iGPU (~1.5 min)
+        - GPU-OBM-002  # dGPU

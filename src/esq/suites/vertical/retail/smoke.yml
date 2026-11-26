@@ -1,0 +1,20 @@
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+# Smoke tests: the minimum set of tests that shows this sub-suite still works on every
+# device it supports, chosen to finish quickly (smallest model, shortest variant).
+# Run them with: esq run --smoke vertical/retail[/<test_name>]
+# CI runs them when this sub-suite, or framework code it imports, changes.
+# Times are approximate, from a full Test Benchmark run on a mainstream runner
+# (the first test of a profile also includes image builds and downloads).
+
+tests:
+  test_di_vlm:  # every device
+    - name: profile.vertical.retail-di-vlm
+      test_ids: [DIO-BNK-001, DIO-BNK-002, DIO-BNK-003]  # CPU, iGPU, dGPU (~6-8 min each)
+  test_lp_vlm:  # single pipeline
+    - name: profile.vertical.retail-lp-vlm
+      test_ids: [LP-VLM-001]  # ~22 min
+  test_ta_vlm:  # every device
+    - name: profile.vertical.retail-ta-vlm
+      test_ids: [TAO-BNK-001, TAO-BNK-002, TAO-BNK-003]  # CPU, iGPU, dGPU (~6 min each)

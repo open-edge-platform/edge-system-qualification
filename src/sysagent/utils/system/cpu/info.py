@@ -15,12 +15,12 @@ import os
 import platform
 from typing import Any
 
-import cpuinfo
 import psutil
 
 from .cpufreq import collect_cpufreq_info
 from .cpuidle import collect_cpuidle_info
 from .generation import detect_cpu_generation_and_segment
+from .procinfo import read_cpu_info
 from .rdt import collect_cache_partition_info
 from .topology import collect_cpu_core_types
 
@@ -64,7 +64,7 @@ def _get_cpu_socket_count() -> int | None:
 
 
 def _detect_cpu_features(cpu_info_data: dict[str, Any]) -> dict[str, Any]:
-    """Detect advanced CPU features from raw cpuinfo flags.
+    """Detect advanced CPU features from raw CPU flags.
 
     Returns a dict with boolean fields:
     ``virtualization``, ``hyper_threading``, ``turbo_boost``,
@@ -115,7 +115,7 @@ def collect_cpu_info(openvino_cpu=None) -> dict[str, Any]:
         ``rdt`` (global hardware-level RDT capabilities).
     """
     try:
-        cpu_info_data = cpuinfo.get_cpu_info()
+        cpu_info_data = read_cpu_info()
         socket_count = _get_cpu_socket_count()
 
         cpu_info: dict[str, Any] = {

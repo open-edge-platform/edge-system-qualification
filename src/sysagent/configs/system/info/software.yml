@@ -23,4 +23,3 @@ python_packages:
   - requests
   - numpy
   - matplotlib
-  - py-cpuinfo

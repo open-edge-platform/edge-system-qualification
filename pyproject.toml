@@ -31,7 +31,6 @@ dependencies = [
     "tomli>=2.2.1",
     "matplotlib>=3.11.2",
     "psutil>=7.0.0",
-    "py-cpuinfo>=9.0.0",
     "requests>=2.33.1",
     "openvino>=2026.4.1",
     "docker>=7.1.0",

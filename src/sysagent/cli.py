@@ -122,6 +122,7 @@ def _main() -> int:
                 qualification_only=getattr(args, "qualification_only", False),
                 select_profile=getattr(args, "select", False),
                 profiles_file=getattr(args, "profiles_file", None),
+                smoke=getattr(args, "smoke", None),
                 force=force,
                 no_mask=args.no_mask,
                 set_prompt=getattr(args, "set_prompt", None),

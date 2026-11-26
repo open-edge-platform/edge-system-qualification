@@ -78,6 +78,7 @@ from .profile_dependencies import (
     resolve_profile_dependencies,
     validate_profile_dependencies,
 )
+from .profile_selection import SMOKE_FILE, ProfileSelection, load_smoke_selection, parse_profile_entries
 
 # Re-export all functions and classes
 __all__ = [
@@ -147,4 +148,9 @@ __all__ = [
     "ProfileDependencyError",
     "CircularDependencyError",
     "MissingDependencyError",
+    # From profile_selection
+    "SMOKE_FILE",
+    "ProfileSelection",
+    "load_smoke_selection",
+    "parse_profile_entries",
 ]

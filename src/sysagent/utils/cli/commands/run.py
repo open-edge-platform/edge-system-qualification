@@ -23,7 +23,14 @@ import yaml
 
 from sysagent.utils.cli.filters import parse_filters
 from sysagent.utils.cli.handlers import handle_interrupt
-from sysagent.utils.config import filter_profile_by_tier, get_suite_directory, list_profiles, setup_data_dir
+from sysagent.utils.config import (
+    filter_profile_by_tier,
+    get_suite_directory,
+    list_profiles,
+    load_smoke_selection,
+    parse_profile_entries,
+    setup_data_dir,
+)
 from sysagent.utils.config.config_loader import get_cli_aware_project_name
 from sysagent.utils.core import shared_state
 from sysagent.utils.core.dependencies import NETWORK_CHECK_NAME, reset_prerun_state, run_prerun_checks
@@ -114,6 +121,7 @@ def run_tests(
     profiles_file: str = None,
     telemetry_interval: int = None,
     tags: list[str] = None,
+    smoke: str | None = None,
 ) -> int:
     """
     Run tests based on profiles, suites, or specific test cases.
@@ -123,6 +131,7 @@ def run_tests(
     - Specific profile (-p): Runs specified profile
     - Suite/test run: Runs specified suite/test
     - Profiles file (--profiles-file): Runs the profile(s) listed in a YAML file
+    - Smoke tests (--smoke): Runs the smoke tests a sub-suite lists in its smoke.yml
     - Interactive selection (--select): Pick profile(s)/test_id(s) via a checkbox tree
 
     Args:
@@ -145,6 +154,7 @@ def run_tests(
         profiles_file: Path to a YAML profiles template file to run (see --profiles-file).
         tags: List of tag keywords to resolve to profile(s). Ignored in generic sysagent
             (package-specific implementations like ESQ resolve tags to profiles).
+        smoke: Smoke tests to run: "<suite>/<sub_suite>[/<test_name>]" or "all" (see --smoke).
 
     Returns:
         int: Exit code (0 for success, non-zero for failure)
@@ -200,6 +210,10 @@ def run_tests(
         logger.error("Error: --profiles-file cannot be combined with --profile or --suite")
         return 1
 
+    if smoke and (profile_name or suite_name or profiles_file):
+        logger.error("Error: --smoke cannot be combined with --profile, --profiles-file, or --suite")
+        return 1
+
     # Parse and validate filters
     parsed_filters = {}
     if filters:
@@ -211,8 +225,8 @@ def run_tests(
             return 1
 
         # Filters can only be used with profile-based execution
-        if not profile_name and not profiles_file:
-            logger.error("Error: --filter option can only be used with --profile or --profiles-file option")
+        if not profile_name and not profiles_file and not smoke:
+            logger.error("Error: --filter option can only be used with --profile, --profiles-file, or --smoke option")
             return 1
 
     data_dir = setup_data_dir()
@@ -240,8 +254,8 @@ def run_tests(
     active_flags = None
     if profile_name:
         active_flags = _collect_requirement_flags_from_profiles([profile_name])
-    elif profiles_file:
-        file_profile_names, _ = _load_profiles_from_file(profiles_file)
+    elif profiles_file or smoke:
+        file_profile_names, _ = _load_profile_selection(profiles_file, smoke)
         active_flags = _collect_requirement_flags_from_profiles(file_profile_names or [])
 
     # Readiness is always re-verified for each run, never reused from an earlier one.
@@ -282,10 +296,10 @@ def run_tests(
                 profile_name, pytest_args, data_dir, verbose, debug, parsed_filters, force
             )
 
-        # Option 2: If a profiles file is provided, run the profile(s) listed in it
-        elif profiles_file:
+        # Option 2: If a profiles file or smoke tests are requested, run the profile(s) they list
+        elif profiles_file or smoke:
             result_code, tests_ran = _run_profiles_file(
-                profiles_file, pytest_args, data_dir, verbose, debug, parsed_filters, force
+                profiles_file, pytest_args, data_dir, verbose, debug, parsed_filters, force, smoke=smoke
             )
 
         # Option 3: If a suite name is provided, run that specific suite (no prompt)
@@ -445,6 +459,31 @@ def _run_profile_tests(
     return final_exit_code, tests_ran
 
 
+def _expand_requested_profiles(
+    requested_profile_names: list[str], all_profiles_dict: dict[str, Any], no_dependencies=frozenset()
+) -> dict[str, Any]:
+    """
+    Requested profiles plus their depends_on profiles, deduplicated across requests.
+
+    Profiles in ``no_dependencies`` are added on their own. Returns None if a dependency
+    cannot be resolved.
+    """
+    from sysagent.utils.config import expand_profile_with_dependencies
+
+    required_profiles: dict[str, Any] = {}
+    for profile_name in requested_profile_names:
+        if profile_name in no_dependencies:
+            required_profiles[profile_name] = all_profiles_dict[profile_name]
+            continue
+        try:
+            for expanded_name in expand_profile_with_dependencies(profile_name, all_profiles_dict):
+                required_profiles[expanded_name] = all_profiles_dict[expanded_name]
+        except Exception as e:
+            logger.error(f"Failed to resolve dependencies for profile '{profile_name}': {e}")
+            return None
+    return required_profiles
+
+
 def _resolve_and_execute_profiles(
     requested_profile_names: list[str],
     pytest_args: list[str],
@@ -454,6 +493,7 @@ def _resolve_and_execute_profiles(
     filters: dict[str, Any] = None,
     force: bool = False,
     per_profile_filters: dict[str, dict[str, Any]] = None,
+    no_dependencies: frozenset = frozenset(),
 ) -> tuple:
     """
     Resolve dependencies for one or more explicitly requested profiles and execute them.
@@ -470,11 +510,12 @@ def _resolve_and_execute_profiles(
             `filters` for specific requested profiles (e.g., a per-profile test_id scope
             picked via --select or loaded from --profiles-file). Profiles not present in
             this mapping fall back to the shared `filters`.
+        no_dependencies: Requested profiles to run without their depends_on profiles.
 
     Returns:
         tuple: (exit_code, tests_ran)
     """
-    from sysagent.utils.config import expand_profile_with_dependencies, resolve_profile_dependencies
+    from sysagent.utils.config import resolve_profile_dependencies
 
     per_profile_filters = per_profile_filters or {}
 
@@ -493,16 +534,9 @@ def _resolve_and_execute_profiles(
         logger.error(f"Profile(s) not found: {', '.join(missing)}")
         return 1, False
 
-    # Expand each requested profile with its dependencies; a dict naturally
-    # dedupes profiles shared across multiple requested profiles.
-    required_profiles: dict[str, Any] = {}
-    for profile_name in requested_profile_names:
-        try:
-            for expanded_name in expand_profile_with_dependencies(profile_name, all_profiles_dict):
-                required_profiles[expanded_name] = all_profiles_dict[expanded_name]
-        except Exception as e:
-            logger.error(f"Failed to resolve dependencies for profile '{profile_name}': {e}")
-            return 1, False
+    required_profiles = _expand_requested_profiles(requested_profile_names, all_profiles_dict, no_dependencies)
+    if required_profiles is None:
+        return 1, False
 
     try:
         execution_order = resolve_profile_dependencies(required_profiles)
@@ -553,21 +587,25 @@ def _run_profiles_file(
     debug: bool = False,
     filters: dict[str, Any] = None,
     force: bool = False,
+    smoke: str | None = None,
 ) -> tuple:
     """
-    Run the profile(s) listed in a YAML profiles template file (see --profiles-file).
+    Run the profile(s) listed in a YAML profiles template file (see --profiles-file), or the
+    smoke tests of a sub-suite (see --smoke).
 
     Returns:
         tuple: (exit_code, tests_ran)
     """
-    profile_names, per_profile_filters = _load_profiles_from_file(profiles_file)
+    source = f"smoke tests '{smoke}'" if smoke else f"'{profiles_file}'"
+    selection = _load_profile_selection(profiles_file, smoke)
+    profile_names, per_profile_filters = selection
     if profile_names is None:
         return 1, False
     if not profile_names:
-        logger.error(f"No profiles listed in '{profiles_file}' - nothing to run")
+        logger.error(f"No profiles listed in {source} - nothing to run")
         return 1, False
 
-    logger.info(f"Loaded {len(profile_names)} profile(s) from '{profiles_file}': {', '.join(profile_names)}")
+    logger.info(f"Loaded {len(profile_names)} profile(s) from {source}: {', '.join(profile_names)}")
     return _resolve_and_execute_profiles(
         profile_names,
         pytest_args,
@@ -577,6 +615,7 @@ def _run_profiles_file(
         filters,
         force,
         per_profile_filters=per_profile_filters,
+        no_dependencies=getattr(selection, "no_dependencies", frozenset()),
     )
 
 
@@ -867,27 +906,14 @@ def _load_profiles_from_file(profiles_file: str) -> tuple:
         logger.error(f"Invalid format in '{profiles_file}': expected a list or a mapping with a 'profiles' key")
         return None, None
 
-    profile_names = []
-    per_profile_filters = {}
-    seen = set()
-    for entry in raw_entries:
-        if isinstance(entry, str):
-            name, test_ids = entry.strip(), None
-        elif isinstance(entry, dict):
-            name, test_ids = str(entry.get("name", "")).strip(), entry.get("test_ids")
-        else:
-            continue
+    return parse_profile_entries(raw_entries)
 
-        if not name or name in seen:
-            continue
-        seen.add(name)
-        profile_names.append(name)
 
-        if test_ids:
-            cleaned_ids = sorted({str(t).strip() for t in test_ids if str(t).strip()})
-            if cleaned_ids:
-                per_profile_filters[name] = {"test_id": cleaned_ids}
-    return profile_names, per_profile_filters
+def _load_profile_selection(profiles_file: str | None = None, smoke: str | None = None) -> tuple:
+    """Profiles and per-profile test_id filters from --smoke or --profiles-file."""
+    if smoke:
+        return load_smoke_selection(smoke)
+    return _load_profiles_from_file(profiles_file)
 
 
 def _write_profiles_file(profiles_file: str, profile_names: list, per_profile_filters: dict = None) -> bool:

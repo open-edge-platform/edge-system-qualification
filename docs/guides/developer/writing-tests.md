@@ -23,6 +23,7 @@ Because the type is profile-driven, a test does not need every file. Create only
 | `test_<name>.py` | Required | Required | Required | Test implementation |
 | Profile YAML | Required | Required | Required | Test parameters, devices, and (for qualification) KPI references |
 | `config.yml` | Optional | Optional | Required | Shared KPI **definitions** only |
+| `smoke.yml` | Recommended | Recommended | Recommended | Quick minimum tests per device ([Smoke Tests](#smoke-tests)) |
 
 Key rules:
 
@@ -78,6 +79,7 @@ src/esq/suites/
 └── my_domain/
     └── my_feature/
         ├── config.yml          # KPI definitions — required for qualification only
+        ├── smoke.yml           # Smoke tests — recommended (see Smoke Tests)
         └── test_my_feature.py  # Test implementation — always required
 
 # In a custom extension package:
@@ -85,6 +87,7 @@ src/your_package/suites/
 └── my_domain/
     └── my_feature/
         ├── config.yml          # KPI definitions — required for qualification only
+        ├── smoke.yml           # Smoke tests — recommended (see Smoke Tests)
         └── test_my_feature.py  # Test implementation — always required
 ```
 
@@ -328,7 +331,76 @@ esq -d run -nc --profile profile.horizontal.my_feature
 
 # Override a runtime parameter for this run only
 ENV_SUITE_MY_TEST_DURATION_SECONDS=60 esq -v run --profile profile.horizontal.my_feature
+
+# Run the smoke tests of your sub-suite (or of one test in it)
+esq -v run --smoke my_domain/my_feature
+esq -v run --smoke my_domain/my_feature/test_my_feature
 ```
+
+---
+
+## Smoke Tests
+
+`smoke.yml` lists the minimum set of tests that shows a sub-suite still works on every device it supports. Run
+it before you push, instead of the whole profile:
+
+```bash
+esq -v run --smoke ai/gen                       # every test in the sub-suite
+esq -v run --smoke ai/gen/test_text_generation  # one test
+esq -v run --smoke all                          # every sub-suite (slow)
+```
+
+`--smoke` resolves the sub-suite in any installed package (ESQ or sysagent core), so you never type a
+site-packages path. It loads the file through the same selection logic as `--profiles-file`, and it can be
+combined with `--filter`, `-nc` and other run options, but not with `--profile`, `--tag`, `--profiles-file` or
+`--suite`. Smoke entries run without their profile's `depends_on` profiles.
+
+### Writing `smoke.yml`
+
+Place it next to the test files. `tests` maps each test file name (without `.py`) to profile entries, in the
+same `name` / `test_ids` form as a [profiles file](profiles-file.md):
+
+```yaml
+# src/<package>/suites/my_domain/my_feature/smoke.yml
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+tests:
+  test_my_feature:  # smallest model, every device
+    - name: profile.horizontal.my_feature
+      test_ids:
+        - MYF-FEA-001  # CPU (~1 min)
+        - MYF-FEA-002  # iGPU (~1 min)
+        - MYF-FEA-003  # NPU
+```
+
+Choose the entries this way:
+
+1. Cover every device the test supports (CPU, iGPU, dGPU, NPU, hetero), one entry per device.
+2. Pick the fastest variant for each device: the smallest model, the shortest duration, a single stream.
+3. Prefer horizontal profiles without `depends_on`. Use a qualification or vertical profile only when the test
+   has no other profile.
+4. Omit `test_ids` only when the whole profile is already quick.
+5. Note the approximate time per entry in a comment, so reviewers can see the cost.
+
+Update `smoke.yml` when you add a test, a device, or a profile that replaces the listed one. Every `smoke.yml` is
+validated in CI; an unknown profile or test ID fails the **Verify Test Benchmark Status** check.
+
+### How CI uses it
+
+The Test Benchmark workflow runs only what a pull request affects:
+
+| Change | What runs |
+|--------|-----------|
+| Profile YAML | The whole profile, with its `depends_on` profiles |
+| Test, helper, container or data file of a sub-suite | Smoke tests of the affected tests |
+| Shared util or framework module | Smoke tests of the tests that import it, directly or indirectly |
+| Plugins, CLI, config loading, reporting, dependencies | Smoke tests of every sub-suite |
+| Docs, unit tests, agent files | Nothing; the check passes without a run |
+
+When a test has no smoke entries, CI runs one whole profile that uses it instead, which is slower. When a pull
+request matches several rows, the selections are combined and the widest one wins per profile: a whole profile
+beats a list of test IDs. The full rules are in `.github/scripts/README.md` in the source repository.
 
 ---
 

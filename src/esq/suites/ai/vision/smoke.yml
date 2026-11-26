@@ -1,0 +1,27 @@
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+# Smoke tests: the minimum set of tests that shows this sub-suite still works on every
+# device it supports, chosen to finish quickly (smallest model, shortest variant).
+# Run them with: esq run --smoke ai/vision[/<test_name>]
+# CI runs them when this sub-suite, or framework code it imports, changes.
+# Times are approximate, from a full Test Benchmark run on a mainstream runner
+# (the first test of a profile also includes image builds and downloads).
+
+tests:
+  test_dlstreamer:  # shortest DL Streamer profile (1080p15 H.264 YOLO11n), every device
+    - name: profile.horizontal.ai.vision-vrb
+      test_ids:
+        - VSN-VRB-002  # CPU (~5 min)
+        - VSN-VRB-003  # iGPU (~1.5 min)
+        - VSN-VRB-004  # dGPU
+        - VSN-VRB-005  # NPU
+  test_ov_benchmark:  # small model (mobilenet-v2-pytorch INT8), every device the profile covers
+    - name: profile.horizontal.ai.vision-ov
+      test_ids:
+        - VSN-OBM-010  # iGPU (~3 min)
+        - VSN-OBM-011  # dGPU
+        - VSN-OBM-012  # NPU
+  test_video_analytics:  # light workload, all available devices in one test
+    - name: profile.horizontal.ai.vision-va
+      test_ids: [VSN-LIGHT-001]  # ~10 min

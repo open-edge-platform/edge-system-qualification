@@ -1,0 +1,31 @@
+# Copyright (C) 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+#
+# Smoke tests: the minimum set of tests that shows this sub-suite still works on every
+# device it supports, chosen to finish quickly (smallest model, shortest variant).
+# Run them with: esq run --smoke ai/gen[/<test_name>]
+# CI runs them when this sub-suite, or framework code it imports, changes.
+# Times are approximate, from a full Test Benchmark run on a mainstream runner
+# (the first test of a profile also includes image builds and downloads).
+
+tests:
+  test_chatqna_core:  # each backend and device, single prompt
+    - name: profile.horizontal.ai.gen-chatqna-core
+      test_ids:
+        - GEN-CHAT-001  # OpenVINO CPU (~2.5 min)
+        - GEN-CHAT-002  # OpenVINO GPU (~2 min)
+        - GEN-CHAT-003  # Ollama CPU (~2 min)
+  test_text_generation:  # smallest model (DeepSeek-R1-Distill-Qwen-1.5B INT4), every device
+    - name: profile.horizontal.ai.gen-llm
+      test_ids:
+        - GEN-LLM-001  # CPU (~2.5 min)
+        - GEN-LLM-002  # iGPU (~1.5 min)
+        - GEN-LLM-003  # dGPU
+        - GEN-LLM-004  # hetero dGPU
+        - GEN-LLM-005  # NPU
+  test_vlm_prompt:  # shortest load (stream density, 10 s latency target), every device
+    - name: profile.vertical.retail-oa-ta
+      test_ids:
+        - TAO-VLM-004  # CPU (~2 min)
+        - TAO-VLM-005  # iGPU (~3.5 min)
+        - TAO-VLM-006  # dGPU

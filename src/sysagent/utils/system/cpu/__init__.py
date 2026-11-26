@@ -30,6 +30,10 @@ cpuidle
     ``idle_time_pct``) and an aggregate summary dict; integrated into
     ``collect_cpu_info()`` so C-state data appears in the hardware JSON.
 
+procinfo
+    Dependency-free CPU identification (``read_cpu_info()``) from
+    ``/proc/cpuinfo`` with ``lscpu``, sysfs and ``platform`` fallbacks.
+
 info
     Main ``collect_cpu_info()`` orchestrator plus socket-count and
     feature-flag helpers.  Depends on all other sub-modules.

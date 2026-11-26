@@ -76,21 +76,11 @@ def _simplify_cpu_name(name: str) -> str:
 def _get_current_system_cpu() -> str:
     """Return the running system's CPU brand string."""
     try:
-        import cpuinfo
+        from sysagent.utils.system.cpu.procinfo import read_cpu_info
 
-        cpu_data = cpuinfo.get_cpu_info()
-        return str(cpu_data.get("brand_raw", "")).strip() or "Unknown"
+        return str(read_cpu_info().get("brand_raw", "")).strip() or "Unknown"
     except Exception:
-        pass
-    # Fallback: read /proc/cpuinfo directly
-    try:
-        with open("/proc/cpuinfo", "r", encoding="utf-8") as fh:
-            for line in fh:
-                if line.startswith("model name"):
-                    return line.split(":", 1)[1].strip()
-    except Exception:
-        pass
-    return "Unknown"
+        return "Unknown"
 
 
 def _add_platform_legend_box(
